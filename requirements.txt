@@ -1,0 +1,29 @@
+# Core dependencies
+requests>=2.31.0
+openpyxl>=3.1.0
+
+# Database (for future phases)
+sqlalchemy>=2.0.0
+
+# Testing
+pytest>=7.4.0
+pytest-cov>=4.1.0
+pytest-mock>=3.11.0
+
+# Data analysis (for future phases)
+pandas>=2.0.0
+
+# Visualization (for future phases)
+matplotlib>=3.7.0
+plotly>=5.17.0
+
+# Web API (for future phases)
+fastapi>=0.100.0
+uvicorn>=0.23.0
+pydantic>=2.0.0
+
+# ML (for future phases)
+scikit-learn>=1.3.0
+
+# Utils
+python-dotenv>=1.0.0
