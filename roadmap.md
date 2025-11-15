@@ -1,0 +1,640 @@
+# PoE Price Checker - Development Roadmap
+**Project Vision:** Over-engineered, portfolio-worthy PoE economy tool supporting both PoE1 & PoE2
+
+## 🎯 PROJECT GOALS
+
+### Primary Objectives
+1. **Learning Experience:** Deep dive into Python architecture, APIs, databases, plugins
+2. **Portfolio Piece:** Demonstrate professional development practices
+3. **Practical Tool:** Actually useful for PoE trading and economy analysis
+4. **Expandability:** Plugin system for community contributions
+
+### Success Criteria
+- [ ] Supports both PoE1 and PoE2 seamlessly
+- [ ] 5+ data sources integrated
+- [ ] Plugin system with 3+ example plugins
+- [ ] Sales tracking with price learning
+- [ ] Web API + documentation
+- [ ] 80%+ test coverage
+- [ ] Clean, documented code reviewable by other LLMs
+
+## 📊 FEATURE BREAKDOWN
+
+### ✅ Phase 1: Foundation & Refactoring (CURRENT)
+
+**Week 1-2: Infrastructure**
+- [x] PyCharm setup
+- [x] Initial working GUI
+- [ ] Git initialization
+- [ ] GitHub repository creation
+- [ ] Project structure refactoring
+- [ ] CONTEXT.md (this file)
+- [ ] requirements.txt
+- [ ] .gitignore setup
+
+**Week 2-3: Core Architecture**
+- [ ] `base_api.py` - Abstract API client with:
+  - Rate limiting (exponential backoff)
+  - Response caching (TTL-based)
+  - Error handling & retries
+  - Request logging
+  - User-Agent management
+- [ ] `database.py` - SQLite wrapper:
+  - Connection pooling
+  - Migration system
+  - Transaction management
+  - Query helpers
+- [ ] `game_version.py` - PoE1/PoE2 enum
+- [ ] `config.py` - Enhanced config with validation
+- [ ] `item_parser.py` - Refactored parser with tests
+
+**Week 3-4: Data Sources - Pricing**
+- [ ] `poe_ninja.py` - PoE1 pricing (refactor existing)
+- [ ] `poe2_scout.py` - PoE2 pricing integration
+  - Swagger API client generation
+  - Error handling for beta API changes
+  - Fallback to manual trade searches
+- [ ] `poe_watch.py` - Historical pricing
+  - Time-series data storage
+  - Trend analysis helpers
+
+**Deliverable:** Working multi-source price checker with database persistence
+
+---
+
+### 🔌 Phase 2: Plugin System (Weeks 5-7)
+
+**Core Plugin Infrastructure**
+- [ ] `base_plugin.py` - Plugin interface:
+  ```python
+  class PluginBase(ABC):
+      def initialize(app_context)
+      def on_item_checked(item_data)
+      def on_price_update(price_data)
+      def on_sale_recorded(sale_data)
+      def get_config_schema()
+      def shutdown()
+  ```
+- [ ] `plugin_manager.py` - Discovery & lifecycle:
+  - Auto-discover plugins in `/plugins` directory
+  - Dependency resolution
+  - Enable/disable via GUI
+  - Config UI generation from schema
+  - Sandbox/safety checks
+- [ ] Plugin database table for state persistence
+
+**Example Plugins (to demonstrate system)**
+1. **Price Alert Plugin**
+   - Monitor specific items
+   - Webhook to Discord/Telegram when price drops
+   - Configurable thresholds
+   - Alert history tracking
+
+2. **Export Plugin**
+   - Additional export formats (CSV, JSON, Google Sheets)
+   - Scheduled exports
+   - Cloud backup integration
+
+3. **Statistics Plugin**
+   - Dashboard with charts (matplotlib/plotly)
+   - Profit/loss tracking
+   - Item flip suggestions
+
+**Deliverable:** Plugin system with 3 working plugins, GUI management
+
+---
+
+### 📈 Phase 3: Sales Tracking & Price Learning (Weeks 8-10)
+
+**Sales Recording System**
+- [ ] GUI for recording sales:
+  - Link checked item → sale record
+  - Quick entry form (sold/not sold after 72h)
+  - Batch processing
+  - Import from clipboard (trade whispers)
+- [ ] Automated tracking (future):
+  - Parse Client.txt for trade whispers
+  - Match whispers to listed items
+  - Auto-record completed trades
+
+**Price Learning Algorithm**
+- [ ] Statistical analysis:
+  - Compare poe.ninja price vs actual sale price
+  - Time-to-sale correlation with price
+  - Identify underpriced items (sold in <1 hour)
+  - Identify overpriced items (no sale in 72h)
+- [ ] Machine learning (stretch):
+  - Feature extraction: item stats, league age, meta relevance
+  - Predict optimal listing price
+  - Confidence intervals
+  - Model: scikit-learn Random Forest or XGBoost
+
+**Deliverable:** Sales tracking UI, basic price adjustment recommendations
+
+---
+
+### 🎮 Phase 4: Meta Analysis from PoB (Weeks 11-13)
+
+**PoB Parser Integration**
+- [ ] Parse PoB links/files:
+  - Decode base64 XML
+  - Extract required item affixes
+  - Identify gear slots with needs
+  - Life/ES/Resist thresholds
+  - Damage scaling stats (+gem levels, etc.)
+- [ ] Meta database:
+  - Store popular build requirements
+  - Weight affixes by build popularity
+  - Track meta shifts over time
+
+**Smart Item Scoring**
+- [ ] Affix matching engine:
+  - Score items based on meta relevance
+  - "This item is 9/10 for RF builds"
+  - Highlight undervalued rares
+- [ ] Build recommendation:
+  - "Good for: Righteous Fire, RF/Scorching Ray"
+  - Link to build guides
+
+**Data Sources for Builds**
+- [ ] poe.ninja builds endpoint
+- [ ] Manual PoB import (user-provided)
+- [ ] Scrape popular streamers/content creators (with respect)
+
+**Deliverable:** Meta-aware pricing, rare item evaluation
+
+---
+
+### 🌐 Phase 5: Official Trade API Integration (Weeks 14-16)
+
+**Trade API Client**
+- [ ] OAuth 2.1 implementation:
+  - Client registration with GGG
+  - Authorization flow (web-based)
+  - Token refresh handling
+  - Scope management
+- [ ] Trade search:
+  - Query builder UI
+  - Advanced filtering (mods, sockets, links)
+  - Live search results
+  - Price comparison
+- [ ] Listing creation (future):
+  - Post items to trade site
+  - Update prices
+  - Delist items
+
+**Use Cases**
+- Generate trade URLs for items
+- Real-time price comparison
+- Arbitrage detection (price differences between sellers)
+- Market depth analysis
+
+**Deliverable:** Trade search integration, OAuth setup guide
+
+---
+
+### 🖼️ Phase 6: Computer Vision (Weeks 17-19)
+
+**OCR Item Recognition**
+- [ ] Screenshot capture:
+  - Hotkey to screenshot stash tab
+  - Crop to individual items
+  - Grid detection
+- [ ] Text extraction:
+  - pytesseract for OCR
+  - Image preprocessing (contrast, noise reduction)
+  - Template matching for icons
+- [ ] Bulk processing:
+  - Screenshot quad tab → price all 24 items
+  - Export to spreadsheet
+  - Flag valuable items
+
+**Image Processing Pipeline**
+```
+Screenshot → Preprocessing → OCR → Parser → Price Lookup → UI Display
+```
+
+**Challenges & Solutions**
+- Low contrast text: Adaptive thresholding
+- Various resolutions: Scale normalization
+- Non-English clients: Multi-language OCR models
+
+**Deliverable:** Screenshot-to-price workflow
+
+---
+
+### 🌍 Phase 7: Web Dashboard & API (Weeks 20-23)
+
+**REST API (FastAPI)**
+- [ ] Endpoints:
+  - `GET /api/items/{id}` - Item details
+  - `POST /api/items/check` - Price check
+  - `GET /api/sales` - Sales history
+  - `GET /api/trends/{item}` - Price trends
+  - `POST /api/plugins/{name}/execute` - Trigger plugin
+- [ ] Authentication:
+  - API key generation
+  - Rate limiting per key
+  - Usage tracking
+- [ ] Documentation:
+  - Auto-generated Swagger/OpenAPI
+  - Example requests
+  - SDKs (Python client)
+
+**Web Frontend (React or Vue)**
+- [ ] Dashboard views:
+  - Price checker interface
+  - Sales tracking
+  - Charts & graphs (Chart.js)
+  - Plugin management
+- [ ] Mobile responsive
+- [ ] Real-time updates (WebSocket)
+
+**Deployment Options**
+- Docker container
+- Heroku/Railway.app (free tier)
+- Self-hosted instructions
+
+**Deliverable:** Web app accessible from any device
+
+---
+
+### 📊 Phase 8: Market Trend Analysis (Weeks 24-26)
+
+**Historical Data Collection**
+- [ ] Automated price snapshots:
+  - Daily price recording for all items
+  - League progression tracking
+  - Volume indicators
+- [ ] Database optimization for time-series:
+  - Indexed by date + item
+  - Aggregation queries
+  - Data retention policy
+
+**Visualization & Insights**
+- [ ] Price charts:
+  - Line graphs (matplotlib or Plotly)
+  - Moving averages
+  - Volatility indicators
+- [ ] Trend detection:
+  - Identify rising/falling items
+  - Meta shift correlation
+  - League start vs mid-league patterns
+- [ ] Flip opportunities:
+  - Buy low, sell high suggestions
+  - Profit margin calculations
+  - Risk assessment
+
+**Export & Sharing**
+- [ ] Report generation (PDF)
+- [ ] Share charts (PNG/SVG)
+- [ ] Public dashboards (read-only API)
+
+**Deliverable:** Economic analysis tools
+
+---
+
+### 🔔 Phase 9: Real-Time Alerts & Webhooks (Weeks 27-28)
+
+**Alert System**
+- [ ] Trigger types:
+  - Price drop below threshold
+  - New item listed matching criteria
+  - Meta build becomes popular
+  - User-defined custom rules
+- [ ] Notification channels:
+  - Discord webhook
+  - Telegram bot
+  - Email (SMTP)
+  - Desktop notifications
+  - In-app alerts
+
+**Webhook Integration**
+- [ ] Outbound webhooks:
+  - Custom URL + payload
+  - Retry logic
+  - Delivery confirmation
+- [ ] Inbound webhooks:
+  - Accept external triggers
+  - Security (HMAC signatures)
+
+**Use Cases**
+- Alert me when Exalted Orb < 100c
+- Notify when "Shavronne's Wrappings" 6-link listed < 5 div
+- Daily summary of sales
+
+**Deliverable:** Multi-channel alert system
+
+---
+
+### 🧪 Phase 10: Testing & Documentation (Weeks 29-30)
+
+**Testing Suite**
+- [ ] Unit tests (pytest):
+  - All parsers
+  - Database operations
+  - API clients (with mocks)
+  - Plugin system
+- [ ] Integration tests:
+  - End-to-end workflows
+  - Database migrations
+  - API endpoints
+- [ ] Mock data:
+  - Sample items
+  - Fake API responses
+  - Test database fixtures
+- [ ] Coverage reporting:
+  - pytest-cov
+  - Target: 80%+ coverage
+
+**Documentation**
+- [ ] User manual:
+  - Installation guide
+  - Feature tutorials
+  - FAQ
+  - Troubleshooting
+- [ ] Developer docs:
+  - Architecture overview
+  - Plugin development guide
+  - API reference
+  - Contributing guidelines
+- [ ] Code documentation:
+  - Docstrings (Google style)
+  - Type hints throughout
+  - Inline comments for complex logic
+
+**Deliverable:** Production-ready with full docs
+
+---
+
+## 🛠️ TECHNICAL STACK
+
+### Core Technologies
+- **Language:** Python 3.12+
+- **GUI:** Tkinter (initial), Web (later)
+- **Database:** SQLite → PostgreSQL (if scaling needed)
+- **API Framework:** FastAPI (web API)
+- **Testing:** pytest, pytest-cov
+- **Version Control:** Git + GitHub
+
+### Key Libraries
+```
+# Core
+requests>=2.31.0
+tkinter (built-in)
+
+# Data
+openpyxl>=3.1.0
+pandas>=2.0.0
+sqlalchemy>=2.0.0
+
+# Web (Phase 7)
+fastapi>=0.100.0
+uvicorn>=0.23.0
+pydantic>=2.0.0
+
+# ML (Phase 3)
+scikit-learn>=1.3.0
+xgboost>=2.0.0
+
+# CV (Phase 6)
+opencv-python>=4.8.0
+pytesseract>=0.3.10
+Pillow>=10.0.0
+
+# Visualization
+matplotlib>=3.7.0
+plotly>=5.17.0
+
+# Testing
+pytest>=7.4.0
+pytest-cov>=4.1.0
+pytest-mock>=3.11.0
+
+# Utils
+python-dotenv>=1.0.0
+pyyaml>=6.0.0
+```
+
+### Development Tools
+- **IDE:** PyCharm
+- **Cloud IDE:** GitHub Codespaces
+- **Linting:** ruff or pylint
+- **Formatting:** black
+- **Type Checking:** mypy
+- **Documentation:** Sphinx or MkDocs
+
+---
+
+## 📁 FINAL PROJECT STRUCTURE
+
+```
+poe-price-checker/
+├── .github/
+│   └── workflows/
+│       ├── tests.yml              # CI/CD
+│       └── deploy.yml
+├── docs/
+│   ├── user_guide.md
+│   ├── developer_guide.md
+│   ├── api_reference.md
+│   └── plugin_tutorial.md
+├── core/
+│   ├── __init__.py
+│   ├── database.py
+│   ├── game_version.py
+│   ├── item_parser.py
+│   ├── config.py
+│   ├── models.py
+│   └── exceptions.py
+├── data_sources/
+│   ├── __init__.py
+│   ├── base_api.py
+│   ├── official/
+│   │   ├── trade_api.py
+│   │   ├── character_api.py
+│   │   ├── oauth_client.py
+│   │   └── public_stash.py
+│   ├── pricing/
+│   │   ├── poe_ninja.py
+│   │   ├── poe2_scout.py
+│   │   └── poe_watch.py
+│   └── wiki/
+│       └── cargo_api.py
+├── plugins/
+│   ├── __init__.py
+│   ├── base_plugin.py
+│   ├── plugin_manager.py
+│   └── examples/
+│       ├── price_alert.py
+│       ├── export_plugin.py
+│       └── stats_plugin.py
+├── gui/
+│   ├── __init__.py
+│   ├── main_window.py
+│   ├── price_checker_tab.py
+│   ├── sales_tracker_tab.py
+│   ├── plugin_manager_tab.py
+│   └── settings_tab.py
+├── web/
+│   ├── __init__.py
+│   ├── api/
+│   │   ├── routes/
+│   │   ├── models.py
+│   │   └── auth.py
+│   ├── frontend/
+│   │   ├── src/
+│   │   ├── public/
+│   │   └── package.json
+│   └── main.py
+├── ml/
+│   ├── __init__.py
+│   ├── price_predictor.py
+│   ├── meta_analyzer.py
+│   └── models/                    # Trained models
+├── cv/
+│   ├── __init__.py
+│   ├── screenshot.py
+│   ├── ocr_engine.py
+│   └── preprocessing.py
+├── tests/
+│   ├── unit/
+│   ├── integration/
+│   ├── fixtures/
+│   └── conftest.py
+├── scripts/
+│   ├── migrate_db.py
+│   ├── seed_data.py
+│   └── benchmark.py
+├── .env.example
+├── .gitignore
+├── CONTEXT.md                     # LLM reference
+├── README.md
+├── requirements.txt
+├── requirements-dev.txt
+├── setup.py
+├── Dockerfile
+├── docker-compose.yml
+└── LICENSE
+```
+
+---
+
+## 🎓 LEARNING OBJECTIVES
+
+### Python Advanced Concepts
+- [ ] Abstract Base Classes (ABC)
+- [ ] Decorators (caching, rate limiting)
+- [ ] Context managers (database connections)
+- [ ] Generators (large dataset processing)
+- [ ] Type hints & mypy
+- [ ] Async/await (web API)
+- [ ] Metaclasses (plugin system)
+
+### Software Engineering
+- [ ] SOLID principles
+- [ ] Design patterns:
+  - Adapter (API clients)
+  - Factory (plugin creation)
+  - Observer (alerts)
+  - Strategy (pricing algorithms)
+  - Singleton (database connection)
+- [ ] Dependency injection
+- [ ] Clean architecture
+
+### Data & ML
+- [ ] SQL optimization
+- [ ] Database indexing
+- [ ] Feature engineering
+- [ ] Model evaluation
+- [ ] Cross-validation
+- [ ] Hyperparameter tuning
+
+### DevOps
+- [ ] Git workflow (feature branches, PR reviews)
+- [ ] CI/CD pipelines
+- [ ] Docker containerization
+- [ ] Environment management
+- [ ] Logging & monitoring
+
+---
+
+## 📅 TIMELINE ESTIMATE
+
+**Total Duration:** ~30 weeks (7-8 months part-time)
+
+**Milestones:**
+- **Month 1:** Foundation complete, refactored codebase
+- **Month 2:** Plugin system working, 3 example plugins
+- **Month 3:** Sales tracking & basic ML
+- **Month 4:** Meta analysis, PoB integration
+- **Month 5:** Trade API, OAuth setup
+- **Month 6:** Computer vision, OCR
+- **Month 7:** Web app MVP
+- **Month 8:** Polish, testing, documentation
+
+**Flexibility:** Phases can overlap, some features optional
+
+---
+
+## 🏆 PORTFOLIO HIGHLIGHTS
+
+**What Makes This Special:**
+1. **Dual-game support** - Unique in ecosystem
+2. **Plugin architecture** - Shows extensibility
+3. **ML integration** - Price prediction
+4. **Full-stack** - Desktop → Web → API
+5. **Real-world problem** - Actually useful
+6. **LLM collaboration** - Novel development approach
+7. **Open source** - Community value
+
+**Talking Points for Interviews:**
+- "Built a modular API aggregator with rate limiting and caching"
+- "Designed a plugin system using ABC and dynamic imports"
+- "Implemented price prediction ML model with 85% accuracy"
+- "Created REST API serving 1000+ req/min"
+- "Integrated computer vision for automated data entry"
+
+---
+
+## 🚀 GETTING STARTED CHECKLIST
+
+### Today (Session 1)
+- [x] Create CONTEXT.md
+- [x] Create ROADMAP.md
+- [ ] Initialize Git repository
+- [ ] Create GitHub repository
+- [ ] Push initial code
+
+### Next Session
+- [ ] Create feature branch: `feature/refactor-architecture`
+- [ ] Build `data_sources/base_api.py`
+- [ ] Implement rate limiting
+- [ ] Write tests for base_api
+
+### This Week
+- [ ] Complete core/ module refactor
+- [ ] Database schema implementation
+- [ ] First migration
+- [ ] Update CONTEXT.md with progress
+
+---
+
+## 📝 NOTES & DECISIONS LOG
+
+### 2025-11-15: Initial Planning
+- Chose SQLite over Postgres for simplicity
+- Decided on plugin system for extensibility
+- Unified PoE1/PoE2 approach confirmed
+- Token-optimized CONTEXT.md created
+- Roadmap established
+
+### Future Decisions
+- [TBD] Web framework: FastAPI vs Flask
+- [TBD] Frontend: React vs Vue vs Svelte
+- [TBD] ML library: scikit-learn vs PyTorch
+- [TBD] Deployment: Self-hosted vs Cloud
+
+---
+
+**For LLM:** This is the master plan. Reference this for feature priorities, technical decisions, and implementation order. Update as we complete phases.
