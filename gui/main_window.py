@@ -288,6 +288,22 @@ class PriceCheckerGUI:
 
         self.tree.pack(fill=tk.BOTH, expand=True)
 
+        # Context menu for copying from results
+        self.tree_menu = tk.Menu(self.root, tearoff=0)
+        self.tree_menu.add_command(
+            label="Copy Item Name",
+            command=self._copy_item_name,
+        )
+        self.tree_menu.add_command(
+            label="Copy Row (tab-separated)",
+            command=self._copy_row_tsv,
+        )
+
+        # Right-click on row
+        self.tree.bind("<Button-3>", self._on_tree_right_click)
+        # Ctrl+C to copy row as TSV
+        self.tree.bind("<Control-c>", self._on_tree_ctrl_c)
+
         # Status bar
         status_frame = ttk.Frame(self.root)
         status_frame.pack(fill=tk.X, padx=10, pady=(0, 5))
@@ -623,6 +639,73 @@ class PriceCheckerGUI:
         """Handle <<Paste>> into the text box and auto-check after paste."""
         # Let the default paste complete, then check
         self.root.after(10, self._auto_check_if_not_empty)
+
+    # ---------- Result copying helpers ----------
+
+    def _get_selected_row(self) -> tuple[str, str, str, str, str, str] | None:
+        """
+        Return the currently selected row's values as a tuple:
+        (item_name, rarity, stack, chaos, divine, total)
+        """
+        selection = self.tree.selection()
+        if not selection:
+            return None
+
+        iid = selection[0]
+        item = self.tree.item(iid)
+        values = item.get("values", [])
+        if len(values) < 6:
+            return None
+
+        # values order: Item, Rarity, Stack, Chaos, Divine, Total
+        return tuple(values[:6])  # type: ignore[return-value]
+
+    def _copy_row_tsv(self, event: tk.Event | None = None) -> None:
+        """Copy the selected row as tab-separated text to the clipboard."""
+        row = self._get_selected_row()
+        if not row:
+            return
+
+        text = "\t".join(str(v) for v in row)
+        self._copy_to_clipboard(text)
+        self.status_var.set("Copied row to clipboard.")
+
+    def _copy_item_name(self) -> None:
+        """Copy just the item name from the selected row."""
+        row = self._get_selected_row()
+        if not row:
+            return
+
+        item_name = row[0]
+        self._copy_to_clipboard(item_name)
+        self.status_var.set(f"Copied item name: {item_name}")
+
+    def _copy_to_clipboard(self, text: str) -> None:
+        """Helper to put text on the system clipboard."""
+        try:
+            self.root.clipboard_clear()
+            self.root.clipboard_append(text)
+            # update() helps keep the clipboard content after the app closes
+            self.root.update()
+        except Exception:
+            pass
+
+    def _on_tree_right_click(self, event: tk.Event) -> None:
+        """Right-click: select the row under cursor and show context menu."""
+        row_id = self.tree.identify_row(event.y)
+        if row_id:
+            # Change selection to the row under the cursor
+            self.tree.selection_set(row_id)
+            self.tree.focus(row_id)
+            try:
+                self.tree_menu.tk_popup(event.x_root, event.y_root)
+            finally:
+                self.tree_menu.grab_release()
+
+    def _on_tree_ctrl_c(self, event: tk.Event) -> str:
+        """Ctrl+C on the tree: copy row as TSV."""
+        self._copy_row_tsv()
+        return "break"
 
     def _on_ctrl_v(self, event: tk.Event | None = None) -> str:
         """Normalize Ctrl+V to <<Paste>> and prevent double-paste."""
