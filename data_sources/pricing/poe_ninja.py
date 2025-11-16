@@ -291,7 +291,9 @@ if __name__ == "__main__":
         print(f"Current league: {current_league}")
 
         # Test divine orb price
-        divine_data = api.find_item_price("Divine Orb", rarity="CURRENCY")
+        currency_data = api.get_currency_overview()
+        divine_data = next((item for item in currency_data.get("lines", [])
+                            if "divine" in item.get("currencyTypeName", "").lower()), None)
         if divine_data:
             print(f"Divine Orb: {divine_data.get('chaosEquivalent', 'N/A')} chaos")
 
