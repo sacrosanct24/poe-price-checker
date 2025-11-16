@@ -760,5 +760,148 @@ poe-price-checker/
 - [TBD] Deployment: Self-hosted vs Cloud
 
 ---
+Phase 1 — GUI Refactor & Polish (Updated 2025-11-16)
+✔ Completed
+
+Full GUI refactor into gui/main_window.py
+
+Moved entry point to main.py with clean run_app()
+
+Added:
+
+Paste auto-detect (<<Paste>> → triggers price check automatically)
+
+Better menu system + placeholders for future functionality
+
+Help/Links menu (GGG, PoEDB, Maxroll, etc.)
+
+“Open Log File” & “Open Config Folder” file-ops helpers
+
+Status bar reads active league + window state
+
+Implemented full application logging
+
+Located in: ~/.poe_price_checker/app.log
+
+Rotating logs supported
+
+Colorized console output
+
+Unified logging for GUI, DB, config, and API clients
+
+Added:
+
+About… dialog
+
+Auto-paste → auto-check flow
+
+Tk callback signature cleanup
+
+Ensured tree results support Ctrl+C copy-to-clipboard
+
+Removed unstable dark mode implementation pending full theme system
+
+🧪 Verified Behaviors
+
+Prices validated for various categories (currency, uniques, maps)
+
+Chaos Orb fallback logic functioning
+
+No blocking UI operations
+
+Clean exit → saves window size + closes database safely
+
+Logging works across all modules
+
+🐞 Known Issues / Backlog
+
+Chaos Orb behaviour still quirky when poe.ninja returns odd values
+→ Added a fallback constant 1c
+→ Will revisit during API validation pass
+
+CPU usage spikes slightly during large paste operations
+→ Future: thread off heavy operations
+
+Dark mode needs real ttk-theming (use ttkbootstrap or custom themes)
+
+📘 CONTEXT.md Updates
+
+Add to "Current Immediate Issues" or "Debugging Notes" section:
+
+GUI Polish + Logging (Nov 2025 Update)
+
+Completed full GUI structural refactor
+
+Implemented robust logging system (app.log in the user config directory)
+
+Added user help menus + file-open utilities
+
+Added About dialog
+
+Ensured tree supports copy/paste
+
+Added autopaste → price check callback
+
+Next UI steps:
+
+Migrate long-running price-check calls onto a worker thread
+→ prevents GUI freeze
+
+Add unified theme manager (switch light/dark)
+
+Create a Results → “Export to Excel / CSV” menu
+
+Plugin manager UI (enable/disable plugins, plugin list)
+
+Eventually embed PoE icon/branding
+
+Keyboard shortcuts: Ctrl+L (clear), Ctrl+E (export), Ctrl+R (refresh)
+
+🧭 END-OF-SESSION SUMMARY (Paste Into Progress Log)
+
+Date: 2025-11-16
+Session: GUI Polish + Logging + Quality of Life
+
+Work Completed
+
+Cleaned up UI including:
+
+Paste detection
+
+Menus
+
+Help links
+
+About dialog
+
+Log and config file open helpers
+
+Implemented complete logging subsystem
+
+Improved price checking logic for currency
+
+Removed broken dark mode
+
+Set up progress markers for next session
+
+Blockers
+
+Chaos Orb logic occasionally bypasses fallback — needs deeper inspection
+
+GUI still synchronous — threading recommended
+
+Dark theme will require dedicated styling library
+
+Next Steps (First Tasks Next Session)
+
+Add background worker threads for price checking
+
+Create Export to Excel / CSV feature
+
+Build Plugin Manager UI
+
+Add “View Recent Checks” window (DB → table popup)
+
+Stabilize currency fallback logic
 
 **For LLM:** This is the master plan. Reference this for feature priorities, technical decisions, and implementation order. Update as we complete phases.
