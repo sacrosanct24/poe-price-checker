@@ -2,6 +2,9 @@
 PoE.ninja API client for Path of Exile 1 pricing data.
 Inherits from BaseAPIClient for rate limiting and caching.
 """
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from typing import Optional, Dict, List, Any
 from data_sources.base_api import BaseAPIClient
