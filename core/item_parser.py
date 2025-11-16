@@ -214,6 +214,12 @@ class ItemParser:
                     item.item_level = int(line.split(':', 1)[1].strip())
                 except ValueError:
                     pass
+            # Stack Size (currency and stacks)
+            elif line.startswith('Stack Size:'):
+                match = re.search(r'(\d+)/(\d+)', line)
+                if match:
+                    item.stack_size = int(match.group(1))
+                    item.max_stack_size = int(match.group(2))
 
             # Quality
             elif line.startswith('Quality:'):
@@ -303,8 +309,8 @@ class ItemParser:
         Returns:
             List of ParsedItem objects
         """
-        # Split by double newlines or "Rarity:" or "Stack Size:" markers
-        items_text = re.split(r'\n\s*\n+|(?=Rarity:)|(?=Stack Size:)', bulk_text)
+        # Split by double newlines or "Rarity:" markers
+        items_text = re.split(r'\n\s*\n+|(?=Rarity:)', bulk_text)
         items_text = [text.strip() for text in items_text if text.strip()]
 
         parsed_items = []

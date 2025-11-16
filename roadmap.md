@@ -192,6 +192,130 @@
 **Deliverable:** Trade search integration, OAuth setup guide
 
 ---
+### 🔧 Debugging Task: Chaos Orb Matching / Parsing Issue
+
+Status: Known Issue • Low Priority (workaround active)
+Category: Parser Accuracy / Currency Matching
+Severity: Low (Chaos Orb always = 1c by definition)
+ETA: Phase 4 or Phase 5
+
+🛑 Problem Summary
+
+Chaos Orbs currently fail to match poe.ninja’s "currencyTypeName": "Chaos Orb" entry under certain parsing conditions. This results in:
+
+Missing chaos values in the grid
+
+Correct behavior for all other currencies (Divine, Exalted, Alchemy, Fusing, etc.)
+
+Chaos Orb only appearing correctly due to a temporary hard-coded fallback
+
+This inconsistency indicates a mismatch between the extracted item name/base type and poe.ninja’s currency names, likely due to subtle formatting differences.
+
+💡 Suspected Root Causes
+
+ItemParser may produce slightly inconsistent item.base_type / item.name for Chaos Orbs:
+
+case differences
+
+hidden whitespace
+
+unicode clipboard characters
+
+parse_multiple split behavior may fragment currency blocks in certain edge cases
+
+fuzzy match logic may be too strict or too loose at different stages
+
+normalization inconsistencies ("chaos orb" vs "Chaos Orb" vs "chaos")
+
+✅ Temporary Fix (Implemented)
+
+Chaos Orb is currently handled via a reliable special case:
+
+if key in ("chaos orb", "chaos"):
+    return {
+        "currencyTypeName": "Chaos Orb",
+        "chaosEquivalent": 1.0,
+        "chaosValue": 1.0
+    }
+
+
+This is legitimate because Chaos Orb defines the chaos economy (always = 1c).
+
+🎯 Long-Term Fix Plan
+1. Add Debug Tracing
+
+Enhance _lookup_price() to print unmatched currency keys:
+
+Record normalized key
+
+Log the first 10 poe.ninja currencyTypeName values
+
+Identify exactly why Chaos fails matching
+
+2. Normalize Item Data Consistently
+
+Implement a shared helper:
+
+normalize(name: str) -> str
+
+
+That performs:
+
+.lower()
+
+unicode normalization
+
+whitespace collapse
+
+punctuation trimming
+
+Use this everywhere in:
+
+ItemParser
+
+PoeNinjaAPI
+
+Currency matcher
+
+3. Improve Currency Matching Logic
+
+Refactor the matching steps:
+
+Step 1: strict equality
+
+Step 2: trimmed equality
+
+Step 3: normalized equality
+
+Step 4: controlled fuzzy match (word boundary match)
+
+Step 5: fallback to special cases
+
+4. Add Unit Tests
+
+Create explicit tests for:
+
+"Chaos Orb"
+
+"chaos"
+
+Copy-pasted in-game Chaos Orb text
+
+Mixed-case / whitespace variants
+
+Edge cases involving multiple items in clipboard
+
+5. Remove Temporary Hard-Code (Optional)
+
+Once normalization + tests guarantee match correctness, retire the fallback.
+
+📌 Priority Justification
+
+Chaos Orb will continue to work correctly due to the special-case fallback.
+Other currencies are unaffected.
+Thus, this is a quality-of-implementation fix, not an end-user blocker.
+
+Best addressed after core features are complete (Phase 4–5).
 
 ### 🖼️ Phase 6: Computer Vision (Weeks 17-19)
 
