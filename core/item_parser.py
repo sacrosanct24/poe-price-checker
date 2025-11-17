@@ -130,6 +130,11 @@ class ItemParser:
             logger.warning("Empty item text")
             return None
 
+        # Validate minimum length
+        if len(item_text.strip()) < 10:
+            logger.warning("Item text too short to be valid")
+            return None
+
         try:
             lines = [line.strip() for line in item_text.strip().split('\n')]
 
@@ -145,6 +150,19 @@ class ItemParser:
 
             # Parse body sections (separated by dashes)
             self._parse_body(lines[line_index:], item)
+            # Validate that we parsed something meaningful
+            has_valid_structure = (
+                    item.rarity is not None or
+                    item.stack_size > 1 or
+                    item.item_level is not None or
+                    len(item.explicits) > 0 or
+                    len(item.implicits) > 0 or
+                    item.quality is not None
+            )
+
+            if not has_valid_structure:
+                logger.warning(f"No valid PoE item structure detected in: {item_text[:50]}...")
+                return None
 
             logger.debug(f"Parsed item: {item.get_display_name()} ({item.rarity})")
             return item
@@ -288,12 +306,17 @@ class ItemParser:
                 if any(skip in line for skip in ['Requirements:', 'Level:', 'Str:', 'Dex:', 'Int:']):
                     continue
 
-                # Enchant
-                if '(enchant)' in line.lower():
-                    item.enchants.append(line.replace('(enchant)', '').strip())
+                    # Enchant
+                elif '(enchant)' in line.lower():
+                    clean_line = line.replace('(enchant)', '').replace('(Enchant)', '').strip()
+                    if clean_line:
+                        item.enchants.append(clean_line)
                 # Implicit
                 elif '(implicit)' in line.lower():
-                    item.implicits.append(line.replace('(implicit)', '').strip())
+                    clean_line = line.replace('(implicit)', '').replace('(Implicit)', '').strip()
+                    if clean_line:
+                        item.implicits.append(clean_line)
+
                 # Explicit mod
                 else:
                     item.explicits.append(line)
