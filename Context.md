@@ -377,4 +377,211 @@ class PluginManager:
 7. Update CONTEXT.md as we progress
 
 ---
+PoE Price Checker – Master Context File (Updated)
+1. Project Overview
+
+The project is a Python-based price checking and item parsing tool for Path of Exile.
+It includes:
+
+Config management (core/config.py)
+
+SQLite persistence (core/database.py)
+
+POE item text parser (core/item_parser.py)
+
+Game configuration types (core/game_version.py)
+
+A growing test suite (58+ tests)
+
+The goal: a reliable, cross-version PoE item price checker with plugin support and GUI integration in the future.
+
+2. Current Architecture Summary
+Configuration Layer (core/config.py)
+
+Responsible for:
+
+Loading/saving JSON config
+
+Managing per-game settings (PoE1/PoE2)
+
+UI preferences (min chaos, window size, vendor visibility)
+
+API settings (auto-detect league)
+
+Plugin enable/disable
+
+Resetting config to defaults
+
+Ensuring deep-copy of defaults (no test contamination)
+
+Status: Fully refactored and stable.
+
+Database Layer (core/database.py)
+
+SQLite-backed storage for:
+
+Recent item checks
+
+Sales & completion times
+
+Price history snapshots
+
+Plugin state + config
+
+Stats aggregation
+
+Schema versioning
+
+Timestamp normalization to UTC
+
+Safe transaction wrapper
+
+Deterministic ordering for checked items
+
+Status: Fully refactored and stable.
+
+Item Parsing Layer (core/item_parser.py)
+
+Parses POE clipboard text into ParsedItem objects:
+
+Rarity
+
+Name / base type
+
+Item level / quality
+
+Requirements block
+
+Sockets & links
+
+Influences (Shaper, Elder, Exarch, etc.)
+
+Flags (Corrupted, Fractured, Synthesised, Mirrored)
+
+Implicit, explicit, enchant mods
+
+Multi-item parsing (parse_multiple)
+
+Status: Fully refactored and stable.
+
+3. Test Suite Summary (58+ tests)
+Covers:
+
+Config defaults, persistence, deep-copy isolation
+
+Multi-game settings transitions
+
+UI preference persistence
+
+API flag persistence
+
+Plugin enable/disable/config storage
+
+Database filters (game, league, sold-only, etc.)
+
+Sales time normalization (UTC-safe)
+
+Price history retrieval & ordering
+
+Item parser: implicit, explicit, enchant, requirements, sockets, links, influences
+
+Validity checks for malformed text
+
+Everything passes after refactor.
+
+4. Known Good State
+
+As of the last commit:
+
+All tests pass across all modules
+
+Behavior remains backward compatible
+
+Refactored modules are cleaner, modular, and extensible
+
+Developer workflow validated through PyCharm + pytest
+
+Ready for future features: GUI, plug-ins, async fetchers, schema upgrades
+
+5. Your Workflow Preferences
+
+You want clean, maintainable code, not just “it works.”
+
+You like deep refactors when the tests guarantee safety.
+
+You prefer short, actionable commit messages for version control.
+
+You rely on ChatGPT as a pair programmer and expect output that can be pasted directly into PyCharm.
+
+You want ChatGPT to:
+
+maintain high context continuity
+
+provide safe refactors
+
+design additional tests
+
+produce standalone files for copy/paste
+
+help with PRs, summaries, changelogs, and architecture decisions
+
+6. Next Steps You’ve Expressed Interest In
+
+You haven’t chosen yet, but future tasks may include:
+
+Potential Phase 4: Project Polish
+
+Add pyproject.toml packaging
+
+Consistent logging
+
+Type hinting across modules
+
+Black/Ruff/Isort formatting profile
+
+Coverage config
+
+Potential Phase 5: More Tests
+
+Integration tests across config→parser→database
+
+Schema-migration tests
+
+Multi-item parsing edge cases
+
+Plugin system round-trip expansion
+
+Potential Phase 6: Performance Improvements
+
+Prepared SQLite statements
+
+Caching strategies
+
+Parser speedups
+
+Bulk inserts
+
+Async API fetchers via asyncio
+
+Potential Phase 7: Feature Development
+
+GUI (Tkinter or PyQt)
+
+Plugin interfaces
+
+Pricing engine enhancements
+
+PoE2-specific logic separation
+
+UI theme/layout updates
+
+7. How to use this Context File in the Future
+
+If starting a new session:
+
+“Load this context file for the PoE Price Checker project:”
+[Paste everything from “PoE Price Checker – Master Context File” onward]
+
+I will restore full continuity immediately.
+
 **For LLM:** This document contains ALL critical context. Read this first on new sessions. Key sections: Gotchas (rate limits!), Architecture, Database Schema, Data Sources.
