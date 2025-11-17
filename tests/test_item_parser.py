@@ -193,6 +193,89 @@ def test_parser_should_validate_minimum_structure():
             )
             # For truly invalid text, this should be False
 
+def test_parse_requirements_section(parser):
+    text = """Rarity: RARE
+Doom Visor
+Hubris Circlet
+--------
+Item Level: 84
+--------
+Requirements:
+Level: 70
+Str: 10
+Dex: 20
+Int: 154
+"""
+    item = parser.parse(text)
+    assert item is not None
+    assert item.requirements["level"] == 70
+    assert item.requirements["str"] == 10
+    assert item.requirements["dex"] == 20
+    assert item.requirements["int"] == 154
+
+def test_parse_sockets_and_links(parser):
+    text = """Rarity: RARE
+Doom Visor
+Hubris Circlet
+--------
+Sockets: R-G-B R-R
+"""
+    item = parser.parse(text)
+    assert item is not None
+    assert item.sockets == "R-G-B R-R"
+    # "R-G-B" = 3 linked, "R-R" = 2 linked → max group size 3
+    assert item.links == 3
+
+def test_parse_influences_normalized(parser):
+    text = """Rarity: RARE
+Doom Visor
+Hubris Circlet
+--------
+Item Level: 84
+Searing Exarch Item
+Eater of Worlds Item
+Shaper Item
+"""
+    item = parser.parse(text)
+    assert item is not None
+    # 'Searing Exarch' → 'Exarch', 'Eater of Worlds' → 'Eater', 'Shaper' stays 'Shaper'
+    assert set(item.influences) == {"Exarch", "Eater", "Shaper"}
+
+def test_parse_flags_corrupted_fractured_synth_mirrored(parser):
+    text = """Rarity: UNIQUE
+Awesome Item
+Awesome Base
+--------
+Item Level: 86
+--------
+Fractured Item
+Synthesised Item
+Mirrored
+Corrupted
+"""
+    item = parser.parse(text)
+    assert item.is_fractured is True
+    assert item.is_synthesised is True
+    assert item.is_mirrored is True
+    assert item.is_corrupted is True
+
+def test_parse_multiple_items(parser):
+    item1 = """Rarity: UNIQUE
+Shavronne's Wrappings
+Occultist's Vestment
+"""
+    item2 = """Rarity: RARE
+Doom Visor
+Hubris Circlet
+"""
+    bulk = item1 + "\n\n" + item2
+
+    items = parser.parse_multiple(bulk)
+    assert len(items) == 2
+    names = {i.name or i.base_type for i in items}
+    assert "Shavronne's Wrappings" in names or "Occultist's Vestment" in names
+    assert "Doom Visor" in names or "Hubris Circlet" in names
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

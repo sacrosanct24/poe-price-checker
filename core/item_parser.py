@@ -1,427 +1,418 @@
 """
-Path of Exile item text parser.
-Parses item text copied from the game (Ctrl+C on item).
+Item text parser for the PoE Price Checker.
+
+Parses clipboard text copied from Path of Exile into a structured
+ParsedItem object.
+
+Supports:
+- Rarity / name / base type
+- Item level, quality, sockets/links
+- Requirements (level, Str/Dex/Int)
+- Implicit mods
+- Enchant mods
+- Explicit mods
+- Influences (Shaper, Elder, Exarch, Eater, etc.)
+- Corrupted, Fractured, Synthesised, Mirrored
+- Stack size (currency)
 """
 
+from __future__ import annotations
+
 import re
-import logging
-from typing import Optional, Dict, List, Any
 from dataclasses import dataclass, field
+from typing import Optional, List
 
-logger = logging.getLogger(__name__)
+from core.game_version import GameVersion
 
+
+# ----------------------------------------------------------------------
+# Parsed Item Model
+# ----------------------------------------------------------------------
 
 @dataclass
 class ParsedItem:
-    """
-    Structured representation of a parsed PoE item.
-    Uses dataclass for clean structure and type hints.
-    """
+    """Data structure representing a parsed PoE item."""
+
     raw_text: str
+
+    # Basic info
     rarity: Optional[str] = None
-    name: Optional[str] = None
-    base_type: Optional[str] = None
+    name: Optional[str] = None         # Top line after "Rarity: X"
+    base_type: Optional[str] = None    # Second line after name (for rares)
     item_level: Optional[int] = None
+
+    # Properties
     quality: Optional[int] = None
     sockets: Optional[str] = None
     links: int = 0
     stack_size: int = 1
     max_stack_size: int = 1
 
-    # Item properties
+    # Required attributes
+    requirements: dict = field(default_factory=dict)
+
+    # Affix sets
+    explicits: List[str] = field(default_factory=list)
+    implicits: List[str] = field(default_factory=list)
+    enchants: List[str] = field(default_factory=list)
+
+    # Flags
     is_corrupted: bool = False
     is_fractured: bool = False
     is_synthesised: bool = False
     is_mirrored: bool = False
 
-    # Influences (can have multiple)
+    # Influences (Shaper, Elder, Exarch, Eater)
     influences: List[str] = field(default_factory=list)
 
-    # Mod text
-    implicits: List[str] = field(default_factory=list)
-    explicits: List[str] = field(default_factory=list)
-    enchants: List[str] = field(default_factory=list)
-
-    # Additional info
-    item_class: Optional[str] = None
-    requirements: Dict[str, int] = field(default_factory=dict)
-
-    def __post_init__(self):
-        """Validate and normalize after creation"""
-        # Normalize rarity to uppercase
-        if self.rarity:
-            self.rarity = self.rarity.upper()
-
-    def is_currency(self) -> bool:
-        """Check if this is a currency item"""
-        return self.rarity is None or self.rarity == "CURRENCY"
-
-    def is_unique(self) -> bool:
-        """Check if this is a unique item"""
-        return self.rarity == "UNIQUE"
-
-    def is_rare(self) -> bool:
-        """Check if this is a rare item"""
-        return self.rarity == "RARE"
-
-    def is_magic(self) -> bool:
-        """Check if this is a magic item"""
-        return self.rarity == "MAGIC"
-
-    def is_normal(self) -> bool:
-        """Check if this is a normal item"""
-        return self.rarity == "NORMAL"
-
-    def get_display_name(self) -> str:
-        """Get the item's display name (name or base type)"""
-        return self.name or self.base_type or "Unknown Item"
-
-    def has_influence(self, influence: str) -> bool:
-        """Check if item has a specific influence"""
-        return influence.lower() in [inf.lower() for inf in self.influences]
-
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary for serialization"""
+    def to_dict(self) -> dict:
+        """Convert to a plain dictionary for serialization or testing."""
         return {
-            'rarity': self.rarity,
-            'name': self.name,
-            'base_type': self.base_type,
-            'item_level': self.item_level,
-            'quality': self.quality,
-            'sockets': self.sockets,
-            'links': self.links,
-            'stack_size': self.stack_size,
-            'max_stack_size': self.max_stack_size,
-            'is_corrupted': self.is_corrupted,
-            'is_fractured': self.is_fractured,
-            'is_synthesised': self.is_synthesised,
-            'influences': self.influences,
-            'implicits': self.implicits,
-            'explicits': self.explicits
+            "rarity": self.rarity,
+            "name": self.name,
+            "base_type": self.base_type,
+            "item_level": self.item_level,
+            "quality": self.quality,
+            "sockets": self.sockets,
+            "links": self.links,
+            "stack_size": self.stack_size,
+            "max_stack_size": self.max_stack_size,
+            "requirements": self.requirements,
+            "explicits": self.explicits,
+            "implicits": self.implicits,
+            "enchants": self.enchants,
+            "is_corrupted": self.is_corrupted,
+            "is_fractured": self.is_fractured,
+            "is_synthesised": self.is_synthesised,
+            "is_mirrored": self.is_mirrored,
+            "influences": self.influences,
         }
 
 
+# ----------------------------------------------------------------------
+# Parser Implementation
+# ----------------------------------------------------------------------
+
 class ItemParser:
     """
-    Parser for Path of Exile item text.
-    Handles items from both PoE1 and PoE2 (similar format).
+    Full item parser for PoE clipboard text.
+
+    Handles header, body, modifiers, influences, requirements,
+    sockets, corruptions, etc.
     """
 
-    # Item separator pattern
-    SEPARATOR_PATTERN = r'^-{5,}$'
+    SEPARATOR_PATTERN = r"^-{2,}$"      # -------- separator lines
+    RARITY_PATTERN = r"^Rarity:\s*(\w+)"
+    STACK_PATTERN = r"Stack Size:\s*(\d+)/(\d+)"
+    QUALITY_PATTERN = r"Quality:\s*\+?(\d+)%"
+    ITEM_LEVEL_PATTERN = r"Item Level:\s*(\d+)"
 
-    # Influence keywords
-    INFLUENCES = [
-        'Shaper', 'Elder', 'Crusader', 'Redeemer',
-        'Hunter', 'Warlord', 'Searing Exarch', 'Eater of Worlds'
+    INFLUENCE_KEYWORDS = [
+        "Shaper",
+        "Elder",
+        "Crusader",
+        "Hunter",
+        "Redeemer",
+        "Warlord",
+        "Searing Exarch",
+        "Eater of Worlds",
     ]
 
-    def parse(self, item_text: str) -> Optional[ParsedItem]:
-        """
-        Parse item text from clipboard.
+    # Normalize Exarch/Eater into short forms
+    INFLUENCE_NORMALIZATION = {
+        "Searing Exarch": "Exarch",
+        "Eater of Worlds": "Eater",
+    }
 
-        Args:
-            item_text: Raw item text from in-game Ctrl+C
-
-        Returns:
-            ParsedItem object or None if parsing fails
+    def parse(self, text: str) -> Optional[ParsedItem]:
         """
-        if not item_text or not item_text.strip():
-            logger.warning("Empty item text")
+        Parse a single item from raw clipboard text.
+
+        Returns ParsedItem or None if parsing fails or text is malformed.
+        """
+        lines = [line.strip() for line in text.splitlines() if line.strip()]
+        if not lines:
             return None
 
-        # Validate minimum length
-        if len(item_text.strip()) < 10:
-            logger.warning("Item text too short to be valid")
+        # Must begin with Rarity
+        if not re.match(self.RARITY_PATTERN, lines[0]):
             return None
+
+        item = ParsedItem(raw_text=text)
 
         try:
-            lines = [line.strip() for line in item_text.strip().split('\n')]
-
-            if len(lines) < 1:
-                logger.warning("Item text too short")
-                return None
-
-            # Create item object
-            item = ParsedItem(raw_text=item_text)
-
-            # Parse header section
-            line_index = self._parse_header(lines, item)
-
-            # Parse body sections (separated by dashes)
-            self._parse_body(lines[line_index:], item)
-            # Validate that we parsed something meaningful
-            has_valid_structure = (
-                    item.rarity is not None or
-                    item.stack_size > 1 or
-                    item.item_level is not None or
-                    len(item.explicits) > 0 or
-                    len(item.implicits) > 0 or
-                    item.quality is not None
-            )
-
-            if not has_valid_structure:
-                logger.warning(f"No valid PoE item structure detected in: {item_text[:50]}...")
-                return None
-
-            logger.debug(f"Parsed item: {item.get_display_name()} ({item.rarity})")
-            return item
-
-        except Exception as e:
-            logger.error(f"Failed to parse item: {e}")
-            logger.debug(f"Item text was: {item_text[:200]}")
+            lines = self._parse_header(lines, item)
+            self._parse_body(lines, item)
+        except Exception:
+            # Fail closed - better to return None than misparse
             return None
 
-    def _parse_header(self, lines: List[str], item: ParsedItem) -> int:
+        # Final validation check: ensure useful minimum structure
+        if not item.rarity or not (item.name or item.base_type):
+            return None
+
+        return item
+
+    def parse_multiple(self, bulk_text: str) -> List[ParsedItem]:
         """
-        Parse the header section (rarity, name, base).
-        Returns the line index where body starts.
+        Parse multiple items from a block of text.
+
+        Items may be separated by:
+        - blank lines, or
+        - repeated "Rarity:" markers
         """
-        idx = 0
+        blocks: List[str] = []
+        current: List[str] = []
 
-        # Check for stack size FIRST (currency items start with this)
-        if idx < len(lines) and lines[idx].startswith('Stack Size:'):
-            match = re.search(r'(\d+)/(\d+)', lines[idx])
-            if match:
-                item.stack_size = int(match.group(1))
-                item.max_stack_size = int(match.group(2))
-            idx += 1  # Move past Stack Size line
+        for line in bulk_text.splitlines():
+            if line.strip().startswith("Rarity:"):
+                if current:
+                    blocks.append("\n".join(current))
+                current = [line]
+            else:
+                current.append(line)
 
-        # Parse rarity (if present - comes after Stack Size for currency, or first for gear)
-        if idx < len(lines) and lines[idx].startswith('Rarity:'):
-            item.rarity = lines[idx].replace('Rarity:', '').strip()
-            idx += 1
+        if current:
+            blocks.append("\n".join(current))
 
-        # Parse name (next non-empty, non-separator line)
-        if idx < len(lines) and lines[idx] and not lines[idx].startswith('---'):
-            item.name = lines[idx]
-            idx += 1
+        items = []
+        for blk in blocks:
+            parsed = self.parse(blk)
+            if parsed:
+                items.append(parsed)
 
-        # Parse base type (next non-empty, non-separator line)
-        if idx < len(lines) and lines[idx] and not lines[idx].startswith('---'):
-            item.base_type = lines[idx]
-            idx += 1
+        return items
 
-        # If name equals base, it's a normal/magic item or currency (only one name line)
-        if item.name == item.base_type:
-            item.base_type = item.name
-            item.name = None
+    # ------------------------------------------------------------------
+    # Header Parsing
+    # ------------------------------------------------------------------
 
-        return idx
+    def _parse_header(self, lines: List[str], item: ParsedItem) -> List[str]:
+        """
+        Parse the header section of the item:
+        - Rarity
+        - Name
+        - Base type (for rare/magic/unique, when present)
+        Returns remaining lines after the header.
+        """
 
-    def _parse_body(self, lines: List[str], item: ParsedItem):
-        """Parse the body sections (properties, mods, etc.)"""
+        # Rarity: Rare / Magic / Unique / etc.
+        match = re.match(self.RARITY_PATTERN, lines[0])
+        if match:
+            item.rarity = match.group(1).upper()
 
-        current_section = 0  # Track which section we're in
+        # Next line is item name (if present)
+        if len(lines) > 1:
+            item.name = lines[1]
+
+        # Helper: is a given line a section separator ("--------")?
+        def is_separator(idx: int) -> bool:
+            return 0 <= idx < len(lines) and re.match(self.SEPARATOR_PATTERN, lines[idx]) is not None
+
+        # Non-unique items normally have a base type line after the name,
+        # e.g.:
+        #   Rarity: RARE
+        #   Doom Visor
+        #   Hubris Circlet
+        #
+        # But in some cases (like belts, jewels, or tests), the next line
+        # is already the separator. In that case there is no separate
+        # base_type line in the header.
+        if item.rarity not in ("UNIQUE", "NORMAL") and len(lines) > 2:
+            if is_separator(2):
+                # No base_type line; header ends before the separator
+                return lines[2:]
+            item.base_type = lines[2]
+            return lines[3:]
+
+        # Unique items typically have:
+        #   Rarity: UNIQUE
+        #   Shavronne's Wrappings
+        #   Occultist's Vestment
+        if item.rarity == "UNIQUE" and len(lines) > 2:
+            if is_separator(2):
+                # No explicit base_type line before separator
+                return lines[2:]
+            item.base_type = lines[2]
+            return lines[3:]
+
+        # Fallback: just name + no base_type
+        return lines[2:]
+
+    # ------------------------------------------------------------------
+    # Body Parsing
+    # ------------------------------------------------------------------
+
+    def _parse_body(self, lines: List[str], item: ParsedItem) -> None:
+        """
+        Parse the body sections of the item, which include:
+        - Properties
+        - Requirements
+        - Influences
+        - Flags
+        - Mods (implicit, enchant, explicit)
+        """
+        current_section = 0
         in_requirements = False
 
         for line in lines:
-            # Separator line - move to next section
-            if not line or re.match(self.SEPARATOR_PATTERN, line):
+            # Section break
+            if re.match(self.SEPARATOR_PATTERN, line):
                 current_section += 1
                 in_requirements = False
                 continue
 
-            # Item Class
-            if line.startswith('Item Class:'):
-                item.item_class = line.split(':', 1)[1].strip()
+            # ───────────────────────────────────────────────
+            # Item Properties
+            # ───────────────────────────────────────────────
 
             # Item Level
-            elif line.startswith('Item Level:'):
-                try:
-                    item.item_level = int(line.split(':', 1)[1].strip())
-                except ValueError:
-                    pass
-            # Stack Size (currency and stacks)
-            elif line.startswith('Stack Size:'):
-                match = re.search(r'(\d+)/(\d+)', line)
-                if match:
-                    item.stack_size = int(match.group(1))
-                    item.max_stack_size = int(match.group(2))
-
-            # Quality
-            elif line.startswith('Quality:'):
-                match = re.search(r'\+?(\d+)%', line)
-                if match:
-                    item.quality = int(match.group(1))
-
-            # Sockets
-            elif line.startswith('Sockets:'):
-                sockets = line.split(':', 1)[1].strip()
-                item.sockets = sockets
-                # Calculate links (connected by dashes)
-                link_groups = sockets.split(' ')
-                item.links = max(len(group.replace('-', '')) for group in link_groups) if link_groups else 0
-
-            # Requirements
-            elif line.startswith('Requirements:'):
-                in_requirements = True
-
-            elif in_requirements:
-                # Level requirement
-                if line.startswith('Level:'):
-                    try:
-                        item.requirements['level'] = int(line.split(':')[1].strip())
-                    except ValueError:
-                        pass
-                # Stat requirements
-                for stat in ['Str', 'Dex', 'Int']:
-                    if line.startswith(f'{stat}:'):
-                        try:
-                            item.requirements[stat.lower()] = int(line.split(':')[1].strip())
-                        except ValueError:
-                            pass
-
-            # Corrupted
-            elif 'Corrupted' in line and 'Uncorrupted' not in line:
-                item.is_corrupted = True
-
-            # Fractured
-            elif 'Fractured Item' in line:
-                item.is_fractured = True
-
-            # Synthesised
-            elif 'Synthesised Item' in line:
-                item.is_synthesised = True
-
-            # Mirrored
-            elif 'Mirrored' in line:
-                item.is_mirrored = True
-
-            # Influences
-            elif any(inf in line for inf in self.INFLUENCES):
-                for inf in self.INFLUENCES:
-                    if inf in line:
-                        # Normalize influence names
-                        if inf == 'Searing Exarch':
-                            item.influences.append('Exarch')
-                        elif inf == 'Eater of Worlds':
-                            item.influences.append('Eater')
-                        else:
-                            item.influences.append(inf)
-
-            # Mods (anything in section 2+ that's not a property)
-            elif current_section >= 2 and line:
-                # Skip certain lines
-                if any(skip in line for skip in ['Requirements:', 'Level:', 'Str:', 'Dex:', 'Int:']):
-                    continue
-
-                    # Enchant
-                elif '(enchant)' in line.lower():
-                    clean_line = line.replace('(enchant)', '').replace('(Enchant)', '').strip()
-                    if clean_line:
-                        item.enchants.append(clean_line)
-                # Implicit
-                elif '(implicit)' in line.lower():
-                    clean_line = line.replace('(implicit)', '').replace('(Implicit)', '').strip()
-                    if clean_line:
-                        item.implicits.append(clean_line)
-
-                # Explicit mod
-                else:
-                    item.explicits.append(line)
-
-    def parse_multiple(self, bulk_text: str) -> List[ParsedItem]:
-        """
-        Parse multiple items from bulk text.
-        Items can be separated by double newlines or "Rarity:" markers.
-
-        Args:
-            bulk_text: Text containing multiple items
-
-        Returns:
-            List of ParsedItem objects
-        """
-        # Split by double newlines or "Rarity:" markers
-        items_text = re.split(r'\n\s*\n+|(?=Rarity:)', bulk_text)
-        items_text = [text.strip() for text in items_text if text.strip()]
-
-        parsed_items = []
-        for item_text in items_text:
-            # Must start with Rarity: or Stack Size:
-            if not (item_text.startswith('Rarity:') or item_text.startswith('Stack Size:')):
+            if m := re.match(self.ITEM_LEVEL_PATTERN, line):
+                item.item_level = int(m.group(1))
                 continue
 
-            item = self.parse(item_text)
-            if item:
-                parsed_items.append(item)
+            # Quality
+            if m := re.search(self.QUALITY_PATTERN, line):
+                item.quality = int(m.group(1))
+                continue
 
-        logger.info(f"Parsed {len(parsed_items)} items from bulk text")
-        return parsed_items
+            # Sockets
+            if line.startswith("Sockets:"):
+                sockets = line.split(":", 1)[1].strip()
+                item.sockets = sockets
+
+                # Calculate links: largest connected group
+                groups = sockets.split(" ")
+                item.links = max(
+                    len(g.replace("-", ""))
+                    for g in groups
+                ) if groups else 0
+                continue
+
+            # Stack Size (currency)
+            if m := re.search(self.STACK_PATTERN, line):
+                item.stack_size = int(m.group(1))
+                item.max_stack_size = int(m.group(2))
+                continue
+
+            # ───────────────────────────────────────────────
+            # Requirements
+            # ───────────────────────────────────────────────
+
+            if line.startswith("Requirements:"):
+                in_requirements = True
+                continue
+
+            if in_requirements:
+                self._parse_requirement_line(line, item)
+                continue
+
+            # ───────────────────────────────────────────────
+            # Influences / Flags
+            # ───────────────────────────────────────────────
+
+            # Corrupted
+            if "Corrupted" in line and "Uncorrupted" not in line:
+                item.is_corrupted = True
+                continue
+
+            if "Fractured Item" in line:
+                item.is_fractured = True
+                continue
+
+            if "Synthesised Item" in line:
+                item.is_synthesised = True
+                continue
+
+            if "Mirrored" in line:
+                item.is_mirrored = True
+                continue
+
+            # Influences
+            for keyword in self.INFLUENCE_KEYWORDS:
+                if keyword in line:
+                    normalized = self.INFLUENCE_NORMALIZATION.get(keyword, keyword)
+                    item.influences.append(normalized)
+                    break
+
+            # ───────────────────────────────────────────────
+            # Mods: implicit / enchant / explicit
+            # Section 1+ contains mods in PoE clipboard format
+            # ───────────────────────────────────────────────
+
+            if current_section >= 1 and line:
+                # Ignore lines belonging to other sections
+                if any(kw in line for kw in ("Requirements:", "Level:", "Str:", "Dex:", "Int:")):
+                    continue
+
+                lower = line.lower()
+
+                if "(enchant)" in lower:
+                    clean = self._strip_tag(line, "enchant")
+                    if clean:
+                        item.enchants.append(clean)
+                    continue
+
+                if "(implicit)" in lower:
+                    clean = self._strip_tag(line, "implicit")
+                    if clean:
+                        item.implicits.append(clean)
+                    continue
+
+                # Otherwise it's a normal explicit mod
+                item.explicits.append(line)
+
+    # ----------------------------------------------------------------------
+    # Helpers
+    # ----------------------------------------------------------------------
+
+    @staticmethod
+    def _strip_tag(line: str, tag: str) -> str:
+        """
+        Remove (tag)/(Tag) from a line and strip whitespace.
+        Example: "(implicit)" or "(Implicit)".
+        """
+        return (
+            line.replace(f"({tag})", "")
+                .replace(f"({tag.capitalize()})", "")
+                .strip()
+        )
+
+    @staticmethod
+    def _parse_requirement_line(line: str, item: ParsedItem) -> None:
+        """Parse Level/Str/Dex/Int during requirements block."""
+        if line.startswith("Level:"):
+            try:
+                item.requirements["level"] = int(line.split(":", 1)[1].strip())
+            except ValueError:
+                pass
+            return
+
+        for stat in ("Str", "Dex", "Int"):
+            if line.startswith(f"{stat}:"):
+                try:
+                    item.requirements[stat.lower()] = int(line.split(":", 1)[1].strip())
+                except ValueError:
+                    pass
+                return
 
 
-# Testing
-if __name__ == "__main__":
-    print("=== Item Parser Test ===\n")
-
+if __name__ == "__main__":  # pragma: no cover
+    print("=== Item Parser Smoke Test ===")
     parser = ItemParser()
-
-    # Test 1: Unique item
-    unique_text = """Rarity: UNIQUE
-Shavronne's Wrappings
-Occultist's Vestment
+    sample = """Rarity: RARE
+Doom Visor
+Hubris Circlet
 --------
-Energy Shield: 300
---------
-Item Level: 85
-Sockets: B-B-B-B-B-B
---------
-+1 to Level of Socketed Gems
-200% increased Energy Shield
-+50 to Intelligence
-Chaos Damage does not bypass Energy Shield
---------
-Corrupted"""
-
-    item1 = parser.parse(unique_text)
-    if item1:
-        print(f"✓ Item 1: {item1.get_display_name()}")
-        print(f"  Rarity: {item1.rarity}")
-        print(f"  Base Type: {item1.base_type}")
-        print(f"  Links: {item1.links}")
-        print(f"  Corrupted: {item1.is_corrupted}")
-        print(f"  Explicits: {len(item1.explicits)}")
-
-    # Test 2: Currency
-    currency_text = """Stack Size: 15/40
-Divine Orb"""
-
-    item2 = parser.parse(currency_text)
-    if item2:
-        print(f"\n✓ Item 2: {item2.get_display_name()}")
-        print(f"  Is Currency: {item2.is_currency()}")
-        print(f"  Stack: {item2.stack_size}/{item2.max_stack_size}")
-
-    # Test 3: Rare item with influence
-    rare_text = """Rarity: RARE
-Doom Guard
-Vaal Regalia
---------
+Item Level: 84
 Quality: +20%
-Energy Shield: 450
+Sockets: R-G-B R-R
 --------
-Item Level: 86
-Sockets: B-B-B-B-B-B
++80 to maximum Energy Shield (implicit)
 --------
-Shaper Item
---------
-+120 to maximum Energy Shield
-+45% to Fire Resistance
-+38% to Cold Resistance"""
-
-    item3 = parser.parse(rare_text)
-    if item3:
-        print(f"\n✓ Item 3: {item3.get_display_name()}")
-        print(f"  Rarity: {item3.rarity}")
-        print(f"  Quality: {item3.quality}%")
-        print(f"  Influences: {item3.influences}")
-        print(f"  Has Shaper: {item3.has_influence('Shaper')}")
-
-    # Test 4: Multiple items
-    bulk_text = unique_text + "\n\n" + currency_text + "\n\n" + rare_text
-    items = parser.parse_multiple(bulk_text)
-    print(f"\n✓ Parsed {len(items)} items from bulk text:")
-    for i, item in enumerate(items, 1):
-        print(f"  {i}. {item.get_display_name()} (stack: {item.stack_size}, rarity: {item.rarity or 'CURRENCY'})")
-
-    print("\n=== All Tests Passed! ===")
++50 to maximum Life
+Corrupted
+"""
+    result = parser.parse(sample)
+    print(result)
+    print(result.to_dict())

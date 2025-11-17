@@ -160,6 +160,93 @@ def test_price_history_ordered_by_date_ascending_FIXED(temp_db):
     values = [h['chaos_value'] for h in history]
     assert values == [290.0, 295.0, 300.0, 305.0, 310.0]
 
+def test_get_sales_filters_sold_only(temp_db):
+    # Unsold sale
+    sale1 = temp_db.add_sale(item_name="Item A", listed_price_chaos=10.0)
+
+    # Sold sale
+    sale2 = temp_db.add_sale(item_name="Item B", listed_price_chaos=20.0)
+    temp_db.complete_sale(sale2, actual_price_chaos=19.0, sold_at=datetime.now())
+
+    all_sales = temp_db.get_sales(sold_only=False)
+    sold_sales = temp_db.get_sales(sold_only=True)
+
+    ids_all = {s["id"] for s in all_sales}
+    ids_sold = {s["id"] for s in sold_sales}
+
+    assert sale1 in ids_all and sale2 in ids_all
+    assert sale2 in ids_sold
+    assert sale1 not in ids_sold
+
+def test_mark_sale_unsold_sets_notes_and_sold_at(temp_db):
+    sale_id = temp_db.add_sale(item_name="Item A", listed_price_chaos=10.0)
+    temp_db.complete_sale(sale_id, actual_price_chaos=9.0, sold_at=datetime.now())
+
+    temp_db.mark_sale_unsold(sale_id)
+
+    sales = temp_db.get_sales()
+    sale = next(s for s in sales if s["id"] == sale_id)
+
+    assert sale["notes"] == "Did not sell"
+    assert sale["sold_at"] is not None
+    # We do NOT assert anything about time_to_sale_hours here; current code doesn’t change it.
+
+def test_db_plugin_state_roundtrip(temp_db):
+    temp_db.set_plugin_enabled("price_alert", True)
+    temp_db.set_plugin_config("price_alert", '{"threshold": 100}')
+
+    assert temp_db.is_plugin_enabled("price_alert") is True
+    assert temp_db.get_plugin_config("price_alert") == '{"threshold": 100}'
+
+    # Disable and ensure it flips
+    temp_db.set_plugin_enabled("price_alert", False)
+    assert temp_db.is_plugin_enabled("price_alert") is False
+
+def test_get_checked_items_filters_by_game_and_league(temp_db):
+    # PoE1 / Standard
+    temp_db.add_checked_item(
+        game_version=GameVersion.POE1,
+        league="Standard",
+        item_name="Item A",
+        chaos_value=10.0,
+    )
+
+    # PoE2 / Hardcore
+    temp_db.add_checked_item(
+        game_version=GameVersion.POE2,
+        league="Hardcore",
+        item_name="Item B",
+        chaos_value=20.0,
+    )
+
+    poe1_items = temp_db.get_checked_items(game_version=GameVersion.POE1, league="Standard")
+    assert len(poe1_items) == 1
+    assert poe1_items[0]["item_name"] == "Item A"
+
+def test_get_stats_counts_are_consistent(temp_db):
+    # 2 checked items
+    temp_db.add_checked_item(GameVersion.POE1, "Standard", "Item A", chaos_value=1.0)
+    temp_db.add_checked_item(GameVersion.POE1, "Standard", "Item B", chaos_value=2.0)
+
+    # 1 completed sale
+    sale_id = temp_db.add_sale("Item A", listed_price_chaos=1.0)
+    temp_db.complete_sale(sale_id, actual_price_chaos=1.0, sold_at=datetime.now())
+
+    # 3 price snapshots
+    for v in (10.0, 20.0, 30.0):
+        temp_db.add_price_snapshot(
+            game_version=GameVersion.POE1,
+            league="Standard",
+            item_name="Item A",
+            chaos_value=v,
+        )
+
+    stats = temp_db.get_stats()
+    assert stats["checked_items"] == 2
+    assert stats["sales"] == 1
+    assert stats["completed_sales"] == 1
+    assert stats["price_snapshots"] == 3
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
