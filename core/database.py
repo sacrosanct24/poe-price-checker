@@ -38,7 +38,16 @@ class Database:
     # Current schema version. Increment if schema structure changes.
     SCHEMA_VERSION = 1
 
-    def __init__(self, db_path: Path):
+    def __init__(self, db_path: Optional[Path] = None):
+        """
+        Create a Database instance.
+
+        If db_path is None, use the default location:
+        ~/.poe_price_checker/data.db
+        """
+        if db_path is None:
+            db_path = Path.home() / ".poe_price_checker" / "data.db"
+
         self.db_path = db_path
         self.conn = sqlite3.connect(str(db_path), check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
@@ -50,7 +59,6 @@ class Database:
 
         # Initialize or migrate schema
         self._initialize_schema()
-
     # ----------------------------------------------------------------------
     # Context manager for transactions
     # ----------------------------------------------------------------------

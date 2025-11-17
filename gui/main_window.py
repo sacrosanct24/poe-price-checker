@@ -386,14 +386,9 @@ class PriceCheckerGUI:
     # ---------- Core actions ----------
 
     def check_prices(self) -> None:
-        # Sync filters back into config
-        try:
-            min_val = float(self.min_value_var.get())
-        except (TypeError, ValueError):
-            min_val = 0.0
-            self.min_value_var.set(min_val)
-        self.ctx.config.min_value_chaos = min_val
-        self.ctx.config.show_vendor_items = bool(self.show_vendor_var.get())
+        """Main entry point for checking prices of pasted items."""
+        # Sync UI filters back into config
+        self._sync_filters_to_config()
 
         raw_text = self.input_text.get("1.0", tk.END).strip()
         if not raw_text:
@@ -407,22 +402,19 @@ class PriceCheckerGUI:
         # For now, pricing is only wired for PoE1/poe.ninja
         if self.ctx.config.current_game != GameVersion.POE1:
             messagebox.showinfo(
-                "PoE2 Not Implemented",
+                "Pricing not available",
                 "PoE2 pricing is not implemented yet.\n"
                 "You can still parse items, but prices will be empty.",
             )
 
-        self.status_var.set("Parsing items...")
-        self.root.update_idletasks()
-
+        self._set_status("Parsing items...")
         items = self._parse_items(raw_text)
         if not items:
             messagebox.showwarning("Parse Error", "No valid items were detected.")
-            self.status_var.set("Ready.")
+            self._set_status("Ready.")
             return
 
-        self.status_var.set("Checking prices...")
-        self.root.update_idletasks()
+        self._set_status("Checking prices...")
 
         min_filter = self.ctx.config.min_value_chaos
         show_vendor = self.ctx.config.show_vendor_items
@@ -454,19 +446,19 @@ class PriceCheckerGUI:
 
             self.tree.insert(
                 "",
-                tk.END,
-                text=str(displayed_count),
+                "end",
                 values=(
                     parsed.get_display_name(),
                     parsed.rarity or "",
-                    f"{stack_size}",
+                    parsed.item_level or "",
+                    stack_size,
                     f"{chaos_value:.1f}" if chaos_value is not None else "",
                     f"{divine_value:.2f}" if divine_value is not None else "",
                     f"{total_chaos:.1f}" if chaos_value is not None else "",
                 ),
             )
 
-        self.status_var.set(
+        self._set_status(
             f"Done. Parsed {len(items)} item(s), showing {displayed_count} "
             f"(min {min_filter:.1f}c, vendor items "
             f"{'shown' if show_vendor else 'hidden'})."
@@ -482,6 +474,24 @@ class PriceCheckerGUI:
         self.status_var.set("Cleared input and results.")
 
     # ---------- Helpers ----------
+    # ---------- Helpers ----------
+
+    def _sync_filters_to_config(self) -> None:
+        """Validate filter widgets and persist them into Config."""
+        try:
+            min_val = float(self.min_value_var.get())
+        except (TypeError, ValueError):
+            min_val = 0.0
+            self.min_value_var.set(min_val)
+
+        self.ctx.config.min_value_chaos = min_val
+        self.ctx.config.show_vendor_items = bool(self.show_vendor_var.get())
+
+    def _set_status(self, text: str) -> None:
+        """Update the status bar text and force a UI refresh."""
+        self.status_var.set(text)
+        # Update the event loop so the change is visible during longer operations
+        self.root.update_idletasks()
 
     def _parse_items(self, raw_text: str) -> List[ParsedItem]:
         """
@@ -595,34 +605,34 @@ class PriceCheckerGUI:
         return None
 
     def _record_in_database(
-        self,
-        item: ParsedItem,
-        chaos_value: float | None,
-        divine_value: float | None,
+            self,
+            item: ParsedItem,
+            chaos_value: float | None,
+            divine_value: float | None,
     ) -> None:
         """
-        Persist a checked item to SQLite:
+        Persist a checked item to SQLite.
+
+        We always record the checked item itself, and if a price was found
+        we also record a price snapshot for history.
         """
         db = self.ctx.db
         cfg = self.ctx.config
 
         item_name = item.get_display_name()
         base_type = item.base_type
-        rarity = item.rarity
-        stack_size = item.stack_size or 1
 
+        # Store the check itself (basic info + chaos value)
+        effective_chaos = chaos_value if chaos_value is not None else 0.0
         db.add_checked_item(
             game_version=cfg.current_game,
             league=cfg.league,
             item_name=item_name,
             item_base_type=base_type,
-            item_rarity=rarity,
-            chaos_value=chaos_value,
-            divine_value=divine_value,
-            stack_size=stack_size,
-            raw_data=item.raw_text,
+            chaos_value=effective_chaos,
         )
 
+        # Store a price snapshot only when we have a real price
         if chaos_value is not None:
             db.add_price_snapshot(
                 game_version=cfg.current_game,
