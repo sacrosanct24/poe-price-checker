@@ -23,6 +23,8 @@ from dataclasses import dataclass, field
 from typing import Optional, List
 
 from core.game_version import GameVersion
+LEVEL_RE = re.compile(r"^Level:\s*(\d+)")
+QUALITY_RE = re.compile(r"^Quality:\s*\+?(-?\d+)%")
 
 @dataclass
 class ParsedItem:
@@ -36,6 +38,10 @@ class ParsedItem:
     base_type: Optional[str] = None    # Second line after name (for rares)
     item_level: Optional[int] = None
 
+    # Gem-specific
+    gem_level: Optional[int] = None
+    gem_quality: Optional[int] = None
+
     # Properties
     quality: Optional[int] = None
     sockets: Optional[str] = None
@@ -43,7 +49,7 @@ class ParsedItem:
     stack_size: int = 1
     max_stack_size: int = 1
 
-    # Required attributes
+    # Requirements
     requirements: dict = field(default_factory=dict)
 
     # Affix sets
@@ -54,7 +60,6 @@ class ParsedItem:
     # Flags
     is_corrupted: bool = False
 
-    # ↓↓↓ ADD THIS ↓↓↓
     def get_display_name(self) -> str:
         """
         Human-friendly name for UI/DB rows.
@@ -81,6 +86,8 @@ class ParsedItem:
             "name": self.name,
             "base_type": self.base_type,
             "item_level": self.item_level,
+            "gem_level": self.gem_level,
+            "gem_quality": self.gem_quality,
             "quality": self.quality,
             "sockets": self.sockets,
             "links": self.links,
@@ -92,7 +99,6 @@ class ParsedItem:
             "enchants": self.enchants,
             "is_corrupted": self.is_corrupted,
         }
-
 
 # ----------------------------------------------------------------------
 # Parser Implementation
@@ -292,6 +298,31 @@ class ItemParser:
                     len(g.replace("-", ""))
                     for g in groups
                 ) if groups else 0
+                continue
+
+            # Gem level
+            m_level = LEVEL_RE.match(line)
+            if m_level:
+                try:
+                    level_val = int(m_level.group(1))
+                    # Only treat this as gem level when it’s actually a gem
+                    if (item.rarity or "").lower() == "gem":
+                        item.gem_level = level_val
+                except ValueError:
+                    pass
+                continue
+
+            # Quality (generic)
+            m_q = QUALITY_RE.match(line)
+            if m_q:
+                try:
+                    q_val = int(m_q.group(1))
+                    item.quality = q_val
+                    # Mirror quality to gem_quality for gems
+                    if (item.rarity or "").lower() == "gem":
+                        item.gem_quality = q_val
+                except ValueError:
+                    pass
                 continue
 
             # Stack Size (currency)
