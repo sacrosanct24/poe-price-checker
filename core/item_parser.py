@@ -24,11 +24,6 @@ from typing import Optional, List
 
 from core.game_version import GameVersion
 
-
-# ----------------------------------------------------------------------
-# Parsed Item Model
-# ----------------------------------------------------------------------
-
 @dataclass
 class ParsedItem:
     """Data structure representing a parsed PoE item."""
@@ -58,12 +53,26 @@ class ParsedItem:
 
     # Flags
     is_corrupted: bool = False
-    is_fractured: bool = False
-    is_synthesised: bool = False
-    is_mirrored: bool = False
 
-    # Influences (Shaper, Elder, Exarch, Eater)
-    influences: List[str] = field(default_factory=list)
+    # ↓↓↓ ADD THIS ↓↓↓
+    def get_display_name(self) -> str:
+        """
+        Human-friendly name for UI/DB rows.
+
+        - For rares: 'Name (Base Type)' if both present and different
+        - For uniques/others: name if present, else base_type
+        - Fallback: 'Unknown Item'
+        """
+        name = (self.name or "").strip()
+        base_type = (self.base_type or "").strip()
+
+        if name and base_type and name != base_type:
+            return f"{name} ({base_type})"
+        if name:
+            return name
+        if base_type:
+            return base_type
+        return "Unknown Item"
 
     def to_dict(self) -> dict:
         """Convert to a plain dictionary for serialization or testing."""
@@ -82,10 +91,6 @@ class ParsedItem:
             "implicits": self.implicits,
             "enchants": self.enchants,
             "is_corrupted": self.is_corrupted,
-            "is_fractured": self.is_fractured,
-            "is_synthesised": self.is_synthesised,
-            "is_mirrored": self.is_mirrored,
-            "influences": self.influences,
         }
 
 

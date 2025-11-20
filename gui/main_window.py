@@ -518,7 +518,11 @@ class PriceCheckerGUI:
 
         try:
             rarity = (item.rarity or "").upper()
-            item_class = (item.item_class or "").upper()
+
+            # Text-parsed items don’t have item_class; official JSON items might.
+            raw_item_class = getattr(item, "item_class", None)
+            item_class = (raw_item_class or "").upper()
+
 
             # ---------- Currency path ----------
             if (
@@ -619,11 +623,13 @@ class PriceCheckerGUI:
         db = self.ctx.db
         cfg = self.ctx.config
 
+        # Human-readable item name
         item_name = item.get_display_name()
         base_type = item.base_type
 
-        # Store the check itself (basic info + chaos value)
+        # Even when we don't have a price, we record the lookup with 0c
         effective_chaos = chaos_value if chaos_value is not None else 0.0
+
         db.add_checked_item(
             game_version=cfg.current_game,
             league=cfg.league,
@@ -642,6 +648,7 @@ class PriceCheckerGUI:
                 chaos_value=chaos_value,
                 divine_value=divine_value,
             )
+
 
     # ---------- Utility ----------
 
