@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-
+import logging
 from core.config import Config
 from core.item_parser import ItemParser
 from core.database import Database
@@ -45,8 +45,34 @@ def create_app_context() -> AppContext:
 
     poe_ninja: PoeNinjaAPI | None = None
     if game == GameVersion.POE1:
-        # For now, only PoE1 is wired to poe.ninja
+        # Start with whatever league is in the config
         poe_ninja = PoeNinjaAPI(league=game_cfg.league)
+
+        # Optionally auto-detect the active temp league via poe.ninja
+        if config.auto_detect_league:
+            logger = logging.getLogger(__name__)
+            try:
+                detected = poe_ninja.detect_current_league()
+            except Exception as exc:
+                logger.warning(
+                    "Failed to auto-detect league from poe.ninja; "
+                    "using configured league %s. Error: %s",
+                    game_cfg.league,
+                    exc,
+                )
+            else:
+                if detected and detected != game_cfg.league:
+                    logger.info(
+                        "Auto-detected current league '%s' (was '%s'); updating config.",
+                        detected,
+                        game_cfg.league,
+                    )
+                    # Update the game config + persist
+                    game_cfg.league = detected
+                    config.set_game_config(game_cfg)
+
+                    # Keep the API client in sync
+                    poe_ninja.league = detected
 
     return AppContext(
         config=config,

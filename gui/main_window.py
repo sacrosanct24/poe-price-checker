@@ -12,6 +12,7 @@ import webbrowser
 from core.app_context import AppContext, create_app_context
 from core.item_parser import ParsedItem
 from core.game_version import GameVersion
+from core.value_rules import assess_rare_item
 
 APP_VERSION = "0.2.0-dev"
 
@@ -258,33 +259,39 @@ class PriceCheckerGUI:
         columns = (
             "Item",
             "Rarity",
+            "Item Level",
             "Stack",
             "Chaos Value",
             "Divine Value",
             "Total Value",
+            "Value Flag",
         )
         self.tree = ttk.Treeview(
             results_frame,
             columns=columns,
-            show="tree headings",
-            height=15,
+            show="headings",
+            selectmode="browse",
         )
 
         self.tree.heading("#0", text="#")
         self.tree.heading("Item", text="Item Name")
         self.tree.heading("Rarity", text="Rarity")
+        self.tree.heading("Item Level", text="iLvl")
         self.tree.heading("Stack", text="Stack")
         self.tree.heading("Chaos Value", text="Chaos/Unit")
         self.tree.heading("Divine Value", text="Divine/Unit")
         self.tree.heading("Total Value", text="Total Value (c)")
+        self.tree.heading("Value Flag", text="Value Flag")
 
         self.tree.column("#0", width=40, stretch=False)
         self.tree.column("Item", width=350)
-        self.tree.column("Rarity", width=100)
-        self.tree.column("Stack", width=80, anchor=tk.CENTER)
-        self.tree.column("Chaos Value", width=100, anchor=tk.E)
-        self.tree.column("Divine Value", width=100, anchor=tk.E)
-        self.tree.column("Total Value", width=120, anchor=tk.E)
+        self.tree.column("Rarity", width=80, anchor=tk.CENTER)
+        self.tree.column("Item Level", width=60, anchor=tk.CENTER)
+        self.tree.column("Stack", width=60, anchor=tk.CENTER)
+        self.tree.column("Chaos Value", width=90, anchor=tk.E)
+        self.tree.column("Divine Value", width=90, anchor=tk.E)
+        self.tree.column("Total Value", width=110, anchor=tk.E)
+        self.tree.column("Value Flag", width=100, anchor=tk.CENTER)
 
         self.tree.pack(fill=tk.BOTH, expand=True)
 
@@ -436,6 +443,17 @@ class PriceCheckerGUI:
             except Exception as exc:  # pragma: no cover
                 print(f"DB error while recording item: {exc!r}")
 
+            # Run rare-value assessment (for display only)
+            value_flag = ""
+            try:
+                if (parsed.rarity or "").upper() == "RARE":
+                    assessment = assess_rare_item(parsed)
+                    value_flag = assessment.flag
+            except Exception as exc:  # pragma: no cover
+                # Fail-safe: don't break the whole check on value assessment error
+                print(f"Rare value assessment error: {exc!r}")
+                value_flag = ""
+
             # Apply min chaos filter for display
             if effective_chaos < min_filter and not show_vendor:
                 # Skip showing this item in the tree
@@ -455,8 +473,10 @@ class PriceCheckerGUI:
                     f"{chaos_value:.1f}" if chaos_value is not None else "",
                     f"{divine_value:.2f}" if divine_value is not None else "",
                     f"{total_chaos:.1f}" if chaos_value is not None else "",
+                    value_flag,
                 ),
             )
+
 
         self._set_status(
             f"Done. Parsed {len(items)} item(s), showing {displayed_count} "
@@ -568,10 +588,17 @@ class PriceCheckerGUI:
             item_name = item.name or ""
             base_type = item.base_type
 
+            gem_level = getattr(item, "gem_level", None)
+            gem_quality = getattr(item, "gem_quality", None)
+            corrupted = bool(getattr(item, "is_corrupted", False))
+
             result = api.find_item_price(
                 item_name=item_name,
                 base_type=base_type,
                 rarity=rarity or None,
+                gem_level=gem_level,
+                gem_quality=gem_quality,
+                corrupted=corrupted,
             )
             if result is None:
                 return {}
@@ -659,23 +686,21 @@ class PriceCheckerGUI:
 
     # ---------- Result copying helpers ----------
 
-    def _get_selected_row(self) -> tuple[str, str, str, str, str, str] | None:
+    def _get_selected_row(self) -> tuple | None:
         """
-        Return the currently selected row's values as a tuple:
-        (item_name, rarity, stack, chaos, divine, total)
+        Return all values from the selected row in the Treeview.
+        This works even if columns change (e.g., Value Flag added).
         """
         selection = self.tree.selection()
         if not selection:
             return None
 
         iid = selection[0]
-        item = self.tree.item(iid)
-        values = item.get("values", [])
-        if len(values) < 6:
+        values = self.tree.item(iid, "values")
+        if not values:
             return None
 
-        # values order: Item, Rarity, Stack, Chaos, Divine, Total
-        return tuple(values[:6])  # type: ignore[return-value]
+        return tuple(values)
 
     def _copy_row_tsv(self, event: tk.Event | None = None) -> None:
         """Copy the selected row as tab-separated text to the clipboard."""
@@ -683,7 +708,7 @@ class PriceCheckerGUI:
         if not row:
             return
 
-        text = "\t".join(str(v) for v in row)
+        text = "\t".join("" if v is None else str(v) for v in row)
         self._copy_to_clipboard(text)
         self.status_var.set("Copied row to clipboard.")
 
@@ -702,16 +727,13 @@ class PriceCheckerGUI:
         try:
             self.root.clipboard_clear()
             self.root.clipboard_append(text)
-            # update() helps keep the clipboard content after the app closes
             self.root.update()
         except Exception:
             pass
 
     def _on_tree_right_click(self, event: tk.Event) -> None:
-        """Right-click: select the row under cursor and show context menu."""
         row_id = self.tree.identify_row(event.y)
         if row_id:
-            # Change selection to the row under the cursor
             self.tree.selection_set(row_id)
             self.tree.focus(row_id)
             try:
@@ -720,17 +742,14 @@ class PriceCheckerGUI:
                 self.tree_menu.grab_release()
 
     def _on_tree_ctrl_c(self, event: tk.Event) -> str:
-        """Ctrl+C on the tree: copy row as TSV."""
         self._copy_row_tsv()
         return "break"
 
     def _on_ctrl_v(self, event: tk.Event | None = None) -> str:
-        """Normalize Ctrl+V to <<Paste>> and prevent double-paste."""
         self.input_text.event_generate("<<Paste>>")
         return "break"
 
     def _auto_check_if_not_empty(self) -> None:
-        """If there is content in the input box, run a price check."""
         text = self.input_text.get("1.0", tk.END).strip()
         if text:
             self.check_prices()

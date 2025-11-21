@@ -283,7 +283,7 @@ class Config:
     @auto_detect_league.setter
     def auto_detect_league(self, value: bool) -> None:
         """Set auto-detect league behavior and persist."""
-        self.data["api"]["auto_detect_league"] = value
+        self.data["api"]["auto_detect_league"] = bool(value)
         self.save()
 
     # ------------------------------------------------------------------

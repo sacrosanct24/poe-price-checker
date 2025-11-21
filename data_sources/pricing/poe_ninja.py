@@ -125,23 +125,31 @@ class PoeNinjaAPI(BaseAPIClient):
 
         return data
 
-    def get_item_overview(self, item_type: str) -> Dict[str, Any]:
+    def _get_item_overview(self, item_type: str) -> dict | None:
         """
-        Get item price overview for a specific type.
-
-        Args:
-            item_type: One of ITEM_TYPES (e.g., "UniqueWeapon", "Fragment")
-
-        Returns:
-            Dict with 'lines' (item data)
+        Shared helper for poe.ninja itemoverview endpoints (PoE1 only).
         """
-        if item_type not in self.ITEM_TYPES:
-            raise ValueError(f"Invalid item type: {item_type}. Must be one of {self.ITEM_TYPES}")
+        try:
+            data = self.get(
+                "itemoverview",
+                params={
+                    "league": self.league,
+                    "type": item_type,
+                    "language": "en",
+                },
+            )
+            return data if isinstance(data, dict) else None
+        except Exception as e:
+            logger.warning(f"Failed to fetch itemoverview for {item_type}: {e}")
+            return None
 
-        return self.get(
-            "itemoverview",
-            params={"league": self.league, "type": item_type}
-        )
+    def get_skill_gem_overview(self) -> dict | None:
+        """
+        Return poe.ninja SkillGem overview for the current league.
+
+        Contains lines with: name, gemLevel, gemQuality, corrupted, chaosValue, etc.
+        """
+        return self._get_item_overview("SkillGem")
 
     def load_all_prices(self) -> Dict[str, Dict[str, Any]]:
         """
@@ -189,7 +197,7 @@ class PoeNinjaAPI(BaseAPIClient):
             for item_type in types:
                 logger.info(f"Loading {item_type}...")
                 try:
-                    data = self.get_item_overview(item_type)
+                    data = self._get_item_overview(item_type)
 
                     for item in data.get("lines", []):
                         # For uniques, include base type in key
@@ -205,66 +213,96 @@ class PoeNinjaAPI(BaseAPIClient):
 
         logger.info(f"Loaded all prices for {self.league}")
         return cache
+    def _find_from_overview_by_name(self, overview_type: str, item_name: str) -> dict | None:
+        """
+        Look up a poe.ninja itemoverview entry by name.
+
+        overview_type examples:
+            - "DivinationCard"
+            - "Fragment"
+            - "Essence"
+            - "Fossil"
+            - "Scarab"
+            - "Oil"
+            - "Incubator"
+            - "Vial"
+        """
+        overview = self._get_item_overview(overview_type)
+        if not overview:
+            return None
+
+        lines = overview.get("lines", [])
+        if not lines:
+            return None
+
+        def norm(s: str | None) -> str:
+            return (s or "").strip().lower()
+
+        key = norm(item_name)
+        if not key:
+            return None
+
+        # Exact name match first
+        for line in lines:
+            if norm(line.get("name")) == key:
+                return line
+
+        # Fallback: loose substring match
+        for line in lines:
+            n = norm(line.get("name"))
+            if key in n or n in key:
+                return line
+
+        return None
 
     def find_item_price(
             self,
             item_name: str,
-            base_type: Optional[str] = None,
-            rarity: Optional[str] = None
-    ) -> Optional[Dict[str, Any]]:
+            base_type: str | None,
+            rarity: str | None = None,
+            gem_level: int | None = None,
+            gem_quality: int | None = None,
+            corrupted: bool | None = None,
+    ) -> dict | None:
         """
-        Find price for an item by name.
+        Main item price resolver.
 
-        Args:
-            item_name: Item name
-            base_type: Base type (for uniques)
-            rarity: Item rarity (UNIQUE, CURRENCY, etc.)
-
-        Returns:
-            Item data dict with chaosValue, divineValue, etc., or None if not found
+        - Currency is handled separately in GUI via get_currency_overview()
+        - Here we handle:
+            * Skill gems (SkillGem overview)
+            * Unique items (armour, weapon, accessory, flask, jewel)
+            * Divination cards, fragments, etc. via itemoverview
         """
-        search_key = item_name.lower()
+        rarity_upper = (rarity or "").upper()
+        name = (item_name or "").strip()
 
-        # Try currency first if no name (base_type only)
-        if not item_name and base_type:
-            search_key = base_type.lower()
+        # ---------- Skill gems ----------
+        if rarity_upper == "GEM":
+            return self._find_gem_price(
+                name=name,
+                gem_level=gem_level,
+                gem_quality=gem_quality,
+                corrupted=corrupted,
+            )
 
-            for cache_type in ['currency', 'fragments', 'essences', 'fossils', 'scarabs', 'oils', 'incubators',
-                               'vials']:
-                # Need to load this type first
-                try:
-                    if cache_type == 'currency':
-                        data = self.get_currency_overview()
-                    else:
-                        type_map = {
-                            'fragments': 'Fragment',
-                            'divination': 'DivinationCard',
-                            'essences': 'Essence',
-                            'fossils': 'Fossil',
-                            'scarabs': 'Scarab',
-                            'oils': 'Oil',
-                            'incubators': 'Incubator',
-                            'vials': 'Vial'
-                        }
-                        data = self.get_item_overview(type_map[cache_type])
+        # ---------- Divination cards ----------
+        # Your parser shows "DIVINATION" as rarity in the tree
+        if rarity_upper in ("DIVINATION", "DIVINATION CARD"):
+            return self._find_from_overview_by_name("DivinationCard", name)
 
-                    for item in data.get("lines", []):
-                        item_key = item.get("currencyTypeName", item.get("name", "")).lower()
-                        if search_key in item_key or item_key in search_key:
-                            return item
+        # (Optional future: add fragment / essence etc here)
+        # if rarity_upper == "FRAGMENT":
+        #     return self._find_from_overview_by_name("Fragment", name)
 
-                except Exception as e:
-                    logger.debug(f"Search in {cache_type} failed: {e}")
-
-        # Try uniques if rarity is UNIQUE
-        if rarity == 'UNIQUE':
+        # ---------- Uniques ----------
+        if rarity_upper == "UNIQUE":
             search_key = item_name.lower()
             if base_type:
                 search_key = f"{item_name.lower()} {base_type.lower()}"
 
             for item_type in ["UniqueWeapon", "UniqueArmour", "UniqueAccessory", "UniqueFlask", "UniqueJewel"]:
                 try:
-                    data = self.get_item_overview(item_type)
+                    data = self._get_item_overview(item_type)
 
                     for item in data.get("lines", []):
                         item_key = item['name'].lower()
@@ -278,6 +316,59 @@ class PoeNinjaAPI(BaseAPIClient):
                     logger.debug(f"Search in {item_type} failed: {e}")
 
         return None
+
+    def _find_gem_price(
+        self,
+        name: str,
+        gem_level: int | None,
+        gem_quality: int | None,
+        corrupted: bool | None,
+    ) -> dict | None:
+        """Find price for a skill gem (including Awakened, alt-quality)."""
+        overview = self.get_skill_gem_overview()
+        if not overview:
+            return None
+
+        lines = overview.get("lines", [])
+        if not lines:
+            return None
+
+        def norm(s: str | None) -> str:
+            return (s or "").strip().lower()
+
+        name_key = norm(name)
+        if not name_key:
+            return None
+
+        # Step 1: exact name match
+        candidates = [ln for ln in lines if norm(ln.get("name")) == name_key]
+        if not candidates:
+            return None
+
+        # Step 2: filter by corruption if we know it
+        if corrupted is not None:
+            filtered = [ln for ln in candidates if bool(ln.get("corrupted")) == corrupted]
+            if filtered:
+                candidates = filtered
+
+        # Step 3: filter by gem level, if known
+        if gem_level is not None:
+            filtered = [ln for ln in candidates if ln.get("gemLevel") == gem_level]
+            if filtered:
+                candidates = filtered
+
+        # Step 4: filter by gem quality, if known
+        if gem_quality is not None:
+            filtered = [ln for ln in candidates if ln.get("gemQuality") == gem_quality]
+            if filtered:
+                candidates = filtered
+
+        # Step 5: pick the highest chaosValue as a fallback
+        best = max(
+            candidates,
+            key=lambda ln: float(ln.get("chaosValue") or 0.0),
+        )
+        return best
 
 
 # Testing
