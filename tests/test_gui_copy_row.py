@@ -1,21 +1,31 @@
-# tests/integration/test_gui_copy_row.py
+# tests/test_gui_copy_row.py
 
 import tkinter as tk
 from tkinter import ttk
-
+from typing import Iterator
 import pytest
 
 from gui.main_window import PriceCheckerGUI
 
 
 @pytest.fixture
-def tk_root():
-    """Provide a Tk root and ensure it is destroyed after the test."""
-    root = tk.Tk()
-    # Hide the main window to avoid it flashing during tests
-    root.withdraw()
-    yield root
-    root.destroy()
+def tk_root() -> Iterator[tk.Tk]:
+    """Yield a hidden Tk root window and ensure it is destroyed after the test.
+
+    If Tk cannot be initialized (e.g., in a headless or misconfigured environment),
+    skip these GUI tests instead of failing the whole suite.
+    """
+    try:
+        root = tk.Tk()
+    except tk.TclError:
+        pytest.skip("Tkinter is not available or cannot be initialized in this environment.")
+    else:
+        # Hide the main window to avoid it flashing during tests
+        root.withdraw()
+        try:
+            yield root
+        finally:
+            root.destroy()
 
 
 def _make_fake_gui(root: tk.Tk) -> PriceCheckerGUI:

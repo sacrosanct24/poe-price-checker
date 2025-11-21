@@ -788,8 +788,8 @@ class PriceCheckerGUI:
 
     def _get_selected_row(self) -> tuple | None:
         """
-        Return all values from the selected row in the Treeview.
-        This works even if columns change (e.g., Value Flag added).
+        Return all values from the selected Treeview row.
+        Works for any number of columns.
         """
         selection = self.tree.selection()
         if not selection:
@@ -800,10 +800,11 @@ class PriceCheckerGUI:
         if not values:
             return None
 
+        # Always return all columns, in order
         return tuple(values)
 
+
     def _copy_row_tsv(self, event: tk.Event | None = None) -> None:
-        """Copy the selected row as tab-separated text to the clipboard."""
         row = self._get_selected_row()
         if not row:
             return
@@ -811,6 +812,7 @@ class PriceCheckerGUI:
         text = "\t".join("" if v is None else str(v) for v in row)
         self._copy_to_clipboard(text)
         self.status_var.set("Copied row to clipboard.")
+
 
     def _copy_item_name(self) -> None:
         """Copy just the item name from the selected row."""
