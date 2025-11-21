@@ -68,21 +68,74 @@ class PoeNinjaAPI(BaseAPIClient):
 
     def get_current_leagues(self) -> List[Dict[str, str]]:
         """
-        Fetch list of current leagues from poe.ninja.
+        Fetch list of current trade leagues from the official PoE trade API.
 
         Returns:
-            List of league dicts with 'name' and 'displayName'
-        """
-        try:
-            data = self.get("economyleagues")
-            return data if isinstance(data, list) else []
-        except Exception as e:
-            logger.warning(f"Failed to fetch leagues: {e}")
-            # Fallback leagues
-            return [
+            List of league dicts with 'name' and 'displayName', e.g.:
+            [
                 {"name": "Standard", "displayName": "Standard"},
-                {"name": "Hardcore", "displayName": "Hardcore"}
+                {"name": "Hardcore", "displayName": "Hardcore"},
+                {"name": "Keepers", "displayName": "Keepers of the Trove"},
+                {"name": "Hardcore Keepers", "displayName": "Hardcore Keepers of the Trove"},
+                ...
             ]
+
+        We:
+          - Restrict to PC realm.
+          - Deduplicate by league id.
+        """
+        import requests
+
+        url = "https://www.pathofexile.com/api/trade/data/leagues"
+        headers = {
+            "User-Agent": "PoE-Price-Checker/2.5 (GitHub: sacrosanct24/poe-price-checker)",
+        }
+
+        try:
+            resp = requests.get(url, headers=headers, timeout=10)
+            resp.raise_for_status()
+            data = resp.json()
+
+            result = data.get("result", [])
+            # Deduplicate by league id, and restrict to PC realm
+            id_to_text: dict[str, str] = {}
+
+            for entry in result:
+                # Typical shape: {"id": "Standard", "text": "Standard", "realm": "pc", ...}
+                if entry.get("realm") != "pc":
+                    continue
+
+                league_id = entry.get("id")
+                text = entry.get("text") or league_id
+                if not league_id:
+                    continue
+
+                # First one wins; ignore duplicates from same realm
+                if league_id not in id_to_text:
+                    id_to_text[league_id] = text
+
+            leagues: List[Dict[str, str]] = [
+                {"name": league_id, "displayName": text}
+                for league_id, text in id_to_text.items()
+            ]
+
+            if leagues:
+                logger.info(
+                    "Fetched %d leagues from trade API (pc realm): %s",
+                    len(leagues),
+                    ", ".join(l["name"] for l in leagues),
+                )
+                return leagues
+
+        except Exception as e:
+            logger.warning(f"Failed to fetch leagues from trade API: {e}")
+
+        # Fallback: at least keep the permanent leagues usable
+        logger.info("Falling back to static league list (Standard/Hardcore)")
+        return [
+            {"name": "Standard", "displayName": "Standard"},
+            {"name": "Hardcore", "displayName": "Hardcore"},
+        ]
 
     def detect_current_league(self) -> str:
         """

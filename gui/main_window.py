@@ -366,29 +366,129 @@ class PriceCheckerGUI:
 
     def change_league(self) -> None:
         """
-        Simple dialog to change league.
+        Show a small dialog with a dropdown of available leagues.
 
-        - Updates Config.league for current game
+        - Uses poe.ninja's /economyleagues endpoint via PoeNinjaAPI.get_current_leagues()
+        - Updates Config.league for the current game
         - Updates AppContext.poe_ninja.league if using PoE1
         """
-        current_league = self.ctx.config.league
-        new_league = simpledialog.askstring(
-            "Change League",
-            "Enter league name:",
-            initialvalue=current_league,
-            parent=self.root,
-        )
-        if not new_league:
+        if not self.ctx.poe_ninja:
+            messagebox.showinfo("Change League", "League selection is only available for PoE1.")
             return
 
-        self.ctx.config.league = new_league  # uses current_game under the hood
+        # Fetch leagues from poe.ninja
+        try:
+            leagues = self.ctx.poe_ninja.get_current_leagues()
+        except Exception as exc:
+            messagebox.showerror("Error", f"Failed to fetch leagues from poe.ninja:\n{exc}")
+            return
 
-        # If we're in PoE1 and have a poe.ninja client, update its league
-        if self.ctx.config.current_game == GameVersion.POE1 and self.ctx.poe_ninja:
-            self.ctx.poe_ninja.league = new_league
+        if not leagues:
+            messagebox.showwarning(
+                "Change League",
+                "No leagues were returned from poe.ninja.\n"
+                "Try again later or set the league manually in the config."
+            )
+            return
 
-        self._update_game_info()
-        self.status_var.set(f"League changed to {new_league}")
+        # Map display name → internal name
+        # poe.ninja returns [{"name": "Settlers", "displayName": "Settlers"}, ...]
+        display_to_name: dict[str, str] = {}
+        display_values: list[str] = []
+
+        for entry in leagues:
+            internal = entry.get("name") or ""
+            display = entry.get("displayName") or internal
+            if not internal:
+                continue
+            display_to_name[display] = internal
+            display_values.append(display)
+
+        # Sort alphabetically for nicer UX
+        display_values.sort(key=str.lower)
+
+        if not display_values:
+            messagebox.showwarning(
+                "Change League",
+                "No valid leagues were returned from poe.ninja."
+            )
+            return
+
+        # Current league (internal name)
+        current_league = self.ctx.config.league
+
+        # Try to find the display name that corresponds to current_league
+        initial_display = None
+        for disp, name in display_to_name.items():
+            if name == current_league:
+                initial_display = disp
+                break
+        if initial_display is None:
+            # Fallback to first entry
+            initial_display = display_values[0]
+
+        # --- Build the dialog window ---
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Change League")
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        tk.Label(dialog, text="Select league:", anchor="w").pack(
+            side=tk.TOP, fill=tk.X, padx=10, pady=(10, 4)
+        )
+
+        league_var = tk.StringVar(value=initial_display)
+        combo = ttk.Combobox(
+            dialog,
+            textvariable=league_var,
+            values=display_values,
+            state="readonly",
+            width=40,
+        )
+        combo.pack(side=tk.TOP, fill=tk.X, padx=10, pady=(0, 10))
+        combo.focus_set()
+
+        button_frame = tk.Frame(dialog)
+        button_frame.pack(side=tk.TOP, fill=tk.X, padx=10, pady=(0, 10))
+
+        def on_ok() -> None:
+            chosen_display = league_var.get()
+            internal_name = display_to_name.get(chosen_display)
+            if not internal_name:
+                dialog.destroy()
+                return
+
+            # Update config and poe.ninja client
+            self.ctx.config.league = internal_name
+            if self.ctx.config.current_game == GameVersion.POE1 and self.ctx.poe_ninja:
+                self.ctx.poe_ninja.league = internal_name
+
+            # Refresh status bar
+            self._update_game_info()
+            self.status_var.set(f"League changed to {internal_name}")
+            dialog.destroy()
+
+        def on_cancel() -> None:
+            dialog.destroy()
+
+        ok_btn = ttk.Button(button_frame, text="OK", command=on_ok)
+        ok_btn.pack(side=tk.RIGHT, padx=(5, 0))
+
+        cancel_btn = ttk.Button(button_frame, text="Cancel", command=on_cancel)
+        cancel_btn.pack(side=tk.RIGHT)
+
+        dialog.bind("<Return>", lambda _: on_ok())
+        dialog.bind("<Escape>", lambda _: on_cancel())
+
+        # Center the dialog over the main window
+        self.root.update_idletasks()
+        x = self.root.winfo_rootx()
+        y = self.root.winfo_rooty()
+        w = self.root.winfo_width()
+        h = self.root.winfo_height()
+        dw = dialog.winfo_reqwidth()
+        dh = dialog.winfo_reqheight()
+        dialog.geometry(f"{dw}x{dh}+{x + (w - dw) // 2}+{y + (h - dh) // 2}")
 
     # ---------- Core actions ----------
 
