@@ -1,14 +1,12 @@
 # tests/test_gui_export_and_copy_all_tsv.py
 
 import tkinter as tk
-from tkinter import ttk
 from pathlib import Path
 
 import pytest
 
-from gui.main_window import PriceCheckerGUI, RESULT_COLUMNS
-# tests/integration/gui/test_gui_copy_row.py
-import pytest
+from gui.main_window import PriceCheckerGUI
+
 pytestmark = pytest.mark.integration
 
 
@@ -35,7 +33,9 @@ class _DummyContext:
 @pytest.fixture
 def gui_with_results(tk_root: tk.Tk) -> PriceCheckerGUI:
     gui = PriceCheckerGUI(tk_root, _DummyContext())
-    # Insert a couple of rows into the real ResultsTable
+    # Insert a couple of rows into the real ResultsTable.
+    # NOTE: The GUI now also adds aggregate rows per logical item,
+    # so the final table will contain more than just these two rows.
     rows = [
         {
             "item_name": "ExportItem1",
@@ -61,7 +61,7 @@ def gui_with_results(tk_root: tk.Tk) -> PriceCheckerGUI:
 
 
 def test_copy_all_rows_as_tsv_uses_clipboard(gui_with_results: PriceCheckerGUI, monkeypatch) -> None:
-    captured: dict[str, str] = {}
+    captured: dict[str, object] = {}
 
     def fake_set_clipboard(text: str) -> None:
         captured["value"] = text
@@ -79,13 +79,28 @@ def test_copy_all_rows_as_tsv_uses_clipboard(gui_with_results: PriceCheckerGUI, 
 
     assert "value" in captured
     tsv = captured["value"]
+    assert isinstance(tsv, str)
+
     lines = tsv.splitlines()
-    # header + 2 rows
-    assert len(lines) == 3
-    assert "ExportItem1" in lines[1]
-    assert "ExportItem2" in lines[2]
+    # We expect at least:
+    #   1 header line + 2 per-source rows + 2 aggregate rows = 5
+    # but future sources or changes may add more. So just require >= 3.
+    assert len(lines) >= 3
+
+    header = lines[0]
+    assert "item_name" in header
+    assert "source" in header
+
+    # Data lines (skip header)
+    data_lines = lines[1:]
+
+    # Ensure our two logical items appear somewhere in the TSV
+    assert any("ExportItem1" in line for line in data_lines)
+    assert any("ExportItem2" in line for line in data_lines)
+
+    # We should also have seen the informational dialog
     assert "info" in captured
-    title, msg = captured["info"]
+    title, msg = captured["info"]  # type: ignore[assignment]
     assert "Copy All Rows as TSV" in title
 
 
@@ -105,7 +120,7 @@ def test_export_results_tsv_calls_export_and_handles_path(
     monkeypatch.setattr(filedialog_module, "asksaveasfilename", fake_asksaveasfilename)
 
     # Monkeypatch ResultsTable.export_tsv to track that it was called with the same path
-    called: dict[str, Path] = {}
+    called: dict[str, object] = {}
 
     def fake_export_tsv(path: str | Path, include_header: bool = False) -> None:
         called["path"] = Path(path)

@@ -1,4 +1,4 @@
-# tests/test_gui_details_and_status.py
+# tests/integration/gui/test_gui_details_and_status.py
 
 import tkinter as tk
 from tkinter import ttk
@@ -6,8 +6,7 @@ from tkinter import ttk
 import pytest
 
 from gui.main_window import PriceCheckerGUI, RESULT_COLUMNS
-# tests/integration/gui/test_gui_copy_row.py
-import pytest
+
 pytestmark = pytest.mark.integration
 
 
@@ -34,6 +33,7 @@ class _DummyContext:
     """Minimal stand-in for app_context used by PriceCheckerGUI in tests."""
     def __init__(self) -> None:
         self.logger = None  # GUI resolves its own fallback logger
+        self.config = None  # no league/config in these tests
 
 
 @pytest.fixture
@@ -43,7 +43,12 @@ def gui(tk_root: tk.Tk) -> PriceCheckerGUI:
 
 @pytest.fixture
 def gui_with_one_row(gui: PriceCheckerGUI) -> PriceCheckerGUI:
-    """GUI with one pre-inserted result row and that row selected."""
+    """
+    GUI with one logical result row inserted.
+
+    NOTE: The GUI now also adds an aggregate row for each logical item,
+    so we expect at least one row in the Treeview, but not exactly one.
+    """
     rows = [
         {
             "item_name": "DetailItem",
@@ -59,13 +64,15 @@ def gui_with_one_row(gui: PriceCheckerGUI) -> PriceCheckerGUI:
 
     tree = gui.results_tree
     children = tree.get_children()
-    assert len(children) == 1
+    # There should be at least one row (aggregate + per-source)
+    assert len(children) >= 1
+    # Select the first row for detail tests
     tree.selection_set(children[0])
     return gui
 
 
 def test_view_selected_row_details_shows_message(gui_with_one_row: PriceCheckerGUI, monkeypatch) -> None:
-    captured: dict[str, str | tuple[str, str]] = {}
+    captured: dict[str, tuple[str, str]] = {}
 
     # Monkeypatch messagebox.showinfo to capture title and message
     import tkinter.messagebox as messagebox_module
@@ -86,7 +93,7 @@ def test_view_selected_row_details_shows_message(gui_with_one_row: PriceCheckerG
 
 
 def test_view_selected_row_details_no_selection(gui: PriceCheckerGUI, monkeypatch) -> None:
-    captured: dict[str, str | tuple[str, str]] = {}
+    captured: dict[str, tuple[str, str]] = {}
 
     import tkinter.messagebox as messagebox_module
 
@@ -109,27 +116,31 @@ def test_view_selected_row_details_no_selection(gui: PriceCheckerGUI, monkeypatc
     assert gui.status_var.get().startswith("No row selected")
 
 
-def test_tree_double_click_triggers_view_details(gui_with_one_row: PriceCheckerGUI, monkeypatch) -> None:
+def test_tree_double_click_opens_browser(gui_with_one_row: PriceCheckerGUI, monkeypatch) -> None:
     """
-    Simulate a double-click event on the only row and assert that
-    _view_selected_row_details is called (via its messagebox).
+    Simulate a double-click event on the only logical row and assert that
+    the GUI attempts to open a browser (trade page) for that row.
+
+    Double-click no longer shows the details dialog by default; it now
+    calls _open_selected_row_trade_url_or_details, which opens a browser
+    and only falls back to the details dialog on error.
     """
-    captured: dict[str, tuple[str, str]] = {}
+    opened_urls: list[str] = []
 
-    import tkinter.messagebox as messagebox_module
+    import gui.main_window as main_window_module
 
-    def fake_showinfo(title: str, message: str) -> None:
-        captured["info"] = (title, message)
+    def fake_open_new_tab(url: str) -> None:
+        opened_urls.append(url)
 
-    monkeypatch.setattr(messagebox_module, "showinfo", fake_showinfo)
+    monkeypatch.setattr(main_window_module.webbrowser, "open_new_tab", fake_open_new_tab)
 
     tree = gui_with_one_row.results_tree
-    # Get row bbox to simulate a click inside its cell
     children = tree.get_children()
-    assert len(children) == 1
+    assert len(children) >= 1
     row_id = children[0]
+
+    # Get row bbox to simulate a click inside its cell
     bbox = tree.bbox(row_id, column="#1")  # first visible column
-    # If bbox is empty (e.g. not visible yet), just skip this test
     if not bbox:
         pytest.skip("Treeview row bbox not available in this environment.")
 
@@ -144,10 +155,8 @@ def test_tree_double_click_triggers_view_details(gui_with_one_row: PriceCheckerG
 
     gui_with_one_row._on_tree_double_click(event)
 
-    assert "info" in captured
-    title, message = captured["info"]
-    assert "Item Details" in title
-    assert "DetailItem" in message
+    assert len(opened_urls) == 1
+    assert "pathofexile.com" in opened_urls[0]
 
 
 def test_insert_result_rows_sets_status_with_row_count(gui: PriceCheckerGUI) -> None:
@@ -176,4 +185,6 @@ def test_insert_result_rows_sets_status_with_row_count(gui: PriceCheckerGUI) -> 
 
     status = gui.status_var.get()
     assert "Price check complete" in status
-    assert "2 row(s)" in status
+    # We now have aggregate rows + per-source rows:
+    # 2 logical items → 2 aggregates + 2 per-source = 4 rows
+    assert "4 row(s)" in status

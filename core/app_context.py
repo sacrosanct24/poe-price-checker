@@ -16,6 +16,7 @@ from core.price_multi import (
     ExistingServiceAdapter,
     PriceSource,
 )
+from core.derived_sources import UndercutPriceSource
 from data_sources.pricing.trade_api import PoeTradeClient, TradeApiSource
 
 @dataclass
@@ -94,13 +95,20 @@ def create_app_context() -> AppContext:
     # Multi-source aggregation layer
     # ------------------------------------------------------------------
     base_source: PriceSource = ExistingServiceAdapter(
-        name="poe_ninja",  # appears in the 'source' column in the GUI
+        name="poe_ninja",
         service=base_price_service,
     )
 
     sources: list[PriceSource] = [base_source]
 
-    # --- (SKELETON) Trade API source wiring ---------------------------
+    # Synthetic “derived” source: suggested undercut price based on poe_ninja
+    undercut_source: PriceSource = UndercutPriceSource(
+        name="suggested_undercut",
+        base_service=base_price_service,
+        undercut_factor=0.9,  # 10% under poe_ninja by default
+    )
+    sources.append(undercut_source)
+
     if game == GameVersion.POE1:
         trade_logger = logging.getLogger("poe_price_checker.trade_api")
         trade_client = PoeTradeClient(logger=trade_logger)
@@ -112,10 +120,8 @@ def create_app_context() -> AppContext:
             logger=trade_logger,
         )
 
-        # NOTE: search_and_fetch is a stub for now, so this won't add rows yet.
-        # Once implemented, simply leave this append in place.
+        # NOTE: still a stub until Trade API is implemented
         sources.append(trade_source)
-    # -------------------------------------------------------------------
 
     multi_price_service = MultiSourcePriceService(sources=sources)
 

@@ -1,9 +1,6 @@
-from __future__ import annotations
-
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
-from typing import Any, Iterable, Protocol, runtime_checkable
-
+from typing import Any, Iterable, Protocol, runtime_checkable, Mapping
 
 RESULT_COLUMNS: tuple[str, ...] = (
     "item_name",
@@ -18,33 +15,12 @@ RESULT_COLUMNS: tuple[str, ...] = (
 
 @runtime_checkable
 class PriceSource(Protocol):
-    """
-    A single price data source (PoE Ninja, Trade API, poe.watch, etc.).
-
-    Implementations should:
-      - Set a human-friendly `name` attribute.
-      - Return an iterable of rows mapping RESULT_COLUMNS to values.
-    """
-
     name: str
-
-    def check_item(self, item_text: str) -> Iterable[dict[str, Any]]:
-        ...
+    def check_item(self, item_text: str) -> Iterable[dict[str, Any]]: ...
 
 
 @dataclass
 class ExistingServiceAdapter(PriceSource):
-    """
-    Adapter that wraps your existing single-source service and makes it
-    behave like a PriceSource.
-
-    Example:
-        adapter = ExistingServiceAdapter(
-            name="poe_ninja",
-            service=old_price_service_instance,
-        )
-    """
-
     name: str
     service: Any
 
@@ -52,13 +28,10 @@ class ExistingServiceAdapter(PriceSource):
         raw_results = self.service.check_item(item_text)  # type: ignore[call-arg]
         rows: list[dict[str, Any]] = []
 
-        # Your existing service may already return dicts with matching keys.
-        # Normalize and inject the 'source' field.
         for row in raw_results:
             if isinstance(row, dict):
                 data = dict(row)
             else:
-                # Fallback: pull attributes
                 data = {col: getattr(row, col, "") for col in RESULT_COLUMNS}
 
             data.setdefault("item_name", "")
@@ -67,7 +40,6 @@ class ExistingServiceAdapter(PriceSource):
             data.setdefault("chaos_value", "")
             data.setdefault("divine_value", "")
             data.setdefault("listing_count", "")
-            # Override or set source name explicitly
             data["source"] = self.name
 
             rows.append(data)
@@ -81,7 +53,7 @@ class MultiSourcePriceService:
 
     - Runs sources in parallel using ThreadPoolExecutor.
     - Flattens all results into one list.
-    - Keeps the 'source' column populated with the source name.
+    - Allows enabling/disabling sources by name (for GUI toggling).
     """
 
     def __init__(
@@ -91,20 +63,52 @@ class MultiSourcePriceService:
     ) -> None:
         if not sources:
             raise ValueError("MultiSourcePriceService requires at least one PriceSource.")
-        self._sources = list(sources)
+        self._sources: list[PriceSource] = list(sources)
         self._max_workers = max_workers or min(8, len(self._sources))
+
+        # Track enabled source names; default = all enabled
+        self._enabled_names: set[str] = {s.name for s in self._sources}
 
     @property
     def sources(self) -> list[PriceSource]:
+        """Return all configured sources (read-only view)."""
         return list(self._sources)
+
+    # ----- New: GUI-facing state helpers ---------------------------------
+
+    def get_enabled_state(self) -> dict[str, bool]:
+        """
+        Return a mapping of source_name -> enabled_flag.
+        Used by the GUI to populate checkboxes.
+        """
+        return {s.name: (s.name in self._enabled_names) for s in self._sources}
+
+    def set_enabled_state(self, enabled: Mapping[str, bool]) -> None:
+        """
+        Update which sources are enabled based on a mapping
+        of source_name -> enabled_flag.
+        """
+        new_enabled: set[str] = set()
+        for s in self._sources:
+            if enabled.get(s.name, True):
+                new_enabled.add(s.name)
+        # Avoid ending up with an empty set silently; fall back to all enabled
+        self._enabled_names = new_enabled or {s.name for s in self._sources}
+
+    # ---------------------------------------------------------------------
 
     def check_item(self, item_text: str) -> list[dict[str, Any]]:
         """
-        Run a price check against all configured sources in parallel.
+        Run a price check against all *enabled* sources in parallel.
 
         Returns a flat list of rows. Each row is a dict with RESULT_COLUMNS.
         """
         if not item_text.strip():
+            return []
+
+        # Only active sources participate
+        active_sources = [s for s in self._sources if s.name in self._enabled_names]
+        if not active_sources:
             return []
 
         results: list[dict[str, Any]] = []
@@ -112,20 +116,18 @@ class MultiSourcePriceService:
         with ThreadPoolExecutor(max_workers=self._max_workers) as executor:
             future_to_source = {
                 executor.submit(source.check_item, item_text): source
-                for source in self._sources
+                for source in active_sources
             }
 
             for future in as_completed(future_to_source):
                 source = future_to_source[future]
                 try:
                     rows = future.result()
-                except Exception as exc:
+                except Exception:
                     # In a real app you'd log this; for now we just skip on error.
-                    # logger.warning("Source %s failed: %s", source.name, exc)
                     continue
 
                 for row in rows:
-                    # Ensure 'source' is filled; individual sources can override.
                     if isinstance(row, dict):
                         data = dict(row)
                     else:

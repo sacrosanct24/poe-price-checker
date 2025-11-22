@@ -6,9 +6,10 @@ Tkinter GUI for the PoE Price Checker.
 - Paste or type item text into the input box.
 - Click "Check Price" (or press Ctrl+Enter) to run a price check.
 - View results in the table.
-- Right–click a result row to copy it, copy it as TSV, or view details.
+- Right–click a result row to open in browser, copy it, copy it as TSV, or view details.
 - File menu: open log file, open config folder, export TSV, copy all as TSV, exit.
-- View menu: session history.
+- View menu: session history, data sources, column visibility.
+- Dev menu: paste sample items of various types (map, currency, unique, etc.).
 - Help menu: shortcuts, usage tips, about.
 """
 
@@ -16,14 +17,16 @@ from __future__ import annotations
 
 import logging
 import os
+import random
 import sys
+import webbrowser
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterable, Mapping, TYPE_CHECKING
-import threading
 
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
+from urllib.parse import quote_plus  # currently unused but kept for future URL tweaks
 
 if TYPE_CHECKING:  # pragma: no cover
     from core.app_context import AppContext  # type: ignore
@@ -39,6 +42,114 @@ RESULT_COLUMNS: tuple[str, ...] = (
     "listing_count",
     "source",
 )
+
+# ----------------------------------------------------------------------
+# Sample item texts for development convenience (Dev → Paste Sample ...).
+# These are approximate PoE clipboard formats, good enough for testing.
+# ----------------------------------------------------------------------
+SAMPLE_ITEMS: dict[str, list[str]] = {
+    "map": [
+        """Rarity: Normal
+Cemetery Map
+--------
+Map Tier: 5
+Atlas Region: Haewark Hamlet
+Item Level: 73
+--------
+Travel to this Map by using it in the Templar Laboratory or a personal Map Device. Maps can only be used once.
+""",
+        """Rarity: Magic
+Volcano Map of Exposure
+--------
+Map Tier: 10
+Atlas Region: Lex Proxima
+Item Level: 80
+--------
+Item Quantity: +24%
+Item Rarity: +16%
+Monster Pack Size: +8%
+--------
+Monsters deal 25% extra Fire Damage
+Monsters have 30% Fire Resistance
+--------
+Travel to this Map by using it in the Templar Laboratory or a personal Map Device. Maps can only be used once.
+""",
+    ],
+    "currency": [
+        """Rarity: Currency
+Chaos Orb
+--------
+Stack Size: 1/10
+--------
+Reforges a rare item with new random modifiers
+--------
+Right click this item then left click a rare item to apply it.
+""",
+        """Rarity: Currency
+Orb of Alchemy
+--------
+Stack Size: 1/20
+--------
+Upgrades a normal item to a rare item
+--------
+Right click this item then left click a normal item to apply it.
+""",
+    ],
+    "unique": [
+        """Rarity: Unique
+Tabula Rasa
+Simple Robe
+--------
+Sockets: W-W-W-W-W-W
+--------
+Item Level: 68
+--------
+Item has no Level requirement
+--------
+A white canvas awaits new colours.
+""",
+        """Rarity: Unique
+Goldrim
+Leather Cap
+--------
+Evasion Rating: 33
+--------
+Requires Level 1
+--------
++30% to all Elemental Resistances
+10% increased Rarity of Items found
+""",
+    ],
+    "rare": [
+        """Rarity: Rare
+Gale Gyre
+Opal Ring
+--------
+Requires Level 80
+--------
+Item Level: 84
+--------
++29% to Fire and Lightning Resistances
++16% to all Elemental Resistances
++55 to Maximum Life
++38% to Global Critical Strike Multiplier
+""",
+    ],
+    "gem": [
+        """Rarity: Gem
+Cyclone
+--------
+Attack, AoE, Movement, Channeling, Melee
+Level: 20
+Quality: +20%
+Mana Cost: 2
+--------
+Requires Level 70, 95 Str
+--------
+Channel this skill to move towards a targeted location while spinning, damaging nearby enemies.
+""",
+    ],
+}
 
 
 class ResultsTable:
@@ -57,9 +168,6 @@ class ResultsTable:
         # Track which columns are currently hidden and their base widths
         self._hidden_columns: set[str] = set()
         self._base_column_widths: dict[str, int] = {}
-
-        # Async / background check state
-        self._check_in_progress: bool = False
 
         # Treeview + scrollbar
         self.tree = ttk.Treeview(
@@ -248,7 +356,6 @@ class ResultsTable:
     def _on_heading_click(self, column: str) -> None:
         """Handle clicks on a column header: toggle sort order and sort."""
         reverse = self._sort_reverse.get(column, False)
-        # Toggle
         reverse = not reverse
         self._sort_reverse[column] = reverse
         self.sort_by_column(column, reverse=reverse)
@@ -268,12 +375,10 @@ class ResultsTable:
         def coerce(value: Any) -> Any:
             s = "" if value is None else str(value)
             try:
-                # Try numeric comparison first (good for chaos/divine values)
                 return float(s)
             except ValueError:
                 return s.lower()
 
-        # Build list of (key, item_id) and sort it.
         keyed = []
         for item_id in children:
             values = self.tree.item(item_id, "values") or ()
@@ -282,7 +387,6 @@ class ResultsTable:
 
         keyed.sort(key=lambda pair: pair[0], reverse=reverse)
 
-        # Reorder items in the tree to match the sorted order.
         for index, (_, item_id) in enumerate(keyed):
             self.tree.move(item_id, "", index)
 
@@ -293,19 +397,15 @@ class ResultsTable:
         Width is approximate: we use character count as a proxy and convert to
         pixels with a fixed factor.
         """
-        # Rough "pixels per character" heuristic.
         px_per_char = 7
 
         for col in self.columns:
-            # Do not autosize hidden columns.
             if col in self._hidden_columns:
                 continue
 
-            # Start with header text length.
             header_text = self.tree.heading(col, "text") or ""
             max_chars = len(str(header_text))
 
-            # Check each cell in this column.
             col_index = self.columns.index(col)
             for item_id in self.tree.get_children():
                 values = self.tree.item(item_id, "values") or ()
@@ -313,12 +413,10 @@ class ResultsTable:
                     cell_text = "" if values[col_index] is None else str(values[col_index])
                     max_chars = max(max_chars, len(cell_text))
 
-            # Convert to pixels: chars * px_per_char + some padding.
             width = max_chars * px_per_char + 20
             width = max(min_width, min(max_width, width))
             self.tree.column(col, width=width)
 
-            # Remember this as the base width for when we re-show columns.
             self._base_column_widths[col] = width
 
     # ------------------------------------------------------------------
@@ -336,14 +434,11 @@ class ResultsTable:
             visible = visibility.get(col, True)
 
             if visible:
-                # Unhide column
                 self._hidden_columns.discard(col)
                 base_width = self._base_column_widths.get(col, 100)
                 self.tree.column(col, width=base_width, minwidth=20, stretch=True)
-                # Make sure heading text is present
                 self.tree.heading(col, text=col.replace("_", " ").title())
             else:
-                # Hide column: remember current width first
                 try:
                     current_width = int(self.tree.column(col, "width"))
                 except (ValueError, tk.TclError):
@@ -365,7 +460,7 @@ class PriceCheckerGUI:
 
         self.logger = self._resolve_logger()
         self.root.title("PoE Price Checker")
-        self.root.geometry("900x600")
+        self.root.geometry("1100x650")
 
         # Main containers
         self.main_frame = ttk.Frame(self.root, padding=8)
@@ -374,12 +469,23 @@ class PriceCheckerGUI:
         self.root.rowconfigure(0, weight=1)
         self.root.columnconfigure(0, weight=1)
 
+        self.main_frame.columnconfigure(0, weight=3)
+        self.main_frame.columnconfigure(1, weight=2)
+        self.main_frame.rowconfigure(1, weight=1)  # results row
+
         # Status bar var
         self.status_var = tk.StringVar(value="Ready")
+
+        # Summary bar var (last price check summary)
+        self.summary_var = tk.StringVar(value="No recent price summary.")
 
         # Filter text & backing store for all rows
         self.filter_var = tk.StringVar(value="")
         self._all_result_rows: list[Mapping[str, Any]] = []
+
+        # Source filter (GUI shortcut to filter by 'source' column)
+        self.source_filter_var = tk.StringVar(value="All sources")
+        self._source_filter_value: str | None = None
 
         # Column visibility dialog state
         self._column_visibility_vars: dict[str, tk.BooleanVar] = {}
@@ -390,8 +496,12 @@ class PriceCheckerGUI:
         self._history_window: tk.Toplevel | None = None
         self._history_listbox: tk.Listbox | None = None
 
-        # Async / background check state
-        self._check_in_progress: bool = False  # NEW
+        # Data sources dialog
+        self._sources_window: tk.Toplevel | None = None
+        self._source_vars: dict[str, tk.BooleanVar] = {}
+
+        # Async check state
+        self._check_in_progress: bool = False
 
         # Build UI pieces
         self._create_menu()
@@ -410,7 +520,6 @@ class PriceCheckerGUI:
         logger = getattr(self.app_context, "logger", None)
         if isinstance(logger, logging.Logger):
             return logger
-        # Fallback logger
         logger = logging.getLogger("poe_price_checker.gui")
         if not logger.handlers:
             handler = logging.StreamHandler(sys.stdout)
@@ -436,7 +545,17 @@ class PriceCheckerGUI:
         # View menu
         view_menu = tk.Menu(menubar, tearoff=False)
         view_menu.add_command(label="Session History...", command=self._show_history_window)
+        view_menu.add_command(label="Data Sources...", command=self._show_sources_dialog)
         menubar.add_cascade(label="View", menu=view_menu)
+
+        # Dev menu (sample items)
+        dev_menu = tk.Menu(menubar, tearoff=False)
+        dev_menu.add_command(label="Paste Sample Map", command=lambda: self._paste_sample_item("map"))
+        dev_menu.add_command(label="Paste Sample Currency", command=lambda: self._paste_sample_item("currency"))
+        dev_menu.add_command(label="Paste Sample Unique", command=lambda: self._paste_sample_item("unique"))
+        dev_menu.add_command(label="Paste Sample Rare", command=lambda: self._paste_sample_item("rare"))
+        dev_menu.add_command(label="Paste Sample Gem", command=lambda: self._paste_sample_item("gem"))
+        menubar.add_cascade(label="Dev", menu=dev_menu)
 
         # Help menu
         help_menu = tk.Menu(menubar, tearoff=False)
@@ -453,29 +572,22 @@ class PriceCheckerGUI:
     # -------------------------------------------------------------------------
 
     def _create_input_area(self) -> None:
-        """
-        Create the item input area + 'Last Item' frame.
+        """Create the item input frame (text box + buttons) and the item inspector sidebar."""
+        top_row = ttk.Frame(self.main_frame)
+        top_row.grid(row=0, column=0, columnspan=2, sticky="nsew")
+        top_row.columnconfigure(0, weight=3)
+        top_row.columnconfigure(1, weight=2)
 
-        Left: "Item Input" – editable text and action buttons.
-        Right: "Last Item" – read-only display of the most recent item checked.
-        """
-        top_frame = ttk.Frame(self.main_frame)
-        top_frame.grid(row=0, column=0, sticky="nsew")
-        self.main_frame.rowconfigure(0, weight=0)
-        self.main_frame.columnconfigure(0, weight=1)
+        # --- Item Input (left) ---
+        input_frame = ttk.LabelFrame(top_row, text="Item Input", padding=8)
+        input_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 8))
 
-        # --- Item Input frame (left) ---
-        input_frame = ttk.LabelFrame(top_frame, text="Item Input", padding=8)
-        input_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 4))
-
-        # Text box
         self.input_text = tk.Text(input_frame, height=8, wrap="word", undo=True)
         self.input_text.grid(row=0, column=0, columnspan=3, sticky="nsew", pady=(0, 6))
 
         input_frame.rowconfigure(0, weight=1)
         input_frame.columnconfigure(0, weight=1)
 
-        # Buttons
         self.check_button = ttk.Button(input_frame, text="Check Price", command=self._on_check_clicked)
         self.clear_button = ttk.Button(input_frame, text="Clear", command=self._on_clear_clicked)
         self.paste_button = ttk.Button(input_frame, text="Paste", command=self._on_paste_button_clicked)
@@ -484,33 +596,118 @@ class PriceCheckerGUI:
         self.clear_button.grid(row=1, column=1, sticky="w", padx=(0, 4))
         self.paste_button.grid(row=1, column=2, sticky="e")
 
-        # --- Last Item frame (right) ---
-        last_item_frame = ttk.LabelFrame(top_frame, text="Last Item", padding=8)
-        last_item_frame.grid(row=0, column=1, sticky="nsew")
+        # --- Item Inspector (right) ---
+        self._create_item_inspector(top_row)
 
-        self.last_item_text = tk.Text(
-            last_item_frame,
+    def _create_item_inspector(self, parent: ttk.Frame) -> None:
+        """Create the Item Inspector sidebar panel."""
+        inspector_frame = ttk.LabelFrame(parent, text="Item Inspector", padding=8)
+        inspector_frame.grid(row=0, column=1, sticky="nsew")
+
+        self.item_inspector_text = tk.Text(
+            inspector_frame,
             height=8,
             wrap="word",
             state="disabled",
         )
-        self.last_item_text.grid(row=0, column=0, sticky="nsew")
+        self.item_inspector_text.grid(row=0, column=0, sticky="nsew")
 
-        last_item_frame.rowconfigure(0, weight=1)
-        last_item_frame.columnconfigure(0, weight=1)
+        inspector_frame.rowconfigure(0, weight=1)
+        inspector_frame.columnconfigure(0, weight=1)
 
-        # Layout proportions for left/right
-        top_frame.columnconfigure(0, weight=3)
-        top_frame.columnconfigure(1, weight=2)
-        top_frame.rowconfigure(0, weight=1)
+    # -------------------------------------------------------------------------
+    # Item Inspector
+    # -------------------------------------------------------------------------
+
+    def _update_item_inspector(self, item_text: str) -> None:
+        """
+        Parse the given item text (if a parser is available) and display
+        a compact summary in the Item Inspector sidebar.
+
+        If parsing fails, show a small fallback message instead of the
+        raw clipboard text.
+        """
+        if not hasattr(self, "item_inspector_text"):
+            return
+
+        item_text = (item_text or "").strip()
+        lines: list[str] = []
+
+        parser = getattr(self.app_context, "parser", None)
+        parsed = None
+
+        if parser is not None and hasattr(parser, "parse"):
+            try:
+                parsed = parser.parse(item_text)
+            except Exception:
+                parsed = None
+
+        if parsed is None:
+            # Fallback: no parse – show a helpful note + first line.
+            first_line = item_text.splitlines()[0] if item_text else ""
+            if parser is None:
+                lines.append("Parser: not available.")
+            else:
+                lines.append("Parser: failed to parse item.")
+            if first_line:
+                lines.append("")
+                lines.append(f"First line: {first_line}")
+        else:
+            # Parse succeeded – show key fields.
+            def get_attr(name: str, default: str = "") -> str:
+                val = getattr(parsed, name, default)
+                if val is None:
+                    return default
+                return str(val)
+
+            name = get_attr("name") or get_attr("item_name")
+            base = get_attr("base_type") or get_attr("type_line")
+            rarity = get_attr("rarity")
+            variant = get_attr("variant")
+            ilvl = get_attr("item_level") or get_attr("ilvl")
+            map_tier = get_attr("map_tier")
+            gem_level = get_attr("gem_level")
+            quality = get_attr("quality")
+            sockets = get_attr("sockets")
+            links = get_attr("links")
+            influences = getattr(parsed, "influences", None)
+            tags = getattr(parsed, "tags", None)
+
+            lines.append(f"Name: {name or '(unknown)'}")
+            if base and base != name:
+                lines.append(f"Base: {base}")
+            if rarity:
+                lines.append(f"Rarity: {rarity}")
+            if variant:
+                lines.append(f"Variant: {variant}")
+            if ilvl:
+                lines.append(f"Item Level: {ilvl}")
+            if map_tier:
+                lines.append(f"Map Tier: {map_tier}")
+            if gem_level:
+                lines.append(f"Gem Level: {gem_level}")
+            if quality:
+                lines.append(f"Quality: {quality}")
+            if sockets or links:
+                lines.append(f"Sockets/Links: {sockets or '-'} ({links or '0'}L)")
+            if influences:
+                lines.append(f"Influences: {influences}")
+            if tags:
+                lines.append(f"Tags: {tags}")
+
+        text = "\n".join(lines) if lines else "No item loaded."
+
+        self.item_inspector_text.configure(state="normal")
+        self.item_inspector_text.delete("1.0", "end")
+        self.item_inspector_text.insert("1.0", text)
+        self.item_inspector_text.configure(state="disabled")
 
     def _create_results_area(self) -> None:
-        """Create the results frame, filter bar, and attach a ResultsTable."""
+        """Create the results frame, filter bar, summary banner, and attach a ResultsTable."""
         results_frame = ttk.LabelFrame(self.main_frame, text="Results", padding=8)
-        results_frame.grid(row=1, column=0, sticky="nsew", pady=(8, 0))
+        results_frame.grid(row=1, column=0, columnspan=2, sticky="nsew", pady=(8, 0))
 
         self.main_frame.rowconfigure(1, weight=1)
-        self.main_frame.columnconfigure(0, weight=1)
 
         # --- Filter bar (row 0) ---
         filter_frame = ttk.Frame(results_frame)
@@ -528,25 +725,55 @@ class PriceCheckerGUI:
         gear_button = ttk.Button(filter_frame, text="⚙", width=3, command=self._show_column_visibility_dialog)
         gear_button.grid(row=0, column=3, sticky="e")
 
-        filter_frame.columnconfigure(1, weight=1)
+        source_label = ttk.Label(filter_frame, text="Source:")
+        source_label.grid(row=0, column=4, sticky="w", padx=(8, 4))
 
-        # When the filter text changes, apply the filter
+        self.source_filter_combo = ttk.Combobox(
+            filter_frame,
+            textvariable=self.source_filter_var,
+            state="readonly",
+            width=18,
+        )
+        self._populate_source_filter_options()
+        self.source_filter_combo.grid(row=0, column=5, sticky="w")
+
+        self.source_filter_combo.bind("<<ComboboxSelected>>", self._on_source_filter_change)
         self.filter_entry.bind("<KeyRelease>", self._on_filter_change)
 
-        # --- Results table (row 1) ---
-        results_table_frame = ttk.Frame(results_frame)
-        results_table_frame.grid(row=1, column=0, columnspan=2, sticky="nsew")
+        filter_frame.columnconfigure(1, weight=1)
 
-        results_frame.rowconfigure(1, weight=1)
+        # --- Summary banner (row 1) ---
+        summary_frame = ttk.Frame(results_frame)
+        summary_frame.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0, 4))
+
+        summary_label = ttk.Label(
+            summary_frame,
+            textvariable=self.summary_var,
+            anchor="w",
+        )
+        summary_label.grid(row=0, column=0, sticky="w")
+
+        # New: Copy button to put the summary on the clipboard
+        copy_summary_btn = ttk.Button(
+            summary_frame,
+            text="Copy",
+            command=self._copy_last_summary,
+            width=8,
+        )
+        copy_summary_btn.grid(row=0, column=1, sticky="e", padx=(8, 0))
+
+        summary_frame.columnconfigure(0, weight=1)
+
+        # --- Results table (row 2) ---
+        results_table_frame = ttk.Frame(results_frame)
+        results_table_frame.grid(row=2, column=0, columnspan=2, sticky="nsew")
+
+        results_frame.rowconfigure(2, weight=1)
         results_frame.columnconfigure(0, weight=1)
 
-        # Use ResultsTable helper
         self.results_table = ResultsTable(results_table_frame, RESULT_COLUMNS)
-        # For compatibility with the rest of the GUI and tests,
-        # keep a direct reference to the underlying Treeview.
         self.results_tree = self.results_table.tree
 
-        # Context menu for tree
         self._create_tree_context_menu()
 
     def _create_status_bar(self) -> None:
@@ -557,32 +784,30 @@ class PriceCheckerGUI:
         status_label.grid(row=0, column=0, sticky="w")
         status_frame.columnconfigure(0, weight=1)
 
-        self.progress_bar = ttk.Progressbar(status_frame, mode="indeterminate", length=160)
-        self.progress_bar.grid(row=0, column=1, sticky="e", padx=(8, 0))
-
-        status_frame.columnconfigure(0, weight=1)
-        status_frame.columnconfigure(1, weight=0)
-
     def _create_tree_context_menu(self) -> None:
         self.tree_menu = tk.Menu(self.results_tree, tearoff=False)
-        self.tree_menu.add_command(label="View Details...", command=self._view_selected_row_details)
+
+        self.tree_menu.add_command(
+            label="Open in Browser",
+            command=self._open_selected_row_trade_url_or_details,
+        )
+        self.tree_menu.add_command(
+            label="View Details...",
+            command=self._view_selected_row_details,
+        )
         self.tree_menu.add_separator()
         self.tree_menu.add_command(label="Copy Row", command=self._copy_selected_row)
         self.tree_menu.add_command(label="Copy Row as TSV", command=self._copy_selected_row_as_tsv)
 
         self.results_tree.bind("<Button-3>", self._on_tree_right_click)
-        # macOS sometimes uses Button-2; harmless on other platforms
-        self.results_tree.bind("<Button-2>", self._on_tree_right_click)
-        # Double-click to view details
+        self.results_tree.bind("<Button-2>", self._on_tree_right_click)  # macOS sometimes uses Button-2
         self.results_tree.bind("<Double-1>", self._on_tree_double_click)
 
     def _create_bindings(self) -> None:
-        # Key bindings
-        self.root.bind("<Control-Return>", self._on_check_clicked)  # Ctrl+Enter
-        self.root.bind("<Control-K>", self._on_clear_clicked)       # Ctrl+K clear
-        self.root.bind("<F5>", self._on_check_clicked)              # F5 re-check
+        self.root.bind("<Control-Return>", self._on_check_clicked)
+        self.root.bind("<Control-K>", self._on_clear_clicked)
+        self.root.bind("<F5>", self._on_check_clicked)
 
-        # Paste detection in text widget
         self.input_text.bind("<<Paste>>", self._on_paste)
 
     # -------------------------------------------------------------------------
@@ -590,42 +815,12 @@ class PriceCheckerGUI:
     # -------------------------------------------------------------------------
 
     def _set_status(self, message: str) -> None:
-        """
-        Update the status bar and log the status if a logger is available.
-
-        Defensive so it also works on the fake GUI used in tests.
-        """
         if hasattr(self, "status_var"):
             self.status_var.set(message)
 
         logger = getattr(self, "logger", None)
         if isinstance(logger, logging.Logger):
             logger.info("Status: %s", message)
-
-    def _set_progress_active(self, active: bool) -> None:
-        """
-        Start or stop the indeterminate progress bar animation.
-        """
-        if not hasattr(self, "progress_bar"):
-            return
-
-        if active:
-            self.progress_bar.start(80)  # ms per step
-        else:
-            self.progress_bar.stop()
-            # Ensure bar is visually reset
-            self.progress_bar.config(value=0)
-
-    def _set_controls_enabled(self, enabled: bool) -> None:
-        """
-        Enable/disable key controls while a background check is running.
-        """
-        state = "normal" if enabled else "disabled"
-
-        for btn in (getattr(self, "check_button", None), getattr(self, "paste_button", None)):
-            if btn is not None:
-                btn.config(state=state)
-        # Clear button stays enabled so you can bail out visually if you want.
 
     # -------------------------------------------------------------------------
     # Menu commands
@@ -658,21 +853,14 @@ class PriceCheckerGUI:
         self._open_path_in_explorer(cfg_path)
 
     def _export_results_tsv(self) -> None:
-        """
-        Prompt for a file path and export the current results table to TSV.
-
-        Uses ResultsTable.export_tsv under the hood.
-        """
         if not hasattr(self, "results_table"):
             messagebox.showinfo("Export TSV", "No results table is available to export.")
             return
 
-        # If there are no rows, give a gentle heads-up.
         if not list(self.results_table.iter_rows()):
             if not messagebox.askyesno(
                 "Export TSV",
-                "There are no results in the table.\n\n"
-                "Export an empty file anyway?",
+                "There are no results in the table.\n\nExport an empty file anyway?",
                 icon=messagebox.QUESTION,
             ):
                 return
@@ -688,13 +876,11 @@ class PriceCheckerGUI:
             initialfile=default_name,
         )
 
-        # User cancelled
         if not file_path:
             self._set_status("Export cancelled.")
             return
 
         try:
-            # Include header row for clarity
             self.results_table.export_tsv(file_path, include_header=True)
         except OSError as exc:
             self.logger.exception("Failed to export TSV to %s: %s", file_path, exc)
@@ -709,11 +895,6 @@ class PriceCheckerGUI:
         messagebox.showinfo("Export TSV", f"Results exported to:\n{file_path}")
 
     def _copy_all_rows_as_tsv(self) -> None:
-        """
-        Copy all rows in the results table as TSV to the clipboard.
-
-        Uses ResultsTable.to_tsv(include_header=True).
-        """
         if not hasattr(self, "results_table"):
             messagebox.showinfo("Copy All Rows as TSV", "No results table is available.")
             return
@@ -744,12 +925,11 @@ class PriceCheckerGUI:
                 os.system(f'open "{path}"')
             else:
                 os.system(f'xdg-open "{path}"')
-        except Exception as exc:  # pragma: no cover - OS specific
+        except Exception as exc:  # pragma: no cover
             self.logger.exception("Failed to open path %s: %s", path, exc)
             messagebox.showerror("Error", f"Failed to open path:\n{path}\n\n{exc}")
 
     def _show_shortcuts(self) -> None:
-        """Show a small cheat sheet of keyboard & mouse shortcuts."""
         messagebox.showinfo(
             "Keyboard Shortcuts",
             (
@@ -757,14 +937,13 @@ class PriceCheckerGUI:
                 "• Ctrl+Enter   – Check prices\n"
                 "• F5           – Re-check prices\n"
                 "• Ctrl+K       – Clear input and results\n"
-                "• Right-click  – Show row context menu (Copy / Copy as TSV / Details)\n"
-                "• Double-click – View item details\n"
+                "• Right-click  – Row context menu (Browser / Copy / Details)\n"
+                "• Double-click – Open in browser (trade site)\n"
                 "• Paste button – Paste item from clipboard and auto-check\n"
             ),
         )
 
     def _show_usage_tips(self) -> None:
-        """Show helpful usage tips, including the menu items we’ve added."""
         messagebox.showinfo(
             "Usage Tips",
             (
@@ -773,20 +952,23 @@ class PriceCheckerGUI:
                 "  then press Ctrl+Enter or click \"Check Price\".\n\n"
                 "• The Results table shows key data like chaos/divine value\n"
                 "  and listing counts; click column headers to sort.\n\n"
-                "• Use the Filter box above the results to quickly narrow\n"
-                "  down by item name, variant, source, etc.\n\n"
+                "• Use the Filter box and Source dropdown above the results\n"
+                "  to narrow down by text and by data source.\n\n"
                 "• Right-click a row to:\n"
+                "  – Open in Browser\n"
                 "  – View Details\n"
-                "  – Copy Row (space-separated)\n"
-                "  – Copy Row as TSV (tab-separated)\n\n"
-                "• File → Open Log File\n"
-                "  Open the current log file for debugging.\n\n"
-                "• File → Open Config Folder\n"
-                "  Jump straight to the config directory.\n\n"
+                "  – Copy Row\n"
+                "  – Copy Row as TSV\n\n"
+                "• File → Open Log File / Config Folder\n"
+                "  Quick access for debugging and configuration.\n\n"
                 "• File → Export TSV...\n"
                 "  Save all current results to a .tsv file with headers.\n\n"
                 "• View → Session History...\n"
-                "  View and restore previous price checks from this session.\n"
+                "  View and restore previous price checks from this session.\n\n"
+                "• View → Data Sources...\n"
+                "  Enable or disable specific price sources.\n\n"
+                "• Dev → Paste Sample ...\n"
+                "  Quickly load example items (map, currency, unique, etc.) for testing.\n"
             ),
         )
 
@@ -795,7 +977,7 @@ class PriceCheckerGUI:
             "About PoE Price Checker",
             "PoE Price Checker\n\n"
             "GUI front-end for Path of Exile item price checks.\n"
-            "Paste item text, run checks, and copy or export results.",
+            "Multi-source, with history, aggregates, and dev tools.",
         )
 
     # -------------------------------------------------------------------------
@@ -803,124 +985,154 @@ class PriceCheckerGUI:
     # -------------------------------------------------------------------------
 
     def _get_input_text(self) -> str:
-        # Use "end-1c" to avoid the trailing newline Tk adds at the end.
-        return self.input_text.get("1.0", "end-1c").strip()
-
-    def _set_last_item(self, text: str) -> None:
-        """
-        Update the read-only 'Last Item' box with the provided item text.
-        """
-        if not hasattr(self, "last_item_text"):
-            return
-
-        self.last_item_text.configure(state="normal")
-        self.last_item_text.delete("1.0", "end")
-        self.last_item_text.insert("1.0", text)
-        self.last_item_text.configure(state="disabled")
-
-    def _check_current_input_and_clear(self) -> None:
-        """
-        Core flow for checking the current input:
-
-        - Read input text.
-        - If non-empty, move it to the Last Item frame.
-        - Clear the input box.
-        - Kick off the price check in a background thread.
-        """
-        if getattr(self, "_check_in_progress", False):
-            # Avoid overlapping checks; user can see status message.
-            self._set_status("A price check is already in progress...")
-            return
-
-        text = self._get_input_text()
-        if not text:
-            self._set_status("No item text to check.")
-            return
-
-        # Move to Last Item and clear the input for the next paste.
-        self._set_last_item(text)
-        self.input_text.delete("1.0", "end")
-
-        self._start_background_check(text)
+        return self.input_text.get("1.0", "end").strip()
 
     def _on_check_clicked(self, event: tk.Event | None = None) -> None:  # type: ignore[override]
-        del event  # unused
-        self._check_current_input_and_clear()
+        del event
+        if self._check_in_progress:
+            self._set_status("Price check already in progress...")
+            return
 
-    def _run_price_check(self) -> None:
-        """
-        Backwards-compatible wrapper for older call sites:
-
-        Uses the current input text directly. Prefer _run_price_check_for_text
-        in new code so we can track the 'Last Item' correctly.
-        """
         text = self._get_input_text()
-        self._run_price_check_for_text(text)
-
-    def _run_price_check_for_text(self, text: str) -> None:
-        """
-        Run a price check for the given item text and update the results/history.
-        """
         if not text:
             self._set_status("No item text to check.")
             return
 
-        price_service = getattr(self.app_context, "price_service", None)
-        if price_service is None:
-            # Fallback: just insert a dummy row so GUI is still usable in isolation
-            self.logger.warning("price_service not available on app_context; inserting dummy result.")
-            self._insert_result_rows(
-                [
-                    {
-                        "item_name": "Dummy Item",
-                        "variant": "N/A",
-                        "links": "N/A",
-                        "chaos_value": "0",
-                        "divine_value": "0",
-                        "listing_count": "0",
-                        "source": "no price_service",
-                    }
-                ],
-                input_text=text,
-            )
-            self._set_status("price_service not configured; showing dummy result.")
-            return
+        self._set_status("Checking prices...")
+        self._check_in_progress = True
+        self.root.after(10, self._run_price_check)
 
+    def _run_price_check(self) -> None:
         try:
-            results = price_service.check_item(text)  # type: ignore[call-arg]
-        except Exception as exc:  # pragma: no cover - depends on service
-            self.logger.exception("Error during price check: %s", exc)
-            messagebox.showerror("Error", f"An error occurred while checking prices:\n{exc}")
-            self._set_status("Error during price check.")
-            return
+            text = self._get_input_text()
+            if not text:
+                self._set_status("No item text to check.")
+                return
 
-        try:
+            # Update the item inspector before we potentially clear input.
+            self._update_item_inspector(text)
+
+            price_service = getattr(self.app_context, "price_service", None)
+            if price_service is None:
+                self.logger.warning("price_service not available on app_context; inserting dummy result.")
+                self._clear_results()
+                self._insert_result_rows(
+                    [
+                        {
+                            "item_name": "Dummy Item",
+                            "variant": "N/A",
+                            "links": "N/A",
+                            "chaos_value": "0",
+                            "divine_value": "0",
+                            "listing_count": "0",
+                            "source": "no price_service",
+                        }
+                    ],
+                    input_text=text,
+                )
+                self._set_status("price_service not configured; showing dummy result.")
+                return
+
+            try:
+                results = price_service.check_item(text)  # type: ignore[call-arg]
+            except Exception as exc:  # pragma: no cover
+                self.logger.exception("Error during price check: %s", exc)
+                messagebox.showerror("Error", f"An error occurred while checking prices:\n{exc}")
+                self._set_status("Error during price check.")
+                return
+
+            self._clear_results()
             self._insert_result_rows(results, input_text=text)
-        except Exception as exc:  # pragma: no cover
-            self.logger.exception("Error inserting results: %s", exc)
-            messagebox.showerror("Error", f"Failed to display results:\n{exc}")
-            self._set_status("Failed to display results.")
+        finally:
+            self._check_in_progress = False
+
+    def _build_aggregate_rows_for_check(
+        self,
+        rows: list[Mapping[str, Any]],
+    ) -> list[dict[str, Any]]:
+        """
+        Build synthetic 'aggregate' rows per logical item across sources.
+
+        Grouping key: (item_name, variant, links)
+        """
+        if not rows:
+            return []
+
+        grouped: dict[tuple[str, str, str], list[Mapping[str, Any]]] = {}
+
+        for row in rows:
+            name = str(row.get("item_name", "") or "")
+            variant = str(row.get("variant", "") or "")
+            links = str(row.get("links", "") or "")
+            key = (name, variant, links)
+            grouped.setdefault(key, []).append(row)
+
+        aggregates: list[dict[str, Any]] = []
+
+        for (name, variant, links), group_rows in grouped.items():
+            chaos_vals: list[float] = []
+            divine_vals: list[float] = []
+            listing_counts: list[int] = []
+
+            for r in group_rows:
+                try:
+                    cv = float(r.get("chaos_value", 0) or 0)
+                    chaos_vals.append(cv)
+                except (TypeError, ValueError):
+                    pass
+
+                try:
+                    dv = float(r.get("divine_value", 0) or 0)
+                    divine_vals.append(dv)
+                except (TypeError, ValueError):
+                    pass
+
+                try:
+                    lc = int(r.get("listing_count", 0) or 0)
+                    listing_counts.append(lc)
+                except (TypeError, ValueError):
+                    pass
+
+            def mean(xs: list[float]) -> float:
+                return sum(xs) / len(xs) if xs else 0.0
+
+            chaos_avg = mean(chaos_vals)
+            divine_avg = mean(divine_vals)
+            total_listings = sum(listing_counts) if listing_counts else 0
+
+            agg_row: dict[str, Any] = {
+                "item_name": name,
+                "variant": variant,
+                "links": links,
+                "chaos_value": chaos_avg,
+                "divine_value": divine_avg,
+                "listing_count": total_listings,
+                "source": "aggregate",
+            }
+
+            aggregates.append(agg_row)
+
+        return aggregates
 
     def _insert_result_rows(
-            self,
-            rows: Iterable[Mapping[str, Any] | Any],
-            *,
-            input_text: str | None = None,
+        self,
+        rows: Iterable[Mapping[str, Any] | Any],
+        *,
+        input_text: str | None = None,
     ) -> None:
         """
         Insert rows into the results table.
 
-        Delegates to ResultsTable for the real GUI, stores them in the
-        backing list for filtering and history, and updates the status with
-        a row count.
-
-        New result sets are *prepended* so the most recent checks appear
-        at the top of the Results table.
+        - Normalizes incoming rows to dicts with RESULT_COLUMNS keys.
+        - Builds synthetic 'aggregate' rows per logical item across sources.
+        - Prepends new rows (aggregate + per-source) to the backing store.
+        - Re-applies any active filters.
+        - Adds an entry to session history.
         """
         if not hasattr(self, "results_table"):
             return
 
-        # Materialize rows and normalize to dicts so filtering/history are predictable
+        # Normalize incoming rows
         canonical_rows: list[Mapping[str, Any]] = []
         for row in rows:
             if isinstance(row, Mapping):
@@ -928,39 +1140,41 @@ class PriceCheckerGUI:
             else:
                 canonical_rows.append({col: getattr(row, col, "") for col in RESULT_COLUMNS})
 
-        # Prepend to the backing store so newest results are first
+        # Aggregate rows for this check
+        aggregate_rows = self._build_aggregate_rows_for_check(canonical_rows)
+        this_check_rows: list[Mapping[str, Any]] = aggregate_rows + canonical_rows
+
+        # Prepend to backing store
         existing = getattr(self, "_all_result_rows", [])
-        self._all_result_rows = canonical_rows + list(existing)
+        self._all_result_rows = this_check_rows + list(existing)
 
-        active_filter = (self.filter_var.get() or "").strip()
+        # --- NEW: update the summary banner for this check ---
+        self._update_summary_banner(aggregate_rows, canonical_rows)
 
-        if active_filter:
-            # If a filter is active, re-apply it to all rows so order is consistent
-            self._apply_filter(active_filter)
-        else:
-            # No filter → re-render all rows with newest at the top
-            self.results_table.clear()
-            self.results_table.insert_rows(self._all_result_rows)
+        # Re-apply active filters
+        active_text_filter = (self.filter_var.get() or "").strip()
+        self._apply_filter(active_text_filter)
 
-        # Compute total row count after insert (visible rows)
+        # Update status
         total_rows = sum(1 for _ in self.results_table.iter_rows())
         self._set_status(f"Price check complete. {total_rows} row(s).")
 
-        # Add to history (history accumulates until explicitly cleared)
+        # Add to history using only the per-source rows, so we don't double-count aggregates
         self._add_history_entry(canonical_rows, input_text=input_text)
 
     def _clear_results(self) -> None:
-        """Clear all rows from the results table."""
         if hasattr(self, "results_table"):
             self.results_table.clear()
         self._all_result_rows = []
+        # Reset summary banner when everything is cleared
+        if hasattr(self, "summary_var"):
+            self.summary_var.set("No recent price summary.")
 
     def _on_clear_clicked(self, event: tk.Event | None = None) -> None:  # type: ignore[override]
         del event
         self.input_text.delete("1.0", "end")
         self._clear_results()
-        self._on_clear_filter()
-        self._set_last_item("")
+        self._update_item_inspector("")
         self._set_status("Cleared.")
 
     def _on_paste_button_clicked(self) -> None:
@@ -974,158 +1188,195 @@ class PriceCheckerGUI:
             self._auto_check_if_not_empty()
 
     def _on_paste(self, event: tk.Event | None = None) -> None:
-        """
-        Handle <<Paste>> into the text box and auto-check after paste.
-
-        We schedule a short delay so the default paste operation completes first.
-        """
         del event
-        # Let the default paste complete, then check
-        self.root.after(10, self._auto_check_if_not_empty)
+        self.root.after(10, self._auto_check_if_not_empty)  # type: ignore[arg-type]
 
     def _auto_check_if_not_empty(self) -> None:
         if self._get_input_text():
-            self._check_current_input_and_clear()
+            self._on_check_clicked()
 
-    def _start_background_check(self, text: str) -> None:
-        """
-        Start a background thread to perform the price check.
+    def _paste_sample_item(self, category: str) -> None:
+        key = (category or "").lower()
+        items = SAMPLE_ITEMS.get(key)
 
-        All interaction with Tk widgets happens on the main thread via root.after.
-        """
-        if self._check_in_progress:
-            self._set_status("A price check is already in progress...")
+        if not items:
+            messagebox.showinfo(
+                "Sample Item",
+                f"No sample items are defined for category '{category}'.",
+            )
             return
 
-        self._check_in_progress = True
-        self._set_controls_enabled(False)
-        self._set_progress_active(True)
-        self._set_status("Checking prices...")
+        sample_text = random.choice(items)
 
-        def worker() -> None:
-            price_service = getattr(self.app_context, "price_service", None)
-            results: Any | None = None
-            error: Exception | None = None
+        self.input_text.delete("1.0", "end")
+        self.input_text.insert("1.0", sample_text)
 
-            if price_service is None:
-                # Fallback dummy row if no service is configured
-                self.logger.warning("price_service not available on app_context; inserting dummy result.")
-                results = [
-                    {
-                        "item_name": "Dummy Item",
-                        "variant": "N/A",
-                        "links": "N/A",
-                        "chaos_value": "0",
-                        "divine_value": "0",
-                        "listing_count": "0",
-                        "source": "no price_service",
-                    }
-                ]
-            else:
-                try:
-                    results = price_service.check_item(text)  # type: ignore[call-arg]
-                except Exception as exc:
-                    error = exc
+        self._auto_check_if_not_empty()
+        self._set_status(f"Pasted sample {category} item and started price check.")
 
-            # Bounce back to the Tk main thread
-            self.root.after(
-                0,
-                lambda: self._on_price_check_complete(text=text, results=results, error=error),
-            )
+    # -------------------------------------------------------------------------
+    # Item Inspector
+    # -------------------------------------------------------------------------
 
-        thread = threading.Thread(target=worker, daemon=True)
-        thread.start()
-
-    def _on_price_check_complete(
-        self,
-        *,
-        text: str,
-        results: Any | None,
-        error: Exception | None,
+    def _update_summary_banner(
+            self,
+            aggregate_rows: list[Mapping[str, Any]],
+            per_source_rows: list[Mapping[str, Any]],
     ) -> None:
         """
-        Called on the Tk main thread when the background check finishes.
+        Compute a one-line summary for the most recent price check and
+        update the summary_var used by the banner above the table.
         """
-        self._check_in_progress = False
-        self._set_progress_active(False)
-        self._set_controls_enabled(True)
-
-        if error is not None:
-            self.logger.exception("Error during price check: %s", error)
-            messagebox.showerror("Error", f"An error occurred while checking prices:\n{error}")
-            self._set_status("Error during price check.")
+        if not hasattr(self, "summary_var"):
             return
 
-        if results is None:
-            # Treat as empty result set
-            self._set_status("Price check complete. 0 row(s).")
+        if not aggregate_rows and not per_source_rows:
+            self.summary_var.set("No recent price summary.")
             return
 
+        # Prefer an aggregate row if available; otherwise fall back to the first per-source row.
+        row: Mapping[str, Any] | None = None
+        if aggregate_rows:
+            row = aggregate_rows[0]
+        elif per_source_rows:
+            row = per_source_rows[0]
+
+        if row is None:
+            self.summary_var.set("No recent price summary.")
+            return
+
+        name = str(row.get("item_name", "") or "Unknown Item")
+        variant = str(row.get("variant", "") or "").strip()
+        links = str(row.get("links", "") or "").strip()
+
+        def as_float(value: Any) -> float:
+            try:
+                return float(value)
+            except (TypeError, ValueError):
+                return 0.0
+
+        chaos = as_float(row.get("chaos_value", 0))
+        divine = as_float(row.get("divine_value", 0))
+        listings = 0
         try:
-            self._insert_result_rows(results, input_text=text)
-        except Exception as exc:  # pragma: no cover
-            self.logger.exception("Error inserting results: %s", exc)
-            messagebox.showerror("Error", f"Failed to display results:\n{exc}")
-            self._set_status("Failed to display results.")
+            listings = int(row.get("listing_count", 0) or 0)
+        except (TypeError, ValueError):
+            listings = 0
+
+        # Compute how many per-source rows we had and which sources participated.
+        source_names = sorted(
+            {
+                str(r.get("source", "") or "")
+                for r in per_source_rows
+                if (r.get("source", "") or "") != "aggregate"
+            }
+        )
+        # Remove empties
+        source_names = [s for s in source_names if s]
+
+        # Build a concise human-readable label
+        parts: list[str] = []
+
+        base_label = name
+        detail_bits: list[str] = []
+        if links:
+            detail_bits.append(f"{links}L")
+        if variant:
+            detail_bits.append(variant)
+        if detail_bits:
+            base_label += " (" + ", ".join(detail_bits) + ")"
+        parts.append(base_label)
+
+        if chaos or divine:
+            parts.append(f"– {chaos:.1f}c")
+            if divine:
+                parts[-1] += f" ({divine:.2f}d)"
+        if listings:
+            parts.append(f"{listings} listing(s) total")
+
+        if source_names:
+            parts.append("sources: " + ", ".join(source_names))
+
+        summary_text = " ".join(parts) if parts else "No recent price summary."
+        self.summary_var.set(summary_text)
 
     # -------------------------------------------------------------------------
     # Filtering helpers
     # -------------------------------------------------------------------------
 
+    def _populate_source_filter_options(self) -> None:
+        values: list[str] = ["All sources"]
+
+        service = getattr(self.app_context, "price_service", None)
+        if service is not None and hasattr(service, "get_enabled_state"):
+            try:
+                state = service.get_enabled_state()
+                names = sorted(state.keys())
+                values.extend(names)
+            except Exception:
+                pass
+
+        if hasattr(self, "source_filter_combo"):
+            self.source_filter_combo["values"] = values
+
+        self.source_filter_var.set("All sources")
+        self._source_filter_value = None
+
     def _on_filter_change(self, event: tk.Event | None = None) -> None:
-        """Called on key release in the filter entry to apply the current filter."""
         del event
         text = self.filter_var.get()
         self._apply_filter(text)
 
     def _on_clear_filter(self) -> None:
-        """Clear filter text and show all rows."""
         self.filter_var.set("")
+        self.source_filter_var.set("All sources")
+        self._source_filter_value = None
         self._apply_filter("")
 
-    def _apply_filter(self, filter_text: str) -> None:
-        """
-        Apply a simple case-insensitive substring filter across all columns.
+    def _on_source_filter_change(self, event: tk.Event | None = None) -> None:
+        del event
+        selected = (self.source_filter_var.get() or "").strip()
+        if not selected or selected == "All sources":
+            self._source_filter_value = None
+        else:
+            self._source_filter_value = selected
+        self._apply_filter(self.filter_var.get())
 
-        Uses the backing store _all_result_rows, then re-renders the results table
-        with only matching rows.
-        """
+    def _apply_filter(self, filter_text: str) -> None:
         if not hasattr(self, "results_table"):
             return
 
         text = (filter_text or "").strip().lower()
 
         if not self._all_result_rows:
-            # Nothing stored yet, nothing to do.
             self.results_table.clear()
             self._set_status("No results to filter.")
             return
 
-        if not text:
-            # No filter → show all rows
+        if not text and self._source_filter_value is None:
             rows_to_show = self._all_result_rows
         else:
             rows_to_show = [
-                row for row in self._all_result_rows
+                row
+                for row in self._all_result_rows
                 if self._row_matches_filter(row, text)
+                and self._row_matches_source_filter(row)
             ]
 
         self.results_table.clear()
         self.results_table.insert_rows(rows_to_show)
 
         total_rows = sum(1 for _ in self.results_table.iter_rows())
-        if text:
+        any_filter = bool(text or self._source_filter_value)
+        if any_filter:
             self._set_status(f"Filter applied ({total_rows} row(s) match).")
         else:
             self._set_status(f"Filter cleared. {total_rows} row(s).")
 
     def _row_matches_filter(self, row: Mapping[str, Any] | Any, text: str) -> bool:
-        """
-        Return True if the given row matches the filter text.
+        if not text:
+            return True
 
-        Currently uses a simple case-insensitive substring search across all
-        visible columns (RESULT_COLUMNS).
-        """
         for col in RESULT_COLUMNS:
             if isinstance(row, Mapping):
                 val = row.get(col, "")
@@ -1136,21 +1387,31 @@ class PriceCheckerGUI:
                 return True
         return False
 
+    def _row_matches_source_filter(self, row: Mapping[str, Any] | Any) -> bool:
+        if not self._source_filter_value:
+            return True
+
+        target = self._source_filter_value.lower()
+
+        if isinstance(row, Mapping):
+            val = row.get("source", "")
+        else:
+            val = getattr(row, "source", "")
+
+        s = "" if val is None else str(val).lower()
+        return s == target
+
     # -------------------------------------------------------------------------
     # Column visibility dialog
     # -------------------------------------------------------------------------
 
     def _show_column_visibility_dialog(self) -> None:
-        """
-        Show a small dialog with checkboxes to control which columns are visible.
-        """
         if self._column_visibility_window is not None:
             try:
                 if self._column_visibility_window.winfo_exists():
                     self._column_visibility_window.lift()
                     return
             except tk.TclError:
-                # Fall through and recreate
                 pass
 
         win = tk.Toplevel(self.root)
@@ -1165,7 +1426,6 @@ class PriceCheckerGUI:
             row=0, column=0, columnspan=3, sticky="w", padx=8, pady=(8, 4)
         )
 
-        # Figure out current visibility from the tree
         current_visibility: dict[str, bool] = {}
         for col in RESULT_COLUMNS:
             info = self.results_tree.column(col)
@@ -1175,11 +1435,9 @@ class PriceCheckerGUI:
             except (ValueError, TypeError):
                 width = 0
                 minwidth = 0
-            # Hidden if both width and minwidth are 0
             visible = not (width == 0 and minwidth == 0)
             current_visibility[col] = visible
 
-        # Create a checkbox for each column
         for row_index, col in enumerate(RESULT_COLUMNS, start=1):
             label = col.replace("_", " ").title()
             var = tk.BooleanVar(value=current_visibility.get(col, True))
@@ -1187,7 +1445,6 @@ class PriceCheckerGUI:
             chk = ttk.Checkbutton(win, text=label, variable=var)
             chk.grid(row=row_index, column=0, columnspan=3, sticky="w", padx=12, pady=2)
 
-        # Buttons
         btn_frame = ttk.Frame(win)
         btn_frame.grid(row=len(RESULT_COLUMNS) + 1, column=0, columnspan=3, pady=(8, 8), padx=8, sticky="e")
 
@@ -1222,43 +1479,117 @@ class PriceCheckerGUI:
         }
 
         self.results_table.set_column_visibility(visibility)
-
-        # Update status with how many columns are visible
         visible_count = sum(1 for v in visibility.values() if v)
         total = len(visibility)
         self._set_status(f"Updated column visibility: {visible_count}/{total} visible.")
+
+    # -------------------------------------------------------------------------
+    # Data sources dialog
+    # -------------------------------------------------------------------------
+
+    def _show_sources_dialog(self) -> None:
+        service = getattr(self.app_context, "price_service", None)
+        if service is None or not hasattr(service, "get_enabled_state"):
+            messagebox.showinfo(
+                "Data Sources",
+                "The current price service does not support source toggling.",
+            )
+            return
+
+        if self._sources_window is not None:
+            try:
+                if self._sources_window.winfo_exists():
+                    self._sources_window.lift()
+                    return
+            except tk.TclError:
+                self._sources_window = None
+
+        state = service.get_enabled_state()
+        if not state:
+            messagebox.showinfo("Data Sources", "No data sources are configured.")
+            return
+
+        win = tk.Toplevel(self.root)
+        win.title("Data Sources")
+        win.transient(self.root)
+        win.resizable(False, False)
+
+        self._sources_window = win
+        self._source_vars = {}
+
+        ttk.Label(
+            win,
+            text="Enable or disable data sources for price checks:",
+        ).grid(row=0, column=0, columnspan=3, sticky="w", padx=8, pady=(8, 4))
+
+        for idx, (name, enabled) in enumerate(state.items(), start=1):
+            var = tk.BooleanVar(value=enabled)
+            self._source_vars[name] = var
+            chk = ttk.Checkbutton(win, text=name, variable=var)
+            chk.grid(row=idx, column=0, columnspan=3, sticky="w", padx=12, pady=2)
+
+        btn_frame = ttk.Frame(win)
+        btn_frame.grid(
+            row=len(state) + 1,
+            column=0,
+            columnspan=3,
+            pady=(8, 8),
+            padx=8,
+            sticky="e",
+        )
+
+        select_all_btn = ttk.Button(btn_frame, text="Select All", command=self._sources_select_all)
+        select_all_btn.grid(row=0, column=0, padx=(0, 4))
+
+        select_none_btn = ttk.Button(btn_frame, text="Select None", command=self._sources_select_none)
+        select_none_btn.grid(row=0, column=1, padx=(0, 4))
+
+        apply_btn = ttk.Button(btn_frame, text="Apply", command=self._sources_apply_visibility)
+        apply_btn.grid(row=0, column=2, padx=(0, 4))
+
+        close_btn = ttk.Button(btn_frame, text="Close", command=win.destroy)
+        close_btn.grid(row=0, column=3)
+
+        win.columnconfigure(0, weight=1)
+
+    def _sources_select_all(self) -> None:
+        for var in self._source_vars.values():
+            var.set(True)
+
+    def _sources_select_none(self) -> None:
+        for var in self._source_vars.values():
+            var.set(False)
+
+    def _sources_apply_visibility(self) -> None:
+        service = getattr(self.app_context, "price_service", None)
+        if service is None or not hasattr(service, "set_enabled_state"):
+            return
+
+        enabled_state = {name: var.get() for name, var in self._source_vars.items()}
+        service.set_enabled_state(enabled_state)
+
+        enabled_count = sum(1 for v in enabled_state.values() if v)
+        total = len(enabled_state)
+        self._set_status(f"Updated data sources: {enabled_count}/{total} enabled.")
+        # Refresh the Source filter options so it picks up any new/changed sources.
+        self._populate_source_filter_options()
 
     # -------------------------------------------------------------------------
     # Treeview helpers (used by tests)
     # -------------------------------------------------------------------------
 
     def _get_tree(self) -> Any:
-        """
-        Return the Treeview-like object in use.
-
-        In the real GUI this is self.results_tree.
-        In tests, a fake Treeview is attached as self.tree.
-        """
         tree = getattr(self, "tree", None)
         if tree is not None:
             return tree
         return getattr(self, "results_tree", None)
 
     def _get_selected_row(self) -> tuple[Any, ...]:
-        """
-        Return the values of the currently selected row as a tuple.
-
-        Works with:
-          - real GUI: uses ResultsTable (via self.results_table)
-          - tests:    uses self.tree (a fake Treeview) or self.results_tree
-        """
-        # Real GUI path: prefer ResultsTable if present and tree matches
         if hasattr(self, "results_table"):
             tree = self._get_tree()
             if tree is self.results_table.tree:
                 return self.results_table.get_selected_row_values()
 
-        # Test / fallback path: use whichever Treeview-like object _get_tree returns
         tree = self._get_tree()
         if tree is None:
             return ()
@@ -1272,15 +1603,6 @@ class PriceCheckerGUI:
         return tuple(values)
 
     def _copy_row_tsv(self) -> None:
-        """
-        Copy the selected row as TSV.
-
-        Tests call this on a fake GUI:
-            gui._copy_row_tsv()
-        and expect it to:
-          - read from gui.tree (via _get_selected_row)
-          - call gui._copy_to_clipboard(tsv_string) if present
-        """
         row = self._get_selected_row()
         if not row:
             self._set_status("No row selected to copy.")
@@ -1288,7 +1610,6 @@ class PriceCheckerGUI:
 
         line = "\t".join(str(v) for v in row)
 
-        # Tests stub _copy_to_clipboard; real GUI uses _set_clipboard.
         copy_fn = getattr(self, "_copy_to_clipboard", None)
         if callable(copy_fn):
             copy_fn(line)
@@ -1310,22 +1631,15 @@ class PriceCheckerGUI:
         if not row_id:
             return
 
-        # Ensure the row is selected before showing the menu
         if row_id not in self.results_tree.selection():
             self.results_tree.selection_set(row_id)
 
         try:
             self.tree_menu.tk_popup(event.x_root, event.y_root)
-        finally:  # pragma: no cover - Tk internal
+        finally:  # pragma: no cover
             self.tree_menu.grab_release()
 
     def _on_tree_double_click(self, event: tk.Event) -> None:
-        """
-        Double-click on a row to show its details.
-
-        We make sure the clicked row is selected, then reuse the same logic
-        as the context-menu action.
-        """
         region = self.results_tree.identify("region", event.x, event.y)
         if region != "cell":
             return
@@ -1337,13 +1651,70 @@ class PriceCheckerGUI:
         if row_id not in self.results_tree.selection():
             self.results_tree.selection_set(row_id)
 
-        self._view_selected_row_details()
+        self._open_selected_row_trade_url_or_details()
+
+    def _open_selected_row_trade_url_or_details(self) -> None:
+        """
+        Attempt to open a trade URL for the selected row in the default browser.
+
+        - If the row has a 'trade_url' field, open it directly.
+        - Otherwise, open the generic trade search page for the current league.
+        - On any failure, fall back to showing the item details dialog.
+        """
+        row = self._get_selected_row()
+        if not row:
+            self._set_status("No row selected.")
+            messagebox.showinfo("Item Details", "No row is currently selected.")
+            return
+
+        if hasattr(self, "results_table"):
+            columns = self.results_table.columns
+        else:
+            columns = RESULT_COLUMNS
+
+        data: dict[str, Any] = {}
+        for col, val in zip(columns, row):
+            data[col] = val
+
+        item_name = str(data.get("item_name", "") or "").strip()
+        source_name = str(data.get("source", "") or "").strip()
+        trade_url = str(data.get("trade_url", "") or "").strip() if "trade_url" in data else ""
+
+        league = ""
+        try:
+            cfg = getattr(self.app_context, "config", None)
+            if cfg is not None:
+                game = cfg.current_game
+                game_cfg = cfg.get_game_config(game)
+                league = getattr(game_cfg, "league", "") or ""
+        except Exception:
+            league = ""
+
+        try:
+            if trade_url:
+                url = trade_url
+            else:
+                base_url = "https://www.pathofexile.com/trade/search"
+                if league:
+                    url = f"{base_url}/{league}"
+                else:
+                    url = base_url
+
+            webbrowser.open_new_tab(url)
+
+            if trade_url and item_name:
+                self._set_status(f"Opened trade listing for '{item_name}' ({source_name or 'trade'}).")
+            elif trade_url:
+                self._set_status("Opened trade listing.")
+            elif item_name:
+                self._set_status(f"Opened trade search page for league '{league or 'unknown'}'.")
+            else:
+                self._set_status("Opened trade search page.")
+        except Exception:
+            self._view_selected_row_details()
 
     def _view_selected_row_details(self, event: tk.Event | None = None) -> None:
-        """
-        Show a dialog with the selected row's values, one per line with labels.
-        """
-        del event  # unused; allows binding if needed
+        del event
 
         row = self._get_selected_row()
         if not row:
@@ -1351,12 +1722,9 @@ class PriceCheckerGUI:
             messagebox.showinfo("Item Details", "No row is currently selected.")
             return
 
-        # In the real GUI, we have a ResultsTable with column names.
         if hasattr(self, "results_table"):
             columns = self.results_table.columns
         else:
-            # Fallback: use RESULT_COLUMNS; in practice this is only used
-            # in the real app, not in tests.
             columns = RESULT_COLUMNS
 
         lines: list[str] = []
@@ -1370,10 +1738,22 @@ class PriceCheckerGUI:
 
         messagebox.showinfo("Item Details", "\n".join(lines))
 
+    def _copy_last_summary(self) -> None:
+        """
+        Copy the most recent price summary line to the clipboard.
+
+        If there is no meaningful summary yet, show a gentle status message
+        and do nothing.
+        """
+        text = (self.summary_var.get() or "").strip()
+        if not text or text == "No recent price summary.":
+            self._set_status("No price summary to copy.")
+            return
+
+        self._set_clipboard(text)
+        self._set_status("Last price summary copied to clipboard.")
+
     def _copy_selected_row(self) -> None:
-        """
-        Context menu → copy selected row as space-separated text.
-        """
         row = self._get_selected_row()
         if not row:
             self._set_status("No row selected to copy.")
@@ -1384,21 +1764,14 @@ class PriceCheckerGUI:
         self._set_status("Row copied to clipboard.")
 
     def _copy_selected_row_as_tsv(self) -> None:
-        """
-        Context menu → copy selected row as TSV.
-        Reuses the same core logic as _copy_row_tsv.
-        """
         self._copy_row_tsv()
 
     def _set_clipboard(self, text: str) -> None:
-        # Helper so tests can monkeypatch if needed
         self.root.clipboard_clear()
         self.root.clipboard_append(text)
-        # Update to ensure clipboard is populated even if app closes soon
         try:
             self.root.update_idletasks()
         except tk.TclError:
-            # In headless or teardown scenarios, this may fail; ignore.
             pass
 
     # -------------------------------------------------------------------------
@@ -1408,19 +1781,16 @@ class PriceCheckerGUI:
     def _add_history_entry(
         self,
         rows: list[Mapping[str, Any]],
-        *,
         input_text: str | None = None,
     ) -> None:
         """
         Add a new history entry for the latest price check.
 
-        `input_text` is the original item text that produced these rows.
-        If omitted, a best-effort attempt is made to read from the input box.
+        If input_text is not provided, fall back to reading from the input widget.
         """
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         if input_text is None:
-            # Fallback: try to capture the current input text; if anything goes wrong, just fallback.
             try:
                 input_text = self._get_input_text()
             except Exception:
@@ -1432,11 +1802,10 @@ class PriceCheckerGUI:
                 "timestamp": timestamp,
                 "summary": summary,
                 "rows": rows,
-                "input_text": input_text or "",
+                "input_text": input_text,
             }
         )
 
-        # If history window is open, refresh its listbox
         if self._history_window is not None and self._history_listbox is not None:
             try:
                 if self._history_window.winfo_exists():
@@ -1455,9 +1824,6 @@ class PriceCheckerGUI:
         return f"{name} ({count} row(s), {chaos}c)"
 
     def _show_history_window(self) -> None:
-        """
-        Show or raise the session history window.
-        """
         if self._history_window is not None:
             try:
                 if self._history_window.winfo_exists():
@@ -1480,7 +1846,7 @@ class PriceCheckerGUI:
         self._history_listbox.grid(row=1, column=0, columnspan=4, sticky="nsew", padx=8)
 
         scrollbar = ttk.Scrollbar(win, orient="vertical", command=self._history_listbox.yview)
-        scrollbar.grid(row=1, column=4, sticky="ns", pady=(0, 0))
+        scrollbar.grid(row=1, column=4, sticky="ns")
         self._history_listbox.configure(yscrollcommand=scrollbar.set)
 
         win.rowconfigure(1, weight=1)
@@ -1573,7 +1939,7 @@ def run(app_context: Any) -> None:
     Convenience function to run the GUI directly.
     """
     root = tk.Tk()
-    root.withdraw()  # Start hidden to avoid flash; we deiconify after setup
+    root.withdraw()
     gui = PriceCheckerGUI(root, app_context)
     root.deiconify()
     root.mainloop()
