@@ -320,14 +320,15 @@ class PoeNinjaAPI(BaseAPIClient):
         """
         Main item price resolver.
 
-        - Currency is handled separately in GUI via get_currency_overview()
+        - Currency is handled separately in GUI via currencyoverview()
         - Here we handle:
             * Skill gems (SkillGem overview)
-            * Unique items (armour, weapon, accessory, flask, jewel)
-            * Divination cards, fragments, etc. via itemoverview
+            * Unique items (armour, weapon, accessory, flask, jewel, maps)
+            * Divination cards, fragments, etc. via itemoverview + heuristics
         """
         rarity_upper = (rarity or "").upper()
         name = (item_name or "").strip()
+        lower_name = name.lower()
 
         # ---------- Skill gems ----------
         if rarity_upper == "GEM":
@@ -343,11 +344,60 @@ class PoeNinjaAPI(BaseAPIClient):
         if rarity_upper in ("DIVINATION", "DIVINATION CARD"):
             return self._find_from_overview_by_name("DivinationCard", name)
 
-        # (Optional future: add fragment / essence etc here)
-        # if rarity_upper == "FRAGMENT":
-        #     return self._find_from_overview_by_name("Fragment", name)
+        # ---------- Fragments ----------
+        # If your parser marks them as FRAGMENT, we can use the Fragment overview directly.
+        if rarity_upper == "FRAGMENT":
+            hit = self._find_from_overview_by_name("Fragment", name)
+            if hit:
+                return hit
 
-        # ---------- Uniques ----------
+        # ---------- Maps (unique & possibly non-unique) ----------
+        # Vaal Temple Map showed up as rarity=UNIQUE in your logs.
+        # If it's a map-like base, use the UniqueMap / Map overviews.
+        if rarity_upper in ("MAP", "UNIQUE") and "map" in (base_type or name).lower():
+            # Try unique maps first
+            hit = self._find_from_overview_by_name("UniqueMap", name)
+            if hit:
+                return hit
+            # Fallback: generic Map overview if poe.ninja exposes that
+            hit = self._find_from_overview_by_name("Map", name)
+            if hit:
+                return hit
+
+        # ---------- Other itemoverview-based misc with name heuristics ----------
+        # These rely on simple substring checks in the item name, then the
+        # corresponding poe.ninja overview.
+        if "scarab" in lower_name:
+            hit = self._find_from_overview_by_name("Scarab", name)
+            if hit:
+                return hit
+
+        if "essence" in lower_name:
+            hit = self._find_from_overview_by_name("Essence", name)
+            if hit:
+                return hit
+
+        if "fossil" in lower_name:
+            hit = self._find_from_overview_by_name("Fossil", name)
+            if hit:
+                return hit
+
+        if "oil" in lower_name:
+            hit = self._find_from_overview_by_name("Oil", name)
+            if hit:
+                return hit
+
+        if "incubator" in lower_name:
+            hit = self._find_from_overview_by_name("Incubator", name)
+            if hit:
+                return hit
+
+        if "vial" in lower_name:
+            hit = self._find_from_overview_by_name("Vial", name)
+            if hit:
+                return hit
+
+        # ---------- Uniques (non-map) ----------
         if rarity_upper == "UNIQUE":
             search_key = item_name.lower()
             if base_type:
@@ -356,6 +406,8 @@ class PoeNinjaAPI(BaseAPIClient):
             for item_type in ["UniqueWeapon", "UniqueArmour", "UniqueAccessory", "UniqueFlask", "UniqueJewel"]:
                 try:
                     data = self._get_item_overview(item_type)
+                    if not data:
+                        continue
 
                     for item in data.get("lines", []):
                         item_key = item['name'].lower()
@@ -368,7 +420,10 @@ class PoeNinjaAPI(BaseAPIClient):
                 except Exception as e:
                     logger.debug(f"Search in {item_type} failed: {e}")
 
+        # Rares and other categories we don't explicitly know how to map
+        # will fall through here.
         return None
+
 
     def _find_gem_price(
         self,

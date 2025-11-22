@@ -8,6 +8,7 @@ from core.item_parser import ItemParser
 from core.database import Database
 from core.game_version import GameVersion, GameConfig
 from data_sources.pricing.poe_ninja import PoeNinjaAPI
+from core.price_service import PriceService
 
 
 @dataclass
@@ -20,22 +21,15 @@ class AppContext:
     - parser: item text → ParsedItem
     - db: SQLite persistence (checked items, sales, price history, plugins)
     - poe_ninja: PoE1 pricing API client
+    - price_service: high-level item pricing façade for GUI/CLI
     """
     config: Config
     parser: ItemParser
     db: Database
     poe_ninja: PoeNinjaAPI | None  # None when current game is PoE2 (until PoE2 support exists)
-
+    price_service: PriceService
 
 def create_app_context() -> AppContext:
-    """
-    Factory to create the default application context.
-
-    - Loads JSON config
-    - Initializes SQLite DB
-    - Creates ItemParser
-    - Creates PoeNinjaAPI for PoE1 (if current game is PoE1)
-    """
     config = Config()
     parser = ItemParser()
     db = Database()  # Uses default ~/.poe_price_checker/data.db
@@ -74,9 +68,20 @@ def create_app_context() -> AppContext:
                     # Keep the API client in sync
                     poe_ninja.league = detected
 
+    # Create the high-level price service that the GUI will use
+    price_logger = logging.getLogger("poe_price_checker.price_service")
+    price_service = PriceService(
+        config=config,
+        parser=parser,
+        db=db,
+        poe_ninja=poe_ninja,
+        logger=price_logger,
+    )
+
     return AppContext(
         config=config,
         parser=parser,
         db=db,
         poe_ninja=poe_ninja,
+        price_service=price_service,
     )
