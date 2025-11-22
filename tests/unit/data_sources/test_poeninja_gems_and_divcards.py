@@ -3,6 +3,9 @@
 import pytest
 
 from data_sources.pricing.poe_ninja import PoeNinjaAPI
+# tests/unit/core/test_price_multi.py
+import pytest
+pytestmark = pytest.mark.unit
 
 
 @pytest.fixture

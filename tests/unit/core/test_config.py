@@ -11,6 +11,9 @@ from pathlib import Path
 
 from core.config import Config
 from core.game_version import GameVersion, GameConfig
+# tests/unit/core/test_price_multi.py
+import pytest
+pytestmark = pytest.mark.unit
 
 
 def get_unique_config_path(tmp_path):

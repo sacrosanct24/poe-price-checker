@@ -20,6 +20,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterable, Mapping, TYPE_CHECKING
+import threading
 
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
@@ -56,6 +57,9 @@ class ResultsTable:
         # Track which columns are currently hidden and their base widths
         self._hidden_columns: set[str] = set()
         self._base_column_widths: dict[str, int] = {}
+
+        # Async / background check state
+        self._check_in_progress: bool = False
 
         # Treeview + scrollbar
         self.tree = ttk.Treeview(
@@ -386,6 +390,9 @@ class PriceCheckerGUI:
         self._history_window: tk.Toplevel | None = None
         self._history_listbox: tk.Listbox | None = None
 
+        # Async / background check state
+        self._check_in_progress: bool = False  # NEW
+
         # Build UI pieces
         self._create_menu()
         self._create_input_area()
@@ -446,9 +453,20 @@ class PriceCheckerGUI:
     # -------------------------------------------------------------------------
 
     def _create_input_area(self) -> None:
-        """Create the item input frame (text box + buttons)."""
-        input_frame = ttk.LabelFrame(self.main_frame, text="Item Input", padding=8)
-        input_frame.grid(row=0, column=0, sticky="nsew")
+        """
+        Create the item input area + 'Last Item' frame.
+
+        Left: "Item Input" – editable text and action buttons.
+        Right: "Last Item" – read-only display of the most recent item checked.
+        """
+        top_frame = ttk.Frame(self.main_frame)
+        top_frame.grid(row=0, column=0, sticky="nsew")
+        self.main_frame.rowconfigure(0, weight=0)
+        self.main_frame.columnconfigure(0, weight=1)
+
+        # --- Item Input frame (left) ---
+        input_frame = ttk.LabelFrame(top_frame, text="Item Input", padding=8)
+        input_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 4))
 
         # Text box
         self.input_text = tk.Text(input_frame, height=8, wrap="word", undo=True)
@@ -465,6 +483,26 @@ class PriceCheckerGUI:
         self.check_button.grid(row=1, column=0, sticky="w", padx=(0, 4))
         self.clear_button.grid(row=1, column=1, sticky="w", padx=(0, 4))
         self.paste_button.grid(row=1, column=2, sticky="e")
+
+        # --- Last Item frame (right) ---
+        last_item_frame = ttk.LabelFrame(top_frame, text="Last Item", padding=8)
+        last_item_frame.grid(row=0, column=1, sticky="nsew")
+
+        self.last_item_text = tk.Text(
+            last_item_frame,
+            height=8,
+            wrap="word",
+            state="disabled",
+        )
+        self.last_item_text.grid(row=0, column=0, sticky="nsew")
+
+        last_item_frame.rowconfigure(0, weight=1)
+        last_item_frame.columnconfigure(0, weight=1)
+
+        # Layout proportions for left/right
+        top_frame.columnconfigure(0, weight=3)
+        top_frame.columnconfigure(1, weight=2)
+        top_frame.rowconfigure(0, weight=1)
 
     def _create_results_area(self) -> None:
         """Create the results frame, filter bar, and attach a ResultsTable."""
@@ -519,6 +557,12 @@ class PriceCheckerGUI:
         status_label.grid(row=0, column=0, sticky="w")
         status_frame.columnconfigure(0, weight=1)
 
+        self.progress_bar = ttk.Progressbar(status_frame, mode="indeterminate", length=160)
+        self.progress_bar.grid(row=0, column=1, sticky="e", padx=(8, 0))
+
+        status_frame.columnconfigure(0, weight=1)
+        status_frame.columnconfigure(1, weight=0)
+
     def _create_tree_context_menu(self) -> None:
         self.tree_menu = tk.Menu(self.results_tree, tearoff=False)
         self.tree_menu.add_command(label="View Details...", command=self._view_selected_row_details)
@@ -557,6 +601,31 @@ class PriceCheckerGUI:
         logger = getattr(self, "logger", None)
         if isinstance(logger, logging.Logger):
             logger.info("Status: %s", message)
+
+    def _set_progress_active(self, active: bool) -> None:
+        """
+        Start or stop the indeterminate progress bar animation.
+        """
+        if not hasattr(self, "progress_bar"):
+            return
+
+        if active:
+            self.progress_bar.start(80)  # ms per step
+        else:
+            self.progress_bar.stop()
+            # Ensure bar is visually reset
+            self.progress_bar.config(value=0)
+
+    def _set_controls_enabled(self, enabled: bool) -> None:
+        """
+        Enable/disable key controls while a background check is running.
+        """
+        state = "normal" if enabled else "disabled"
+
+        for btn in (getattr(self, "check_button", None), getattr(self, "paste_button", None)):
+            if btn is not None:
+                btn.config(state=state)
+        # Clear button stays enabled so you can bail out visually if you want.
 
     # -------------------------------------------------------------------------
     # Menu commands
@@ -734,21 +803,64 @@ class PriceCheckerGUI:
     # -------------------------------------------------------------------------
 
     def _get_input_text(self) -> str:
-        return self.input_text.get("1.0", "end").strip()
+        # Use "end-1c" to avoid the trailing newline Tk adds at the end.
+        return self.input_text.get("1.0", "end-1c").strip()
 
-    def _on_check_clicked(self, event: tk.Event | None = None) -> None:  # type: ignore[override]
-        del event  # unused
+    def _set_last_item(self, text: str) -> None:
+        """
+        Update the read-only 'Last Item' box with the provided item text.
+        """
+        if not hasattr(self, "last_item_text"):
+            return
+
+        self.last_item_text.configure(state="normal")
+        self.last_item_text.delete("1.0", "end")
+        self.last_item_text.insert("1.0", text)
+        self.last_item_text.configure(state="disabled")
+
+    def _check_current_input_and_clear(self) -> None:
+        """
+        Core flow for checking the current input:
+
+        - Read input text.
+        - If non-empty, move it to the Last Item frame.
+        - Clear the input box.
+        - Kick off the price check in a background thread.
+        """
+        if getattr(self, "_check_in_progress", False):
+            # Avoid overlapping checks; user can see status message.
+            self._set_status("A price check is already in progress...")
+            return
+
         text = self._get_input_text()
         if not text:
             self._set_status("No item text to check.")
             return
 
-        self._set_status("Checking prices...")
-        # Small delay to keep UI responsive
-        self.root.after(10, self._run_price_check)
+        # Move to Last Item and clear the input for the next paste.
+        self._set_last_item(text)
+        self.input_text.delete("1.0", "end")
+
+        self._start_background_check(text)
+
+    def _on_check_clicked(self, event: tk.Event | None = None) -> None:  # type: ignore[override]
+        del event  # unused
+        self._check_current_input_and_clear()
 
     def _run_price_check(self) -> None:
+        """
+        Backwards-compatible wrapper for older call sites:
+
+        Uses the current input text directly. Prefer _run_price_check_for_text
+        in new code so we can track the 'Last Item' correctly.
+        """
         text = self._get_input_text()
+        self._run_price_check_for_text(text)
+
+    def _run_price_check_for_text(self, text: str) -> None:
+        """
+        Run a price check for the given item text and update the results/history.
+        """
         if not text:
             self._set_status("No item text to check.")
             return
@@ -757,7 +869,6 @@ class PriceCheckerGUI:
         if price_service is None:
             # Fallback: just insert a dummy row so GUI is still usable in isolation
             self.logger.warning("price_service not available on app_context; inserting dummy result.")
-            self._clear_results()
             self._insert_result_rows(
                 [
                     {
@@ -769,7 +880,8 @@ class PriceCheckerGUI:
                         "listing_count": "0",
                         "source": "no price_service",
                     }
-                ]
+                ],
+                input_text=text,
             )
             self._set_status("price_service not configured; showing dummy result.")
             return
@@ -782,22 +894,28 @@ class PriceCheckerGUI:
             self._set_status("Error during price check.")
             return
 
-        self._clear_results()
-
         try:
-            self._insert_result_rows(results)
+            self._insert_result_rows(results, input_text=text)
         except Exception as exc:  # pragma: no cover
             self.logger.exception("Error inserting results: %s", exc)
             messagebox.showerror("Error", f"Failed to display results:\n{exc}")
             self._set_status("Failed to display results.")
 
-    def _insert_result_rows(self, rows: Iterable[Mapping[str, Any] | Any]) -> None:
+    def _insert_result_rows(
+            self,
+            rows: Iterable[Mapping[str, Any] | Any],
+            *,
+            input_text: str | None = None,
+    ) -> None:
         """
         Insert rows into the results table.
 
         Delegates to ResultsTable for the real GUI, stores them in the
         backing list for filtering and history, and updates the status with
         a row count.
+
+        New result sets are *prepended* so the most recent checks appear
+        at the top of the Results table.
         """
         if not hasattr(self, "results_table"):
             return
@@ -810,17 +928,26 @@ class PriceCheckerGUI:
             else:
                 canonical_rows.append({col: getattr(row, col, "") for col in RESULT_COLUMNS})
 
-        self._all_result_rows = canonical_rows
+        # Prepend to the backing store so newest results are first
+        existing = getattr(self, "_all_result_rows", [])
+        self._all_result_rows = canonical_rows + list(existing)
 
-        self.results_table.clear()
-        self.results_table.insert_rows(canonical_rows)
+        active_filter = (self.filter_var.get() or "").strip()
 
-        # Compute total row count after insert
+        if active_filter:
+            # If a filter is active, re-apply it to all rows so order is consistent
+            self._apply_filter(active_filter)
+        else:
+            # No filter → re-render all rows with newest at the top
+            self.results_table.clear()
+            self.results_table.insert_rows(self._all_result_rows)
+
+        # Compute total row count after insert (visible rows)
         total_rows = sum(1 for _ in self.results_table.iter_rows())
         self._set_status(f"Price check complete. {total_rows} row(s).")
 
-        # Add to history
-        self._add_history_entry(canonical_rows)
+        # Add to history (history accumulates until explicitly cleared)
+        self._add_history_entry(canonical_rows, input_text=input_text)
 
     def _clear_results(self) -> None:
         """Clear all rows from the results table."""
@@ -832,6 +959,8 @@ class PriceCheckerGUI:
         del event
         self.input_text.delete("1.0", "end")
         self._clear_results()
+        self._on_clear_filter()
+        self._set_last_item("")
         self._set_status("Cleared.")
 
     def _on_paste_button_clicked(self) -> None:
@@ -852,11 +981,92 @@ class PriceCheckerGUI:
         """
         del event
         # Let the default paste complete, then check
-        self.root.after(10, self._auto_check_if_not_empty)  # type: ignore[arg-type]
+        self.root.after(10, self._auto_check_if_not_empty)
 
     def _auto_check_if_not_empty(self) -> None:
         if self._get_input_text():
-            self._on_check_clicked()
+            self._check_current_input_and_clear()
+
+    def _start_background_check(self, text: str) -> None:
+        """
+        Start a background thread to perform the price check.
+
+        All interaction with Tk widgets happens on the main thread via root.after.
+        """
+        if self._check_in_progress:
+            self._set_status("A price check is already in progress...")
+            return
+
+        self._check_in_progress = True
+        self._set_controls_enabled(False)
+        self._set_progress_active(True)
+        self._set_status("Checking prices...")
+
+        def worker() -> None:
+            price_service = getattr(self.app_context, "price_service", None)
+            results: Any | None = None
+            error: Exception | None = None
+
+            if price_service is None:
+                # Fallback dummy row if no service is configured
+                self.logger.warning("price_service not available on app_context; inserting dummy result.")
+                results = [
+                    {
+                        "item_name": "Dummy Item",
+                        "variant": "N/A",
+                        "links": "N/A",
+                        "chaos_value": "0",
+                        "divine_value": "0",
+                        "listing_count": "0",
+                        "source": "no price_service",
+                    }
+                ]
+            else:
+                try:
+                    results = price_service.check_item(text)  # type: ignore[call-arg]
+                except Exception as exc:
+                    error = exc
+
+            # Bounce back to the Tk main thread
+            self.root.after(
+                0,
+                lambda: self._on_price_check_complete(text=text, results=results, error=error),
+            )
+
+        thread = threading.Thread(target=worker, daemon=True)
+        thread.start()
+
+    def _on_price_check_complete(
+        self,
+        *,
+        text: str,
+        results: Any | None,
+        error: Exception | None,
+    ) -> None:
+        """
+        Called on the Tk main thread when the background check finishes.
+        """
+        self._check_in_progress = False
+        self._set_progress_active(False)
+        self._set_controls_enabled(True)
+
+        if error is not None:
+            self.logger.exception("Error during price check: %s", error)
+            messagebox.showerror("Error", f"An error occurred while checking prices:\n{error}")
+            self._set_status("Error during price check.")
+            return
+
+        if results is None:
+            # Treat as empty result set
+            self._set_status("Price check complete. 0 row(s).")
+            return
+
+        try:
+            self._insert_result_rows(results, input_text=text)
+        except Exception as exc:  # pragma: no cover
+            self.logger.exception("Error inserting results: %s", exc)
+            messagebox.showerror("Error", f"Failed to display results:\n{exc}")
+            self._set_status("Failed to display results.")
 
     # -------------------------------------------------------------------------
     # Filtering helpers
@@ -1195,17 +1405,26 @@ class PriceCheckerGUI:
     # Session history
     # -------------------------------------------------------------------------
 
-    def _add_history_entry(self, rows: list[Mapping[str, Any]]) -> None:
+    def _add_history_entry(
+        self,
+        rows: list[Mapping[str, Any]],
+        *,
+        input_text: str | None = None,
+    ) -> None:
         """
         Add a new history entry for the latest price check.
+
+        `input_text` is the original item text that produced these rows.
+        If omitted, a best-effort attempt is made to read from the input box.
         """
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        # Attempt to capture the current input text; if anything goes wrong, just fallback.
-        try:
-            input_text = self._get_input_text()
-        except Exception:
-            input_text = ""
+        if input_text is None:
+            # Fallback: try to capture the current input text; if anything goes wrong, just fallback.
+            try:
+                input_text = self._get_input_text()
+            except Exception:
+                input_text = ""
 
         summary = self._build_history_summary(rows)
         self._history.append(
@@ -1213,7 +1432,7 @@ class PriceCheckerGUI:
                 "timestamp": timestamp,
                 "summary": summary,
                 "rows": rows,
-                "input_text": input_text,
+                "input_text": input_text or "",
             }
         )
 

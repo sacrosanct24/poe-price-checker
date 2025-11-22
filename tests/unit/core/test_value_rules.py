@@ -4,6 +4,9 @@ import pytest
 
 from core.item_parser import ParsedItem
 from core.value_rules import assess_rare_item
+# tests/unit/core/test_price_multi.py
+import pytest
+pytestmark = pytest.mark.unit
 
 
 def make_rare_item(

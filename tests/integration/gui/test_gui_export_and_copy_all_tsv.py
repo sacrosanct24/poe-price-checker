@@ -7,6 +7,9 @@ from pathlib import Path
 import pytest
 
 from gui.main_window import PriceCheckerGUI, RESULT_COLUMNS
+# tests/integration/gui/test_gui_copy_row.py
+import pytest
+pytestmark = pytest.mark.integration
 
 
 @pytest.fixture

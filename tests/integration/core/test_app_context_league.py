@@ -4,6 +4,9 @@ from dataclasses import dataclass
 
 import core.app_context as appctx
 from core.game_version import GameVersion, GameConfig
+# tests/integration/gui/test_gui_copy_row.py
+import pytest
+pytestmark = pytest.mark.integration
 
 
 @dataclass

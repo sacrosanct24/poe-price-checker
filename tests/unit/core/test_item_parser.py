@@ -11,6 +11,9 @@ These patches address:
 import pytest
 from core.item_parser import ItemParser, ParsedItem
 from core.game_version import GameVersion
+# tests/unit/core/test_price_multi.py
+import pytest
+pytestmark = pytest.mark.unit
 
 
 # Fix 1: ParsedItem.to_dict() test

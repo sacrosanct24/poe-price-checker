@@ -6,6 +6,9 @@ from typing import Iterator
 import pytest
 
 from gui.main_window import PriceCheckerGUI
+# tests/integration/gui/test_gui_copy_row.py
+import pytest
+pytestmark = pytest.mark.integration
 
 
 @pytest.fixture

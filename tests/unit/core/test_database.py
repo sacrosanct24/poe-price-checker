@@ -9,6 +9,9 @@ from datetime import datetime, timedelta
 import pytest
 from core.database import Database
 from core.game_version import GameVersion
+# tests/unit/core/test_price_multi.py
+import pytest
+pytestmark = pytest.mark.unit
 
 
 # Fix for: test_get_checked_items_returns_newest_first
