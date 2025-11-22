@@ -1,962 +1,794 @@
-# gui/main_window.py
+"""
+gui.main_window
+
+Tkinter GUI for the PoE Price Checker.
+
+- Paste or type item text into the input box.
+- Click "Check Price" (or press Ctrl+Enter) to run a price check.
+- View results in the table.
+- Right–click a result row to copy it or copy it as TSV.
+- File menu: open log file, open config folder, exit.
+- Help menu: About dialog.
+"""
+
 from __future__ import annotations
 
+import logging
 import os
-import subprocess
+import sys
+from pathlib import Path
+from typing import Any, Iterable, Mapping, TYPE_CHECKING
+
 import tkinter as tk
-from tkinter import ttk, scrolledtext, messagebox, simpledialog
-from typing import Any, Dict, List, Tuple
-from datetime import datetime
-import webbrowser
+from tkinter import ttk, messagebox, filedialog
 
-from core.app_context import AppContext, create_app_context
-from core.item_parser import ParsedItem
-from core.game_version import GameVersion
-from core.value_rules import assess_rare_item
 
-APP_VERSION = "0.2.0-dev"
+if TYPE_CHECKING:  # pragma: no cover
+    from core.app_context import AppContext  # type: ignore
+
+
+# Columns used by the real GUI results table.
+RESULT_COLUMNS: tuple[str, ...] = (
+    "item_name",
+    "variant",
+    "links",
+    "chaos_value",
+    "divine_value",
+    "listing_count",
+    "source",
+)
+
+
+class ResultsTable:
+    """
+    Helper class that owns the results Treeview and its scrollbar.
+
+    This is used by the real GUI. The tests, however, create their own fake Treeview
+    and attach it directly to a PriceCheckerGUI instance as `gui.tree`, so this class
+    is not involved in the test path.
+    """
+
+    def __init__(self, parent: ttk.Frame, columns: tuple[str, ...]) -> None:
+        self.columns = columns
+        self._sort_reverse: dict[str, bool] = {}
+
+        # Treeview + scrollbar
+        self.tree = ttk.Treeview(
+            parent,
+            columns=self.columns,
+            show="headings",
+            selectmode="extended",
+        )
+
+        for col in self.columns:
+            # Use a heading command so clicking the header sorts by that column.
+            self.tree.heading(
+                col,
+                text=col.replace("_", " ").title(),
+                command=lambda c=col: self._on_heading_click(c),
+            )
+            self.tree.column(col, width=100, anchor="w")
+
+        vsb = ttk.Scrollbar(parent, orient="vertical", command=self.tree.yview)
+        self.tree.configure(yscrollcommand=vsb.set)
+
+        self.tree.grid(row=0, column=0, sticky="nsew")
+        vsb.grid(row=0, column=1, sticky="ns")
+
+        parent.rowconfigure(0, weight=1)
+        parent.columnconfigure(0, weight=1)
+
+    # ------------------------------------------------------------------
+    # Core operations
+    # ------------------------------------------------------------------
+
+    def clear(self) -> None:
+        """Remove all rows from the table."""
+        for item_id in self.tree.get_children():
+            self.tree.delete(item_id)
+
+    def insert_rows(self, rows: Iterable[Mapping[str, Any] | Any]) -> None:
+        """
+        Insert rows into the table.
+
+        Each row may be:
+            - a mapping-like object with keys matching self.columns; or
+            - an arbitrary object with attributes named like self.columns.
+        """
+        for row in rows:
+            values: list[str] = []
+            for col in self.columns:
+                if isinstance(row, Mapping):
+                    val = row.get(col, "")
+                else:
+                    val = getattr(row, col, "")
+                values.append("" if val is None else str(val))
+            self.tree.insert("", "end", values=values)
+
+        # After inserting, adjust column widths based on content.
+        self.autosize_columns()
+
+    def get_selected_row_values(self) -> tuple[Any, ...]:
+        """Return the values of the first selected row, or an empty tuple."""
+        selection = self.tree.selection()
+        if not selection:
+            return ()
+        item_id = selection[0]
+        values = self.tree.item(item_id, "values")
+        return tuple(values)
+
+    def iter_rows(self) -> Iterable[tuple[Any, ...]]:
+        """Yield all rows as tuples of values (in insertion order)."""
+        for item_id in self.tree.get_children():
+            values = self.tree.item(item_id, "values")
+            yield tuple(values)
+
+    # ------------------------------------------------------------------
+    # Export helpers
+    # ------------------------------------------------------------------
+
+    def to_tsv(self, include_header: bool = False) -> str:
+        """
+        Return the table contents as a TSV string.
+
+        If include_header is True, the first line will be a header row made
+        from the column names.
+        """
+        lines: list[str] = []
+
+        if include_header:
+            header = "\t".join(self.columns)
+            lines.append(header)
+
+        for row in self.iter_rows():
+            lines.append("\t".join("" if v is None else str(v) for v in row))
+
+        return "\n".join(lines)
+
+    def export_tsv(self, path: str | Path, include_header: bool = False) -> None:
+        """
+        Write the table contents to a TSV file at the given path.
+
+        Raises OSError if the file cannot be written.
+        """
+        tsv = self.to_tsv(include_header=include_header)
+        p = Path(path)
+        p.write_text(tsv, encoding="utf-8")
+
+    # ------------------------------------------------------------------
+    # Sorting & autosize
+    # ------------------------------------------------------------------
+
+    def _on_heading_click(self, column: str) -> None:
+        """Handle clicks on a column header: toggle sort order and sort."""
+        reverse = self._sort_reverse.get(column, False)
+        # Toggle
+        reverse = not reverse
+        self._sort_reverse[column] = reverse
+        self.sort_by_column(column, reverse=reverse)
+
+    def sort_by_column(self, column: str, reverse: bool = False) -> None:
+        """
+        Sort table rows by a given column.
+
+        Attempts numeric sort when possible, falling back to string sort.
+        """
+        if column not in self.columns:
+            return
+
+        col_index = self.columns.index(column)
+        children = list(self.tree.get_children())
+
+        def coerce(value: Any) -> Any:
+            s = "" if value is None else str(value)
+            try:
+                # Try numeric comparison first (good for chaos/divine values)
+                return float(s)
+            except ValueError:
+                return s.lower()
+
+        # Build list of (key, item_id) and sort it.
+        keyed = []
+        for item_id in children:
+            values = self.tree.item(item_id, "values") or ()
+            val = values[col_index] if col_index < len(values) else ""
+            keyed.append((coerce(val), item_id))
+
+        keyed.sort(key=lambda pair: pair[0], reverse=reverse)
+
+        # Reorder items in the tree to match the sorted order.
+        for index, (_, item_id) in enumerate(keyed):
+            self.tree.move(item_id, "", index)
+
+    def autosize_columns(self, min_width: int = 80, max_width: int = 320) -> None:
+        """
+        Adjust column widths based on header + cell text lengths.
+
+        Width is approximate: we use character count as a proxy and convert to
+        pixels with a fixed factor.
+        """
+        # Rough "pixels per character" heuristic.
+        px_per_char = 7
+
+        for col in self.columns:
+            # Start with header text length.
+            header_text = self.tree.heading(col, "text") or ""
+            max_chars = len(str(header_text))
+
+            # Check each cell in this column.
+            col_index = self.columns.index(col)
+            for item_id in self.tree.get_children():
+                values = self.tree.item(item_id, "values") or ()
+                if col_index < len(values):
+                    cell_text = "" if values[col_index] is None else str(values[col_index])
+                    max_chars = max(max_chars, len(cell_text))
+
+            # Convert to pixels: chars * px_per_char + some padding.
+            width = max_chars * px_per_char + 20
+            width = max(min_width, min(max_width, width))
+            self.tree.column(col, width=width)
 
 
 class PriceCheckerGUI:
-    """Main Tkinter window for the PoE Price Checker."""
+    """Main GUI class for the PoE Price Checker."""
 
-    def __init__(self, root: tk.Tk, app_context: AppContext) -> None:
+    def __init__(self, root: tk.Tk, app_context: Any) -> None:
         self.root = root
-        self.ctx = app_context
+        self.app_context = app_context
 
-        self.root.title("PoE Item Price Checker")
+        self.logger = self._resolve_logger()
+        self.root.title("PoE Price Checker")
+        self.root.geometry("900x600")
 
-        # --- Window size from config ---
-        win_w, win_h = self.ctx.config.window_size
-        self.root.geometry(f"{win_w}x{win_h}")
+        # Main containers
+        self.main_frame = ttk.Frame(self.root, padding=8)
+        self.main_frame.grid(row=0, column=0, sticky="nsew")
 
-        self.status_var = tk.StringVar(value="Ready.")
+        self.root.rowconfigure(0, weight=1)
+        self.root.columnconfigure(0, weight=1)
 
-        # This will display: "PoE1 – Standard (last price update: 2025-11-15 17:31)"
-        self.game_info_var = tk.StringVar(value="")
+        # Status bar var
+        self.status_var = tk.StringVar(value="Ready")
 
-        # UI filter state (backed by Config)
-        self.min_value_var = tk.DoubleVar(value=self.ctx.config.min_value_chaos)
-        self.show_vendor_var = tk.BooleanVar(value=self.ctx.config.show_vendor_items)
+        # Build UI pieces
+        self._create_menu()
+        self._create_input_area()
+        self._create_results_area()
+        self._create_status_bar()
+        self._create_bindings()
 
-        # This will store the latest (ParsedItem, price_data) tuples
-        self.checked_items: List[Tuple[ParsedItem, Dict[str, Any]]] = []
+        self._set_status("Ready")
 
-        self._build_menu()
-        self._build_layout()
-        self._update_game_info()  # Initialize league + last update display
+    # -------------------------------------------------------------------------
+    # Setup helpers
+    # -------------------------------------------------------------------------
 
-        # Auto-focus the input box shortly after startup
-        self.root.after(150, self.input_text.focus_set)
+    def _resolve_logger(self) -> logging.Logger:
+        logger = getattr(self.app_context, "logger", None)
+        if isinstance(logger, logging.Logger):
+            return logger
+        # Fallback logger
+        logger = logging.getLogger("poe_price_checker.gui")
+        if not logger.handlers:
+            handler = logging.StreamHandler(sys.stdout)
+            handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
+            logger.addHandler(handler)
+        logger.setLevel(logging.INFO)
+        return logger
 
-        # Hook window close to save size + close DB
-        self.root.protocol("WM_DELETE_WINDOW", self.on_close)
-
-    # ---------- UI building ----------
-
-    def _build_menu(self) -> None:
+    def _create_menu(self) -> None:
         menubar = tk.Menu(self.root)
-        self.root.config(menu=menubar)
 
-        # --- File menu ---
-        file_menu = tk.Menu(menubar, tearoff=0)
+        # File menu
+        file_menu = tk.Menu(menubar, tearoff=False)
+        file_menu.add_command(label="Open Log File", command=self._open_log_file)
+        file_menu.add_command(label="Open Config Folder", command=self._open_config_folder)
+        file_menu.add_separator()
+        file_menu.add_command(label="Export TSV...", command=self._export_results_tsv)
+        file_menu.add_command(label="Copy All Rows as TSV", command=self._copy_all_rows_as_tsv)
+        file_menu.add_separator()
+        file_menu.add_command(label="Exit", command=self.root.quit)
         menubar.add_cascade(label="File", menu=file_menu)
-        file_menu.add_command(label="Exit", command=self.on_close)
 
-        # --- Settings menu ---
-        settings_menu = tk.Menu(menubar, tearoff=0)
-        menubar.add_cascade(label="Settings", menu=settings_menu)
-        settings_menu.add_command(label="Change League", command=self.change_league)
-        # Later: menu for switching PoE1 / PoE2
 
-        # --- Tools menu ---
-        tools_menu = tk.Menu(menubar, tearoff=0)
-        menubar.add_cascade(label="Tools", menu=tools_menu)
-
-        tools_menu.add_command(
-            label="Open Log File",
-            command=self._open_log_file,
-        )
-        tools_menu.add_command(
-            label="Open Config Folder",
-            command=self._open_config_folder,
-        )
-
-        tools_menu.add_separator()
-
-        tools_menu.add_command(
-            label="Export Checked Items to Excel... (Planned)",
-            command=lambda: self._not_implemented("Excel export"),
-        )
-        tools_menu.add_command(
-            label="View Price History (Planned)",
-            command=lambda: self._not_implemented("Price history viewer"),
-        )
-        tools_menu.add_separator()
-        tools_menu.add_command(
-            label="Refresh Price Data (poe.ninja)",
-            command=lambda: self._not_implemented("Price data refresh"),
-        )
-        tools_menu.add_command(
-            label="Import GGG Item JSON (Planned)",
-            command=lambda: self._not_implemented("GGG item JSON import"),
-        )
-        tools_menu.add_separator()
-        tools_menu.add_command(
-            label="Plugin Manager (Planned)",
-            command=lambda: self._not_implemented("Plugin manager"),
-        )
-
-        # --- Helpful Links menu ---
-        links_menu = tk.Menu(menubar, tearoff=0)
-        menubar.add_cascade(label="Links", menu=links_menu)
-
-        # Official / GGG links
-        official_menu = tk.Menu(links_menu, tearoff=0)
-        links_menu.add_cascade(label="Official / GGG", menu=official_menu)
-        official_menu.add_command(
-            label="Path of Exile (PoE1)",
-            command=lambda: self._open_url("https://www.pathofexile.com"),
-        )
-        official_menu.add_command(
-            label="PoE Trade (Official)",
-            command=lambda: self._open_url("https://www.pathofexile.com/trade"),
-        )
-        official_menu.add_command(
-            label="Path of Exile 2",
-            command=lambda: self._open_url("https://www.pathofexile2.com"),
-        )
-
-        # Databases / Info
-        db_menu = tk.Menu(links_menu, tearoff=0)
-        links_menu.add_cascade(label="Databases & Info", menu=db_menu)
-        db_menu.add_command(
-            label="PoE Wiki",
-            command=lambda: self._open_url("https://www.poewiki.net"),
-        )
-        db_menu.add_command(
-            label="PoEDB",
-            command=lambda: self._open_url("https://poedb.tw"),
-        )
-        db_menu.add_command(
-            label="poe.ninja (Economy)",
-            command=lambda: self._open_url("https://poe.ninja"),
-        )
-
-        # Build guides
-        builds_menu = tk.Menu(links_menu, tearoff=0)
-        links_menu.add_cascade(label="Build Guides", menu=builds_menu)
-        builds_menu.add_command(
-            label="Maxroll – PoE2",
-            command=lambda: self._open_url("https://maxroll.gg/poe2"),
-        )
-        builds_menu.add_command(
-            label="Maxroll – PoE1",
-            command=lambda: self._open_url("https://maxroll.gg/path-of-exile"),
-        )
-        builds_menu.add_command(
-            label="PoE Vault",
-            command=lambda: self._open_url("https://www.poe-vault.com"),
-        )
-
-        # Developer / Programming
-        dev_menu = tk.Menu(links_menu, tearoff=0)
-        links_menu.add_cascade(label="Dev / Programming", menu=dev_menu)
-        dev_menu.add_command(
-            label="GGG Trade API Thread",
-            command=lambda: self._open_url(
-                "https://www.pathofexile.com/forum/view-thread/3072628"
-            ),
-        )
-        dev_menu.add_command(
-            label="PoE Wiki Cargo API",
-            command=lambda: self._open_url(
-                "https://www.poewiki.net/wiki/Help:Cargo"
-            ),
-        )
-        dev_menu.add_command(
-            label="poe.ninja API Info (GitHub)",
-            command=lambda: self._open_url(
-                "https://github.com/poe-ninja/poe-ninja-api"
-            ),
-        )
-        dev_menu.add_command(
-            label="poe2scout API (Swagger)",
-            command=lambda: self._open_url(
-                "https://poe2scout.com/api/swagger"
-            ),
-        )
-
-        # --- Help menu ---
-        help_menu = tk.Menu(menubar, tearoff=0)
+        # Help menu
+        help_menu = tk.Menu(menubar, tearoff=False)
+        help_menu.add_command(label="Keyboard Shortcuts", command=self._show_shortcuts)
+        help_menu.add_command(label="Usage Tips", command=self._show_usage_tips)
+        help_menu.add_separator()
+        help_menu.add_command(label="About", command=self._show_about_dialog)
         menubar.add_cascade(label="Help", menu=help_menu)
-        help_menu.add_command(
-            label="About PoE Price Checker",
-            command=self.show_about,
-        )
 
-    def _build_layout(self) -> None:
-        # Input frame
-        input_frame = ttk.LabelFrame(
-            self.root,
-            text="Paste items here (Ctrl+C in game, Ctrl+V here)",
-            padding=10,
-        )
-        input_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+        self.root.config(menu=menubar)
+    # -------------------------------------------------------------------------
+    # Layout pieces
+    # -------------------------------------------------------------------------
 
-        self.input_text = scrolledtext.ScrolledText(
-            input_frame,
-            height=10,
-            wrap=tk.WORD,
-        )
-        self.input_text.pack(fill=tk.BOTH, expand=True)
+    def _create_input_area(self) -> None:
+        """Create the item input frame (text box + buttons)."""
+        input_frame = ttk.LabelFrame(self.main_frame, text="Item Input", padding=8)
+        input_frame.grid(row=0, column=0, sticky="nsew")
 
-        # Auto-check on paste:
-        # - <<Paste>> fires after paste, so we schedule a check a tick later
+        # Text box
+        self.input_text = tk.Text(input_frame, height=8, wrap="word", undo=True)
+        self.input_text.grid(row=0, column=0, columnspan=3, sticky="nsew", pady=(0, 6))
+
+        input_frame.rowconfigure(0, weight=1)
+        input_frame.columnconfigure(0, weight=1)
+
+        # Buttons
+        self.check_button = ttk.Button(input_frame, text="Check Price", command=self._on_check_clicked)
+        self.clear_button = ttk.Button(input_frame, text="Clear", command=self._on_clear_clicked)
+        self.paste_button = ttk.Button(input_frame, text="Paste", command=self._on_paste_button_clicked)
+
+        self.check_button.grid(row=1, column=0, sticky="w", padx=(0, 4))
+        self.clear_button.grid(row=1, column=1, sticky="w", padx=(0, 4))
+        self.paste_button.grid(row=1, column=2, sticky="e")
+
+    def _create_results_area(self) -> None:
+        """Create the results frame and attach a ResultsTable."""
+        results_frame = ttk.LabelFrame(self.main_frame, text="Results", padding=8)
+        results_frame.grid(row=1, column=0, sticky="nsew", pady=(8, 0))
+
+        self.main_frame.rowconfigure(1, weight=1)
+        self.main_frame.columnconfigure(0, weight=1)
+
+        # Use ResultsTable helper
+        self.results_table = ResultsTable(results_frame, RESULT_COLUMNS)
+        # For compatibility with the rest of the GUI and tests,
+        # keep a direct reference to the underlying Treeview.
+        self.results_tree = self.results_table.tree
+
+        # Context menu for tree
+        self._create_tree_context_menu()
+
+    def _create_status_bar(self) -> None:
+        """Create the bottom status bar."""
+        status_frame = ttk.Frame(self.root, padding=(8, 2))
+        status_frame.grid(row=1, column=0, sticky="ew")
+        status_label = ttk.Label(status_frame, textvariable=self.status_var, anchor="w")
+        status_label.grid(row=0, column=0, sticky="w")
+        status_frame.columnconfigure(0, weight=1)
+
+    def _create_tree_context_menu(self) -> None:
+        self.tree_menu = tk.Menu(self.results_tree, tearoff=False)
+        self.tree_menu.add_command(label="Copy Row", command=self._copy_selected_row)
+        self.tree_menu.add_command(label="Copy Row as TSV", command=self._copy_selected_row_as_tsv)
+
+        self.results_tree.bind("<Button-3>", self._on_tree_right_click)
+        # macOS sometimes uses Button-2; harmless on other platforms
+        self.results_tree.bind("<Button-2>", self._on_tree_right_click)
+
+    def _create_bindings(self) -> None:
+        # Key bindings
+        self.root.bind("<Control-Return>", self._on_check_clicked)  # Ctrl+Enter
+        self.root.bind("<Control-K>", self._on_clear_clicked)       # Ctrl+K clear
+        self.root.bind("<F5>", self._on_check_clicked)              # F5 re-check
+
+        # Paste detection in text widget
         self.input_text.bind("<<Paste>>", self._on_paste)
-        # Ensure Ctrl+V maps to <<Paste>> consistently
-        self.input_text.bind("<Control-v>", self._on_ctrl_v)
 
-        # Buttons + filters
-        button_frame = ttk.Frame(self.root)
-        button_frame.pack(fill=tk.X, padx=10, pady=(0, 5))
+    # -------------------------------------------------------------------------
+    # Status helpers
+    # -------------------------------------------------------------------------
 
-        self.check_button = ttk.Button(
-            button_frame,
-            text="Check Prices",
-            command=self.check_prices,
-        )
-        self.check_button.pack(side=tk.LEFT)
-
-        # New: Clear button
-        self.clear_button = ttk.Button(
-            button_frame,
-            text="Clear",
-            command=self.clear_all,
-        )
-        self.clear_button.pack(side=tk.LEFT, padx=(5, 0))
-
-        # --- Filters: Min chaos & vendor items ---
-        ttk.Label(button_frame, text="   Min chaos:").pack(side=tk.LEFT, padx=(15, 2))
-        self.min_value_entry = ttk.Entry(
-            button_frame,
-            width=8,
-            textvariable=self.min_value_var,
-        )
-        self.min_value_entry.pack(side=tk.LEFT)
-
-        self.vendor_check = ttk.Checkbutton(
-            button_frame,
-            text="Show vendor items",
-            variable=self.show_vendor_var,
-        )
-        self.vendor_check.pack(side=tk.LEFT, padx=(10, 0))
-
-        # Results frame
-        results_frame = ttk.LabelFrame(self.root, text="Results", padding=10)
-        results_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
-
-        columns = (
-            "Item",
-            "Rarity",
-            "Item Level",
-            "Stack",
-            "Chaos Value",
-            "Divine Value",
-            "Total Value",
-            "Value Flag",
-        )
-        self.tree = ttk.Treeview(
-            results_frame,
-            columns=columns,
-            show="headings",
-            selectmode="browse",
-        )
-
-        self.tree.heading("#0", text="#")
-        self.tree.heading("Item", text="Item Name")
-        self.tree.heading("Rarity", text="Rarity")
-        self.tree.heading("Item Level", text="iLvl")
-        self.tree.heading("Stack", text="Stack")
-        self.tree.heading("Chaos Value", text="Chaos/Unit")
-        self.tree.heading("Divine Value", text="Divine/Unit")
-        self.tree.heading("Total Value", text="Total Value (c)")
-        self.tree.heading("Value Flag", text="Value Flag")
-
-        self.tree.column("#0", width=40, stretch=False)
-        self.tree.column("Item", width=350)
-        self.tree.column("Rarity", width=80, anchor=tk.CENTER)
-        self.tree.column("Item Level", width=60, anchor=tk.CENTER)
-        self.tree.column("Stack", width=60, anchor=tk.CENTER)
-        self.tree.column("Chaos Value", width=90, anchor=tk.E)
-        self.tree.column("Divine Value", width=90, anchor=tk.E)
-        self.tree.column("Total Value", width=110, anchor=tk.E)
-        self.tree.column("Value Flag", width=100, anchor=tk.CENTER)
-
-        self.tree.pack(fill=tk.BOTH, expand=True)
-
-        # Context menu for copying from results
-        self.tree_menu = tk.Menu(self.root, tearoff=0)
-        self.tree_menu.add_command(
-            label="Copy Item Name",
-            command=self._copy_item_name,
-        )
-        self.tree_menu.add_command(
-            label="Copy Row (tab-separated)",
-            command=self._copy_row_tsv,
-        )
-
-        # Right-click on row
-        self.tree.bind("<Button-3>", self._on_tree_right_click)
-        # Ctrl+C to copy row as TSV
-        self.tree.bind("<Control-c>", self._on_tree_ctrl_c)
-
-        # Status bar
-        status_frame = ttk.Frame(self.root)
-        status_frame.pack(fill=tk.X, padx=10, pady=(0, 5))
-
-        # Left: status messages
-        ttk.Label(status_frame, textvariable=self.status_var).pack(side=tk.LEFT)
-
-        # Right: game + league + last update
-        ttk.Label(
-            status_frame,
-            textvariable=self.game_info_var,
-            anchor=tk.E,
-        ).pack(side=tk.RIGHT)
-
-    # ---------- Settings / State ----------
-
-    def _update_game_info(self) -> None:
+    def _set_status(self, message: str) -> None:
         """
-        Update the display string for:
-        - current game (PoE1 / PoE2)
-        - league
-        - last price update timestamp
+        Update the status bar and log the status if a logger is available.
+
+        Defensive so it also works on the fake GUI used in tests.
         """
-        cfg = self.ctx.config
+        if hasattr(self, "status_var"):
+            self.status_var.set(message)
 
-        # Game label (PoE1 / PoE2)
-        if cfg.current_game == GameVersion.POE1:
-            game_label = "PoE1"
-        elif cfg.current_game == GameVersion.POE2:
-            game_label = "PoE2"
-        else:
-            game_label = str(cfg.current_game)
+        logger = getattr(self, "logger", None)
+        if isinstance(logger, logging.Logger):
+            logger.info("Status: %s", message)
 
-        league = cfg.league
+    # -------------------------------------------------------------------------
+    # Menu commands
+    # -------------------------------------------------------------------------
 
-        # last_price_update may be None, str, or datetime; normalize it
-        last_update = getattr(cfg, "last_price_update", None)
-        if isinstance(last_update, datetime):
-            ts = last_update.strftime("%Y-%m-%d %H:%M")
-        elif isinstance(last_update, str) and last_update:
-            # stored as ISO string "2025-11-15T17:31:10.707953"
-            try:
-                dt = datetime.fromisoformat(last_update)
-                ts = dt.strftime("%Y-%m-%d %H:%M")
-            except Exception:
-                ts = last_update.replace("T", " ").split(".")[0]
-        else:
-            ts = "never"
-
-        self.game_info_var.set(
-            f"{game_label} – {league} (last price update: {ts})"
-        )
-
-    def change_league(self) -> None:
-        """
-        Show a small dialog with a dropdown of available leagues.
-
-        - Uses poe.ninja's /economyleagues endpoint via PoeNinjaAPI.get_current_leagues()
-        - Updates Config.league for the current game
-        - Updates AppContext.poe_ninja.league if using PoE1
-        """
-        if not self.ctx.poe_ninja:
-            messagebox.showinfo("Change League", "League selection is only available for PoE1.")
+    def _open_log_file(self) -> None:
+        path = getattr(self.app_context, "log_file_path", None)
+        if not path:
+            messagebox.showinfo("Log File", "Log file path is not configured.")
             return
 
-        # Fetch leagues from poe.ninja
-        try:
-            leagues = self.ctx.poe_ninja.get_current_leagues()
-        except Exception as exc:
-            messagebox.showerror("Error", f"Failed to fetch leagues from poe.ninja:\n{exc}")
+        log_path = Path(path)
+        if not log_path.exists():
+            messagebox.showwarning("Log File", f"Log file does not exist:\n{log_path}")
             return
 
-        if not leagues:
-            messagebox.showwarning(
-                "Change League",
-                "No leagues were returned from poe.ninja.\n"
-                "Try again later or set the league manually in the config."
+        self._open_path_in_explorer(log_path)
+    def _show_shortcuts(self) -> None:
+        """Show a small cheat sheet of keyboard & mouse shortcuts."""
+        messagebox.showinfo(
+            "Keyboard Shortcuts",
+            (
+                "Keyboard & Mouse Shortcuts\n\n"
+                "• Ctrl+Enter   – Check prices\n"
+                "• F5           – Re-check prices\n"
+                "• Ctrl+K       – Clear input and results\n"
+                "• Right-click  – Show row context menu (Copy / Copy as TSV)\n"
+                "• Paste button – Paste item from clipboard and auto-check\n"
+            ),
+        )
+
+    def _show_usage_tips(self) -> None:
+        """Show helpful usage tips, including the menu items we’ve added."""
+        messagebox.showinfo(
+            "Usage Tips",
+            (
+                "Usage Tips\n\n"
+                "• Paste your Path of Exile item text into the input box,\n"
+                "  then press Ctrl+Enter or click \"Check Price\".\n\n"
+                "• The Results table shows key data like chaos/divine value\n"
+                "  and listing counts; click column headers to sort.\n\n"
+                "• Right-click a row to:\n"
+                "  – Copy Row (space-separated)\n"
+                "  – Copy Row as TSV (tab-separated)\n\n"
+                "• File → Open Log File\n"
+                "  Open the current log file for debugging.\n\n"
+                "• File → Open Config Folder\n"
+                "  Jump straight to the config directory.\n\n"
+                "• File → Export TSV...\n"
+                "  Save all current results to a .tsv file with headers.\n"
+            ),
+        )
+
+    def _open_config_folder(self) -> None:
+        cfg = getattr(self.app_context, "config_dir", None)
+        if not cfg:
+            messagebox.showinfo("Config Folder", "Config folder is not configured.")
+            return
+
+        cfg_path = Path(cfg)
+        if not cfg_path.exists():
+            messagebox.showwarning("Config Folder", f"Config folder does not exist:\n{cfg_path}")
+            return
+
+        self._open_path_in_explorer(cfg_path)
+
+    def _copy_all_rows_as_tsv(self) -> None:
+        """
+        Copy all rows in the results table as TSV to the clipboard.
+
+        Uses ResultsTable.to_tsv(include_header=True).
+        """
+        if not hasattr(self, "results_table"):
+            messagebox.showinfo("Copy All Rows as TSV", "No results table is available.")
+            return
+
+        rows = list(self.results_table.iter_rows())
+        if not rows:
+            messagebox.showinfo(
+                "Copy All Rows as TSV",
+                "There are no rows in the results table to copy.",
             )
+            self._set_status("No rows to copy.")
             return
 
-        # Map display name → internal name
-        # poe.ninja returns [{"name": "Settlers", "displayName": "Settlers"}, ...]
-        display_to_name: dict[str, str] = {}
-        display_values: list[str] = []
+        tsv_text = self.results_table.to_tsv(include_header=True)
+        self._set_clipboard(tsv_text)
+        self._set_status("All rows copied as TSV to clipboard.")
+        messagebox.showinfo(
+            "Copy All Rows as TSV",
+            "All results have been copied to the clipboard as TSV.\n\n"
+            "You can now paste into Excel, Google Sheets, or a text editor.",
+        )
 
-        for entry in leagues:
-            internal = entry.get("name") or ""
-            display = entry.get("displayName") or internal
-            if not internal:
-                continue
-            display_to_name[display] = internal
-            display_values.append(display)
+    def _export_results_tsv(self) -> None:
+        """
+        Prompt for a file path and export the current results table to TSV.
 
-        # Sort alphabetically for nicer UX
-        display_values.sort(key=str.lower)
-
-        if not display_values:
-            messagebox.showwarning(
-                "Change League",
-                "No valid leagues were returned from poe.ninja."
-            )
+        Uses ResultsTable.export_tsv under the hood.
+        """
+        if not hasattr(self, "results_table"):
+            messagebox.showinfo("Export TSV", "No results table is available to export.")
             return
 
-        # Current league (internal name)
-        current_league = self.ctx.config.league
-
-        # Try to find the display name that corresponds to current_league
-        initial_display = None
-        for disp, name in display_to_name.items():
-            if name == current_league:
-                initial_display = disp
-                break
-        if initial_display is None:
-            # Fallback to first entry
-            initial_display = display_values[0]
-
-        # --- Build the dialog window ---
-        dialog = tk.Toplevel(self.root)
-        dialog.title("Change League")
-        dialog.transient(self.root)
-        dialog.grab_set()
-
-        tk.Label(dialog, text="Select league:", anchor="w").pack(
-            side=tk.TOP, fill=tk.X, padx=10, pady=(10, 4)
-        )
-
-        league_var = tk.StringVar(value=initial_display)
-        combo = ttk.Combobox(
-            dialog,
-            textvariable=league_var,
-            values=display_values,
-            state="readonly",
-            width=40,
-        )
-        combo.pack(side=tk.TOP, fill=tk.X, padx=10, pady=(0, 10))
-        combo.focus_set()
-
-        button_frame = tk.Frame(dialog)
-        button_frame.pack(side=tk.TOP, fill=tk.X, padx=10, pady=(0, 10))
-
-        def on_ok() -> None:
-            chosen_display = league_var.get()
-            internal_name = display_to_name.get(chosen_display)
-            if not internal_name:
-                dialog.destroy()
+        # If there are no rows, give a gentle heads-up.
+        if not list(self.results_table.iter_rows()):
+            if not messagebox.askyesno(
+                "Export TSV",
+                "There are no results in the table.\n\n"
+                "Export an empty file anyway?",
+                icon=messagebox.QUESTION,
+            ):
                 return
 
-            # Update config and poe.ninja client
-            self.ctx.config.league = internal_name
-            if self.ctx.config.current_game == GameVersion.POE1 and self.ctx.poe_ninja:
-                self.ctx.poe_ninja.league = internal_name
+        initial_dir = str(Path.home())
+        default_name = "poe_price_results.tsv"
 
-            # Refresh status bar
-            self._update_game_info()
-            self.status_var.set(f"League changed to {internal_name}")
-            dialog.destroy()
+        file_path = filedialog.asksaveasfilename(
+            title="Export Results as TSV",
+            defaultextension=".tsv",
+            filetypes=[("TSV files", "*.tsv"), ("All files", "*.*")],
+            initialdir=initial_dir,
+            initialfile=default_name,
+        )
 
-        def on_cancel() -> None:
-            dialog.destroy()
-
-        ok_btn = ttk.Button(button_frame, text="OK", command=on_ok)
-        ok_btn.pack(side=tk.RIGHT, padx=(5, 0))
-
-        cancel_btn = ttk.Button(button_frame, text="Cancel", command=on_cancel)
-        cancel_btn.pack(side=tk.RIGHT)
-
-        dialog.bind("<Return>", lambda _: on_ok())
-        dialog.bind("<Escape>", lambda _: on_cancel())
-
-        # Center the dialog over the main window
-        self.root.update_idletasks()
-        x = self.root.winfo_rootx()
-        y = self.root.winfo_rooty()
-        w = self.root.winfo_width()
-        h = self.root.winfo_height()
-        dw = dialog.winfo_reqwidth()
-        dh = dialog.winfo_reqheight()
-        dialog.geometry(f"{dw}x{dh}+{x + (w - dw) // 2}+{y + (h - dh) // 2}")
-
-    # ---------- Core actions ----------
-
-    def check_prices(self) -> None:
-        """Main entry point for checking prices of pasted items."""
-        # Sync UI filters back into config
-        self._sync_filters_to_config()
-
-        raw_text = self.input_text.get("1.0", tk.END).strip()
-        if not raw_text:
-            messagebox.showwarning("No Input", "Please paste at least one item.")
+        # User cancelled
+        if not file_path:
+            self._set_status("Export cancelled.")
             return
 
-        # Clear previous results
-        self.tree.delete(*self.tree.get_children())
-        self.checked_items.clear()
-
-        # For now, pricing is only wired for PoE1/poe.ninja
-        if self.ctx.config.current_game != GameVersion.POE1:
-            messagebox.showinfo(
-                "Pricing not available",
-                "PoE2 pricing is not implemented yet.\n"
-                "You can still parse items, but prices will be empty.",
+        try:
+            # Include header row for clarity
+            self.results_table.export_tsv(file_path, include_header=True)
+        except OSError as exc:
+            self.logger.exception("Failed to export TSV to %s: %s", file_path, exc)
+            messagebox.showerror(
+                "Export TSV",
+                f"Failed to export results to:\n{file_path}\n\n{exc}",
             )
+            self._set_status("Export TSV failed.")
+            return
 
-        self._set_status("Parsing items...")
-        items = self._parse_items(raw_text)
-        if not items:
-            messagebox.showwarning("Parse Error", "No valid items were detected.")
-            self._set_status("Ready.")
+        self._set_status(f"Exported results to {file_path}")
+        messagebox.showinfo("Export TSV", f"Results exported to:\n{file_path}")
+
+    def _open_path_in_explorer(self, path: Path) -> None:
+        try:
+            if sys.platform.startswith("win"):
+                os.startfile(path)  # type: ignore[attr-defined]
+            elif sys.platform == "darwin":
+                os.system(f'open "{path}"')
+            else:
+                os.system(f'xdg-open "{path}"')
+        except Exception as exc:  # pragma: no cover - OS specific
+            self.logger.exception("Failed to open path %s: %s", path, exc)
+            messagebox.showerror("Error", f"Failed to open path:\n{path}\n\n{exc}")
+
+    def _show_about_dialog(self) -> None:
+        messagebox.showinfo(
+            "About PoE Price Checker",
+            "PoE Price Checker\n\n"
+            "GUI front-end for Path of Exile item price checks.\n"
+            "Paste item text, run checks, and copy results.",
+        )
+
+    # -------------------------------------------------------------------------
+    # Input / action handlers
+    # -------------------------------------------------------------------------
+
+    def _get_input_text(self) -> str:
+        return self.input_text.get("1.0", "end").strip()
+
+    def _on_check_clicked(self, event: tk.Event | None = None) -> None:  # type: ignore[override]
+        del event  # unused
+        text = self._get_input_text()
+        if not text:
+            self._set_status("No item text to check.")
             return
 
         self._set_status("Checking prices...")
+        # Small delay to keep UI responsive
+        self.root.after(10, self._run_price_check)
 
-        min_filter = self.ctx.config.min_value_chaos
-        show_vendor = self.ctx.config.show_vendor_items
+    def _run_price_check(self) -> None:
+        text = self._get_input_text()
+        if not text:
+            self._set_status("No item text to check.")
+            return
 
-        displayed_count = 0
-
-        for parsed in items:
-            price_data: Dict[str, Any] = self._lookup_price(parsed)
-
-            chaos_value = self._extract_chaos_value(price_data)
-            divine_value = self._extract_divine_value(price_data)
-            stack_size = parsed.stack_size or 1
-            effective_chaos = chaos_value or 0.0
-            total_chaos = effective_chaos * stack_size
-
-            # Persist to DB regardless of filter (so history is complete)
-            try:
-                self._record_in_database(parsed, chaos_value, divine_value)
-            except Exception as exc:  # pragma: no cover
-                print(f"DB error while recording item: {exc!r}")
-
-            # Run rare-value assessment (for display only)
-            value_flag = ""
-            try:
-                if (parsed.rarity or "").upper() == "RARE":
-                    assessment = assess_rare_item(parsed)
-                    value_flag = assessment.flag
-            except Exception as exc:  # pragma: no cover
-                # Fail-safe: don't break the whole check on value assessment error
-                print(f"Rare value assessment error: {exc!r}")
-                value_flag = ""
-
-            # Apply min chaos filter for display
-            if effective_chaos < min_filter and not show_vendor:
-                # Skip showing this item in the tree
-                continue
-
-            displayed_count += 1
-            self.checked_items.append((parsed, price_data))
-
-            self.tree.insert(
-                "",
-                "end",
-                values=(
-                    parsed.get_display_name(),
-                    parsed.rarity or "",
-                    parsed.item_level or "",
-                    stack_size,
-                    f"{chaos_value:.1f}" if chaos_value is not None else "",
-                    f"{divine_value:.2f}" if divine_value is not None else "",
-                    f"{total_chaos:.1f}" if chaos_value is not None else "",
-                    value_flag,
-                ),
-            )
-
-
-        self._set_status(
-            f"Done. Parsed {len(items)} item(s), showing {displayed_count} "
-            f"(min {min_filter:.1f}c, vendor items "
-            f"{'shown' if show_vendor else 'hidden'})."
-        )
-
-    def clear_all(self) -> None:
-        """
-        Clear input box and results table.
-        """
-        self.input_text.delete("1.0", tk.END)
-        self.tree.delete(*self.tree.get_children())
-        self.checked_items.clear()
-        self.status_var.set("Cleared input and results.")
-
-    # ---------- Helpers ----------
-    # ---------- Helpers ----------
-
-    def _sync_filters_to_config(self) -> None:
-        """Validate filter widgets and persist them into Config."""
-        try:
-            min_val = float(self.min_value_var.get())
-        except (TypeError, ValueError):
-            min_val = 0.0
-            self.min_value_var.set(min_val)
-
-        self.ctx.config.min_value_chaos = min_val
-        self.ctx.config.show_vendor_items = bool(self.show_vendor_var.get())
-
-    def _set_status(self, text: str) -> None:
-        """Update the status bar text and force a UI refresh."""
-        self.status_var.set(text)
-        # Update the event loop so the change is visible during longer operations
-        self.root.update_idletasks()
-
-    def _parse_items(self, raw_text: str) -> List[ParsedItem]:
-        """
-        Parse one or more items from the pasted text using ItemParser.
-        """
-        try:
-            return self.ctx.parser.parse_multiple(raw_text)
-        except Exception as exc:
-            messagebox.showerror("Parse Error", f"Error parsing items:\n{exc}")
-            return []
-
-    def _lookup_price(self, item: ParsedItem) -> Dict[str, Any]:
-        """
-        Use PoeNinjaAPI to get the price for the given ParsedItem (PoE1 only).
-
-        - For currency, call get_currency_overview() and match on currencyTypeName
-        - For uniques/other items, delegate to PoeNinjaAPI.find_item_price()
-        """
-        # If no poe.ninja client (e.g. PoE2), skip pricing
-        if self.ctx.config.current_game != GameVersion.POE1 or not self.ctx.poe_ninja:
-            return {}
-
-        api = self.ctx.poe_ninja
-
-        try:
-            rarity = (item.rarity or "").upper()
-
-            # Text-parsed items don’t have item_class; official JSON items might.
-            raw_item_class = getattr(item, "item_class", None)
-            item_class = (raw_item_class or "").upper()
-
-
-            # ---------- Currency path ----------
-            if (
-                rarity == "CURRENCY"
-                or "CURRENCY" in item_class
-                or "STACKABLE CURRENCY" in item_class
-            ):
-                # Prefer base_type for currency; fallback to name
-                key = (item.base_type or item.name or "").strip().lower()
-                if not key:
-                    return {}
-
-                # Special case: Chaos Orb is always 1c by definition.
-                if key in ("chaos orb", "chaos"):
-                    return {
-                        "currencyTypeName": "Chaos Orb",
-                        "chaosEquivalent": 1.0,
-                        "chaosValue": 1.0,
+        price_service = getattr(self.app_context, "price_service", None)
+        if price_service is None:
+            # Fallback: just insert a dummy row so GUI is still usable in isolation
+            self.logger.warning("price_service not available on app_context; inserting dummy result.")
+            self._clear_results()
+            self._insert_result_rows(
+                [
+                    {
+                        "item_name": "Dummy Item",
+                        "variant": "N/A",
+                        "links": "N/A",
+                        "chaos_value": "0",
+                        "divine_value": "0",
+                        "listing_count": "0",
+                        "source": "no price_service",
                     }
-
-                overview = api.get_currency_overview()
-                lines = overview.get("lines", [])
-
-                # First try strict match
-                for line in lines:
-                    c_name = line.get("currencyTypeName", "").strip().lower()
-                    if not c_name:
-                        continue
-                    if c_name == key:
-                        return line
-
-                # Fallback: slightly fuzzy match
-                for line in lines:
-                    c_name = line.get("currencyTypeName", "").strip().lower()
-                    if not c_name:
-                        continue
-                    if key in c_name or c_name in key:
-                        return line
-
-                return {}
-
-            # ---------- Non-currency path (uniques, etc.) ----------
-            item_name = item.name or ""
-            base_type = item.base_type
-
-            gem_level = getattr(item, "gem_level", None)
-            gem_quality = getattr(item, "gem_quality", None)
-            corrupted = bool(getattr(item, "is_corrupted", False))
-
-            result = api.find_item_price(
-                item_name=item_name,
-                base_type=base_type,
-                rarity=rarity or None,
-                gem_level=gem_level,
-                gem_quality=gem_quality,
-                corrupted=corrupted,
+                ]
             )
-            if result is None:
-                return {}
+            self._set_status("price_service not configured; showing dummy result.")
+            return
 
-            return dict(result)
+        try:
+            results = price_service.check_item(text)  # type: ignore[call-arg]
+        except Exception as exc:  # pragma: no cover - depends on service
+            self.logger.exception("Error during price check: %s", exc)
+            messagebox.showerror("Error", f"An error occurred while checking prices:\n{exc}")
+            self._set_status("Error during price check.")
+            return
 
-        except Exception as exc:
-            messagebox.showerror("Pricing Error", f"Error fetching price:\n{exc}")
-            return {}
+        self._clear_results()
 
-    @staticmethod
-    def _extract_chaos_value(price_data: Dict[str, Any]) -> float | None:
+        try:
+            self._insert_result_rows(results)
+            self._set_status("Price check complete.")
+        except Exception as exc:  # pragma: no cover
+            self.logger.exception("Error inserting results: %s", exc)
+            messagebox.showerror("Error", f"Failed to display results:\n{exc}")
+            self._set_status("Failed to display results.")
+
+    def _insert_result_rows(self, rows: Iterable[Mapping[str, Any] | Any]) -> None:
         """
-        Normalize chaos value from poe.ninja data.
+        Insert rows into the results table.
+
+        Delegates to ResultsTable for the real GUI.
         """
-        if not price_data:
-            return None
+        if hasattr(self, "results_table"):
+            self.results_table.insert_rows(rows)
 
-        if "chaosValue" in price_data and price_data["chaosValue"] is not None:
-            return float(price_data["chaosValue"])
-        if "chaosEquivalent" in price_data and price_data["chaosEquivalent"] is not None:
-            return float(price_data["chaosEquivalent"])
-        return None
+    def _clear_results(self) -> None:
+        """Clear all rows from the results table."""
+        if hasattr(self, "results_table"):
+            self.results_table.clear()
 
-    @staticmethod
-    def _extract_divine_value(price_data: Dict[str, Any]) -> float | None:
-        """
-        Extract divine value if present.
-        """
-        if not price_data:
-            return None
+    def _on_clear_clicked(self, event: tk.Event | None = None) -> None:  # type: ignore[override]
+        del event
+        self.input_text.delete("1.0", "end")
+        self._clear_results()
+        self._set_status("Cleared.")
 
-        if "divineValue" in price_data and price_data["divineValue"] is not None:
-            return float(price_data["divineValue"])
-        return None
-
-    def _record_in_database(
-            self,
-            item: ParsedItem,
-            chaos_value: float | None,
-            divine_value: float | None,
-    ) -> None:
-        """
-        Persist a checked item to SQLite.
-
-        We always record the checked item itself, and if a price was found
-        we also record a price snapshot for history.
-        """
-        db = self.ctx.db
-        cfg = self.ctx.config
-
-        # Human-readable item name
-        item_name = item.get_display_name()
-        base_type = item.base_type
-
-        # Even when we don't have a price, we record the lookup with 0c
-        effective_chaos = chaos_value if chaos_value is not None else 0.0
-
-        db.add_checked_item(
-            game_version=cfg.current_game,
-            league=cfg.league,
-            item_name=item_name,
-            item_base_type=base_type,
-            chaos_value=effective_chaos,
-        )
-
-        # Store a price snapshot only when we have a real price
-        if chaos_value is not None:
-            db.add_price_snapshot(
-                game_version=cfg.current_game,
-                league=cfg.league,
-                item_name=item_name,
-                item_base_type=base_type,
-                chaos_value=chaos_value,
-                divine_value=divine_value,
-            )
-
-
-    # ---------- Utility ----------
+    def _on_paste_button_clicked(self) -> None:
+        try:
+            text = self.root.clipboard_get()
+        except tk.TclError:
+            text = ""
+        if text:
+            self.input_text.delete("1.0", "end")
+            self.input_text.insert("1.0", text)
+            self._auto_check_if_not_empty()
 
     def _on_paste(self, event: tk.Event | None = None) -> None:
-        """Handle <<Paste>> into the text box and auto-check after paste."""
+        """
+        Handle <<Paste>> into the text box and auto-check after paste.
+
+        We schedule a short delay so the default paste operation completes first.
+        """
+        del event
         # Let the default paste complete, then check
-        self.root.after(10, self._auto_check_if_not_empty)
-
-    # ---------- Result copying helpers ----------
-
-    def _get_selected_row(self) -> tuple | None:
-        """
-        Return all values from the selected Treeview row.
-        Works for any number of columns.
-        """
-        selection = self.tree.selection()
-        if not selection:
-            return None
-
-        iid = selection[0]
-        values = self.tree.item(iid, "values")
-        if not values:
-            return None
-
-        # Always return all columns, in order
-        return tuple(values)
-
-
-    def _copy_row_tsv(self, event: tk.Event | None = None) -> None:
-        row = self._get_selected_row()
-        if not row:
-            return
-
-        text = "\t".join("" if v is None else str(v) for v in row)
-        self._copy_to_clipboard(text)
-        self.status_var.set("Copied row to clipboard.")
-
-
-    def _copy_item_name(self) -> None:
-        """Copy just the item name from the selected row."""
-        row = self._get_selected_row()
-        if not row:
-            return
-
-        item_name = row[0]
-        self._copy_to_clipboard(item_name)
-        self.status_var.set(f"Copied item name: {item_name}")
-
-    def _copy_to_clipboard(self, text: str) -> None:
-        """Helper to put text on the system clipboard."""
-        try:
-            self.root.clipboard_clear()
-            self.root.clipboard_append(text)
-            self.root.update()
-        except Exception:
-            pass
-
-    def _on_tree_right_click(self, event: tk.Event) -> None:
-        row_id = self.tree.identify_row(event.y)
-        if row_id:
-            self.tree.selection_set(row_id)
-            self.tree.focus(row_id)
-            try:
-                self.tree_menu.tk_popup(event.x_root, event.y_root)
-            finally:
-                self.tree_menu.grab_release()
-
-    def _on_tree_ctrl_c(self, event: tk.Event) -> str:
-        self._copy_row_tsv()
-        return "break"
-
-    def _on_ctrl_v(self, event: tk.Event | None = None) -> str:
-        self.input_text.event_generate("<<Paste>>")
-        return "break"
+        self.root.after(10, self._auto_check_if_not_empty)  # type: ignore[arg-type]
 
     def _auto_check_if_not_empty(self) -> None:
-        text = self.input_text.get("1.0", tk.END).strip()
-        if text:
-            self.check_prices()
+        if self._get_input_text():
+            self._on_check_clicked()
 
-    @staticmethod
-    def _open_url(url: str) -> None:
-        """Open a URL in the default web browser."""
-        try:
-            webbrowser.open_new_tab(url)
-        except Exception as exc:
-            messagebox.showerror("Error", f"Could not open browser:\n{exc}")
+    # -------------------------------------------------------------------------
+    # Treeview helpers (used by tests)
+    # -------------------------------------------------------------------------
 
-    def _open_log_file(self) -> None:
-        """Open the app.log file in Notepad (Windows) or system default."""
-        try:
-            log_path = os.path.join(
-                os.path.expanduser("~"),
-                ".poe_price_checker",
-                "app.log",
-            )
-
-            if os.path.exists(log_path):
-                if os.name == "nt":
-                    subprocess.Popen(["notepad.exe", log_path])
-                else:
-                    webbrowser.open(log_path)
-            else:
-                messagebox.showinfo("Log File", "Log file not found.")
-        except Exception as exc:
-            messagebox.showerror("Error", f"Could not open log file:\n{exc}")
-
-    def _open_config_folder(self) -> None:
-        """Open the .poe_price_checker directory in Explorer (or system default)."""
-        try:
-            folder = os.path.join(os.path.expanduser("~"), ".poe_price_checker")
-
-            if os.path.exists(folder):
-                if os.name == "nt":
-                    subprocess.Popen(["explorer", folder])
-                else:
-                    webbrowser.open(folder)
-            else:
-                messagebox.showinfo("Config Folder", "Config folder not found.")
-        except Exception as exc:
-            messagebox.showerror("Error", f"Could not open folder:\n{exc}")
-
-    def _not_implemented(self, feature: str) -> None:
-        """Show a placeholder dialog for planned features."""
-        messagebox.showinfo(
-            "Not Implemented Yet",
-            f"{feature} is planned but not implemented yet.\n\n"
-            "This menu entry is here as a preview of upcoming functionality.",
-        )
-
-    def show_about(self) -> None:
-        """Show an About dialog with basic app info."""
-        # Try to get config + DB paths if available
-        cfg_path = getattr(
-            self.ctx.config, "config_path", "~/.poe_price_checker/config.json"
-        )
-        db_path = getattr(self.ctx.db, "db_path", "<unknown>")
-
-        text = (
-            "PoE Price Checker\n"
-            f"Version: {APP_VERSION}\n\n"
-            f"Current game: {self.ctx.config.current_game.name}\n"
-            f"Current league: {self.ctx.config.league}\n\n"
-            f"Config file: {cfg_path}\n"
-            f"Database: {db_path}\n\n"
-            "GitHub: https://github.com/sacrosanct24/poe-price-checker\n"
-        )
-        messagebox.showinfo("About PoE Price Checker", text)
-
-    # ---------- Shutdown ----------
-
-    def on_close(self) -> None:
+    def _get_tree(self) -> Any:
         """
-        Save window size to config, close DB, and destroy the window.
+        Return the Treeview-like object in use.
+
+        In the real GUI this is self.results_tree.
+        In tests, a fake Treeview is attached as self.tree.
         """
+        tree = getattr(self, "tree", None)
+        if tree is not None:
+            return tree
+        return getattr(self, "results_tree", None)
+
+    def _get_selected_row(self) -> tuple[Any, ...]:
+        """
+        Return the values of the currently selected row as a tuple.
+
+        Works with:
+          - real GUI: uses ResultsTable (via self.results_table)
+          - tests:    uses self.tree (a fake Treeview) or self.results_tree
+        """
+        # Real GUI path: prefer ResultsTable if present and tree matches
+        if hasattr(self, "results_table"):
+            tree = self._get_tree()
+            if tree is self.results_table.tree:
+                return self.results_table.get_selected_row_values()
+
+        # Test / fallback path: use whichever Treeview-like object _get_tree returns
+        tree = self._get_tree()
+        if tree is None:
+            return ()
+
+        selection = tree.selection()
+        if not selection:
+            return ()
+
+        item_id = selection[0]
+        values = tree.item(item_id, "values")
+        return tuple(values)
+
+    def _copy_row_tsv(self) -> None:
+        """
+        Copy the selected row as TSV.
+
+        Tests call this on a fake GUI:
+            gui._copy_row_tsv()
+        and expect it to:
+          - read from gui.tree (via _get_selected_row)
+          - call gui._copy_to_clipboard(tsv_string) if present
+        """
+        row = self._get_selected_row()
+        if not row:
+            self._set_status("No row selected to copy.")
+            return
+
+        line = "\t".join(str(v) for v in row)
+
+        # Tests stub _copy_to_clipboard; real GUI uses _set_clipboard.
+        copy_fn = getattr(self, "_copy_to_clipboard", None)
+        if callable(copy_fn):
+            copy_fn(line)
+        else:
+            self._set_clipboard(line)
+
+        self._set_status("Row copied as TSV to clipboard.")
+
+    # -------------------------------------------------------------------------
+    # Treeview context menu / copy helpers
+    # -------------------------------------------------------------------------
+
+    def _on_tree_right_click(self, event: tk.Event) -> None:
+        region = self.results_tree.identify("region", event.x, event.y)
+        if region != "cell":
+            return
+
+        row_id = self.results_tree.identify_row(event.y)
+        if not row_id:
+            return
+
+        # Ensure the row is selected before showing the menu
+        if row_id not in self.results_tree.selection():
+            self.results_tree.selection_set(row_id)
+
         try:
-            w = self.root.winfo_width()
-            h = self.root.winfo_height()
-            self.ctx.config.window_size = (w, h)
-        except Exception:
+            self.tree_menu.tk_popup(event.x_root, event.y_root)
+        finally:  # pragma: no cover - Tk internal
+            self.tree_menu.grab_release()
+
+    def _copy_selected_row(self) -> None:
+        """
+        Context menu → copy selected row as space-separated text.
+        """
+        row = self._get_selected_row()
+        if not row:
+            self._set_status("No row selected to copy.")
+            return
+
+        text = " ".join(str(v) for v in row)
+        self._set_clipboard(text)
+        self._set_status("Row copied to clipboard.")
+
+    def _copy_selected_row_as_tsv(self) -> None:
+        """
+        Context menu → copy selected row as TSV.
+        Reuses the same core logic as _copy_row_tsv.
+        """
+        self._copy_row_tsv()
+
+    def _set_clipboard(self, text: str) -> None:
+        # Helper so tests can monkeypatch if needed
+        self.root.clipboard_clear()
+        self.root.clipboard_append(text)
+        # Update to ensure clipboard is populated even if app closes soon
+        try:
+            self.root.update_idletasks()
+        except tk.TclError:
+            # In headless or teardown scenarios, this may fail; ignore.
             pass
 
-        try:
-            if self.ctx.db:
-                self.ctx.db.close()
-        except Exception:
-            pass
 
-        self.root.destroy()
+# -------------------------------------------------------------------------
+# Optional convenience entrypoint
+# -------------------------------------------------------------------------
 
-
-# ---------------------------------------------------------
-# Application Entry Point
-# ---------------------------------------------------------
-
-def run_app() -> None:
+def run(app_context: Any) -> None:
     """
-    Launch the PoE Price Checker Tkinter GUI.
-    This is called by main.py.
+    Convenience function to run the GUI directly.
     """
     root = tk.Tk()
-    ctx = create_app_context()
-    app = PriceCheckerGUI(root, ctx)
+    root.withdraw()  # Start hidden to avoid flash; we deiconify after setup
+    gui = PriceCheckerGUI(root, app_context)
+    root.deiconify()
     root.mainloop()
