@@ -1,9 +1,8 @@
-# tests/core/test_price_multi.py
 from __future__ import annotations
 
 from typing import Any, Iterable, Mapping
-
 import logging
+import pytest
 
 from core.price_multi import (
     MultiSourcePriceService,
@@ -11,18 +10,19 @@ from core.price_multi import (
     RESULT_COLUMNS,
     PriceSource,
 )
-# tests/unit/core/test_price_multi.py
-import pytest
+
 pytestmark = pytest.mark.unit
 
 
+# --------------------------------------------------------
+# Fake underlying single-source PriceService
+# --------------------------------------------------------
+
 class FakeUnderlyingService:
     """
-    Simple fake for the existing single-source PriceService.
-
-    It just returns whatever rows we configure it with.
+    Simulates the original PriceService before you added multi-source support.
+    check_item returns the rows we inject.
     """
-
     def __init__(self, rows: list[Mapping[str, Any]]) -> None:
         self._rows = rows
         self.calls: list[str] = []
@@ -32,11 +32,14 @@ class FakeUnderlyingService:
         return list(self._rows)
 
 
-class FakeSource:
-    """
-    Minimal PriceSource implementation for testing MultiSourcePriceService.
-    """
+# --------------------------------------------------------
+# Fake source (implements PriceSource)
+# --------------------------------------------------------
 
+class FakeSource(PriceSource):
+    """
+    A simple PriceSource that returns predefined rows.
+    """
     def __init__(self, name: str, rows: list[Mapping[str, Any]]) -> None:
         self.name = name
         self._rows = rows
@@ -47,9 +50,13 @@ class FakeSource:
         return list(self._rows)
 
 
-class ErrorSource:
+# --------------------------------------------------------
+# Error-producing fake source
+# --------------------------------------------------------
+
+class ErrorSource(PriceSource):
     """
-    PriceSource that always raises, to verify error isolation in the aggregator.
+    A PriceSource that always raises an error.
     """
 
     def __init__(self, name: str = "error_source") -> None:
@@ -61,30 +68,31 @@ class ErrorSource:
         raise RuntimeError("boom")
 
 
+# --------------------------------------------------------
+# Tests
+# --------------------------------------------------------
+
 def test_existing_service_adapter_normalizes_rows_and_sets_source() -> None:
     base_rows = [
         {
             "item_name": "Hat",
             "chaos_value": 12.3,
-            # deliberately omit some fields like variant, links, divine_value, listing_count
+            # Missing fields should be default-filled
         }
     ]
     underlying = FakeUnderlyingService(base_rows)
     adapter = ExistingServiceAdapter(name="poe_ninja", service=underlying)
 
     result = adapter.check_item("some item")
-
     assert len(result) == 1
-    row = result[0]
 
-    # Source should be set to adapter name
+    row = result[0]
     assert row["source"] == "poe_ninja"
 
-    # All expected columns should exist
+    # All expected columns exist
     for col in RESULT_COLUMNS:
         assert col in row
 
-    # Underlying service should have been called with the original text
     assert underlying.calls == ["some item"]
 
 
@@ -102,6 +110,7 @@ def test_multi_source_aggregator_combines_rows_from_multiple_sources() -> None:
             }
         ],
     )
+
     source_b = FakeSource(
         name="source_b",
         rows=[
@@ -116,21 +125,17 @@ def test_multi_source_aggregator_combines_rows_from_multiple_sources() -> None:
         ],
     )
 
-    service = MultiSourcePriceService(sources=[source_a, source_b])
+    svc = MultiSourcePriceService(sources=[source_a, source_b])
+    rows = svc.check_item("rare ring")
 
-    rows = service.check_item("rare ring")
-
-    # We should get rows from both sources
     assert len(rows) == 2
-    sources_seen = {row["source"] for row in rows}
-    assert sources_seen == {"source_a", "source_b"}
+    srcs = {row["source"] for row in rows}
+    assert srcs == {"source_a", "source_b"}
 
-    # All expected columns should be present
     for row in rows:
         for col in RESULT_COLUMNS:
             assert col in row
 
-    # Both sources should have been called with the same text
     assert source_a.calls == ["rare ring"]
     assert source_b.calls == ["rare ring"]
 
@@ -151,25 +156,21 @@ def test_multi_source_aggregator_skips_errored_sources() -> None:
     )
     bad_source = ErrorSource(name="bad_source")
 
-    service = MultiSourcePriceService(sources=[good_source, bad_source])
+    svc = MultiSourcePriceService(sources=[good_source, bad_source])
+    rows = svc.check_item("some amulet")
 
-    rows = service.check_item("some amulet")
-
-    # We still get results from the good source
+    # Should return result from good source only
     assert len(rows) == 1
     assert rows[0]["source"] == "good_source"
 
-    # Both sources were called
     assert good_source.calls == ["some amulet"]
     assert bad_source.calls == ["some amulet"]
 
 
 def test_multi_source_aggregator_returns_empty_for_blank_input_and_does_not_call_sources() -> None:
     source = FakeSource(name="only_source", rows=[])
-    service = MultiSourcePriceService(sources=[source])
+    svc = MultiSourcePriceService(sources=[source])
 
-    rows = service.check_item("   ")  # whitespace
-
+    rows = svc.check_item("   ")
     assert rows == []
-    # No calls because input is effectively empty
     assert source.calls == []

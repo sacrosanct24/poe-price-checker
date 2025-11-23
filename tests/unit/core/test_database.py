@@ -1,233 +1,108 @@
-# tests/test_database_fixes.py
-"""
-Fixes for database test failures.
-These patches should be applied to test_database.py
-"""
+from __future__ import annotations
 
 import time
 from datetime import datetime, timedelta
 import pytest
+
 from core.database import Database
 from core.game_version import GameVersion
-# tests/unit/core/test_price_multi.py
-import pytest
+
 pytestmark = pytest.mark.unit
 
 
-# Fix for: test_get_checked_items_returns_newest_first
-def test_get_checked_items_returns_newest_first_FIXED(temp_db):
-    """Items should be returned with newest first"""
-    # Add items with explicit timing to ensure ordering
+# -------------------------
+# Fixtures
+# -------------------------
+
+@pytest.fixture
+def temp_db(tmp_path):
+    db_path = tmp_path / "test.db"
+    return Database(db_path)
+
+
+# -------------------------
+# Checked Items
+# -------------------------
+
+def test_get_checked_items_returns_newest_first(temp_db):
     temp_db.add_checked_item(
         game_version=GameVersion.POE1,
         league="Test",
         item_name="First",
-        chaos_value=100.0
+        chaos_value=100.0,
     )
-
-    # Sleep to ensure different timestamps
     time.sleep(0.01)
-
     temp_db.add_checked_item(
         game_version=GameVersion.POE1,
         league="Test",
         item_name="Second",
-        chaos_value=200.0
+        chaos_value=200.0,
     )
 
     items = temp_db.get_checked_items(limit=10)
 
-    # Newest (Second) should be first in the list
     assert len(items) >= 2
-    assert items[0]['item_name'] == "Second"
-    assert items[1]['item_name'] == "First"
+    assert items[0]["item_name"] == "Second"
+    assert items[1]["item_name"] == "First"
 
 
-# Fix for: test_complete_sale_updates_fields and test_complete_sale_calculates_time_to_sale
-def test_complete_sale_FIXED(temp_db):
-    """Test sale completion with proper timing"""
-    # Create sale with known time
-    sale_id = temp_db.add_sale(
-        item_name="Test Item",
-        listed_price_chaos=100.0
+def test_get_checked_items_filters_by_game_and_league(temp_db):
+    temp_db.add_checked_item(
+        GameVersion.POE1,
+        "Standard",
+        "Item A",
+        chaos_value=10.0,
+    )
+    temp_db.add_checked_item(
+        GameVersion.POE2,
+        "Hardcore",
+        "Item B",
+        chaos_value=20.0,
     )
 
-    # Wait a bit to ensure time passes
+    result = temp_db.get_checked_items(
+        game_version=GameVersion.POE1,
+        league="Standard",
+    )
+
+    assert len(result) == 1
+    assert result[0]["item_name"] == "Item A"
+
+
+# -------------------------
+# Sales
+# -------------------------
+
+def test_complete_sale(temp_db):
+    sale_id = temp_db.add_sale(
+        item_name="Item X",
+        listed_price_chaos=100.0,
+    )
+
     time.sleep(0.1)
+    now = datetime.now()
+    temp_db.complete_sale(
+        sale_id,
+        actual_price_chaos=95.0,
+        sold_at=now,
+    )
 
-    # Complete the sale
-    sold_time = datetime.now()
-    temp_db.complete_sale(sale_id, actual_price_chaos=95.0, sold_at=sold_time)
-
-    # Retrieve the sale
     sales = temp_db.get_sales(sold_only=True)
     assert len(sales) == 1
 
     sale = sales[0]
-    assert sale['id'] == sale_id
-    assert sale['actual_price_chaos'] == 95.0
-    assert sale['sold_at'] is not None
+    assert sale["id"] == sale_id
+    assert sale["actual_price_chaos"] == 95.0
+    assert sale["sold_at"] is not None
+    assert sale["time_to_sale_hours"] >= 0
+    assert sale["time_to_sale_hours"] < 1.0
 
-    # Time to sale should be positive and reasonable (< 1 hour for this test)
-    assert sale['time_to_sale_hours'] is not None
-    assert sale['time_to_sale_hours'] >= 0
-    assert sale['time_to_sale_hours'] < 1.0  # Should be just a fraction of a second
-
-import pytest
-from datetime import datetime, timedelta
-
-from core.database import Database
-
-
-def test_record_instant_sale_inserts_row_and_sets_expected_fields(tmp_path) -> None:
-    """
-    record_instant_sale should:
-    - Insert exactly one row into `sales`
-    - Set item_name, item_base_type, notes correctly
-    - Set listed_price_chaos and actual_price_chaos to the given chaos_value
-    - Set listed_at and sold_at to non-null, near-identical timestamps
-    - Set time_to_sale_hours to 0.0
-    """
-    db_path = tmp_path / "test_sales.db"
-    db = Database(db_path)
-
-    item_name = "Test Item of the Monkey"
-    base_type = "Fancy Base Type"
-    chaos_value = 123.0
-    notes = "Test instant sale"
-
-    sale_id = db.record_instant_sale(
-        item_name=item_name,
-        chaos_value=chaos_value,
-        item_base_type=base_type,
-        notes=notes,
-    )
-
-    # Fetch the row directly from SQLite
-    rows = db.conn.execute("SELECT * FROM sales").fetchall()
-    assert len(rows) == 1
-
-    row = rows[0]
-
-    # ID and basic fields
-    assert row["id"] == sale_id
-    assert row["item_name"] == item_name
-    assert row["item_base_type"] == base_type
-    assert row["notes"] == notes
-
-    # Prices
-    assert row["listed_price_chaos"] == pytest.approx(chaos_value)
-    assert row["actual_price_chaos"] == pytest.approx(chaos_value)
-
-    # Timestamps should be set and very close to each other
-    assert row["listed_at"] is not None
-    assert row["sold_at"] is not None
-
-    listed_at = datetime.fromisoformat(row["listed_at"])
-    sold_at = datetime.fromisoformat(row["sold_at"])
-
-    # Small tolerance in case of slight timing differences
-    assert abs((sold_at - listed_at).total_seconds()) < 2.0
-
-    # Time to sale should be exactly 0.0 for instant sale
-    assert row["time_to_sale_hours"] == pytest.approx(0.0)
-
-# Fix for: test_get_price_history_respects_days_parameter
-def test_get_price_history_respects_days_parameter_FIXED(temp_db):
-    """Price history should respect the days filter"""
-    item_name = "Divine Orb"
-
-    # Add recent snapshot (within 7 days)
-    temp_db.add_price_snapshot(
-        game_version=GameVersion.POE1,
-        league="Standard",
-        item_name=item_name,
-        chaos_value=300.0
-    )
-
-    # Add old snapshot by manipulating the database directly
-    # (since add_price_snapshot uses CURRENT_TIMESTAMP)
-    import sqlite3
-    old_date = (datetime.now() - timedelta(days=10)).isoformat()
-
-    temp_db.conn.execute("""
-                         INSERT INTO price_history
-                             (game_version, league, item_name, chaos_value, recorded_at)
-                         VALUES (?, ?, ?, ?, ?)
-                         """, (GameVersion.POE1.value, "Standard", item_name, 250.0, old_date))
-    temp_db.conn.commit()
-
-    # Get last 7 days
-    history_7d = temp_db.get_price_history(
-        item_name=item_name,
-        game_version=GameVersion.POE1,
-        league="Standard",
-        days=7
-    )
-
-    # Should only get the recent one
-    assert len(history_7d) == 1
-    assert history_7d[0]['chaos_value'] == 300.0
-
-    # Get last 30 days
-    history_30d = temp_db.get_price_history(
-        item_name=item_name,
-        game_version=GameVersion.POE1,
-        league="Standard",
-        days=30
-    )
-
-    # Should get both
-    assert len(history_30d) == 2
-
-
-# Fix for: test_price_history_ordered_by_date_ascending
-def test_price_history_ordered_by_date_ascending_FIXED(temp_db):
-    """Price history should be ordered oldest to newest"""
-    item_name = "Exalted Orb"
-
-    # We need to insert with specific timestamps
-    # Since add_price_snapshot uses CURRENT_TIMESTAMP, we'll insert directly
-    import sqlite3
-
-    base_time = datetime.now()
-    prices_and_times = [
-        (290.0, base_time - timedelta(hours=4)),
-        (295.0, base_time - timedelta(hours=3)),
-        (300.0, base_time - timedelta(hours=2)),
-        (305.0, base_time - timedelta(hours=1)),
-        (310.0, base_time),
-    ]
-
-    for price, timestamp in prices_and_times:
-        temp_db.conn.execute("""
-                             INSERT INTO price_history
-                                 (game_version, league, item_name, chaos_value, recorded_at)
-                             VALUES (?, ?, ?, ?, ?)
-                             """, (GameVersion.POE1.value, "Standard", item_name, price, timestamp.isoformat()))
-
-    temp_db.conn.commit()
-
-    # Get history
-    history = temp_db.get_price_history(
-        item_name=item_name,
-        game_version=GameVersion.POE1,
-        league="Standard",
-        days=7
-    )
-
-    # Should be ordered oldest to newest (ascending)
-    assert len(history) == 5
-    values = [h['chaos_value'] for h in history]
-    assert values == [290.0, 295.0, 300.0, 305.0, 310.0]
 
 def test_get_sales_filters_sold_only(temp_db):
-    # Unsold sale
-    sale1 = temp_db.add_sale(item_name="Item A", listed_price_chaos=10.0)
+    s1 = temp_db.add_sale("Item A", listed_price_chaos=10.0)
+    s2 = temp_db.add_sale("Item B", listed_price_chaos=20.0)
 
-    # Sold sale
-    sale2 = temp_db.add_sale(item_name="Item B", listed_price_chaos=20.0)
-    temp_db.complete_sale(sale2, actual_price_chaos=19.0, sold_at=datetime.now())
+    temp_db.complete_sale(s2, actual_price_chaos=19.0, sold_at=datetime.now())
 
     all_sales = temp_db.get_sales(sold_only=False)
     sold_sales = temp_db.get_sales(sold_only=True)
@@ -235,12 +110,13 @@ def test_get_sales_filters_sold_only(temp_db):
     ids_all = {s["id"] for s in all_sales}
     ids_sold = {s["id"] for s in sold_sales}
 
-    assert sale1 in ids_all and sale2 in ids_all
-    assert sale2 in ids_sold
-    assert sale1 not in ids_sold
+    assert s1 in ids_all and s2 in ids_all
+    assert s2 in ids_sold
+    assert s1 not in ids_sold
+
 
 def test_mark_sale_unsold_sets_notes_and_sold_at(temp_db):
-    sale_id = temp_db.add_sale(item_name="Item A", listed_price_chaos=10.0)
+    sale_id = temp_db.add_sale("Item A", listed_price_chaos=10.0)
     temp_db.complete_sale(sale_id, actual_price_chaos=9.0, sold_at=datetime.now())
 
     temp_db.mark_sale_unsold(sale_id)
@@ -250,7 +126,59 @@ def test_mark_sale_unsold_sets_notes_and_sold_at(temp_db):
 
     assert sale["notes"] == "Did not sell"
     assert sale["sold_at"] is not None
-    # We do NOT assert anything about time_to_sale_hours here; current code doesn’t change it.
+
+
+def test_record_instant_sale_inserts_row(temp_db):
+    sale_id = temp_db.record_instant_sale(
+        item_name="Monkey Sword",
+        chaos_value=123.0,
+        item_base_type="Fancy Base",
+        notes="Testing",
+    )
+
+    rows = temp_db.conn.execute("SELECT * FROM sales").fetchall()
+    assert len(rows) == 1
+    row = rows[0]
+
+    assert row["id"] == sale_id
+    assert row["item_name"] == "Monkey Sword"
+    assert row["item_base_type"] == "Fancy Base"
+    assert row["notes"] == "Testing"
+    assert row["listed_price_chaos"] == 123.0
+    assert row["actual_price_chaos"] == 123.0
+
+    listed_at = datetime.fromisoformat(row["listed_at"])
+    sold_at = datetime.fromisoformat(row["sold_at"])
+    assert abs((sold_at - listed_at).total_seconds()) < 2.0
+    assert row["time_to_sale_hours"] == 0.0
+
+
+def test_record_instant_sale_updates_stats_counts(temp_db):
+    before = temp_db.get_stats()
+
+    assert before["checked_items"] == 0
+    assert before["sales"] == 0
+    assert before["completed_sales"] == 0
+    assert before["price_snapshots"] == 0
+
+    temp_db.record_instant_sale(
+        item_name="Instant Sale",
+        chaos_value=50.0,
+        item_base_type="Base",
+        notes="Testing",
+    )
+
+    after = temp_db.get_stats()
+
+    assert after["checked_items"] == before["checked_items"] == 0
+    assert after["price_snapshots"] == before["price_snapshots"] == 0
+    assert after["sales"] == before["sales"] + 1
+    assert after["completed_sales"] == before["completed_sales"] + 1
+
+
+# -------------------------
+# Plugin State
+# -------------------------
 
 def test_db_plugin_state_roundtrip(temp_db):
     temp_db.set_plugin_enabled("price_alert", True)
@@ -259,47 +187,96 @@ def test_db_plugin_state_roundtrip(temp_db):
     assert temp_db.is_plugin_enabled("price_alert") is True
     assert temp_db.get_plugin_config("price_alert") == '{"threshold": 100}'
 
-    # Disable and ensure it flips
     temp_db.set_plugin_enabled("price_alert", False)
     assert temp_db.is_plugin_enabled("price_alert") is False
 
-def test_get_checked_items_filters_by_game_and_league(temp_db):
-    # PoE1 / Standard
-    temp_db.add_checked_item(
+
+# -------------------------
+# Price History
+# -------------------------
+
+def test_price_history_respects_days_parameter(temp_db):
+    item_name = "Divine Orb"
+
+    temp_db.add_price_snapshot(
         game_version=GameVersion.POE1,
         league="Standard",
-        item_name="Item A",
-        chaos_value=10.0,
+        item_name=item_name,
+        chaos_value=300.0,
     )
 
-    # PoE2 / Hardcore
-    temp_db.add_checked_item(
-        game_version=GameVersion.POE2,
-        league="Hardcore",
-        item_name="Item B",
-        chaos_value=20.0,
+    old_date = (datetime.now() - timedelta(days=10)).isoformat()
+    temp_db.conn.execute(
+        """
+        INSERT INTO price_history
+        (game_version, league, item_name, chaos_value, recorded_at)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        (GameVersion.POE1.value, "Standard", item_name, 250.0, old_date),
+    )
+    temp_db.conn.commit()
+
+    last_7_days = temp_db.get_price_history(
+        item_name, GameVersion.POE1, "Standard", days=7
+    )
+    assert len(last_7_days) == 1
+    assert last_7_days[0]["chaos_value"] == 300.0
+
+    last_30_days = temp_db.get_price_history(
+        item_name, GameVersion.POE1, "Standard", days=30
+    )
+    assert len(last_30_days) == 2
+
+
+def test_price_history_ordered_by_date_ascending(temp_db):
+    item_name = "Exalted Orb"
+    base = datetime.now()
+
+    data = [
+        (290.0, base - timedelta(hours=4)),
+        (295.0, base - timedelta(hours=3)),
+        (300.0, base - timedelta(hours=2)),
+        (305.0, base - timedelta(hours=1)),
+        (310.0, base),
+    ]
+
+    for price, ts in data:
+        temp_db.conn.execute(
+            """
+            INSERT INTO price_history
+            (game_version, league, item_name, chaos_value, recorded_at)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (GameVersion.POE1.value, "Standard", item_name, price, ts.isoformat()),
+        )
+    temp_db.conn.commit()
+
+    hist = temp_db.get_price_history(
+        item_name, GameVersion.POE1, "Standard", days=7
     )
 
-    poe1_items = temp_db.get_checked_items(game_version=GameVersion.POE1, league="Standard")
-    assert len(poe1_items) == 1
-    assert poe1_items[0]["item_name"] == "Item A"
+    assert len(hist) == 5
+    vals = [h["chaos_value"] for h in hist]
+    assert vals == [290.0, 295.0, 300.0, 305.0, 310.0]
+
+
+# -------------------------
+# Stats Summary
+# -------------------------
 
 def test_get_stats_counts_are_consistent(temp_db):
-    # 2 checked items
     temp_db.add_checked_item(GameVersion.POE1, "Standard", "Item A", chaos_value=1.0)
     temp_db.add_checked_item(GameVersion.POE1, "Standard", "Item B", chaos_value=2.0)
 
-    # 1 completed sale
-    sale_id = temp_db.add_sale("Item A", listed_price_chaos=1.0)
-    temp_db.complete_sale(sale_id, actual_price_chaos=1.0, sold_at=datetime.now())
+    s = temp_db.add_sale("Item A", listed_price_chaos=1.0)
+    temp_db.complete_sale(s, actual_price_chaos=1.0, sold_at=datetime.now())
 
-    # 3 price snapshots
-    for v in (10.0, 20.0, 30.0):
+    for val in (10.0, 20.0, 30.0):
         temp_db.add_price_snapshot(
             game_version=GameVersion.POE1,
             league="Standard",
             item_name="Item A",
-            chaos_value=v,
+            chaos_value=val,
         )
 
     stats = temp_db.get_stats()
@@ -307,41 +284,3 @@ def test_get_stats_counts_are_consistent(temp_db):
     assert stats["sales"] == 1
     assert stats["completed_sales"] == 1
     assert stats["price_snapshots"] == 3
-
-def test_record_instant_sale_updates_stats_counts(temp_db) -> None:
-    """
-    record_instant_sale should increment both:
-    - stats["sales"]
-    - stats["completed_sales"]
-
-    It should NOT affect checked_items or price_snapshots.
-    """
-    # Baseline stats from a fresh DB
-    stats_before = temp_db.get_stats()
-
-    assert stats_before["checked_items"] == 0
-    assert stats_before["sales"] == 0
-    assert stats_before["completed_sales"] == 0
-    assert stats_before["price_snapshots"] == 0
-
-    # Record a single instant sale
-    temp_db.record_instant_sale(
-        item_name="Instant Sale Item",
-        chaos_value=50.0,
-        item_base_type="Some Base",
-        notes="Recorded via record_instant_sale",
-    )
-
-    # Stats after the sale
-    stats_after = temp_db.get_stats()
-
-    # Checked items and price snapshots remain unchanged
-    assert stats_after["checked_items"] == stats_before["checked_items"] == 0
-    assert stats_after["price_snapshots"] == stats_before["price_snapshots"] == 0
-
-    # Sales and completed_sales should both increment by 1
-    assert stats_after["sales"] == stats_before["sales"] + 1
-    assert stats_after["completed_sales"] == stats_before["completed_sales"] + 1
-
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])

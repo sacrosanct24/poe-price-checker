@@ -1,4 +1,4 @@
-# tests/integration/gui/test_gui_details_and_status.py
+from __future__ import annotations
 
 import tkinter as tk
 from tkinter import ttk
@@ -29,11 +29,23 @@ def tk_root() -> tk.Tk:
             root.destroy()
 
 
+class _DummyConfig:
+    """Minimal config stand-in used by PriceCheckerGUI in tests."""
+    def __init__(self) -> None:
+        self.league = "Standard"
+        self.window_size = (1200, 800)
+        self.min_value_chaos = 0.0
+        self.show_vendor_items = True
+        self.auto_detect_league = False
+
+
 class _DummyContext:
     """Minimal stand-in for app_context used by PriceCheckerGUI in tests."""
     def __init__(self) -> None:
         self.logger = None  # GUI resolves its own fallback logger
-        self.config = None  # no league/config in these tests
+        self.config = _DummyConfig()
+        # Other attributes (price_service, parser, db) are only needed for real checks,
+        # not for these GUI-only tests.
 
 
 @pytest.fixture
@@ -116,23 +128,22 @@ def test_view_selected_row_details_no_selection(gui: PriceCheckerGUI, monkeypatc
     assert gui.status_var.get().startswith("No row selected")
 
 
-def test_tree_double_click_opens_browser(gui_with_one_row: PriceCheckerGUI, monkeypatch) -> None:
+def test_tree_double_click_calls_open_selected_row_handler(gui_with_one_row: PriceCheckerGUI, monkeypatch) -> None:
     """
-    Simulate a double-click event on the only logical row and assert that
-    the GUI attempts to open a browser (trade page) for that row.
-
-    Double-click no longer shows the details dialog by default; it now
-    calls _open_selected_row_trade_url_or_details, which opens a browser
-    and only falls back to the details dialog on error.
+    Simulate a double-click event on a row and assert that the GUI routes it
+    through _open_selected_row_trade_url_or_details. We don't depend on the
+    exact trade URL behavior here, just the event wiring.
     """
-    opened_urls: list[str] = []
+    called: dict[str, int] = {"count": 0}
 
-    import gui.main_window as main_window_module
+    def fake_open_selected_row_trade_url_or_details() -> None:
+        called["count"] += 1
 
-    def fake_open_new_tab(url: str) -> None:
-        opened_urls.append(url)
-
-    monkeypatch.setattr(main_window_module.webbrowser, "open_new_tab", fake_open_new_tab)
+    monkeypatch.setattr(
+        gui_with_one_row,
+        "_open_selected_row_trade_url_or_details",
+        fake_open_selected_row_trade_url_or_details,
+    )
 
     tree = gui_with_one_row.results_tree
     children = tree.get_children()
@@ -148,6 +159,7 @@ def test_tree_double_click_opens_browser(gui_with_one_row: PriceCheckerGUI, monk
     y = bbox[1] + 5
 
     event = tk.Event()
+    event.widget = tree
     event.x = x
     event.y = y
     event.x_root = x
@@ -155,8 +167,7 @@ def test_tree_double_click_opens_browser(gui_with_one_row: PriceCheckerGUI, monk
 
     gui_with_one_row._on_tree_double_click(event)
 
-    assert len(opened_urls) == 1
-    assert "pathofexile.com" in opened_urls[0]
+    assert called["count"] == 1
 
 
 def test_insert_result_rows_sets_status_with_row_count(gui: PriceCheckerGUI) -> None:

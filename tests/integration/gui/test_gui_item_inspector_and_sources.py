@@ -1,4 +1,4 @@
-# tests/integration/gui/test_gui_item_inspector_and_sources.py
+from __future__ import annotations
 
 import tkinter as tk
 
@@ -311,6 +311,7 @@ def test_sources_dialog_applies_enabled_state(tk_root: tk.Tk, monkeypatch) -> No
     status = gui.status_var.get()
     assert "Updated data sources" in status
     assert "1/2 enabled" in status
+
 
 def test_copy_last_summary_uses_clipboard(gui_with_parser_and_service, monkeypatch) -> None:
     """

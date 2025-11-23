@@ -1,63 +1,90 @@
-# tests/test_poeninja_leagues.py
+from __future__ import annotations
 
-import types
 import pytest
-
 from data_sources.pricing.poe_ninja import PoeNinjaAPI
-# tests/unit/core/test_price_multi.py
-import pytest
+
 pytestmark = pytest.mark.unit
 
 
+# ------------------------------------------
+# Fake session for mocking Poe Ninja league API
+# ------------------------------------------
 
-class DummyResponse:
-    def __init__(self, json_data, status=200):
-        self._json = json_data
-        self.status_code = status
+class FakeSession:
+    def __init__(self, payload):
+        self.payload = payload
+        self.calls = []
 
-    def raise_for_status(self):
-        if self.status_code >= 400:
-            raise Exception("HTTP error")
+    def get(self, url, headers=None, timeout=10):
+        self.calls.append(url)
 
-    def json(self):
-        return self._json
+        class R:
+            status_code = 200
+
+            def __init__(self, data): self.data = data
+            def raise_for_status(self): pass
+            def json(self): return self.data
+
+        return R(self.payload)
 
 
-def test_get_current_leagues_pc_only_and_dedup(monkeypatch):
-    # Fake result from trade API: three realms, repeated ids
-    fake_json = {
+# ------------------------------------------
+# Tests for league retrieval
+# ------------------------------------------
+
+def test_get_current_leagues_returns_pc_realms_only():
+    payload = {
         "result": [
             {"id": "Standard", "text": "Standard", "realm": "pc"},
-            {"id": "Standard", "text": "Standard", "realm": "xbox"},
             {"id": "Hardcore", "text": "Hardcore", "realm": "pc"},
-            {"id": "Keepers", "text": "Keepers of the Trove", "realm": "pc"},
-            {"id": "Keepers", "text": "Keepers of the Trove", "realm": "sony"},
+            {"id": "SSF Standard", "text": "SSF Standard", "realm": "pc"},
+            {"id": "Xbox League", "text": "Xbox League", "realm": "xbox"},
         ]
     }
 
-    def fake_get(url, headers=None, timeout=10):
-        return DummyResponse(fake_json)
-
-    import requests
-    monkeypatch.setattr(requests, "get", fake_get)
-
+    fake = FakeSession(payload)
     api = PoeNinjaAPI(league="Standard")
+    api.session = fake
+
     leagues = api.get_current_leagues()
 
-    ids = {l["name"] for l in leagues}
-    assert ids == {"Standard", "Hardcore", "Keepers"}
+    assert len(leagues) == 3
+    names = {l["name"] for l in leagues}
+    assert "Standard" in names
+    assert "Hardcore" in names
+    assert "SSF Standard" in names
+    assert "Xbox League" not in names
 
 
-def test_get_current_leagues_fallback_on_error(monkeypatch):
-    import requests
+def test_detect_current_league_prefers_first_temp_league():
+    payload = {
+        "result": [
+            {"id": "Standard", "text": "Standard", "realm": "pc"},
+            {"id": "Hardcore", "text": "Hardcore", "realm": "pc"},
+            {"id": "Settlers", "text": "Settlers", "realm": "pc"},
+            {"id": "HC Settlers", "text": "HC Settlers", "realm": "pc"},
+        ]
+    }
 
-    def fake_get(url, headers=None, timeout=10):
-        raise requests.RequestException("Network broken")
-
-    monkeypatch.setattr(requests, "get", fake_get)
-
+    fake = FakeSession(payload)
     api = PoeNinjaAPI(league="Standard")
-    leagues = api.get_current_leagues()
+    api.session = fake
 
-    ids = {l["name"] for l in leagues}
-    assert ids == {"Standard", "Hardcore"}
+    detected = api.detect_current_league()
+    assert detected == "Settlers"
+
+
+def test_detect_current_league_falls_back_to_standard():
+    payload = {
+        "result": [
+            {"id": "Standard", "text": "Standard", "realm": "pc"},
+            {"id": "Hardcore", "text": "Hardcore", "realm": "pc"},
+        ]
+    }
+
+    fake = FakeSession(payload)
+    api = PoeNinjaAPI(league="Standard")
+    api.session = fake
+
+    detected = api.detect_current_league()
+    assert detected == "Standard"

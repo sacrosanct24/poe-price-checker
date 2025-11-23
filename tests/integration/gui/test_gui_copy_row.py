@@ -1,4 +1,6 @@
-# tests/test_gui_copy_row.py
+# tests/integration/gui/test_gui_copy_row.py
+
+from __future__ import annotations
 
 import tkinter as tk
 from tkinter import ttk
@@ -6,8 +8,7 @@ from typing import Iterator
 import pytest
 
 from gui.main_window import PriceCheckerGUI
-# tests/integration/gui/test_gui_copy_row.py
-import pytest
+
 pytestmark = pytest.mark.integration
 
 
@@ -35,14 +36,15 @@ def _make_fake_gui(root: tk.Tk) -> PriceCheckerGUI:
     """
     Create a PriceCheckerGUI-like object without running its __init__,
     and attach a Treeview + status_var for testing copy helpers.
+
+    This relies on PriceCheckerGUI._get_selected_row and _copy_row_tsv
+    operating on self.tree (ttk.Treeview) and using _copy_to_clipboard.
     """
     gui = PriceCheckerGUI.__new__(PriceCheckerGUI)  # type: ignore[misc]
     gui.root = root
     gui.status_var = tk.StringVar(value="")
 
-    # Define columns exactly as in the updated GUI:
-    # ("Item", "Rarity", "Item Level", "Stack", "Chaos Value",
-    #  "Divine Value", "Total Value", "Value Flag")
+    # Columns must match the real GUI's main results table columns.
     columns = (
         "Item",
         "Rarity",
@@ -57,7 +59,7 @@ def _make_fake_gui(root: tk.Tk) -> PriceCheckerGUI:
     tree = ttk.Treeview(root, columns=columns, show="headings", selectmode="browse")
     gui.tree = tree
 
-    # Stub out _copy_to_clipboard to capture the last copied text
+    # Stub out _copy_to_clipboard to capture last copied text
     def fake_copy(text: str) -> None:
         gui._last_clipboard_text = text  # type: ignore[attr-defined]
 
@@ -66,7 +68,7 @@ def _make_fake_gui(root: tk.Tk) -> PriceCheckerGUI:
     return gui
 
 
-def test_get_selected_row_returns_all_columns(tk_root):
+def test_get_selected_row_returns_all_columns(tk_root: tk.Tk) -> None:
     gui = _make_fake_gui(tk_root)
 
     # Insert a row with 8 values (one per column)
@@ -83,16 +85,15 @@ def test_get_selected_row_returns_all_columns(tk_root):
     iid = gui.tree.insert("", "end", values=values)
     gui.tree.selection_set(iid)
 
-    # This assumes you've updated _get_selected_row to return all values,
-    # not just the first 6.
+    # Assumes _get_selected_row returns a tuple/list of all column values
     row = gui._get_selected_row()
 
     assert row is not None
     assert len(row) == len(values)
-    assert row == values
+    assert tuple(row) == values
 
 
-def test_copy_row_tsv_includes_all_columns(tk_root):
+def test_copy_row_tsv_includes_all_columns(tk_root: tk.Tk) -> None:
     gui = _make_fake_gui(tk_root)
 
     values = (

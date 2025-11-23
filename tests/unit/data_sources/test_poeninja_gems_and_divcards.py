@@ -1,162 +1,167 @@
-# tests/test_poeninja_gems_and_divcards.py
+from __future__ import annotations
 
 import pytest
-
 from data_sources.pricing.poe_ninja import PoeNinjaAPI
-# tests/unit/core/test_price_multi.py
-import pytest
+
 pytestmark = pytest.mark.unit
 
 
-@pytest.fixture
-def poe_ninja():
-    # Use a dummy league; we won't actually call the real API in these tests.
-    return PoeNinjaAPI(league="Standard")
+# ------------------------------------------------------------------
+# Fake HTTP Session
+# ------------------------------------------------------------------
+
+class FakeSession:
+    def __init__(self, responses):
+        # Map of partial URL → payload
+        self.responses = responses
+        self.calls = []
+
+    def get(self, url, headers=None, timeout=10):
+        self.calls.append(url)
+
+        payload = None
+        for key, val in self.responses.items():
+            if key in url:
+                payload = val
+                break
+        if payload is None:
+            raise AssertionError(f"No fake response for URL: {url}")
+
+        class R:
+            status_code = 200
+            def __init__(self, data): self.data = data
+            def raise_for_status(self): pass
+            def json(self): return self.data
+
+        return R(payload)
 
 
-def test_find_item_price_gem_exact_match(poe_ninja, monkeypatch):
-    """
-    Ensure that find_item_price for rarity='GEM' selects the correct line
-    based on gem name, level, quality, and corrupted flag.
-    """
+# ------------------------------------------------------------------
+# GEM PRICE LOOKUP
+# ------------------------------------------------------------------
 
-    fake_overview = {
+def test_find_gem_price_finds_exact_match():
+    payload = {
         "lines": [
             {
-                "name": "Awakened Multistrike Support",
-                "gemLevel": 1,
+                "name": "Raise Spectre",
+                "gemLevel": 21,
                 "gemQuality": 20,
-                "corrupted": True,
-                "chaosValue": 187813.0,
+                "chaosValue": 120.0,
+                "listingCount": 5,
             },
             {
-                "name": "Awakened Multistrike Support",
-                "gemLevel": 5,
+                "name": "Raise Spectre",
+                "gemLevel": 20,
                 "gemQuality": 20,
-                "corrupted": False,
-                "chaosValue": 250000.0,
+                "chaosValue": 10.0,
+                "listingCount": 50,
             },
         ]
     }
 
-    # Monkeypatch the skill gem overview to return our fake data
-    monkeypatch.setattr(
-        poe_ninja,
-        "get_skill_gem_overview",
-        lambda: fake_overview,
-    )
+    session = FakeSession({
+        "itemoverview": payload
+    })
 
-    result = poe_ninja.find_item_price(
-        item_name="Awakened Multistrike Support",
-        base_type=None,
-        rarity="GEM",
-        gem_level=1,
-        gem_quality=20,
-        corrupted=True,
-    )
+    api = PoeNinjaAPI(league="Standard")
+    api.session = session
 
-    assert result is not None
-    assert result["gemLevel"] == 1
-    assert result["gemQuality"] == 20
-    assert bool(result["corrupted"]) is True
-    assert result["chaosValue"] == pytest.approx(187813.0)
+    class G:
+        name = "Raise Spectre"
+        base_type = "Raise Spectre"
+        gem_level = 21
+        gem_quality = 20
+        rarity = "Gem"
+        is_corrupted = False
+
+    result = api._find_gem_price(G(), payload["lines"])
+    assert result["chaosValue"] == 120.0
+    assert result["listingCount"] == 5
 
 
-def test_find_item_price_gem_best_fallback(poe_ninja, monkeypatch):
-    """
-    If we don't specify level/quality/corruption, the helper should fall back
-    to the candidate with highest chaosValue for the given gem name.
-    """
+def test_find_gem_price_returns_none_when_no_match():
+    payload = {"lines": []}
+    api = PoeNinjaAPI(league="Standard")
+    api.session = FakeSession({"itemoverview": payload})
 
-    fake_overview = {
+    class G:
+        name = "Raise Spectre"
+        base_type = "Raise Spectre"
+        gem_level = 20
+        gem_quality = 20
+        rarity = "Gem"
+        is_corrupted = False
+
+    assert api._find_gem_price(G(), payload["lines"]) is None
+
+
+# ------------------------------------------------------------------
+# NORMAL OVERVIEW LOOKUP (cards, uniques, etc.)
+# ------------------------------------------------------------------
+
+def test_find_from_overview_by_name_matches_case_insensitive():
+    lines = [
+        {"name": "The Doctor", "chaosValue": 1200, "listingCount": 10},
+        {"name": "The Fiend", "chaosValue": 500, "listingCount": 20},
+    ]
+    api = PoeNinjaAPI()
+    r = api._find_from_overview_by_name("the doctor", lines)
+    assert r["chaosValue"] == 1200
+
+
+def test_find_from_overview_by_name_returns_none_if_missing():
+    lines = [{"name": "The Fiend", "chaosValue": 500}]
+    api = PoeNinjaAPI()
+    assert api._find_from_overview_by_name("The Hoarder", lines) is None
+
+
+# ------------------------------------------------------------------
+# FULL find_item_price
+# ------------------------------------------------------------------
+
+def test_find_item_price_gem_flow():
+    payload = {
         "lines": [
             {
-                "name": "Awakened Multistrike Support",
-                "gemLevel": 1,
+                "name": "Raise Spectre",
+                "gemLevel": 21,
                 "gemQuality": 20,
-                "corrupted": True,
-                "chaosValue": 187813.0,
-            },
-            {
-                "name": "Awakened Multistrike Support",
-                "gemLevel": 5,
-                "gemQuality": 20,
-                "corrupted": False,
-                "chaosValue": 250000.0,
-            },
+                "chaosValue": 100.0,
+                "listingCount": 10,
+            }
         ]
     }
 
-    monkeypatch.setattr(
-        poe_ninja,
-        "get_skill_gem_overview",
-        lambda: fake_overview,
-    )
+    api = PoeNinjaAPI(league="Standard")
+    api.session = FakeSession({"itemoverview": payload})
 
-    result = poe_ninja.find_item_price(
-        item_name="Awakened Multistrike Support",
-        base_type=None,
-        rarity="GEM",
-        gem_level=None,
-        gem_quality=None,
-        corrupted=None,
-    )
+    class G:
+        name = "Raise Spectre"
+        base_type = "Raise Spectre"
+        rarity = "Gem"
+        gem_level = 21
+        gem_quality = 20
+        is_corrupted = False
 
+    result = api.find_item_price(G())
     assert result is not None
-    # Should pick the highest chaosValue candidate (level 5 in this fake set)
-    assert result["gemLevel"] == 5
-    assert result["chaosValue"] == pytest.approx(250000.0)
+    assert result["chaosValue"] == 100.0
+    assert result["listingCount"] == 10
 
 
-def test_find_item_price_divination_card(poe_ninja, monkeypatch):
-    """
-    Ensure that divination cards can be resolved via the itemoverview('DivinationCard')
-    data when rarity is DIVINATION or DIVINATION CARD.
-    """
+def test_find_item_price_falls_back_to_zero_when_not_found():
+    payload = {"lines": []}
+    api = PoeNinjaAPI(league="Standard")
+    api.session = FakeSession({"itemoverview": payload})
 
-    fake_div_cards = {
-        "lines": [
-            {
-                "name": "The Nurse",
-                "chaosValue": 69.3,
-                "divineValue": 0.21,
-            },
-            {
-                "name": "The Doctor",
-                "chaosValue": 600.0,
-                "divineValue": 1.8,
-            },
-        ]
-    }
+    class Item:
+        name = "Unknown Item"
+        base_type = "Unknown Item"
+        rarity = "Unique"
+        gem_level = None
+        gem_quality = None
+        is_corrupted = False
 
-    # Monkeypatch the internal _get_item_overview used for DivinationCard lookups
-    def fake_get_item_overview(item_type: str):
-        assert item_type == "DivinationCard"
-        return fake_div_cards
-
-    monkeypatch.setattr(
-        poe_ninja,
-        "_get_item_overview",
-        fake_get_item_overview,
-    )
-
-    # Test with rarity 'DIVINATION'
-    result = poe_ninja.find_item_price(
-        item_name="The Nurse",
-        base_type=None,
-        rarity="DIVINATION",
-    )
-
-    assert result is not None
-    assert result["name"] == "The Nurse"
-    assert result["chaosValue"] == pytest.approx(69.3)
-
-    # And with 'DIVINATION CARD' just to be safe if your implementation supports it
-    result2 = poe_ninja.find_item_price(
-        item_name="The Nurse",
-        base_type=None,
-        rarity="DIVINATION CARD",
-    )
-
-    assert result2 is not None
-    assert result2["name"] == "The Nurse"
+    result = api.find_item_price(Item())
+    assert result["chaosValue"] == 0.0

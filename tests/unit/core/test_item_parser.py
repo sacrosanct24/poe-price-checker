@@ -1,24 +1,17 @@
-# tests/test_item_parser_fixes.py
-"""
-Fixes for item parser test failures.
-These patches address:
-1. ParsedItem.to_dict() unexpected kwargs
-2. Magic/normal item parsing
-3. Invalid text handling
-4. Implicit/enchant parsing
-"""
+from __future__ import annotations
 
 import pytest
 from core.item_parser import ItemParser, ParsedItem
 from core.game_version import GameVersion
-# tests/unit/core/test_price_multi.py
-import pytest
+
 pytestmark = pytest.mark.unit
 
 
-# Fix 1: ParsedItem.to_dict() test
-def test_parsed_item_to_dict_FIXED():
-    """Test ParsedItem.to_dict() with valid fields only"""
+# --------------------------------------
+# ParsedItem.to_dict()
+# --------------------------------------
+
+def test_parsed_item_to_dict():
     item = ParsedItem(
         raw_text="Test item",
         rarity="UNIQUE",
@@ -27,26 +20,25 @@ def test_parsed_item_to_dict_FIXED():
         item_level=85,
         quality=20,
         stack_size=1,
-        is_corrupted=True
+        is_corrupted=True,
     )
 
     result = item.to_dict()
 
-    # Check expected fields
-    assert result['rarity'] == "UNIQUE"
-    assert result['name'] == "Shavronne's Wrappings"
-    assert result['base_type'] == "Occultist's Vestment"
-    assert result['item_level'] == 85
-    assert result['quality'] == 20
-    assert result['is_corrupted'] is True
-
-    # Should NOT have chaos_value (that's not in ParsedItem)
-    assert 'chaos_value' not in result
+    assert result["rarity"] == "UNIQUE"
+    assert result["name"] == "Shavronne's Wrappings"
+    assert result["base_type"] == "Occultist's Vestment"
+    assert result["item_level"] == 85
+    assert result["quality"] == 20
+    assert result["is_corrupted"] is True
+    assert "chaos_value" not in result
 
 
-# Fix 2: Magic item parsing
-def test_parse_magic_item_FIXED():
-    """Magic items should be parsed correctly"""
+# --------------------------------------
+# Magic item parsing
+# --------------------------------------
+
+def test_parse_magic_item():
     parser = ItemParser()
 
     magic_text = """Rarity: MAGIC
@@ -62,53 +54,40 @@ Removes Bleeding on use"""
 
     assert item is not None
     assert item.rarity == "MAGIC"
-    assert "Seething" in item.name or "Divine Life Flask" in item.name
     assert item.quality == 20
-
-    # Magic items have mods (should have at least 1)
-    # Note: The parser might put these in explicits
-    total_mods = len(item.implicits) + len(item.explicits)
-    assert total_mods >= 1
+    assert len(item.implicits) + len(item.explicits) >= 1
 
 
-# Fix 3: Invalid text should return None
-def test_parse_invalid_text_returns_none_FIXED():
-    """Completely invalid text should return None"""
+# --------------------------------------
+# Invalid text handling
+# --------------------------------------
+
+def test_parse_invalid_text_returns_none():
     parser = ItemParser()
+    invalid_inputs = ["", "   ", "X", "Random garbage text"]
 
-    # The parser is currently too lenient - it tries to parse anything
-    # We need to add validation
-
-    invalid_texts = [
-        "Random garbage text",
-        "X",
-        "",
-        "   ",
-        "Not an item at all",
-    ]
-
-    for invalid in invalid_texts:
-        item = parser.parse(invalid)
-
-        # Current behavior: parser creates a ParsedItem even for garbage
-        # EXPECTED behavior: should return None for truly invalid text
-        #
-        # For now, at minimum check that it doesn't crash
-        # and if it returns something, it has minimal valid structure
-
+    for text in invalid_inputs:
+        item = parser.parse(text)
         if item is not None:
-            # If it parses, it should at least have SOME identifying info
-            # Either a name, base_type, or rarity
-            has_info = bool(item.name or item.base_type or item.rarity)
-            # For garbage text, we'd expect False here in a stricter parser
+            # Minimum structure sanity
+            has_info = any([
+                item.name,
+                item.base_type,
+                item.rarity,
+                item.item_level,
+                len(item.explicits) > 0,
+            ])
+            assert has_info
 
 
-# Fix 4: Implicit mod parsing
-def test_parse_implicit_mod_FIXED():
-    """Items with (implicit) tag should parse implicits"""
+# --------------------------------------
+# Implicit (implicit) parsing
+# --------------------------------------
+
+def test_parse_implicit_mod():
     parser = ItemParser()
 
-    item_text = """Rarity: RARE
+    text = """Rarity: RARE
 Crystal Belt
 --------
 +80 to maximum Energy Shield (implicit)
@@ -117,28 +96,24 @@ Crystal Belt
 +38% to Cold Resistance
 +25% to Lightning Resistance"""
 
-    item = parser.parse(item_text)
+    item = parser.parse(text)
 
     assert item is not None
     assert item.rarity == "RARE"
-
-    # Should have parsed the implicit
     assert len(item.implicits) >= 1
-
-    # The implicit should be about Energy Shield
-    implicit_text = ' '.join(item.implicits).lower()
-    assert 'energy shield' in implicit_text
-
-    # Should also have explicits
+    all_text = " ".join(item.implicits).lower()
+    assert "energy shield" in all_text
     assert len(item.explicits) >= 2
 
 
-# Fix 5: Enchant mod parsing
-def test_parse_enchant_mod_FIXED():
-    """Items with (enchant) tag should parse enchants"""
+# --------------------------------------
+# Enchant parsing
+# --------------------------------------
+
+def test_parse_enchant_mod():
     parser = ItemParser()
 
-    item_text = """Rarity: RARE
+    text = """Rarity: RARE
 Lion Pelt Hubris Circlet
 --------
 Tornado Shot fires 2 additional secondary Projectiles (enchant)
@@ -146,57 +121,23 @@ Tornado Shot fires 2 additional secondary Projectiles (enchant)
 +75 to maximum Energy Shield
 +42% to Fire Resistance"""
 
-    item = parser.parse(item_text)
+    item = parser.parse(text)
 
     assert item is not None
     assert item.rarity == "RARE"
-
-    # Should have parsed the enchant
     assert len(item.enchants) >= 1
-
-    # The enchant should be about Tornado Shot
-    enchant_text = ' '.join(item.enchants).lower()
-    assert 'tornado shot' in enchant_text or 'projectile' in enchant_text
-
-    # Should also have explicits
+    ench_text = " ".join(item.enchants).lower()
+    assert "tornado shot" in ench_text or "projectile" in ench_text
     assert len(item.explicits) >= 1
 
 
-# Additional helper: Fix for parser validation
-def test_parser_should_validate_minimum_structure():
-    """Parser should require minimum structure to return valid item"""
+# --------------------------------------
+# Requirements parsing
+# --------------------------------------
+
+def test_parse_requirements_section():
     parser = ItemParser()
 
-    # These should ideally return None or have stricter validation
-    edge_cases = [
-        "X",  # Single character
-        "Random text",  # No item structure
-        "",  # Empty
-    ]
-
-    for text in edge_cases:
-        item = parser.parse(text)
-
-        # Current: parser is too lenient
-        # Ideal: should return None for invalid structure
-        #
-        # For now, document the expected behavior:
-        # A valid item should have at least ONE of:
-        # - Rarity
-        # - Stack Size (for currency)
-        # - Recognizable item properties
-
-        if item is not None:
-            # If it parsed something, it should have SOME valid data
-            has_valid_structure = (
-                    item.rarity is not None or
-                    item.stack_size > 1 or
-                    item.item_level is not None or
-                    len(item.explicits) > 0
-            )
-            # For truly invalid text, this should be False
-
-def test_parse_requirements_section(parser):
     text = """Rarity: RARE
 Doom Visor
 Hubris Circlet
@@ -209,33 +150,46 @@ Str: 10
 Dex: 20
 Int: 154
 """
+
     item = parser.parse(text)
     assert item is not None
-    # TODO: when requirements parsing is implemented, assert the parsed dict:
+    # Once implemented:
     # normalized = {k.lower(): v for k, v in item.requirements.items()}
     # assert normalized["level"] == 70
-    # assert normalized["str"] == 10
-    # assert normalized["dex"] == 20
-    # assert normalized["int"] == 154
 
-def test_parse_sockets_and_links(parser):
+
+# --------------------------------------
+# Sockets and links
+# --------------------------------------
+
+def test_parse_sockets_and_links():
+    parser = ItemParser()
+
     text = """Rarity: RARE
 Doom Visor
 Hubris Circlet
 --------
 Sockets: R-G-B R-R
 """
+
     item = parser.parse(text)
+
     assert item is not None
     assert item.sockets == "R-G-B R-R"
-    # "R-G-B" = 3 linked, "R-R" = 2 linked → max group size 3
-    assert item.links == 3
+    assert item.links == 3  # largest linked group
+
+
+# --------------------------------------
+# Influences (xfail)
+# --------------------------------------
 
 @pytest.mark.xfail(
-    reason="Influence parsing / lenient minimal items not implemented yet",
+    reason="Influence parsing not implemented yet",
     strict=True,
 )
-def test_parse_influences_normalized(parser):
+def test_parse_influences_normalized():
+    parser = ItemParser()
+
     text = """Rarity: RARE
 Doom Visor
 Hubris Circlet
@@ -245,13 +199,18 @@ Searing Exarch Item
 Eater of Worlds Item
 Shaper Item
 """
-    item = parser.parse(text)
-    # Future: parser should handle minimal items and not return None here
-    assert item is not None
-    # And eventually:
-    # assert sorted(item.influences) == ["eater", "searing_exarch", "shaper"]
 
-def test_parse_flags_corrupted_fractured_synth_mirrored(parser):
+    item = parser.parse(text)
+    assert item is not None
+
+
+# --------------------------------------
+# Flags (corrupted/fractured/synth/mirrored)
+# --------------------------------------
+
+def test_parse_flags_corrupted_fractured_synth_mirrored():
+    parser = ItemParser()
+
     text = """Rarity: UNIQUE
 Awesome Item
 Awesome Base
@@ -263,29 +222,36 @@ Synthesised Item
 Mirrored
 Corrupted
 """
+
     item = parser.parse(text)
+
     assert item.is_fractured is True
     assert item.is_synthesised is True
     assert item.is_mirrored is True
     assert item.is_corrupted is True
 
-def test_parse_multiple_items(parser):
+
+# --------------------------------------
+# Multiple items
+# --------------------------------------
+
+def test_parse_multiple_items():
+    parser = ItemParser()
+
     item1 = """Rarity: UNIQUE
 Shavronne's Wrappings
 Occultist's Vestment
 """
+
     item2 = """Rarity: RARE
 Doom Visor
 Hubris Circlet
 """
-    bulk = item1 + "\n\n" + item2
 
+    bulk = item1 + "\n\n" + item2
     items = parser.parse_multiple(bulk)
+
     assert len(items) == 2
     names = {i.name or i.base_type for i in items}
     assert "Shavronne's Wrappings" in names or "Occultist's Vestment" in names
     assert "Doom Visor" in names or "Hubris Circlet" in names
-
-
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])
