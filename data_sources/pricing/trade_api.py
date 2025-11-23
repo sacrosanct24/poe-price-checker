@@ -137,8 +137,12 @@ class TradeApiSource:
         self.league = effective_league
         self.name = name or "trade_api"
 
-        # Fallback session if client doesn't expose one
-        self.session = requests.Session()
+        # Use the client's session when available, otherwise create our own.
+        # Tests can monkeypatch self.session to a fake session.
+        if hasattr(self.client, "session"):
+            self.session = self.client.session
+        else:
+            self.session = requests.Session()
 
         self.logger.info(
             "Initialized TradeApiSource(name=%s, league=%s)",
@@ -166,6 +170,28 @@ class TradeApiSource:
         self.logger.info(
             "TradeApiSource.check_item called for league=%s", self.league
         )
+
+        # Guard: if we don't have any meaningful name/base, don't hit the API.
+        if parsed_item is None:
+            self.logger.info(
+                "TradeApiSource.check_item: parsed_item is None; returning 0 quotes."
+            )
+            return []
+
+        name = getattr(parsed_item, "name", None) or getattr(
+            parsed_item, "display_name", None
+        )
+        base_type = getattr(parsed_item, "base_type", None) or getattr(
+            parsed_item, "base_name", None
+        )
+        name_str = (str(name or "")).strip()
+        base_str = (str(base_type or "")).strip()
+
+        if not name_str and not base_str:
+            self.logger.info(
+                "TradeApiSource.check_item: blank item (no name/base); returning 0 quotes."
+            )
+            return []
 
         # 1) Build a simple search query JSON based on ParsedItem
         query = self._build_query(parsed_item)
@@ -265,9 +291,7 @@ class TradeApiSource:
             query_snippet = str(query)[:800]
         self.logger.debug("Trade API search payload (truncated): %s", query_snippet)
 
-        # Prefer using the client's session so we get its headers / UA
-        session = getattr(self.client, "session", self.session)
-        resp = session.post(url, json=query, timeout=15)
+        resp = self.session.post(url, json=query, timeout=15)
         self.logger.debug("Trade API search status=%s", resp.status_code)
         resp.raise_for_status()
 
@@ -334,7 +358,6 @@ class TradeApiSource:
 
         # trade API: max 10 ids per fetch
         batch_size = 10
-        session = getattr(self.client, "session", self.session)
 
         for i in range(0, len(result_ids), batch_size):
             batch_ids = result_ids[i : i + batch_size]
@@ -349,7 +372,7 @@ class TradeApiSource:
                 search_id,
             )
 
-            resp = session.get(url, params=params, timeout=15)
+            resp = self.session.get(url, params=params, timeout=15)
             self.logger.debug("Trade API fetch status=%s", resp.status_code)
             resp.raise_for_status()
 
