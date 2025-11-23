@@ -52,13 +52,132 @@ class PoeNinjaAPI(BaseAPIClient):
             base_url="https://poe.ninja/api/data",
             rate_limit=0.33,  # ~1 request per 3 seconds (community standard)
             cache_ttl=3600,  # Cache for 1 hour (prices don't change that fast)
-            user_agent="PoE-Price-Checker/2.5 (GitHub: sacrosanct24/poe-price-checker)"
+            user_agent="PoE-Price-Checker/2.5 (GitHub: sacrosanct24/poe-price-checker)",
         )
 
         self.league = league
-        self.divine_chaos_rate = 1.0  # Will be updated on first price load
+        # 0.0 = "unknown until we ask poe.ninja"
+        self.divine_chaos_rate: float = 0.0
 
         logger.info(f"Initialized PoeNinjaAPI for league: {league}")
+
+        def refresh_divine_rate_from_currency(self) -> float:
+            """
+            Fetch poe.ninja currencyoverview and derive chaos_per_divine from
+            the Divine Orb entry.
+
+            Sets self.divine_chaos_rate and returns it.
+            """
+            try:
+                data = self.get_currency_overview()
+            except Exception as exc:
+                logger.warning("Failed to fetch currency overview for divine rate: %s", exc)
+                self.divine_chaos_rate = 0.0
+                return 0.0
+
+            lines = (data.get("lines") or [])
+            for line in lines:
+                name = (line.get("currencyTypeName") or "").strip().lower()
+                if name == "divine orb":
+                    chaos_raw: Any = (
+                            line.get("chaosEquivalent")
+                            or line.get("chaosValue")
+                            or 0.0
+                    )
+                    try:
+                        chaos_equiv = float(chaos_raw)
+                    except (TypeError, ValueError):
+                        chaos_equiv = 0.0
+
+                    self.divine_chaos_rate = chaos_equiv
+                    logger.info(
+                        "poe.ninja divine_chaos_rate set to %.2f chaos per divine (league=%s)",
+                        self.divine_chaos_rate,
+                        self.league,
+                    )
+                    return self.divine_chaos_rate
+
+            logger.warning(
+                "Divine Orb not found in poe.ninja currencyoverview for league %s; "
+                "leaving divine_chaos_rate=0.0",
+                self.league,
+            )
+            self.divine_chaos_rate = 0.0
+            return 0.0
+
+        def ensure_divine_rate(self) -> float:
+            """
+            Return a sane chaos-per-divine rate, refreshing from poe.ninja if needed.
+            """
+            # If we already have something that looks sane, reuse it
+            try:
+                rate = float(self.divine_chaos_rate)
+            except (TypeError, ValueError):
+                rate = 0.0
+
+            if rate > 10.0:  # anything <= 10c/div is probably bogus
+                return rate
+
+            return self.refresh_divine_rate_from_currency()
+
+    def refresh_divine_rate_from_currency(self) -> float:
+        """
+        Fetch poe.ninja currencyoverview and derive chaos_per_divine from
+        the Divine Orb entry.
+
+        Sets self.divine_chaos_rate and returns it.
+        """
+        try:
+            data = self.get_currency_overview()
+        except Exception as exc:
+            logger.warning("Failed to fetch currency overview for divine rate: %s", exc)
+            self.divine_chaos_rate = 0.0
+            return 0.0
+
+        lines = data.get("lines") or []
+        for line in lines:
+            name = (line.get("currencyTypeName") or "").strip().lower()
+            if name == "divine orb":
+                chaos_raw: Any = (
+                        line.get("chaosEquivalent")
+                        or line.get("chaosValue")
+                        or 0.0
+                )
+                try:
+                    chaos_equiv = float(chaos_raw)
+                except (TypeError, ValueError):
+                    chaos_equiv = 0.0
+
+                self.divine_chaos_rate = chaos_equiv
+                logger.info(
+                    "poe.ninja divine_chaos_rate set to %.2f chaos per divine (league=%s)",
+                    self.divine_chaos_rate,
+                    self.league,
+                )
+                return self.divine_chaos_rate
+
+        logger.warning(
+            "Divine Orb not found in poe.ninja currencyoverview for league %s; "
+            "leaving divine_chaos_rate=0.0",
+            self.league,
+        )
+        self.divine_chaos_rate = 0.0
+        return 0.0
+
+    def ensure_divine_rate(self) -> float:
+        """
+        Return a sane chaos-per-divine rate, refreshing from poe.ninja if needed.
+        """
+        try:
+            rate = float(self.divine_chaos_rate)
+        except (TypeError, ValueError):
+            rate = 0.0
+
+        # Anything <= 10c/div is probably bogus or placeholder
+        if rate > 10.0:
+            return rate
+
+        return self.refresh_divine_rate_from_currency()
 
     def _get_cache_key(self, endpoint: str, params: Optional[Dict] = None) -> str:
         """Generate cache key from endpoint and params"""

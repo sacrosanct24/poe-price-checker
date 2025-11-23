@@ -1347,72 +1347,138 @@ class PriceCheckerGUI:
             self._check_in_progress = False
 
     def _build_aggregate_rows_for_check(
-        self,
-        rows: list[Mapping[str, Any]],
+            self,
+            rows: list[Mapping[str, Any]],
     ) -> list[dict[str, Any]]:
         """
-        Build synthetic 'aggregate' rows per logical item across sources.
+        Build one synthetic aggregate row per logical item across sources.
 
-        Grouping key: (item_name, variant, links)
+        Grouping key:
+            (item_name, variant, links)
+
+        Aggregate logic:
+            chaos_value   = mean of source chaos values (float)
+            listing_count = max listing_count across *real* sources
+            source        = "aggregate"
+            divine_value  = derived from aggregate chaos using the primary
+                            real source's chaos/divine ratio, if available.
+                            Otherwise left blank/"0.00".
         """
+
         if not rows:
             return []
 
-        grouped: dict[tuple[str, str, str], list[Mapping[str, Any]]] = {}
-
+        # Group rows by logical item
+        groups: dict[tuple[str, str, str], list[Mapping[str, Any]]] = {}
         for row in rows:
-            name = str(row.get("item_name", "") or "")
-            variant = str(row.get("variant", "") or "")
-            links = str(row.get("links", "") or "")
-            key = (name, variant, links)
-            grouped.setdefault(key, []).append(row)
+            item_name = str(row.get("item_name") or "")
+            variant = str(row.get("variant") or "")
+            links = str(row.get("links") or "")
+            key = (item_name, variant, links)
+            groups.setdefault(key, []).append(row)
 
-        aggregates: list[dict[str, Any]] = []
+        aggregate_rows: list[dict[str, Any]] = []
 
-        for (name, variant, links), group_rows in grouped.items():
-            chaos_vals: list[float] = []
-            divine_vals: list[float] = []
-            listing_counts: list[int] = []
+        for (item_name, variant, links), group_rows in groups.items():
+            # Collect per-source chaos and listing counts
+            chaos_values: list[float] = []
+            listing_counts_real: list[int] = []
+            sources: list[str] = []
+
+            # Try to pick a "primary" real source (e.g. poe_ninja) to
+            # derive the chaos→divine ratio from.
+            primary_row: Mapping[str, Any] | None = None
 
             for r in group_rows:
+                src = str(r.get("source") or "").strip()
+                sources.append(src)
+
+                # Parse chaos_value as float
                 try:
-                    cv = float(r.get("chaos_value", 0) or 0)
-                    chaos_vals.append(cv)
+                    c = float(r.get("chaos_value") or 0.0)
                 except (TypeError, ValueError):
-                    pass
+                    c = 0.0
+                if c > 0:
+                    chaos_values.append(c)
+
+                # Parse listing_count as int
+                try:
+                    lc = int(r.get("listing_count") or 0)
+                except (TypeError, ValueError):
+                    lc = 0
+
+                # Treat synthetic/strategy sources (e.g. suggested_undercut)
+                # as not contributing new *real* listings.
+                is_synthetic = src.lower().startswith("suggested_")
+                if not is_synthetic and lc > 0:
+                    listing_counts_real.append(lc)
+
+                # Choose a primary row:
+                #  - prefer poe_ninja or other non-synthetic source
+                #  - fallback: first row in the group
+                if primary_row is None:
+                    primary_row = r
+                else:
+                    # Upgrade primary if we find a clearly better one
+                    if primary_row.get("source", "").lower().startswith("suggested_") and not is_synthetic:
+                        primary_row = r
+
+            if not chaos_values:
+                # No valid chaos values → skip aggregate for this group
+                continue
+
+            # Aggregate chaos: simple mean for now
+            agg_chaos = sum(chaos_values) / len(chaos_values)
+
+            # Aggregate listing_count:
+            # - Use max of real listing counts to avoid double-counting
+            #   synthetic strategies.
+            if listing_counts_real:
+                agg_listing = max(listing_counts_real)
+            else:
+                # Fallback: max of all listing counts (still better than sum)
+                all_counts: list[int] = []
+                for r in group_rows:
+                    try:
+                        all_counts.append(int(r.get("listing_count") or 0))
+                    except (TypeError, ValueError):
+                        continue
+                agg_listing = max(all_counts) if all_counts else 0
+
+            # Compute aggregate divine from primary row's chaos/divine ratio,
+            # if we can.
+            agg_divine_str = "0.00"
+            if primary_row is not None:
+                try:
+                    primary_chaos = float(primary_row.get("chaos_value") or 0.0)
+                except (TypeError, ValueError):
+                    primary_chaos = 0.0
 
                 try:
-                    dv = float(r.get("divine_value", 0) or 0)
-                    divine_vals.append(dv)
+                    primary_divine = float(primary_row.get("divine_value") or 0.0)
                 except (TypeError, ValueError):
-                    pass
+                    primary_divine = 0.0
 
-                try:
-                    lc = int(r.get("listing_count", 0) or 0)
-                    listing_counts.append(lc)
-                except (TypeError, ValueError):
-                    pass
-
-            def mean(xs: list[float]) -> float:
-                return sum(xs) / len(xs) if xs else 0.0
-
-            chaos_avg = mean(chaos_vals)
-            divine_avg = mean(divine_vals)
-            total_listings = sum(listing_counts) if listing_counts else 0
+                if primary_chaos > 0 and primary_divine > 0:
+                    # chaos_per_divine = primary_chaos / primary_divine
+                    # So divine ≈ agg_chaos / chaos_per_divine
+                    chaos_per_divine = primary_chaos / primary_divine
+                    agg_divine = agg_chaos / chaos_per_divine if chaos_per_divine > 0 else 0.0
+                    agg_divine_str = f"{agg_divine:.2f}"
 
             agg_row: dict[str, Any] = {
-                "item_name": name,
+                "item_name": item_name,
                 "variant": variant,
                 "links": links,
-                "chaos_value": chaos_avg,
-                "divine_value": divine_avg,
-                "listing_count": total_listings,
+                "chaos_value": f"{agg_chaos:.1f}",
+                "divine_value": agg_divine_str,
+                "listing_count": str(agg_listing),
                 "source": "aggregate",
             }
 
-            aggregates.append(agg_row)
+            aggregate_rows.append(agg_row)
 
-        return aggregates
+        return aggregate_rows
 
     def _insert_result_rows(
         self,
@@ -1518,84 +1584,74 @@ class PriceCheckerGUI:
     # -------------------------------------------------------------------------
 
     def _update_summary_banner(
-        self,
-        aggregate_rows: list[Mapping[str, Any]],
-        per_source_rows: list[Mapping[str, Any]],
+            self,
+            aggregate_rows: list[Mapping[str, Any]],
+            per_source_rows: list[Mapping[str, Any]],
     ) -> None:
         """
-        Compute a one-line summary for the most recent price check and
-        update the summary_var used by the banner above the table.
+        Update the summary banner for the most recent check.
+
+        For now we assume a single logical item per check, so we use:
+            - the first aggregate row (if present) for price + listing count
+            - all per-source rows for the source list
         """
         if not hasattr(self, "summary_var"):
             return
 
         if not aggregate_rows and not per_source_rows:
-            self.summary_var.set("No recent price summary.")
+            self.summary_var.set("")
             return
 
-        # Prefer an aggregate row if available; otherwise fall back to the first per-source row.
-        row: Mapping[str, Any] | None = None
+        # Choose an aggregate row if we have one, otherwise fall back
+        # to the first per-source row.
         if aggregate_rows:
-            row = aggregate_rows[0]
-        elif per_source_rows:
-            row = per_source_rows[0]
+            agg = aggregate_rows[0]
+        else:
+            agg = per_source_rows[0]
 
-        if row is None:
-            self.summary_var.set("No recent price summary.")
-            return
-
-        name = str(row.get("item_name", "") or "Unknown Item")
-        variant = str(row.get("variant", "") or "").strip()
-        links = str(row.get("links", "") or "").strip()
-
-        def as_float(value: Any) -> float:
-            try:
-                return float(value)
-            except (TypeError, ValueError):
-                return 0.0
-
-        chaos = as_float(row.get("chaos_value", 0))
-        divine = as_float(row.get("divine_value", 0))
+        item_name = str(agg.get("item_name") or "")
+        chaos_str = str(agg.get("chaos_value") or "")
+        divine_str = str(agg.get("divine_value") or "")
         try:
-            listings = int(row.get("listing_count", 0) or 0)
+            listing_count = int(agg.get("listing_count") or 0)
         except (TypeError, ValueError):
-            listings = 0
+            listing_count = 0
 
-        # Compute which sources participated.
-        source_names = sorted(
-            {
-                str(r.get("source", "") or "")
-                for r in per_source_rows
-                if (r.get("source", "") or "") != "aggregate"
-            }
-        )
-        source_names = [s for s in source_names if s]
+        # Collect distinct sources from per-source rows (exclude "aggregate")
+        sources: list[str] = []
+        seen: set[str] = set()
+        for r in per_source_rows:
+            src = str(r.get("source") or "").strip()
+            if not src or src == "aggregate":
+                continue
+            if src not in seen:
+                seen.add(src)
+                sources.append(src)
 
-        # Build a concise human-readable label
+        sources_text = ", ".join(sources) if sources else "unknown"
+
+        # Example:
+        #   Tabula Rasa (6L) – 3.8c (0.02d), 399 listing(s), sources: poe_ninja, suggested_undercut
         parts: list[str] = []
 
-        base_label = name
-        detail_bits: list[str] = []
-        if links:
-            detail_bits.append(f"{links}L")
-        if variant:
-            detail_bits.append(variant)
-        if detail_bits:
-            base_label += " (" + ", ".join(detail_bits) + ")"
-        parts.append(base_label)
+        label = item_name
+        if agg.get("links"):
+            label = f"{item_name} ({agg['links']}L)"
 
-        if chaos or divine:
-            parts.append(f"– {chaos:.1f}c")
-            if divine:
-                parts[-1] += f" ({divine:.2f}d)"
-        if listings:
-            parts.append(f"{listings} listing(s) total")
+        parts.append(label)
 
-        if source_names:
-            parts.append("sources: " + ", ".join(source_names))
+        if chaos_str:
+            parts.append(f"– {chaos_str}c")
 
-        summary_text = " ".join(parts) if parts else "No recent price summary."
-        self.summary_var.set(summary_text)
+        if divine_str and divine_str != "0.00":
+            parts[-1] = f"{parts[-1]} ({divine_str}d)"  # append to price part
+
+        if listing_count > 0:
+            parts.append(f"{listing_count} listing(s)")
+
+        parts.append(f"sources: {sources_text}")
+
+        self.summary_var.set(" ".join(parts))
 
     # -------------------------------------------------------------------------
     # Filtering helpers

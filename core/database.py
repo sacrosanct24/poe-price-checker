@@ -5,17 +5,20 @@ Responsibilities:
 - Checked items (recent item lookups)
 - Sales tracking (listed → sold/unsold)
 - Price history snapshots
+- Price checks & raw quotes (for robust pricing)
 - Plugin state (enabled/config)
 - Aggregate statistics
 - Schema initialization + versioning
 """
+from __future__ import annotations
 
-import sqlite3
 import logging
-from pathlib import Path
+import sqlite3
+import statistics
 from contextlib import contextmanager
 from datetime import datetime, timezone
-from typing import Optional, List, Dict, Any, Iterator
+from pathlib import Path
+from typing import Any, Dict, Iterator, List, Optional
 
 from core.game_version import GameVersion
 
@@ -31,12 +34,14 @@ class Database:
     - checked_items
     - sales
     - price_history
+    - price_checks
+    - price_quotes
     - plugin_state
     - stats views (via queries)
     """
 
     # Current schema version. Increment if schema structure changes.
-    SCHEMA_VERSION = 2
+    SCHEMA_VERSION = 3
 
     def __init__(self, db_path: Optional[Path] = None):
         """
@@ -59,6 +64,7 @@ class Database:
 
         # Initialize or migrate schema
         self._initialize_schema()
+
     # ----------------------------------------------------------------------
     # Context manager for transactions
     # ----------------------------------------------------------------------
@@ -92,11 +98,11 @@ class Database:
             logger.info("No schema detected — creating schema.")
             self._create_schema()
             self._set_schema_version(self.SCHEMA_VERSION)
-
         elif current_version < self.SCHEMA_VERSION:
-            logger.info(f"Migrating schema from v{current_version} to v{self.SCHEMA_VERSION}")
+            logger.info(
+                f"Migrating schema from v{current_version} to v{self.SCHEMA_VERSION}"
+            )
             self._migrate_schema(current_version, self.SCHEMA_VERSION)
-
         else:
             logger.debug(f"Schema v{current_version} is up-to-date.")
 
@@ -142,7 +148,7 @@ class Database:
                     checked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
 
-                                CREATE TABLE IF NOT EXISTS sales (
+                CREATE TABLE IF NOT EXISTS sales (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     item_id INTEGER,
                     item_name TEXT NOT NULL,
@@ -156,7 +162,6 @@ class Database:
                     relisted BOOLEAN DEFAULT 0,
                     notes TEXT
                 );
-
 
                 CREATE TABLE IF NOT EXISTS price_history (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -173,7 +178,8 @@ class Database:
                     plugin_name TEXT PRIMARY KEY,
                     enabled BOOLEAN,
                     config_json TEXT
-                );                
+                );
+
                 CREATE TABLE IF NOT EXISTS price_checks (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     game_version TEXT NOT NULL,
@@ -187,7 +193,8 @@ class Database:
 
                 CREATE TABLE IF NOT EXISTS price_quotes (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    price_check_id INTEGER NOT NULL REFERENCES price_checks(id) ON DELETE CASCADE,
+                    price_check_id INTEGER NOT NULL
+                        REFERENCES price_checks(id) ON DELETE CASCADE,
                     source TEXT NOT NULL,        -- which endpoint / plugin
                     price_chaos REAL NOT NULL,   -- normalized to chaos
                     original_currency TEXT,      -- e.g. "chaos", "divine"
@@ -197,7 +204,6 @@ class Database:
                     listed_at TIMESTAMP,         -- listing’s own timestamp if available
                     fetched_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
-
                 """
             )
 
@@ -214,11 +220,22 @@ class Database:
 
         with self.transaction() as conn:
             if old < 2 <= new:
-                logger.info("Applying v2 migration: adding `source` column to `sales`.")
-                conn.execute("ALTER TABLE sales ADD COLUMN source TEXT;")
+                logger.info(
+                    "Applying v2 migration: adding `source` column to `sales`."
+                )
+                try:
+                    conn.execute("ALTER TABLE sales ADD COLUMN source TEXT;")
+                except sqlite3.OperationalError as exc:
+                    # Column might already exist if created via a previous schema
+                    logger.warning(
+                        "ALTER TABLE sales ADD COLUMN source failed (possibly already exists): %s",
+                        exc,
+                    )
 
             if old < 3 <= new:
-                logger.info("Applying v3 migration: creating price_checks and price_quotes tables.")
+                logger.info(
+                    "Applying v3 migration: creating price_checks and price_quotes tables."
+                )
                 conn.executescript(
                     """
                     CREATE TABLE IF NOT EXISTS price_checks (
@@ -234,7 +251,8 @@ class Database:
 
                     CREATE TABLE IF NOT EXISTS price_quotes (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        price_check_id INTEGER NOT NULL REFERENCES price_checks(id) ON DELETE CASCADE,
+                        price_check_id INTEGER NOT NULL
+                            REFERENCES price_checks(id) ON DELETE CASCADE,
                         source TEXT NOT NULL,
                         price_chaos REAL NOT NULL,
                         original_currency TEXT,
@@ -270,8 +288,7 @@ class Database:
             return datetime.fromisoformat(value)
         except ValueError:
             try:
-                from datetime import datetime as _dt
-                return _dt.strptime(value, "%Y-%m-%d %H:%M:%S")
+                return datetime.strptime(value, "%Y-%m-%d %H:%M:%S")
             except ValueError:
                 return None
 
@@ -365,13 +382,13 @@ class Database:
         return cursor.lastrowid
 
     def record_instant_sale(
-            self,
-            item_name: str,
-            chaos_value: float | None = None,
-            item_base_type: str | None = None,
-            notes: str | None = None,
-            source: str | None = None,
-            price_chaos: float | None = None,
+        self,
+        item_name: str,
+        chaos_value: float | None = None,
+        item_base_type: str | None = None,
+        notes: str | None = None,
+        source: str | None = None,
+        price_chaos: float | None = None,
     ) -> int:
         """
         Convenience helper: record a sale where listing and sale happen
@@ -401,28 +418,32 @@ class Database:
 
         cursor = self.conn.execute(
             """
-            INSERT INTO sales (item_id,
-                               item_name,
-                               item_base_type,
-                               source,
-                               listed_price_chaos,
-                               listed_at,
-                               sold_at,
-                               actual_price_chaos,
-                               time_to_sale_hours,
-                               relisted,
-                               notes)
-            VALUES (NULL,
-                    ?,
-                    ?,
-                    ?,
-                    ?,
-                    CURRENT_TIMESTAMP,
-                    CURRENT_TIMESTAMP,
-                    ?,
-                    0.0,
-                    0,
-                    ?)
+            INSERT INTO sales (
+                item_id,
+                item_name,
+                item_base_type,
+                source,
+                listed_price_chaos,
+                listed_at,
+                sold_at,
+                actual_price_chaos,
+                time_to_sale_hours,
+                relisted,
+                notes
+            )
+            VALUES (
+                NULL,
+                ?,
+                ?,
+                ?,
+                ?,
+                CURRENT_TIMESTAMP,
+                CURRENT_TIMESTAMP,
+                ?,
+                0.0,
+                0,
+                ?
+            )
             """,
             (
                 item_name,
@@ -518,7 +539,7 @@ class Database:
         return [dict(row) for row in cursor.fetchall()]
 
     # ----------------------------------------------------------------------
-    # Price History
+    # Price History + Price Checks / Quotes
     # ----------------------------------------------------------------------
 
     def add_price_snapshot(
@@ -551,6 +572,7 @@ class Database:
         )
         self.conn.commit()
         return cursor.lastrowid
+
     def create_price_check(
         self,
         game_version: GameVersion,
@@ -659,6 +681,128 @@ class Database:
                 rows,
             )
 
+    def get_price_stats_for_check(self, price_check_id: int) -> Dict[str, Any]:
+        """
+        Compute robust statistics for all price_quotes belonging to a given price_check_id.
+
+        Returns a dict with:
+            - count
+            - min
+            - max
+            - mean
+            - median
+            - p25
+            - p75
+            - trimmed_mean (middle 50%)
+            - stddev  (population-style; 0 if < 2 samples)
+        """
+        cursor = self.conn.execute(
+            """
+            SELECT price_chaos
+            FROM price_quotes
+            WHERE price_check_id = ?
+            ORDER BY price_chaos ASC
+            """,
+            (price_check_id,),
+        )
+        prices = [float(row[0]) for row in cursor.fetchall() if row[0] is not None]
+
+        if not prices:
+            return {
+                "count": 0,
+                "min": None,
+                "max": None,
+                "mean": None,
+                "median": None,
+                "p25": None,
+                "p75": None,
+                "trimmed_mean": None,
+                "stddev": None,
+            }
+
+        prices.sort()
+        count = len(prices)
+        p_min = prices[0]
+        p_max = prices[-1]
+        mean = sum(prices) / count
+
+        median = statistics.median(prices)
+
+        # percentiles (simple interpolation)
+        def percentile(vals: list[float], q: float) -> float:
+            if not vals:
+                return float("nan")
+            idx = (len(vals) - 1) * q
+            lo = int(idx)
+            hi = min(lo + 1, len(vals) - 1)
+            frac = idx - lo
+            return vals[lo] * (1 - frac) + vals[hi] * frac
+
+        p25 = percentile(prices, 0.25)
+        p75 = percentile(prices, 0.75)
+
+        # trimmed mean: middle 50% (drop lowest 25% and highest 25%)
+        if count >= 4:
+            start = int(count * 0.25)
+            end = max(start + 1, int(count * 0.75))
+            trimmed_slice = prices[start:end]
+            trimmed_mean = sum(trimmed_slice) / len(trimmed_slice)
+        else:
+            trimmed_mean = mean
+
+        # simple stddev (population); 0 if < 2 samples
+        if count >= 2:
+            mean_val = mean
+            var = sum((p - mean_val) ** 2 for p in prices) / count
+            stddev = var ** 0.5
+        else:
+            stddev = 0.0
+
+        return {
+            "count": count,
+            "min": p_min,
+            "max": p_max,
+            "mean": mean,
+            "median": median,
+            "p25": p25,
+            "p75": p75,
+            "trimmed_mean": trimmed_mean,
+            "stddev": stddev,
+        }
+
+    def get_latest_price_stats_for_item(
+        self,
+        game_version: GameVersion,
+        league: str,
+        item_name: str,
+        days: int = 2,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Get robust price stats for the most recent price_check row for a given item
+        within the last `days` days. Returns None if no checks found.
+        """
+        cursor = self.conn.execute(
+            """
+            SELECT id
+            FROM price_checks
+            WHERE game_version = ?
+              AND league = ?
+              AND item_name = ?
+              AND checked_at >= datetime('now', ?)
+            ORDER BY checked_at DESC
+            LIMIT 1
+            """,
+            (game_version.value, league, item_name, f"-{int(days)} days"),
+        )
+        row = cursor.fetchone()
+        if row is None:
+            return None
+
+        price_check_id = row[0]
+        stats = self.get_price_stats_for_check(price_check_id)
+        stats["price_check_id"] = price_check_id
+        return stats
+
     def get_price_history(
         self,
         game_version: GameVersion,
@@ -745,7 +889,7 @@ class Database:
         """
         Return aggregate statistics from all tables.
         """
-        stats = {}
+        stats: Dict[str, int] = {}
 
         cursor = self.conn.execute("SELECT COUNT(*) FROM checked_items")
         stats["checked_items"] = cursor.fetchone()[0]
@@ -753,13 +897,22 @@ class Database:
         cursor = self.conn.execute("SELECT COUNT(*) FROM sales")
         stats["sales"] = cursor.fetchone()[0]
 
-        cursor = self.conn.execute("SELECT COUNT(*) FROM sales WHERE sold_at IS NOT NULL")
+        cursor = self.conn.execute(
+            "SELECT COUNT(*) FROM sales WHERE sold_at IS NOT NULL"
+        )
         stats["completed_sales"] = cursor.fetchone()[0]
 
         cursor = self.conn.execute("SELECT COUNT(*) FROM price_history")
         stats["price_snapshots"] = cursor.fetchone()[0]
 
+        cursor = self.conn.execute("SELECT COUNT(*) FROM price_checks")
+        stats["price_checks"] = cursor.fetchone()[0]
+
+        cursor = self.conn.execute("SELECT COUNT(*) FROM price_quotes")
+        stats["price_quotes"] = cursor.fetchone()[0]
+
         return stats
+
     def get_recent_sales(
         self,
         limit: int = 50,
@@ -857,6 +1010,7 @@ class Database:
     # ----------------------------------------------------------------------
     # Maintenance
     # ----------------------------------------------------------------------
+
     def get_sales_summary(self) -> Dict[str, Any]:
         """
         Return overall sales summary:
@@ -869,17 +1023,21 @@ class Database:
         """
         cursor = self.conn.execute(
             """
-            SELECT COUNT(*) AS total_sales,
-                   COALESCE(
-                           SUM(COALESCE(actual_price_chaos, listed_price_chaos)),
-                           0
-                   )        AS total_chaos,
-                   CASE
-                       WHEN COUNT(*) > 0 THEN
-                           COALESCE(AVG(COALESCE(actual_price_chaos, listed_price_chaos)), 0)
-                       ELSE
-                           0
-                       END  AS avg_chaos
+            SELECT
+                COUNT(*) AS total_sales,
+                COALESCE(
+                    SUM(COALESCE(actual_price_chaos, listed_price_chaos)),
+                    0
+                ) AS total_chaos,
+                CASE
+                    WHEN COUNT(*) > 0 THEN
+                        COALESCE(
+                            AVG(COALESCE(actual_price_chaos, listed_price_chaos)),
+                            0
+                        )
+                    ELSE
+                        0
+                END AS avg_chaos
             FROM sales
             """
         )
@@ -910,16 +1068,21 @@ class Database:
         cursor = self.conn.execute(
             """
             SELECT
-                DATE (COALESCE (sold_at, listed_at)) AS day, COUNT (*) AS sale_count, COALESCE (
-                SUM (COALESCE (actual_price_chaos, listed_price_chaos)), 0
-                ) AS total_chaos, CASE WHEN COUNT (*) > 0 THEN
-                COALESCE (
-                AVG (COALESCE (actual_price_chaos, listed_price_chaos)), 0
-                )
-                ELSE
-                0
-            END
-            AS avg_chaos
+                DATE(COALESCE(sold_at, listed_at)) AS day,
+                COUNT(*) AS sale_count,
+                COALESCE(
+                    SUM(COALESCE(actual_price_chaos, listed_price_chaos)),
+                    0
+                ) AS total_chaos,
+                CASE
+                    WHEN COUNT(*) > 0 THEN
+                        COALESCE(
+                            AVG(COALESCE(actual_price_chaos, listed_price_chaos)),
+                            0
+                        )
+                    ELSE
+                        0
+                END AS avg_chaos
             FROM sales
             WHERE COALESCE(sold_at, listed_at) >= DATE('now', ?)
             GROUP BY DATE(COALESCE(sold_at, listed_at))
@@ -928,6 +1091,7 @@ class Database:
             (f"-{int(days)} days",),
         )
         return list(cursor.fetchall())
+
     def wipe_all_data(self) -> None:
         """
         Delete all rows from the main data tables.
@@ -937,14 +1101,19 @@ class Database:
             - table structure
 
         Effectively resets the app's data: checked items, sales, price history,
-        plugin state.
+        price checks/quotes, plugin state.
         """
-        logger.warning("Wiping all database data (checked_items, sales, price_history, plugin_state).")
+        logger.warning(
+            "Wiping all database data (checked_items, sales, price_history, "
+            "price_checks, price_quotes, plugin_state)."
+        )
 
         with self.transaction() as conn:
             conn.execute("DELETE FROM checked_items")
             conn.execute("DELETE FROM sales")
             conn.execute("DELETE FROM price_history")
+            conn.execute("DELETE FROM price_checks")
+            conn.execute("DELETE FROM price_quotes")
             conn.execute("DELETE FROM plugin_state")
 
         # Optional: shrink file; safe but may be slow on huge DBs
@@ -957,12 +1126,14 @@ class Database:
         """Perform SQLite VACUUM for file-size maintenance."""
         self.conn.execute("VACUUM")
         self.conn.commit()
+
     def close(self) -> None:
         """Close the underlying SQLite connection."""
         try:
             self.conn.close()
         except Exception as exc:
             logger.error(f"Error closing database connection: {exc}")
+
 
 if __name__ == "__main__":  # pragma: no cover
     print("=== Database Smoke Test ===")

@@ -32,12 +32,13 @@ class Config:
         "games": {
             "poe1": {
                 "league": "Standard",
-                "divine_chaos_rate": 1.0,
+                # 0.0 = "unknown", will fall back to poe.ninja or be set later
+                "divine_chaos_rate": 0.0,
                 "last_price_update": None,
             },
             "poe2": {
                 "league": "Standard",
-                "divine_chaos_rate": 1.0,
+                "divine_chaos_rate": 0.0,
                 "last_price_update": None,
             },
         },

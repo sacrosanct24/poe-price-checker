@@ -1,13 +1,15 @@
 # core/price_service.py
 from __future__ import annotations
 
-from typing import Any, List
 import logging
-
+from typing import Any, Optional
+from datetime import datetime
 from core.config import Config
 from core.item_parser import ItemParser
 from core.database import Database
+from core.game_version import GameVersion
 from data_sources.pricing.poe_ninja import PoeNinjaAPI
+from data_sources.pricing.trade_api import TradeApiSource
 
 LOG = logging.getLogger(__name__)
 
@@ -38,12 +40,14 @@ class PriceService:
         parser: ItemParser,
         db: Database,
         poe_ninja: PoeNinjaAPI | None,
+        trade_source: TradeApiSource | None = None,
         logger: logging.Logger | None = None,
     ) -> None:
         self.config = config
         self.parser = parser
         self.db = db
         self.poe_ninja = poe_ninja
+        self.trade_source = trade_source
         self.logger = logger or LOG
 
     # ------------------------------------------------------------------ #
@@ -56,6 +60,9 @@ class PriceService:
 
         - Parse the raw item text.
         - Use poe.ninja (or fallback) to get a chaos value and listing count.
+        - Optionally call Trade API for per-listing quotes.
+        - Persist a price_check + price_quotes snapshot.
+        - Compute a robust display price from recent stats.
         - Convert to the RESULT_COLUMNS shape used by the GUI.
         """
         item_text = (item_text or "").strip()
@@ -65,7 +72,7 @@ class PriceService:
         # 1) Parse item text → ParsedItem
         parsed = self.parser.parse(item_text)
 
-        # 2) Look up a price
+        # 2) Look up an aggregate price from poe.ninja
         chaos_value: float
         listing_count: int
         source_label: str
@@ -77,12 +84,57 @@ class PriceService:
             listing_count = 0
             source_label = "no poe.ninja (PoE2 or disabled)"
         else:
-            chaos_value, listing_count, source_label = self._lookup_price_with_poe_ninja(parsed)
+            chaos_value, listing_count, source_label = self._lookup_price_with_poe_ninja(
+                parsed
+            )
 
-        # 3) Divine conversion (if we can)
+        # 3) Optionally gather trade quotes
+        trade_quotes: list[dict[str, Any]] = []
+
+        if self.trade_source is not None:
+            try:
+                trade_quotes = self.trade_source.check_item(parsed, max_results=20)
+                self.logger.info(
+                    "PriceService.check_item: received %d trade quote(s) from TradeApiSource for %s",
+                    len(trade_quotes),
+                    getattr(parsed, "display_name", getattr(parsed, "name", "<unknown>")),
+                )
+            except Exception as exc:  # pragma: no cover - defensive
+                self.logger.warning(
+                    "PriceService.check_item: TradeApiSource.check_item failed: %s", exc
+                )
+                trade_quotes = []
+        else:
+            self.logger.info("PriceService.check_item: no trade_source configured; skipping")
+            trade_quotes = []
+
+        # 4) Persist this check + quotes (poe.ninja synthetic + trade)
+        try:
+            self._save_trade_quotes_for_check(parsed, trade_quotes, chaos_value)
+        except Exception as exc:  # pragma: no cover - defensive
+            self.logger.exception("Failed to save trade quotes: %s", exc)
+
+        # 5) Compute robust display price from latest stats (if any)
+        stats: Optional[dict[str, Any]] = None
+        try:
+            stats = self._get_latest_price_stats_for_item(parsed)
+        except Exception as exc:  # pragma: no cover - defensive
+            self.logger.exception("Failed to compute price stats: %s", exc)
+            stats = None
+
+        if stats is not None:
+            price_info = self.compute_display_price(stats)
+            rounded = price_info.get("rounded_price")
+            if rounded is not None:
+                chaos_value = float(rounded)
+                # Optionally enrich source_label with confidence
+                conf = price_info.get("confidence", "unknown")
+                source_label = f"{source_label} ({conf})"
+
+        # 6) Divine conversion (if we can)
         divine_value = self._convert_chaos_to_divines(chaos_value)
 
-        # 4) Build a single-row result list.
+        # 7) Build a single-row result list.
         row = {
             "item_name": self._get_item_display_name(parsed),
             "variant": self._get_item_variant(parsed),
@@ -95,7 +147,331 @@ class PriceService:
         return [row]
 
     # ------------------------------------------------------------------ #
-    # Internal helpers
+    # Price check / quote persistence
+    # ------------------------------------------------------------------ #
+
+    def _save_trade_quotes_for_check(
+            self,
+            parsed_item: Any,
+            trade_quotes: list[dict[str, Any]],
+            poe_ninja_chaos: float | None,
+    ) -> None:
+        """
+        Persist a price_check + associated price_quotes snapshot.
+
+        - Always writes one synthetic poe.ninja quote when poe_ninja_chaos > 0.
+        - Additionally writes any trade quotes we can convert to chaos.
+        """
+        game_version, league = self._resolve_game_and_league()
+
+        item_name = getattr(parsed_item, "display_name", None) or getattr(
+            parsed_item, "name", "<unknown>"
+        )
+        base_type = getattr(parsed_item, "base_type", None)
+
+        # 1) Insert price_check row using Database.create_price_check
+        price_check_id = self.db.create_price_check(
+            game_version=game_version,
+            league=league,
+            item_name=item_name,
+            item_base_type=base_type,
+            source="trade+poe.ninja",
+            query_hash=None,
+        )
+
+        self.logger.info(
+            "PriceService._save_trade_quotes_for_check: price_check_id=%s, "
+            "item_name=%s, league=%s, raw_trade_quotes=%d",
+            price_check_id,
+            item_name,
+            league,
+            len(trade_quotes),
+        )
+
+        rows_to_save: list[dict[str, Any]] = []
+        now_ts = datetime.utcnow().isoformat(timespec="seconds")
+
+        # 2) Synthetic poe.ninja quote (if available)
+        if poe_ninja_chaos and poe_ninja_chaos > 0:
+            rows_to_save.append(
+                {
+                    "price_check_id": price_check_id,
+                    "source": "poe_ninja",
+                    "price_chaos": float(poe_ninja_chaos),
+                    "original_currency": "chaos",
+                    "stack_size": 1,
+                    "listing_id": None,
+                    "seller_account": None,
+                    "listed_at": None,
+                    "fetched_at": now_ts,
+                }
+            )
+
+        # 3) Convert trade quotes into chaos
+        convertible = 0
+        skipped = 0
+
+        for q in trade_quotes:
+            curr = (q.get("original_currency") or "").lower()
+            amount = q.get("amount")
+
+            if amount is None:
+                skipped += 1
+                self.logger.debug("Skipping trade quote with missing amount: %r", q)
+                continue
+
+            chaos_price: float | None = None
+
+            if curr in {"chaos", "c"}:
+                chaos_price = float(amount)
+            elif curr in {"divine", "divine orb", "d"}:
+                if not getattr(self.poe_ninja, "divine_chaos_rate", None):
+                    self.logger.debug(
+                        "Skipping divine-quoted trade listing (no divine rate): %r", q
+                    )
+                    skipped += 1
+                    continue
+                chaos_price = float(amount) * float(self.poe_ninja.divine_chaos_rate)
+            else:
+                # Extend later with exalts etc.
+                self.logger.debug(
+                    "Skipping trade listing with unsupported currency '%s': %r",
+                    curr,
+                    q,
+                )
+                skipped += 1
+                continue
+
+            if chaos_price is None:
+                skipped += 1
+                continue
+
+            convertible += 1
+
+            rows_to_save.append(
+                {
+                    "price_check_id": price_check_id,
+                    "source": "trade",
+                    "price_chaos": chaos_price,
+                    "original_currency": curr,
+                    "stack_size": q.get("stack_size"),
+                    "listing_id": q.get("listing_id"),
+                    "seller_account": q.get("seller_account"),
+                    "listed_at": q.get("listed_at"),
+                    "fetched_at": now_ts,
+                }
+            )
+
+        self.logger.info(
+            "PriceService._save_trade_quotes_for_check: synthetic=%d, "
+            "trade_convertible=%d, trade_skipped=%d",
+            1 if poe_ninja_chaos and poe_ninja_chaos > 0 else 0,
+            convertible,
+            skipped,
+        )
+
+        # 4) Actually persist rows
+        if rows_to_save:
+            self.db.add_price_quotes_batch(rows_to_save)
+
+        self.logger.info(
+            "Saved %d price_quotes for %s (price_check_id=%s, league=%s)",
+            len(rows_to_save),
+            item_name,
+            price_check_id,
+            league,
+        )
+
+    def _get_latest_price_stats_for_item(self, parsed: Any) -> Optional[dict[str, Any]]:
+        """
+        Pull robust stats for the most recent price_check for this item
+        in the current game/league, using Database.get_latest_price_stats_for_item.
+        """
+        game_version, league = self._resolve_game_and_league()
+        if game_version is None or not league:
+            return None
+
+        item_name = self._get_item_display_name(parsed)
+        stats = self.db.get_latest_price_stats_for_item(
+            game_version=game_version,
+            league=league,
+            item_name=item_name,
+            days=2,
+        )
+        return stats
+
+    def _resolve_game_and_league(
+        self,
+    ) -> tuple[Optional[GameVersion], Optional[str]]:
+        """
+        Decide (game_version, league) using live sources first, config second.
+
+        Priority:
+          - game_version from config.current_game -> GameVersion
+          - league from poe_ninja.league if available
+          - else league from trade_source.league
+          - else config.games[current_game]["league"]
+          - else config.league (last resort)
+        """
+        # --- Game version ---
+        current_game_raw = getattr(self.config, "current_game", "poe1")
+        if isinstance(current_game_raw, GameVersion):
+            current_game_key = current_game_raw.value
+            game_version = current_game_raw
+        else:
+            current_game_key = str(current_game_raw or "poe1")
+            if current_game_key.lower() == "poe2":
+                game_version = GameVersion.POE2
+            else:
+                game_version = GameVersion.POE1
+
+        # --- League ---
+        league: Optional[str] = None
+
+        if self.poe_ninja is not None:
+            league = getattr(self.poe_ninja, "league", None) or league
+
+        if league is None and self.trade_source is not None:
+            league = getattr(self.trade_source, "league", None) or league
+
+        if league is None:
+            games_cfg = getattr(self.config, "games", {}) or {}
+            if isinstance(games_cfg, dict) and current_game_key in games_cfg:
+                game_cfg = games_cfg.get(current_game_key) or {}
+                league = game_cfg.get("league")
+
+        if league is None:
+            league = getattr(self.config, "league", None)
+
+        return game_version, league
+
+    # ------------------------------------------------------------------ #
+    # Display price policy (robust aggregation helper)
+    # ------------------------------------------------------------------ #
+
+    @staticmethod
+    def compute_display_price(stats: dict[str, Any]) -> dict[str, Any]:
+        """
+        Decide a robust display price and confidence level from price stats.
+
+        Expected keys in stats (from Database.get_price_stats_for_check):
+            - count
+            - min
+            - max
+            - mean
+            - median
+            - p25
+            - p75
+            - trimmed_mean
+            - stddev
+
+        Returns:
+            {
+                "display_price": Optional[float],  # raw center used
+                "rounded_price": Optional[float],  # nicely rounded for UI
+                "confidence": str,                 # "none" | "low" | "medium" | "high"
+                "reason": str,                     # human-readable explanation
+            }
+        """
+        count = stats.get("count") or 0
+        if count == 0:
+            return {
+                "display_price": None,
+                "rounded_price": None,
+                "confidence": "none",
+                "reason": "No listings found",
+            }
+
+        mean = stats.get("mean")
+        median = stats.get("median")
+        p25 = stats.get("p25")
+        p75 = stats.get("p75")
+        trimmed_mean = stats.get("trimmed_mean")
+        stddev = stats.get("stddev")
+
+        # --- Step 1: choose base center (trimmed_mean > median > mean) ---
+        if count >= 12 and trimmed_mean is not None:
+            base_price = float(trimmed_mean)
+            center_used = "trimmed_mean"
+        elif count >= 4 and median is not None:
+            base_price = float(median)
+            center_used = "median"
+        elif mean is not None:
+            base_price = float(mean)
+            center_used = "mean"
+        else:
+            # Fallback if somehow everything is None
+            return {
+                "display_price": None,
+                "rounded_price": None,
+                "confidence": "low",
+                "reason": "No valid price values",
+            }
+
+        # --- Step 2: relative spread metrics (IQR / median, stddev / mean) ---
+
+        def safe_ratio(num: Optional[float], den: Optional[float]) -> float:
+            if num is None or den is None:
+                return 0.0
+            try:
+                dn = float(den)
+            except (TypeError, ValueError):
+                return 0.0
+            if dn == 0:
+                return 0.0
+            return float(num) / dn
+
+        iqr: Optional[float] = None
+        if p25 is not None and p75 is not None:
+            iqr = float(p75) - float(p25)
+
+        iqr_ratio = safe_ratio(iqr, median)
+        cv = safe_ratio(stddev, mean)  # coefficient of variation
+
+        # --- Step 3: confidence heuristics ---
+        # Default
+        confidence = "low"
+        reason = f"{count} listings"
+
+        if count >= 20 and iqr_ratio <= 0.35 and cv <= 0.35:
+            confidence = "high"
+            reason = f"High sample size ({count}) with tight spread"
+        elif count >= 8 and iqr_ratio <= 0.6 and cv <= 0.6:
+            confidence = "medium"
+            reason = f"Moderate sample size ({count}) with acceptable spread"
+        else:
+            confidence = "low"
+            # If very noisy, note that in the reason
+            if iqr_ratio > 0.8 or cv > 0.8:
+                reason = f"Volatile prices ({count} listings, high spread)"
+            else:
+                reason = f"Limited or noisy data ({count} listings)"
+
+        # --- Step 4: rounding policy for display ---
+
+        raw = base_price
+        if raw >= 100:
+            # nearest 5c
+            rounded = round(raw / 5.0) * 5.0
+        elif raw >= 10:
+            # nearest 1c
+            rounded = round(raw)
+        elif raw >= 1:
+            # 1 decimal
+            rounded = round(raw, 1)
+        else:
+            # 2 decimals for very cheap items
+            rounded = round(raw, 2)
+
+        return {
+            "display_price": raw,
+            "rounded_price": rounded,
+            "confidence": confidence,
+            "reason": f"{reason} (center={center_used}, iqr_ratio={iqr_ratio:.2f}, cv={cv:.2f})",
+        }
+
+    # ------------------------------------------------------------------ #
+    # poe.ninja pricing helpers
     # ------------------------------------------------------------------ #
 
     def _lookup_price_with_poe_ninja(self, parsed: Any) -> tuple[float, int, str]:
@@ -135,7 +511,9 @@ class PriceService:
             return 0.0, 0, "poe.ninja error"
 
         if not price_data:
-            self.logger.info("poe.ninja: no price found for '%s' (rarity=%s)", item_name, rarity)
+            self.logger.info(
+                "poe.ninja: no price found for '%s' (rarity=%s)", item_name, rarity
+            )
             return 0.0, 0, "not found"
 
         chaos_raw = (
@@ -166,29 +544,60 @@ class PriceService:
     def _convert_chaos_to_divines(self, chaos_value: float) -> float:
         """
         Convert chaos to divines using, in order of preference:
-        - explicit rate on Config (config.divine_rate)
-        - poe.ninja's divine_chaos_rate, if non-trivial
-        """
-        # 1) Config override
-        rate = getattr(self.config, "divine_rate", None)
-        if rate:
-            try:
-                r = float(rate)
-            except (TypeError, ValueError):
-                r = 0.0
-            if r > 0:
-                return chaos_value / r
+        - explicit rate on Config (config.divine_rate OR per-game divine_chaos_rate)
+        - poe.ninja's divine_chaos_rate, via ensure_divine_rate()
 
-        # 2) poe.ninja divine/chaos rate
+        All rates are interpreted as "chaos per 1 divine".
+        If no sane rate is available, returns 0.0 so the UI can hide the
+        divine price.
+        """
+
+        def _normalize_rate(raw: Any) -> float:
+            """Return a usable chaos-per-divine rate or 0.0 if invalid / tiny."""
+            try:
+                r = float(raw)
+            except (TypeError, ValueError):
+                return 0.0
+            # Realistically, 1 divine should cost more than single-digit chaos.
+            return r if r > 10.0 else 0.0
+
+        # 1) Top-level config override (if you ever add one)
+        rate = _normalize_rate(getattr(self.config, "divine_rate", None))
+        if rate > 0:
+            return chaos_value / rate
+
+        # 2) Per-game config: games[current_game]["divine_chaos_rate"]
+        try:
+            current_game = getattr(self.config, "current_game", None)
+            games = getattr(self.config, "games", {}) or {}
+            if isinstance(games, dict):
+                if isinstance(current_game, GameVersion):
+                    game_key = current_game.value
+                else:
+                    game_key = str(current_game or "poe1")
+                if game_key in games:
+                    game_cfg = games.get(game_key) or {}
+                    rate = _normalize_rate(game_cfg.get("divine_chaos_rate"))
+                    if rate > 0:
+                        return chaos_value / rate
+        except Exception:
+            # Config structure weird? Just skip to poe.ninja fallback.
+            pass
+
+        # 3) poe.ninja divine/chaos rate
         if self.poe_ninja is not None:
             try:
-                r = float(getattr(self.poe_ninja, "divine_chaos_rate", 0.0))
-            except (TypeError, ValueError):
-                r = 0.0
-            if r > 0:
-                return chaos_value / r
+                # This will fetch and cache the rate on first use
+                raw_rate = self.poe_ninja.ensure_divine_rate()
+            except AttributeError:
+                # Older PoeNinjaAPI without ensure_divine_rate
+                raw_rate = getattr(self.poe_ninja, "divine_chaos_rate", 0.0)
 
-        # 3) Fallback: unknown
+            rate = _normalize_rate(raw_rate)
+            if rate > 0:
+                return chaos_value / rate
+
+        # 4) Fallback: unknown → hide divine price
         return 0.0
 
     # ------------------------------------------------------------------ #
@@ -280,6 +689,10 @@ class PriceService:
                 except (TypeError, ValueError):
                     return str(val)
         return "0"
+
+    # ------------------------------------------------------------------ #
+    # poe.ninja currency helper
+    # ------------------------------------------------------------------ #
 
     def _lookup_currency_price(self, item_name: str) -> tuple[float, int, str]:
         """
