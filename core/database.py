@@ -173,7 +173,31 @@ class Database:
                     plugin_name TEXT PRIMARY KEY,
                     enabled BOOLEAN,
                     config_json TEXT
+                );                
+                CREATE TABLE IF NOT EXISTS price_checks (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    game_version TEXT NOT NULL,
+                    league TEXT NOT NULL,
+                    item_name TEXT NOT NULL,
+                    item_base_type TEXT,
+                    checked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    source TEXT,                 -- e.g. "poe_trade", "poe_ninja"
+                    query_hash TEXT              -- optional deterministic hash of query params
                 );
+
+                CREATE TABLE IF NOT EXISTS price_quotes (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    price_check_id INTEGER NOT NULL REFERENCES price_checks(id) ON DELETE CASCADE,
+                    source TEXT NOT NULL,        -- which endpoint / plugin
+                    price_chaos REAL NOT NULL,   -- normalized to chaos
+                    original_currency TEXT,      -- e.g. "chaos", "divine"
+                    stack_size INTEGER,
+                    listing_id TEXT,             -- API listing id if any
+                    seller_account TEXT,
+                    listed_at TIMESTAMP,         -- listing’s own timestamp if available
+                    fetched_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+
                 """
             )
 
@@ -182,7 +206,9 @@ class Database:
         Migration path between schema versions.
 
         v1 -> v2:
-            - Add `source` column to `sales` to record where the sale came from.
+            - Add `source` column to `sales`.
+        v2 -> v3:
+            - Add `price_checks` + `price_quotes` tables for raw price data.
         """
         logger.info(f"Starting schema migration v{old} → v{new}")
 
@@ -191,10 +217,38 @@ class Database:
                 logger.info("Applying v2 migration: adding `source` column to `sales`.")
                 conn.execute("ALTER TABLE sales ADD COLUMN source TEXT;")
 
-        # Record final schema version
+            if old < 3 <= new:
+                logger.info("Applying v3 migration: creating price_checks and price_quotes tables.")
+                conn.executescript(
+                    """
+                    CREATE TABLE IF NOT EXISTS price_checks (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        game_version TEXT NOT NULL,
+                        league TEXT NOT NULL,
+                        item_name TEXT NOT NULL,
+                        item_base_type TEXT,
+                        checked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        source TEXT,
+                        query_hash TEXT
+                    );
+
+                    CREATE TABLE IF NOT EXISTS price_quotes (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        price_check_id INTEGER NOT NULL REFERENCES price_checks(id) ON DELETE CASCADE,
+                        source TEXT NOT NULL,
+                        price_chaos REAL NOT NULL,
+                        original_currency TEXT,
+                        stack_size INTEGER,
+                        listing_id TEXT,
+                        seller_account TEXT,
+                        listed_at TIMESTAMP,
+                        fetched_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    );
+                    """
+                )
+
         self._set_schema_version(new)
         logger.info(f"Schema migration complete. Now at v{new}.")
-
 
     # ----------------------------------------------------------------------
     # Timestamp helpers
@@ -497,6 +551,113 @@ class Database:
         )
         self.conn.commit()
         return cursor.lastrowid
+    def create_price_check(
+        self,
+        game_version: GameVersion,
+        league: str,
+        item_name: str,
+        item_base_type: str | None,
+        source: str | None = None,
+        query_hash: str | None = None,
+    ) -> int:
+        """
+        Insert a new price_checks row and return its ID.
+        """
+        cursor = self.conn.execute(
+            """
+            INSERT INTO price_checks (
+                game_version,
+                league,
+                item_name,
+                item_base_type,
+                source,
+                query_hash
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                game_version.value,
+                league,
+                item_name,
+                item_base_type,
+                source,
+                query_hash,
+            ),
+        )
+        self.conn.commit()
+        return int(cursor.lastrowid)
+
+    def add_price_quotes_batch(
+        self,
+        price_check_id: int,
+        quotes: List[Dict[str, Any]],
+    ) -> None:
+        """
+        Insert a batch of raw price quotes for a given price_check_id.
+
+        Each quote dict may contain:
+            - source (str)
+            - price_chaos (float)
+            - original_currency (str)
+            - stack_size (int)
+            - listing_id (str)
+            - seller_account (str)
+            - listed_at (str or datetime)
+        """
+        rows: list[tuple[Any, ...]] = []
+
+        for q in quotes:
+            source = q.get("source") or "unknown"
+            price_chaos = q.get("price_chaos")
+            if price_chaos is None:
+                # Skip invalid rows rather than failing the whole batch
+                continue
+
+            original_currency = q.get("original_currency")
+            stack_size = q.get("stack_size")
+            listing_id = q.get("listing_id")
+            seller_account = q.get("seller_account")
+            listed_at = q.get("listed_at")
+
+            # Normalize listed_at to string if it's a datetime
+            if isinstance(listed_at, datetime):
+                listed_at_str = listed_at.isoformat(timespec="seconds")
+            else:
+                listed_at_str = listed_at
+
+            rows.append(
+                (
+                    price_check_id,
+                    source,
+                    float(price_chaos),
+                    original_currency,
+                    stack_size,
+                    listing_id,
+                    seller_account,
+                    listed_at_str,
+                )
+            )
+
+        if not rows:
+            return
+
+        with self.transaction() as conn:
+            conn.executemany(
+                """
+                INSERT INTO price_quotes (
+                    price_check_id,
+                    source,
+                    price_chaos,
+                    original_currency,
+                    stack_size,
+                    listing_id,
+                    seller_account,
+                    listed_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                rows,
+            )
 
     def get_price_history(
         self,
