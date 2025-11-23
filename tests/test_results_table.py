@@ -27,7 +27,8 @@ def tk_root():
 
 
 def test_results_table_initialization(tk_root):
-    table = ResultsTable(tk_root)
+    frame = ttk.Frame(tk_root)
+    table = ResultsTable(frame, RESULT_COLUMNS)
     tree = table.tree
 
     # Verify all expected columns exist
@@ -38,7 +39,8 @@ def test_results_table_initialization(tk_root):
 
 
 def test_insert_rows_populates_tree_correctly(tk_root):
-    table = ResultsTable(tk_root)
+    frame = ttk.Frame(tk_root)
+    table = ResultsTable(frame, RESULT_COLUMNS)
 
     rows = [
         {
@@ -76,7 +78,8 @@ def test_insert_rows_populates_tree_correctly(tk_root):
 
 
 def test_autosize_columns_operates_within_bounds(tk_root):
-    table = ResultsTable(tk_root)
+    frame = ttk.Frame(tk_root)
+    table = ResultsTable(frame, RESULT_COLUMNS)
 
     rows = [
         {

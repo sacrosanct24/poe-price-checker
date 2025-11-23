@@ -217,13 +217,13 @@ def test_price_history_respects_days_parameter(temp_db):
     temp_db.conn.commit()
 
     last_7_days = temp_db.get_price_history(
-        item_name, GameVersion.POE1, "Standard", days=7
+        GameVersion.POE1, "Standard", item_name, days=7
     )
     assert len(last_7_days) == 1
     assert last_7_days[0]["chaos_value"] == 300.0
 
     last_30_days = temp_db.get_price_history(
-        item_name, GameVersion.POE1, "Standard", days=30
+        GameVersion.POE1, "Standard", item_name, days=30
     )
     assert len(last_30_days) == 2
 
@@ -252,7 +252,7 @@ def test_price_history_ordered_by_date_ascending(temp_db):
     temp_db.conn.commit()
 
     hist = temp_db.get_price_history(
-        item_name, GameVersion.POE1, "Standard", days=7
+        GameVersion.POE1, "Standard", item_name, days=7
     )
 
     assert len(hist) == 5

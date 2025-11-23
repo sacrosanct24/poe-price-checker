@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import logging
 from typing import Any, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from core.config import Config
 from core.item_parser import ItemParser
 from core.database import Database
@@ -189,7 +189,7 @@ class PriceService:
         )
 
         rows_to_save: list[dict[str, Any]] = []
-        now_ts = datetime.utcnow().isoformat(timespec="seconds")
+        now_ts = datetime.now(timezone.utc).isoformat(timespec="seconds")
 
         # 2) Synthetic poe.ninja quote (if available)
         if poe_ninja_chaos and poe_ninja_chaos > 0:

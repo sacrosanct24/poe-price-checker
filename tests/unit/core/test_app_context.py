@@ -21,4 +21,4 @@ def test_create_app_context_smoke() -> None:
     assert ctx.poe_ninja is not None
     assert ctx.price_service is not None
 
-    assert ctx.config.game_version in (GameVersion.POE1, GameVersion.POE2)
+    assert ctx.config.current_game in (GameVersion.POE1, GameVersion.POE2)

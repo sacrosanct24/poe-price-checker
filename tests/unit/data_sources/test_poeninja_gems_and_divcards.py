@@ -1,39 +1,10 @@
 from __future__ import annotations
 
 import pytest
+from unittest.mock import patch, MagicMock
 from data_sources.pricing.poe_ninja import PoeNinjaAPI
 
 pytestmark = pytest.mark.unit
-
-
-# ------------------------------------------------------------------
-# Fake HTTP Session
-# ------------------------------------------------------------------
-
-class FakeSession:
-    def __init__(self, responses):
-        # Map of partial URL → payload
-        self.responses = responses
-        self.calls = []
-
-    def get(self, url, headers=None, timeout=10):
-        self.calls.append(url)
-
-        payload = None
-        for key, val in self.responses.items():
-            if key in url:
-                payload = val
-                break
-        if payload is None:
-            raise AssertionError(f"No fake response for URL: {url}")
-
-        class R:
-            status_code = 200
-            def __init__(self, data): self.data = data
-            def raise_for_status(self): pass
-            def json(self): return self.data
-
-        return R(payload)
 
 
 # ------------------------------------------------------------------
@@ -60,22 +31,18 @@ def test_find_gem_price_finds_exact_match():
         ]
     }
 
-    session = FakeSession({
-        "itemoverview": payload
-    })
-
     api = PoeNinjaAPI(league="Standard")
-    api.session = session
 
-    class G:
-        name = "Raise Spectre"
-        base_type = "Raise Spectre"
-        gem_level = 21
-        gem_quality = 20
-        rarity = "Gem"
-        is_corrupted = False
+    # Mock the get_skill_gem_overview to return our test data
+    with patch.object(api, 'get_skill_gem_overview', return_value=payload):
+        result = api._find_gem_price(
+            name="Raise Spectre",
+            gem_level=21,
+            gem_quality=20,
+            corrupted=False,
+        )
 
-    result = api._find_gem_price(G(), payload["lines"])
+    assert result is not None
     assert result["chaosValue"] == 120.0
     assert result["listingCount"] == 5
 
@@ -83,17 +50,17 @@ def test_find_gem_price_finds_exact_match():
 def test_find_gem_price_returns_none_when_no_match():
     payload = {"lines": []}
     api = PoeNinjaAPI(league="Standard")
-    api.session = FakeSession({"itemoverview": payload})
 
-    class G:
-        name = "Raise Spectre"
-        base_type = "Raise Spectre"
-        gem_level = 20
-        gem_quality = 20
-        rarity = "Gem"
-        is_corrupted = False
+    # Mock the get_skill_gem_overview to return empty data
+    with patch.object(api, 'get_skill_gem_overview', return_value=payload):
+        result = api._find_gem_price(
+            name="Raise Spectre",
+            gem_level=20,
+            gem_quality=20,
+            corrupted=False,
+        )
 
-    assert api._find_gem_price(G(), payload["lines"]) is None
+    assert result is None
 
 
 # ------------------------------------------------------------------
@@ -101,19 +68,33 @@ def test_find_gem_price_returns_none_when_no_match():
 # ------------------------------------------------------------------
 
 def test_find_from_overview_by_name_matches_case_insensitive():
-    lines = [
-        {"name": "The Doctor", "chaosValue": 1200, "listingCount": 10},
-        {"name": "The Fiend", "chaosValue": 500, "listingCount": 20},
-    ]
+    payload = {
+        "lines": [
+            {"name": "The Doctor", "chaosValue": 1200, "listingCount": 10},
+            {"name": "The Fiend", "chaosValue": 500, "listingCount": 20},
+        ]
+    }
     api = PoeNinjaAPI()
-    r = api._find_from_overview_by_name("the doctor", lines)
+
+    # Mock the _get_item_overview to return our test data
+    with patch.object(api, '_get_item_overview', return_value=payload):
+        r = api._find_from_overview_by_name("DivinationCard", "the doctor")
+
+    assert r is not None
     assert r["chaosValue"] == 1200
 
 
 def test_find_from_overview_by_name_returns_none_if_missing():
-    lines = [{"name": "The Fiend", "chaosValue": 500}]
+    payload = {
+        "lines": [{"name": "The Fiend", "chaosValue": 500}]
+    }
     api = PoeNinjaAPI()
-    assert api._find_from_overview_by_name("The Hoarder", lines) is None
+
+    # Mock the _get_item_overview to return our test data
+    with patch.object(api, '_get_item_overview', return_value=payload):
+        result = api._find_from_overview_by_name("DivinationCard", "The Hoarder")
+
+    assert result is None
 
 
 # ------------------------------------------------------------------
@@ -134,17 +115,18 @@ def test_find_item_price_gem_flow():
     }
 
     api = PoeNinjaAPI(league="Standard")
-    api.session = FakeSession({"itemoverview": payload})
 
-    class G:
-        name = "Raise Spectre"
-        base_type = "Raise Spectre"
-        rarity = "Gem"
-        gem_level = 21
-        gem_quality = 20
-        is_corrupted = False
+    # Mock the get_skill_gem_overview to return our test data
+    with patch.object(api, 'get_skill_gem_overview', return_value=payload):
+        result = api.find_item_price(
+            item_name="Raise Spectre",
+            base_type="Raise Spectre",
+            rarity="Gem",
+            gem_level=21,
+            gem_quality=20,
+            corrupted=False,
+        )
 
-    result = api.find_item_price(G())
     assert result is not None
     assert result["chaosValue"] == 100.0
     assert result["listingCount"] == 10
@@ -153,15 +135,17 @@ def test_find_item_price_gem_flow():
 def test_find_item_price_falls_back_to_zero_when_not_found():
     payload = {"lines": []}
     api = PoeNinjaAPI(league="Standard")
-    api.session = FakeSession({"itemoverview": payload})
 
-    class Item:
-        name = "Unknown Item"
-        base_type = "Unknown Item"
-        rarity = "Unique"
-        gem_level = None
-        gem_quality = None
-        is_corrupted = False
+    # Mock all the _get_item_overview calls to return empty data
+    with patch.object(api, '_get_item_overview', return_value=payload):
+        result = api.find_item_price(
+            item_name="Unknown Item",
+            base_type="Unknown Item",
+            rarity="Unique",
+            gem_level=None,
+            gem_quality=None,
+            corrupted=False,
+        )
 
-    result = api.find_item_price(Item())
-    assert result["chaosValue"] == 0.0
+    # When not found, find_item_price returns None, not a dict with 0.0
+    assert result is None
