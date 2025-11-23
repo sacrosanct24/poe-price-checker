@@ -54,6 +54,10 @@ class Database:
             db_path = Path.home() / ".poe_price_checker" / "data.db"
 
         self.db_path = db_path
+
+        # Ensure parent directory exists
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+
         self.conn = sqlite3.connect(str(db_path), check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
 
