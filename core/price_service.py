@@ -272,7 +272,8 @@ class PriceService:
 
         # 4) Actually persist rows
         if rows_to_save:
-            self.db.add_price_quotes_batch(rows_to_save)
+            # FIX: pass price_check_id explicitly as required by Database.add_price_quotes_batch
+            self.db.add_price_quotes_batch(price_check_id, rows_to_save)
 
         self.logger.info(
             "Saved %d price_quotes for %s (price_check_id=%s, league=%s)",
@@ -281,7 +282,6 @@ class PriceService:
             price_check_id,
             league,
         )
-
     def _get_latest_price_stats_for_item(self, parsed: Any) -> Optional[dict[str, Any]]:
         """
         Pull robust stats for the most recent price_check for this item

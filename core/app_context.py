@@ -19,6 +19,7 @@ from core.price_multi import (
 from core.derived_sources import UndercutPriceSource
 from data_sources.pricing.trade_api import PoeTradeClient, TradeApiSource
 
+
 @dataclass
 class AppContext:
     """
@@ -54,8 +55,8 @@ def create_app_context() -> AppContext:
         poe_ninja = PoeNinjaAPI(league=game_cfg.league)
 
         # Optionally auto-detect the active temp league via poe.ninja
+        logger = logging.getLogger(__name__)
         if config.auto_detect_league:
-            logger = logging.getLogger(__name__)
             try:
                 detected = poe_ninja.detect_current_league()
             except Exception as exc:
@@ -80,39 +81,15 @@ def create_app_context() -> AppContext:
                     poe_ninja.league = detected
 
     # ------------------------------------------------------------------
-    # Base single-source price service (existing implementation)
+    # Trade API source (PoE1 only) – wired into PriceService
     # ------------------------------------------------------------------
-    price_logger = logging.getLogger("poe_price_checker.price_service")
-    base_price_service = PriceService(
-        config=config,
-        parser=parser,
-        db=db,
-        poe_ninja=poe_ninja,
-        logger=price_logger,
-    )
-
-    # ------------------------------------------------------------------
-    # Multi-source aggregation layer
-    # ------------------------------------------------------------------
-    base_source: PriceSource = ExistingServiceAdapter(
-        name="poe_ninja",
-        service=base_price_service,
-    )
-
-    sources: list[PriceSource] = [base_source]
-
-    # Synthetic “derived” source: suggested undercut price based on poe_ninja
-    undercut_source: PriceSource = UndercutPriceSource(
-        name="suggested_undercut",
-        base_service=base_price_service,
-        undercut_factor=0.9,  # 10% under poe_ninja by default
-    )
-    sources.append(undercut_source)
-
+    trade_source: TradeApiSource | None = None
     if game == GameVersion.POE1:
         trade_logger = logging.getLogger("poe_price_checker.trade_api")
-        trade_client = PoeTradeClient(logger=trade_logger)
-
+        trade_client = PoeTradeClient(
+            league=game_cfg.league,
+            logger=trade_logger,
+        )
         trade_source = TradeApiSource(
             name="trade_api",
             client=trade_client,
@@ -120,8 +97,45 @@ def create_app_context() -> AppContext:
             logger=trade_logger,
         )
 
-        # NOTE: still a stub until Trade API is implemented
-        sources.append(trade_source)
+    # ------------------------------------------------------------------
+    # Base single-source price service (existing implementation)
+    # Now owns poe.ninja + trade integration.
+    # ------------------------------------------------------------------
+    price_logger = logging.getLogger("poe_price_checker.price_service")
+    base_price_service = PriceService(
+        config=config,
+        parser=parser,
+        db=db,
+        poe_ninja=poe_ninja,
+        trade_source=trade_source,  # <— IMPORTANT: hook in TradeApiSource
+        logger=price_logger,
+    )
+
+    # ------------------------------------------------------------------
+    # Multi-source aggregation layer
+    # ------------------------------------------------------------------
+    # Wrap the existing PriceService as a PriceSource. This "main" source
+    # already uses poe.ninja + trade quotes + DB stats internally.
+    base_source: PriceSource = ExistingServiceAdapter(
+        name="poe_ninja",  # logical source label for the main row
+        service=base_price_service,
+    )
+
+    sources: list[PriceSource] = [base_source]
+
+    # Synthetic “derived” source: suggested undercut price based on the
+    # main price service output.
+    undercut_source: PriceSource = UndercutPriceSource(
+        name="suggested_undercut",
+        base_service=base_price_service,
+        undercut_factor=0.9,  # 10% under poe_ninja by default
+    )
+    sources.append(undercut_source)
+
+    # NOTE: We do *not* add TradeApiSource directly as a separate PriceSource
+    # here. Instead, PriceService uses it internally to enrich poe.ninja
+    # stats and DB history. Later, if we want a "raw trade listings" source,
+    # we can wrap TradeApiSource in its own PriceSource adapter.
 
     multi_price_service = MultiSourcePriceService(sources=sources)
 
