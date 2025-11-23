@@ -33,6 +33,11 @@ env/
 *.swo
 *~
 
+# Continue AI - exclude local cache, keep config
+.continue/index/
+.continue/*.sqlite
+.continue/.continue.json
+
 # OS
 .DS_Store
 Thumbs.db

@@ -1,0 +1,99 @@
+{
+  "models": [
+    {
+      "title": "Claude 3.5 Sonnet",
+      "provider": "anthropic",
+      "model": "claude-3-5-sonnet-20241022",
+      "apiKey": ""
+    }
+  ],
+  "tabAutocompleteModel": {
+    "title": "Starcoder 7b",
+    "provider": "ollama",
+    "model": "starcoder2:7b"
+  },
+  "embeddingsProvider": {
+    "provider": "transformers.js"
+  },
+  "contextProviders": [
+    {
+      "name": "code",
+      "params": {}
+    },
+    {
+      "name": "docs",
+      "params": {}
+    },
+    {
+      "name": "diff",
+      "params": {}
+    },
+    {
+      "name": "terminal",
+      "params": {}
+    },
+    {
+      "name": "problems",
+      "params": {}
+    },
+    {
+      "name": "folder",
+      "params": {}
+    },
+    {
+      "name": "codebase",
+      "params": {}
+    }
+  ],
+  "slashCommands": [
+    {
+      "name": "edit",
+      "description": "Edit code in the current file"
+    },
+    {
+      "name": "comment",
+      "description": "Write comments for highlighted code"
+    },
+    {
+      "name": "share",
+      "description": "Export this session as markdown"
+    },
+    {
+      "name": "cmd",
+      "description": "Generate a shell command"
+    },
+    {
+      "name": "commit",
+      "description": "Generate a commit message"
+    }
+  ],
+  "customCommands": [
+    {
+      "name": "test",
+      "prompt": "Write unit tests for the highlighted code using pytest. Follow the patterns in the tests/ directory.",
+      "description": "Generate pytest tests"
+    },
+    {
+      "name": "docs",
+      "prompt": "Generate comprehensive documentation for this code following the style in docs/. Include examples and explain the architecture.",
+      "description": "Generate documentation"
+    },
+    {
+      "name": "review",
+      "prompt": "Review this code for:\n- Bugs and edge cases\n- Performance issues\n- Code style and best practices\n- Type hints and documentation\nProvide specific, actionable feedback.",
+      "description": "Code review"
+    },
+    {
+      "name": "plugin",
+      "prompt": "Help me create a plugin following the PLUGIN_SPEC.md. Generate the boilerplate and explain how to implement the required interfaces.",
+      "description": "Create plugin boilerplate"
+    }
+  ],
+  "allowAnonymousTelemetry": false,
+  "docs": [
+    {
+      "title": "Project Documentation",
+      "startUrl": "https://github.com/yourusername/poe-price-checker/tree/main/docs"
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "env": {
+    "PYTHONPATH": "${workspaceFolder}"
+  },
+  "python.testing.pytestEnabled": true,
+  "python.testing.unittestEnabled": false,
+  "python.linting.enabled": true,
+  "python.linting.pylintEnabled": false,
+  "python.linting.flake8Enabled": true,
+  "python.formatting.provider": "black"
+}

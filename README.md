@@ -1,18 +1,3 @@
-Great — with the docs centralized, we can now rewrite a **clean, professional, modern README.md** for the root of your repo.
-
-This README will be:
-
-* **Short** and **high-signal**
-* Designed for **GitHub visitors**
-* Points directly to `/docs/`
-* Shows your project as a serious engineering portfolio piece
-* Includes polished badges + structure
-
-Below is the full replacement README.
-You can copy-paste it directly into `README.md`.
-
----
-
 # 📦 PoE Price Checker
 
 *A modern multi-source economy tool for Path of Exile (PoE1 + PoE2)*
@@ -21,6 +6,7 @@ You can copy-paste it directly into `README.md`.
 ![Tests](https://img.shields.io/badge/tests-passing-brightgreen?logo=pytest)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey)
 ![License](https://img.shields.io/badge/license-MIT-green)
+![Continue](https://img.shields.io/badge/AI-Continue%20enabled-purple?logo=ai)
 
 PoE Price Checker is a fully-featured desktop application for pricing Path of Exile items using **multiple sources**, a **modern parser**, **sales tracking**, and a **plugin system**.
 Designed as an **over-engineered portfolio project**, it showcases clean architecture, strong testing, and extensibility.
@@ -84,6 +70,12 @@ Runs with GUI on all major OSes.
 pytest
 ```
 
+### 4. (Optional) Setup Continue AI Assistant in PyCharm
+
+This project includes [Continue](https://continue.dev) configuration for AI-assisted development.
+
+👉 See **[PYCHARM_SETUP.md](docs/PYCHARM_SETUP.md)** for setup instructions.
+
 ---
 
 # 📚 Project Documentation
@@ -93,6 +85,7 @@ All documentation now lives under the `docs/` folder:
 ### **Architecture & Development**
 
 * [DEVELOPMENT_GUIDE.md](docs/DEVELOPMENT_GUIDE.md)
+* [PYCHARM_SETUP.md](docs/PYCHARM_SETUP.md) - AI assistant setup
 
 ### **Plugin API**
 
@@ -126,6 +119,7 @@ poe-price-checker/
 ├── docs/                # All documentation
 ├── tests/               # Unit + integration tests
 │
+├── .continue/           # Continue AI assistant configuration
 └── poe_price_checker.py # Application entrypoint
 ```
 
@@ -160,14 +154,3 @@ When contributing:
 # 📄 License
 
 This project is licensed under the **MIT License**.
-
----
-
-If you'd like, I can also:
-
-✅ Add a screenshot / GIF section
-✅ Add a badges row for code coverage + CI
-✅ Generate a CONTRIBUTING.md
-✅ Create a minimal CHANGELOG.md
-
-Just tell me what you want next.
