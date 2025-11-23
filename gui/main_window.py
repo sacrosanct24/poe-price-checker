@@ -26,6 +26,7 @@ from typing import Any, Iterable, Mapping, TYPE_CHECKING, Callable
 
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
+from tkinter import messagebox
 from urllib.parse import quote_plus  # currently unused but kept for future URL tweaks
 
 from gui.recent_sales_window import RecentSalesWindow
@@ -660,6 +661,46 @@ class PriceCheckerGUI:
         logger.setLevel(logging.INFO)
         return logger
 
+    def _on_wipe_database(self) -> None:
+        """
+        Prompt the user and, if confirmed, wipe all data tables via Database.wipe_all_data.
+        """
+        msg = (
+            "This will delete ALL saved data:\n\n"
+            "  • Checked items\n"
+            "  • Sales history\n"
+            "  • Price history snapshots\n"
+            "  • Plugin state\n\n"
+            "This cannot be undone.\n\n"
+            "Are you sure you want to wipe the database?"
+        )
+        if not messagebox.askyesno("Wipe Database", msg, parent=self.root):
+            return
+
+        try:
+            self.ctx.db.wipe_all_data()
+        except Exception as exc:
+            self.logger.exception("Failed to wipe database: %s", exc)
+            messagebox.showerror(
+                "Error",
+                f"Failed to wipe database.\n\n{exc}",
+                parent=self.root,
+            )
+            return
+
+        # Clear UI state as well
+        try:
+            self._clear_results_table()
+        except Exception:
+            pass
+
+        self._set_status("Database wiped: all data cleared.")
+        messagebox.showinfo(
+            "Database Wiped",
+            "All database tables have been cleared.",
+            parent=self.root,
+        )
+
     def _open_recent_sales_window(self) -> None:
         """Open (or focus) the Recent Sales panel."""
         if self._recent_sales_window is not None and self._recent_sales_window.winfo_exists():
@@ -705,6 +746,11 @@ class PriceCheckerGUI:
         file_menu.add_separator()
         file_menu.add_command(label="Export TSV...", command=self._export_results_tsv)
         file_menu.add_command(label="Copy All Rows as TSV", command=self._copy_all_rows_as_tsv)
+        file_menu.add_separator()
+        file_menu.add_command(
+            label="Wipe Database…",
+            command=self._on_wipe_database,
+        )
         file_menu.add_separator()
         file_menu.add_command(label="Exit", command=self.root.quit)
         self.menubar.add_cascade(label="File", menu=file_menu)

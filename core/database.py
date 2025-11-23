@@ -36,7 +36,7 @@ class Database:
     """
 
     # Current schema version. Increment if schema structure changes.
-    SCHEMA_VERSION = 1
+    SCHEMA_VERSION = 2
 
     def __init__(self, db_path: Optional[Path] = None):
         """
@@ -142,11 +142,12 @@ class Database:
                     checked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
 
-                CREATE TABLE IF NOT EXISTS sales (
+                                CREATE TABLE IF NOT EXISTS sales (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     item_id INTEGER,
                     item_name TEXT NOT NULL,
                     item_base_type TEXT,
+                    source TEXT,
                     listed_price_chaos REAL NOT NULL,
                     listed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     sold_at TIMESTAMP,
@@ -155,6 +156,7 @@ class Database:
                     relisted BOOLEAN DEFAULT 0,
                     notes TEXT
                 );
+
 
                 CREATE TABLE IF NOT EXISTS price_history (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -178,10 +180,21 @@ class Database:
     def _migrate_schema(self, old: int, new: int) -> None:
         """
         Migration path between schema versions.
-        Placeholder: current schema is v1, so nothing to migrate yet.
+
+        v1 -> v2:
+            - Add `source` column to `sales` to record where the sale came from.
         """
-        logger.info(f"No migrations needed for v{old} → v{new}.")
+        logger.info(f"Starting schema migration v{old} → v{new}")
+
+        with self.transaction() as conn:
+            if old < 2 <= new:
+                logger.info("Applying v2 migration: adding `source` column to `sales`.")
+                conn.execute("ALTER TABLE sales ADD COLUMN source TEXT;")
+
+        # Record final schema version
         self._set_schema_version(new)
+        logger.info(f"Schema migration complete. Now at v{new}.")
+
 
     # ----------------------------------------------------------------------
     # Timestamp helpers
@@ -298,13 +311,13 @@ class Database:
         return cursor.lastrowid
 
     def record_instant_sale(
-        self,
-        item_name: str,
-        chaos_value: float | None = None,
-        item_base_type: str | None = None,
-        notes: str | None = None,
-        source: str | None = None,
-        price_chaos: float | None = None,
+            self,
+            item_name: str,
+            chaos_value: float | None = None,
+            item_base_type: str | None = None,
+            notes: str | None = None,
+            source: str | None = None,
+            price_chaos: float | None = None,
     ) -> int:
         """
         Convenience helper: record a sale where listing and sale happen
@@ -322,7 +335,7 @@ class Database:
             price_chaos: chaos value (new keyword used by GUI)
             item_base_type: optional base type
             notes: optional notes
-            source: accepted for API compatibility with GUI, not yet stored
+            source: where the sale came from (trade site, manual, loot, etc.)
         """
         # Support both chaos_value and price_chaos, prefer explicit chaos_value
         effective_chaos = chaos_value if chaos_value is not None else price_chaos
@@ -334,34 +347,33 @@ class Database:
 
         cursor = self.conn.execute(
             """
-            INSERT INTO sales (
-                item_id,
-                item_name,
-                item_base_type,
-                listed_price_chaos,
-                listed_at,
-                sold_at,
-                actual_price_chaos,
-                time_to_sale_hours,
-                relisted,
-                notes
-            )
-            VALUES (
-                NULL,
-                ?,
-                ?,
-                ?,
-                CURRENT_TIMESTAMP,
-                CURRENT_TIMESTAMP,
-                ?,
-                0.0,
-                0,
-                ?
-            )
+            INSERT INTO sales (item_id,
+                               item_name,
+                               item_base_type,
+                               source,
+                               listed_price_chaos,
+                               listed_at,
+                               sold_at,
+                               actual_price_chaos,
+                               time_to_sale_hours,
+                               relisted,
+                               notes)
+            VALUES (NULL,
+                    ?,
+                    ?,
+                    ?,
+                    ?,
+                    CURRENT_TIMESTAMP,
+                    CURRENT_TIMESTAMP,
+                    ?,
+                    0.0,
+                    0,
+                    ?)
             """,
             (
                 item_name,
                 item_base_type,
+                source,
                 effective_chaos,
                 effective_chaos,
                 notes,
@@ -587,15 +599,25 @@ class Database:
         stats["price_snapshots"] = cursor.fetchone()[0]
 
         return stats
-    def get_recent_sales(self, limit: int = 50) -> List[sqlite3.Row]:
+    def get_recent_sales(
+        self,
+        limit: int = 50,
+        search_text: str | None = None,
+        source: str | None = None,
+    ) -> List[sqlite3.Row]:
         """
-        Return the most recent sales rows ordered by most recent activity.
+        Return recent sales rows, ordered by most recent activity, with optional filters.
+
+        Filters:
+            search_text: case-insensitive substring match against
+                         item_name, item_base_type, source, notes
+            source: if provided and not blank/'All', filter by exact source
 
         Fields returned:
             id,
             item_name,
             item_base_type,
-            source        (currently blank, placeholder),
+            source,
             listed_at,
             sold_at,
             listed_price_chaos,
@@ -605,13 +627,39 @@ class Database:
             relisted,
             notes
         """
-        cursor = self.conn.execute(
-            """
+        clauses: list[str] = []
+        params: list[Any] = []
+
+        # Search filter
+        if search_text:
+            like = f"%{search_text.strip().lower()}%"
+            clauses.append(
+                """
+                (
+                    LOWER(item_name) LIKE ?
+                    OR LOWER(COALESCE(item_base_type, '')) LIKE ?
+                    OR LOWER(COALESCE(source, '')) LIKE ?
+                    OR LOWER(COALESCE(notes, '')) LIKE ?
+                )
+                """
+            )
+            params.extend([like, like, like, like])
+
+        # Source filter
+        if source and source.strip() and source.strip().lower() != "all":
+            clauses.append("source = ?")
+            params.append(source.strip())
+
+        where_sql = ""
+        if clauses:
+            where_sql = "WHERE " + " AND ".join(clauses)
+
+        sql = f"""
             SELECT
                 id,
                 item_name,
                 item_base_type,
-                '' AS source,  -- placeholder until we add a real source column
+                source,
                 listed_at,
                 sold_at,
                 listed_price_chaos,
@@ -621,12 +669,29 @@ class Database:
                 relisted,
                 notes
             FROM sales
+            {where_sql}
             ORDER BY COALESCE(sold_at, listed_at) DESC
             LIMIT ?
-            """,
-            (limit,),
-        )
+        """
+        params.append(limit)
+
+        cursor = self.conn.execute(sql, params)
         return list(cursor.fetchall())
+
+    def get_distinct_sale_sources(self) -> List[str]:
+        """
+        Return a list of distinct non-empty sources from the sales table,
+        sorted alphabetically.
+        """
+        cursor = self.conn.execute(
+            """
+            SELECT DISTINCT source
+            FROM sales
+            WHERE source IS NOT NULL AND TRIM(source) <> ''
+            ORDER BY source COLLATE NOCASE
+            """
+        )
+        return [row[0] for row in cursor.fetchall()]
 
     # ----------------------------------------------------------------------
     # Maintenance
@@ -702,6 +767,30 @@ class Database:
             (f"-{int(days)} days",),
         )
         return list(cursor.fetchall())
+    def wipe_all_data(self) -> None:
+        """
+        Delete all rows from the main data tables.
+
+        This preserves:
+            - schema_version entries
+            - table structure
+
+        Effectively resets the app's data: checked items, sales, price history,
+        plugin state.
+        """
+        logger.warning("Wiping all database data (checked_items, sales, price_history, plugin_state).")
+
+        with self.transaction() as conn:
+            conn.execute("DELETE FROM checked_items")
+            conn.execute("DELETE FROM sales")
+            conn.execute("DELETE FROM price_history")
+            conn.execute("DELETE FROM plugin_state")
+
+        # Optional: shrink file; safe but may be slow on huge DBs
+        try:
+            self.conn.execute("VACUUM")
+        except Exception as exc:  # non-fatal
+            logger.error(f"VACUUM after wipe_all_data failed: {exc}")
 
     def vacuum(self) -> None:
         """Perform SQLite VACUUM for file-size maintenance."""

@@ -160,9 +160,37 @@ class RecentSalesWindow(tk.Toplevel):
         self._load_sales_from_db()
 
     def _load_sales_from_db(self) -> None:
-        """Load rows from the database, refresh source list, and apply filters."""
+        """Load rows from the database using current filters, refresh sources, and sort."""
+        # Current filters
+        search_text = self.search_var.get().strip()
+        source_filter = self.source_var.get().strip()
+
+        # Normalize source filter for DB: "All Sources" => None
+        source_arg: Optional[str]
+        if not source_filter or source_filter == "All Sources":
+            source_arg = None
+        else:
+            source_arg = source_filter
+
+        # Refresh source dropdown from DB (global distinct list)
         try:
-            rows = self.db.get_recent_sales(limit=self.limit)
+            sources = self.db.get_distinct_sale_sources()
+        except Exception as exc:  # pragma: no cover - defensive
+            messagebox.showerror("Database Error", f"Failed to load sale sources:\n{exc}")
+            sources = []
+
+        values = ["All Sources"] + sources
+        self.source_combo["values"] = values
+        if self.source_var.get() not in values:
+            self.source_var.set("All Sources")
+
+        # Fetch rows from DB with filters applied
+        try:
+            rows = self.db.get_recent_sales(
+                limit=self.limit,
+                search_text=search_text or None,
+                source=source_arg,
+            )
         except Exception as exc:  # pragma: no cover - defensive
             messagebox.showerror("Database Error", f"Failed to load recent sales:\n{exc}")
             return
@@ -176,54 +204,24 @@ class RecentSalesWindow(tk.Toplevel):
 
         self._all_rows = normalized
 
-        # Update source dropdown
-        sources = sorted(
-            {str(r.get("source") or "").strip() for r in self._all_rows if (r.get("source") or "").strip()}
-        )
-        values = ["All Sources"]
-        values.extend(sources)
-        self.source_combo["values"] = values
-        if self.source_var.get() not in values:
-            self.source_var.set("All Sources")
-
+        # Sort + populate tree
         self._apply_filters_and_sort()
+
 
     def _on_filter_changed(self, _event: tk.Event | None = None) -> None:
-        self._apply_filters_and_sort()
+        # When search text or source changes, reload from DB with filters
+        self._load_sales_from_db()
 
     def _apply_filters_and_sort(self) -> None:
-        """Apply search + source filters, then sort, then repopulate the tree."""
-        search_text = self.search_var.get().strip().lower()
-        source_filter = self.source_var.get()
+        """Sort current rows and repopulate the tree."""
+        # DB has already applied search and source filters; we just sort.
+        rows = list(self._all_rows)
 
-        # Filter rows
-        filtered: List[Dict[str, Any]] = []
-        for row in self._all_rows:
-            # Source filter
-            if source_filter and source_filter != "All Sources":
-                if str(row.get("source") or "") != source_filter:
-                    continue
-
-            # Search filter
-            if search_text:
-                haystack = " ".join(
-                    [
-                        str(row.get("item_name") or ""),
-                        str(row.get("source") or ""),
-                        str(row.get("notes") or ""),
-                    ]
-                ).lower()
-                if search_text not in haystack:
-                    continue
-
-            filtered.append(row)
-
-        # Sort
         key_func = self._get_sort_key(self._sort_column)
-        filtered.sort(key=key_func, reverse=self._sort_reverse)
+        rows.sort(key=key_func, reverse=self._sort_reverse)
 
-        self._filtered_rows = filtered
-        self._populate_tree_from_rows(filtered)
+        self._filtered_rows = rows
+        self._populate_tree_from_rows(rows)
 
     # ------------------------------------------------------------------ Sorting
 
