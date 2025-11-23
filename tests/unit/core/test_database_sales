@@ -1,0 +1,36 @@
+import time
+from datetime import datetime
+from core.database import Database
+
+
+def test_get_recent_sales_returns_most_recent_first(tmp_path) -> None:
+    db_path = tmp_path / "test.db"
+    db = Database(db_path)
+
+    # Insert three sales with different sold_at times
+    db.record_instant_sale(
+        item_name="Old Item",
+        source="test",
+        price_chaos=1.0,
+        notes="old",
+    )
+    time.sleep(0.01)
+    db.record_instant_sale(
+        item_name="Mid Item",
+        source="test",
+        price_chaos=2.0,
+        notes="mid",
+    )
+    time.sleep(0.01)
+    db.record_instant_sale(
+        item_name="New Item",
+        source="test",
+        price_chaos=3.0,
+        notes="new",
+    )
+
+    rows = db.get_recent_sales(limit=2)
+    names = [row["item_name"] for row in rows]
+
+    # Most recent first, limited to 2 rows
+    assert names == ["New Item", "Mid Item"]

@@ -73,6 +73,64 @@ def test_complete_sale_FIXED(temp_db):
     assert sale['time_to_sale_hours'] >= 0
     assert sale['time_to_sale_hours'] < 1.0  # Should be just a fraction of a second
 
+import pytest
+from datetime import datetime, timedelta
+
+from core.database import Database
+
+
+def test_record_instant_sale_inserts_row_and_sets_expected_fields(tmp_path) -> None:
+    """
+    record_instant_sale should:
+    - Insert exactly one row into `sales`
+    - Set item_name, item_base_type, notes correctly
+    - Set listed_price_chaos and actual_price_chaos to the given chaos_value
+    - Set listed_at and sold_at to non-null, near-identical timestamps
+    - Set time_to_sale_hours to 0.0
+    """
+    db_path = tmp_path / "test_sales.db"
+    db = Database(db_path)
+
+    item_name = "Test Item of the Monkey"
+    base_type = "Fancy Base Type"
+    chaos_value = 123.0
+    notes = "Test instant sale"
+
+    sale_id = db.record_instant_sale(
+        item_name=item_name,
+        chaos_value=chaos_value,
+        item_base_type=base_type,
+        notes=notes,
+    )
+
+    # Fetch the row directly from SQLite
+    rows = db.conn.execute("SELECT * FROM sales").fetchall()
+    assert len(rows) == 1
+
+    row = rows[0]
+
+    # ID and basic fields
+    assert row["id"] == sale_id
+    assert row["item_name"] == item_name
+    assert row["item_base_type"] == base_type
+    assert row["notes"] == notes
+
+    # Prices
+    assert row["listed_price_chaos"] == pytest.approx(chaos_value)
+    assert row["actual_price_chaos"] == pytest.approx(chaos_value)
+
+    # Timestamps should be set and very close to each other
+    assert row["listed_at"] is not None
+    assert row["sold_at"] is not None
+
+    listed_at = datetime.fromisoformat(row["listed_at"])
+    sold_at = datetime.fromisoformat(row["sold_at"])
+
+    # Small tolerance in case of slight timing differences
+    assert abs((sold_at - listed_at).total_seconds()) < 2.0
+
+    # Time to sale should be exactly 0.0 for instant sale
+    assert row["time_to_sale_hours"] == pytest.approx(0.0)
 
 # Fix for: test_get_price_history_respects_days_parameter
 def test_get_price_history_respects_days_parameter_FIXED(temp_db):
@@ -250,6 +308,40 @@ def test_get_stats_counts_are_consistent(temp_db):
     assert stats["completed_sales"] == 1
     assert stats["price_snapshots"] == 3
 
+def test_record_instant_sale_updates_stats_counts(temp_db) -> None:
+    """
+    record_instant_sale should increment both:
+    - stats["sales"]
+    - stats["completed_sales"]
+
+    It should NOT affect checked_items or price_snapshots.
+    """
+    # Baseline stats from a fresh DB
+    stats_before = temp_db.get_stats()
+
+    assert stats_before["checked_items"] == 0
+    assert stats_before["sales"] == 0
+    assert stats_before["completed_sales"] == 0
+    assert stats_before["price_snapshots"] == 0
+
+    # Record a single instant sale
+    temp_db.record_instant_sale(
+        item_name="Instant Sale Item",
+        chaos_value=50.0,
+        item_base_type="Some Base",
+        notes="Recorded via record_instant_sale",
+    )
+
+    # Stats after the sale
+    stats_after = temp_db.get_stats()
+
+    # Checked items and price snapshots remain unchanged
+    assert stats_after["checked_items"] == stats_before["checked_items"] == 0
+    assert stats_after["price_snapshots"] == stats_before["price_snapshots"] == 0
+
+    # Sales and completed_sales should both increment by 1
+    assert stats_after["sales"] == stats_before["sales"] + 1
+    assert stats_after["completed_sales"] == stats_before["completed_sales"] + 1
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

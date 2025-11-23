@@ -296,6 +296,56 @@ class Database:
         )
         self.conn.commit()
         return cursor.lastrowid
+    def record_instant_sale(
+        self,
+        item_name: str,
+        chaos_value: float,
+        item_base_type: str | None = None,
+        notes: str | None = None,
+    ) -> int:
+        """
+        Convenience helper: record a sale where listing and sale happen
+        at essentially the same time.
+
+        This:
+        - Inserts into `sales` with listed_at = sold_at = CURRENT_TIMESTAMP
+        - Sets listed_price_chaos = actual_price_chaos = chaos_value
+        - Leaves item_id NULL (we're not linking to checked_items yet)
+        - Sets time_to_sale_hours = 0.0 and relisted = 0
+
+        Returns the new sale row's ID.
+        """
+        cursor = self.conn.execute(
+            """
+            INSERT INTO sales (
+                item_id,
+                item_name,
+                item_base_type,
+                listed_price_chaos,
+                listed_at,
+                sold_at,
+                actual_price_chaos,
+                time_to_sale_hours,
+                relisted,
+                notes
+            )
+            VALUES (
+                NULL,
+                ?,
+                ?,
+                ?,
+                CURRENT_TIMESTAMP,
+                CURRENT_TIMESTAMP,
+                ?,
+                0.0,
+                0,
+                ?
+            )
+            """,
+            (item_name, item_base_type, chaos_value, chaos_value, notes),
+        )
+        self.conn.commit()
+        return int(cursor.lastrowid)
 
     def complete_sale(
         self,
@@ -515,10 +565,94 @@ class Database:
 
         return stats
 
+    import sqlite3
+    from typing import Any, Dict, List
+
+    class Database:
+        # ... existing __init__ / helpers ...
+
+        def get_recent_sales(self, limit: int = 50) -> list[sqlite3.Row]:
+            """
+            Return the most recent sales rows ordered by sold_at DESC.
+
+            Fields returned:
+                id, item_name, source, sold_at, listed_at,
+                price_chaos, notes, time_to_sale_hours
+            """
+            cursor = self.conn.execute(
+                """
+                SELECT id,
+                       item_name,
+                       source,
+                       sold_at,
+                       listed_at,
+                       price_chaos,
+                       notes,
+                       time_to_sale_hours
+                FROM sales
+                ORDER BY sold_at DESC LIMIT ?
+                """,
+                (limit,),
+            )
+            return list(cursor.fetchall())
+
     # ----------------------------------------------------------------------
     # Maintenance
     # ----------------------------------------------------------------------
+    def get_sales_summary(self) -> dict[str, Any]:
+        """
+        Return overall sales summary:
+            - total_sales: number of sales rows
+            - total_chaos: sum of price_chaos
+            - avg_chaos: average price_chaos per sale
+        """
+        cursor = self.conn.execute(
+            """
+            SELECT
+                COUNT(*) AS total_sales,
+                COALESCE(SUM(price_chaos), 0) AS total_chaos,
+                CASE WHEN COUNT(*) > 0
+                     THEN COALESCE(AVG(price_chaos), 0)
+                     ELSE 0
+                END AS avg_chaos
+            FROM sales
+            """
+        )
+        row = cursor.fetchone()
+        if row is None:
+            return {"total_sales": 0, "total_chaos": 0.0, "avg_chaos": 0.0}
+        return {
+            "total_sales": row["total_sales"],
+            "total_chaos": float(row["total_chaos"] or 0.0),
+            "avg_chaos": float(row["avg_chaos"] or 0.0),
+        }
 
+    def get_daily_sales_summary(self, days: int = 30) -> list[sqlite3.Row]:
+        """
+        Return daily sales summary for the last `days` days (including today).
+
+        Each row has:
+            day (YYYY-MM-DD), sale_count, total_chaos, avg_chaos
+        """
+        # Note: Using DATE('now', ?) to get a cutoff and filter sold_at >= that.
+        cursor = self.conn.execute(
+            """
+            SELECT
+                DATE(sold_at) AS day,
+                COUNT(*) AS sale_count,
+                COALESCE(SUM(price_chaos), 0) AS total_chaos,
+                CASE WHEN COUNT(*) > 0
+                     THEN COALESCE(AVG(price_chaos), 0)
+                     ELSE 0
+                END AS avg_chaos
+            FROM sales
+            WHERE sold_at >= DATE('now', ?)
+            GROUP BY DATE(sold_at)
+            ORDER BY DATE(sold_at) DESC
+            """,
+            (f"-{int(days)} days",),
+        )
+        return list(cursor.fetchall())
     def vacuum(self) -> None:
         """Perform SQLite VACUUM for file-size maintenance."""
         self.conn.execute("VACUUM")

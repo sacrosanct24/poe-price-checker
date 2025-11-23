@@ -196,7 +196,6 @@ def test_parser_should_validate_minimum_structure():
             )
             # For truly invalid text, this should be False
 
-@pytest.mark.xfail(reason="Requirements section parsing not implemented yet")
 def test_parse_requirements_section(parser):
     text = """Rarity: RARE
 Doom Visor
@@ -212,7 +211,7 @@ Int: 154
 """
     item = parser.parse(text)
     assert item is not None
-    # Future expected behavior:
+    # TODO: when requirements parsing is implemented, assert the parsed dict:
     # normalized = {k.lower(): v for k, v in item.requirements.items()}
     # assert normalized["level"] == 70
     # assert normalized["str"] == 10
@@ -232,7 +231,10 @@ Sockets: R-G-B R-R
     # "R-G-B" = 3 linked, "R-R" = 2 linked → max group size 3
     assert item.links == 3
 
-@pytest.mark.xfail(reason="Influence parsing / lenient minimal items not implemented yet")
+@pytest.mark.xfail(
+    reason="Influence parsing / lenient minimal items not implemented yet",
+    strict=True,
+)
 def test_parse_influences_normalized(parser):
     text = """Rarity: RARE
 Doom Visor

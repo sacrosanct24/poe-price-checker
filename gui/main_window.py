@@ -23,6 +23,8 @@ import webbrowser
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterable, Mapping, TYPE_CHECKING
+from gui.recent_sales_window import RecentSalesWindow
+from gui.sales_dashboard_window import SalesDashboardWindow
 
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
@@ -461,7 +463,9 @@ class PriceCheckerGUI:
         self.logger = self._resolve_logger()
         self.root.title("PoE Price Checker")
         self.root.geometry("1100x650")
-
+        # NEW: create menubar attribute early
+        self.menubar = tk.Menu(self.root)
+        self.root.config(menu=self.menubar)
         # Main containers
         self.main_frame = ttk.Frame(self.root, padding=8)
         self.main_frame.grid(row=0, column=0, sticky="nsew")
@@ -512,6 +516,8 @@ class PriceCheckerGUI:
 
         self._set_status("Ready")
 
+        self._recent_sales_window: RecentSalesWindow | None = None
+
     # -------------------------------------------------------------------------
     # Setup helpers
     # -------------------------------------------------------------------------
@@ -528,11 +534,32 @@ class PriceCheckerGUI:
         logger.setLevel(logging.INFO)
         return logger
 
-    def _create_menu(self) -> None:
-        menubar = tk.Menu(self.root)
+    def _open_recent_sales_window(self) -> None:
+        """Open (or focus) the Recent Sales panel."""
+        if self._recent_sales_window is not None and self._recent_sales_window.winfo_exists():
+            self._recent_sales_window.deiconify()
+            self._recent_sales_window.lift()
+            self._recent_sales_window.focus_set()
+            return
 
+        self._recent_sales_window = RecentSalesWindow(
+            master=self.root,
+            db=self.ctx.db,   # adjust if your app context exposes db differently
+            limit=50,
+        )
+        self._recent_sales_window.focus_set()
+
+    def _create_menu(self) -> None:
+        """Create the main menubar and all top-level menus."""
+
+        # NOTE: self.menubar MUST already be created in __init__:
+        # self.menubar = tk.Menu(self.root)
+        # self.root.config(menu=self.menubar)
+
+        # -------------------------
         # File menu
-        file_menu = tk.Menu(menubar, tearoff=False)
+        # -------------------------
+        file_menu = tk.Menu(self.menubar, tearoff=False)
         file_menu.add_command(label="Open Log File", command=self._open_log_file)
         file_menu.add_command(label="Open Config Folder", command=self._open_config_folder)
         file_menu.add_separator()
@@ -540,32 +567,41 @@ class PriceCheckerGUI:
         file_menu.add_command(label="Copy All Rows as TSV", command=self._copy_all_rows_as_tsv)
         file_menu.add_separator()
         file_menu.add_command(label="Exit", command=self.root.quit)
-        menubar.add_cascade(label="File", menu=file_menu)
+        self.menubar.add_cascade(label="File", menu=file_menu)
 
+        # -------------------------
         # View menu
-        view_menu = tk.Menu(menubar, tearoff=False)
+        # -------------------------
+        view_menu = tk.Menu(self.menubar, tearoff=False)
         view_menu.add_command(label="Session History...", command=self._show_history_window)
         view_menu.add_command(label="Data Sources...", command=self._show_sources_dialog)
-        menubar.add_cascade(label="View", menu=view_menu)
+        view_menu.add_separator()
+        view_menu.add_command(label="Recent Sales…", command=self._open_recent_sales_window)
+        self.menubar.add_cascade(label="View", menu=view_menu)
 
-        # Dev menu (sample items)
-        dev_menu = tk.Menu(menubar, tearoff=False)
+        # -------------------------
+        # Dev menu
+        # -------------------------
+        dev_menu = tk.Menu(self.menubar, tearoff=False)
         dev_menu.add_command(label="Paste Sample Map", command=lambda: self._paste_sample_item("map"))
         dev_menu.add_command(label="Paste Sample Currency", command=lambda: self._paste_sample_item("currency"))
         dev_menu.add_command(label="Paste Sample Unique", command=lambda: self._paste_sample_item("unique"))
         dev_menu.add_command(label="Paste Sample Rare", command=lambda: self._paste_sample_item("rare"))
         dev_menu.add_command(label="Paste Sample Gem", command=lambda: self._paste_sample_item("gem"))
-        menubar.add_cascade(label="Dev", menu=dev_menu)
+        self.menubar.add_cascade(label="Dev", menu=dev_menu)
 
+        # -------------------------
         # Help menu
-        help_menu = tk.Menu(menubar, tearoff=False)
+        # -------------------------
+        help_menu = tk.Menu(self.menubar, tearoff=False)
         help_menu.add_command(label="Keyboard Shortcuts", command=self._show_shortcuts)
         help_menu.add_command(label="Usage Tips", command=self._show_usage_tips)
         help_menu.add_separator()
         help_menu.add_command(label="About", command=self._show_about_dialog)
-        menubar.add_cascade(label="Help", menu=help_menu)
+        self.menubar.add_cascade(label="Help", menu=help_menu)
 
-        self.root.config(menu=menubar)
+        # Final: assign to root (safe even if already set)
+        self.root.config(menu=self.menubar)
 
     # -------------------------------------------------------------------------
     # Layout pieces
@@ -797,7 +833,15 @@ class PriceCheckerGUI:
         )
         self.tree_menu.add_separator()
         self.tree_menu.add_command(label="Copy Row", command=self._copy_selected_row)
-        self.tree_menu.add_command(label="Copy Row as TSV", command=self._copy_selected_row_as_tsv)
+        self.tree_menu.add_command(
+            label="Copy Row as TSV",
+            command=self._copy_selected_row_as_tsv,
+        )
+        self.tree_menu.add_separator()
+        self.tree_menu.add_command(
+            label="Record Sale...",
+            command=self._record_sale_for_selected_row,
+        )
 
         self.results_tree.bind("<Button-3>", self._on_tree_right_click)
         self.results_tree.bind("<Button-2>", self._on_tree_right_click)  # macOS sometimes uses Button-2
@@ -851,6 +895,123 @@ class PriceCheckerGUI:
             return
 
         self._open_path_in_explorer(cfg_path)
+
+    class RecordSaleDialog:
+        """
+        Simple modal dialog to confirm/edit a sale before recording it.
+
+        It lets the user confirm the chaos price and optionally add notes.
+        On success, it calls the provided `on_submit` callback.
+        """
+
+        def __init__(
+                self,
+                parent: tk.Tk,
+                *,
+                item_name: str,
+                source: str,
+                default_chaos_value: float,
+                on_submit: callable[[float, str | None], None],
+        ) -> None:
+            self._parent = parent
+            self._on_submit = on_submit
+
+            self.top = tk.Toplevel(parent)
+            self.top.title("Record Sale")
+            self.top.transient(parent)
+            self.top.grab_set()
+
+            # Basic layout
+            frame = ttk.Frame(self.top, padding=10)
+            frame.grid(row=0, column=0, sticky="nsew")
+
+            self.top.columnconfigure(0, weight=1)
+            self.top.rowconfigure(0, weight=1)
+
+            # Item name (read-only)
+            ttk.Label(frame, text="Item:").grid(row=0, column=0, sticky="w")
+            ttk.Label(frame, text=item_name, font=("", 10, "bold")).grid(
+                row=0, column=1, sticky="w"
+            )
+
+            # Source (read-only)
+            ttk.Label(frame, text="Source:").grid(row=1, column=0, sticky="w")
+            ttk.Label(frame, text=source).grid(row=1, column=1, sticky="w")
+
+            # Chaos price
+            ttk.Label(frame, text="Sale price (chaos):").grid(row=2, column=0, sticky="w")
+            self.price_var = tk.StringVar()
+            if default_chaos_value > 0:
+                self.price_var.set(f"{default_chaos_value:.1f}")
+            self.price_entry = ttk.Entry(frame, textvariable=self.price_var, width=10)
+            self.price_entry.grid(row=2, column=1, sticky="w")
+            self.price_entry.focus_set()
+
+            # Notes
+            ttk.Label(frame, text="Notes (optional):").grid(row=3, column=0, sticky="nw")
+            self.notes_text = tk.Text(frame, width=40, height=4)
+            self.notes_text.grid(row=3, column=1, sticky="nsew", pady=(2, 4))
+
+            # Buttons
+            button_frame = ttk.Frame(frame)
+            button_frame.grid(row=4, column=0, columnspan=2, sticky="e", pady=(8, 0))
+
+            ok_button = ttk.Button(button_frame, text="Record Sale", command=self._on_ok)
+            cancel_button = ttk.Button(button_frame, text="Cancel", command=self._on_cancel)
+            ok_button.grid(row=0, column=0, padx=(0, 8))
+            cancel_button.grid(row=0, column=1)
+
+            # Keybindings
+            self.top.bind("<Return>", lambda e: self._on_ok())
+            self.top.bind("<Escape>", lambda e: self._on_cancel())
+
+            # Allow resizing a bit
+            frame.columnconfigure(1, weight=1)
+            frame.rowconfigure(3, weight=1)
+
+            # Center over parent
+            self._center_over_parent()
+
+        def _center_over_parent(self) -> None:
+            self.top.update_idletasks()
+            parent_x = self._parent.winfo_rootx()
+            parent_y = self._parent.winfo_rooty()
+            parent_w = self._parent.winfo_width()
+            parent_h = self._parent.winfo_height()
+
+            w = self.top.winfo_width()
+            h = self.top.winfo_height()
+
+            x = parent_x + (parent_w - w) // 2
+            y = parent_y + (parent_h - h) // 2
+
+            self.top.geometry(f"+{x}+{y}")
+
+        def _on_ok(self) -> None:
+            raw_price = self.price_var.get().strip()
+            if not raw_price:
+                messagebox.showerror("Record Sale", "Please enter a chaos price.")
+                return
+
+            try:
+                chaos_value = float(raw_price)
+            except ValueError:
+                messagebox.showerror(
+                    "Record Sale", f"Invalid chaos value: {raw_price!r}. Please enter a number."
+                )
+                return
+
+            notes = self.notes_text.get("1.0", "end").strip()
+            if notes == "":
+                notes = None
+
+            try:
+                self._on_submit(chaos_value, notes)
+            finally:
+                self.top.destroy()
+
+        def _on_cancel(self) -> None:
+            self.top.destroy()
 
     def _export_results_tsv(self) -> None:
         if not hasattr(self, "results_table"):
@@ -986,6 +1147,64 @@ class PriceCheckerGUI:
 
     def _get_input_text(self) -> str:
         return self.input_text.get("1.0", "end").strip()
+
+    def _record_sale_for_selected_row(self) -> None:
+        """
+        Open the Record Sale dialog for the currently selected row and,
+        if confirmed, persist the sale to the database.
+        """
+        values = self._get_selected_row_values()
+        if not values:
+            messagebox.showinfo(
+                "Record Sale",
+                "Please select a result row to record a sale.",
+            )
+            return
+
+        # RESULT_COLUMNS: ("item_name", "variant", "links", "chaos_value",
+        #                  "divine_value", "listing_count", "source")
+        item_name, variant, links, chaos_value, divine_value, listing_count, source = values
+
+        try:
+            default_chaos = float(chaos_value) if chaos_value else 0.0
+        except ValueError:
+            default_chaos = 0.0
+
+        def on_submit(final_chaos: float, notes: str | None) -> None:
+            self._save_sale(item_name=item_name, chaos_value=final_chaos, notes=notes)
+
+        RecordSaleDialog(
+            self.root,
+            item_name=item_name,
+            source=source,
+            default_chaos_value=default_chaos,
+            on_submit=on_submit,
+        )
+
+    def _save_sale(self, item_name: str, chaos_value: float, notes: str | None) -> None:
+        """
+        Persist a sale via the Database helper and update the status bar.
+        """
+        db = self.app_context.db
+        try:
+            sale_id = db.record_instant_sale(
+                item_name=item_name,
+                chaos_value=chaos_value,
+                item_base_type=None,
+                notes=notes,
+            )
+        except Exception as exc:
+            logger = self._get_logger()
+            logger.exception("Failed to record sale")
+            messagebox.showerror(
+                "Record Sale",
+                f"Failed to record sale for {item_name!r}:\n{exc}",
+            )
+            return
+
+        self._set_status(
+            f"Recorded sale #{sale_id} for {item_name!r} at {chaos_value:.1f} chaos."
+        )
 
     def _on_check_clicked(self, event: tk.Event | None = None) -> None:  # type: ignore[override]
         del event
@@ -1601,6 +1820,24 @@ class PriceCheckerGUI:
         item_id = selection[0]
         values = tree.item(item_id, "values")
         return tuple(values)
+
+    def _get_selected_row_values(self) -> tuple[str, ...] | None:
+        """
+        Return the values tuple for the first selected row, or None if
+        nothing is selected.
+        """
+        tree = getattr(self, "results_tree", None)
+        if tree is None:
+            return None
+
+        selection = tree.selection()
+        if not selection:
+            return None
+
+        row_id = selection[0]
+        values = tree.item(row_id, "values")  # type: ignore[no-any-return]
+        # Treeview returns a tuple; be explicit for type checkers
+        return tuple(values) if values is not None else None
 
     def _copy_row_tsv(self) -> None:
         row = self._get_selected_row()
