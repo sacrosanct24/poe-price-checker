@@ -1309,8 +1309,11 @@ class PriceCheckerGUI:
                 self._set_status("No item text to check.")
                 return
 
-            # Update the item inspector before we potentially clear input.
+            # Update the item inspector before we clear input.
             self._update_item_inspector(text)
+
+            # Clear the input box immediately after capturing text
+            self.input_text.delete("1.0", "end")
 
             price_service = getattr(self.app_context, "price_service", None)
             if price_service is None:

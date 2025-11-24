@@ -50,5 +50,9 @@ Thumbs.db
 config.json
 .poe_price_checker_config.pkl
 
+# OAuth credentials - NEVER commit these!
+oauth_config.json
+.poe_price_checker/oauth_token.json
+
 # Logs
 *.log
