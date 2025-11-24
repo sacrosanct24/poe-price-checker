@@ -3,6 +3,16 @@ Manual test script for MCP server functionality.
 Run this to verify the MCP server tools work correctly.
 """
 
+import sys
+
+# Check if MCP is available
+try:
+    from mcp.server.fastmcp import FastMCP
+except ImportError:
+    print("MCP SDK not installed. Skipping test.")
+    print("Install with: pip install 'mcp[cli]'")
+    sys.exit(0)
+
 from mcp_poe_server import (
     parse_item,
     get_item_price,

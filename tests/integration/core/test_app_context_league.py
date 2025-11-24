@@ -100,11 +100,12 @@ class DummyTradeSource:
 class DummyPriceService:
     instances: List["DummyPriceService"] = []
 
-    def __init__(self, config, parser, db, poe_ninja, trade_source, logger=None) -> None:
+    def __init__(self, config, parser, db, poe_ninja, poe_watch=None, trade_source=None, logger=None) -> None:
         self.config = config
         self.parser = parser
         self.db = db
         self.poe_ninja = poe_ninja
+        self.poe_watch = poe_watch
         self.trade_source = trade_source
         self.logger = logger
         DummyPriceService.instances.append(self)

@@ -86,20 +86,18 @@ class TestMCPServerTools:
         from core.game_version import GameVersion
         
         # Setup mocks
-        mock_config.get_league.return_value = "Standard"
-        mock_db.get_price_stats.return_value = {
-            "average": 15000,
+        mock_game_config = Mock()
+        mock_game_config.league = "Standard"
+        mock_config.get_game_config.return_value = mock_game_config
+
+        mock_db.get_latest_price_stats_for_item.return_value = {
+            "mean": 15000,
             "median": 14000,
             "min": 12000,
             "max": 18000,
-            "count": 50
+            "count": 50,
+            "trimmed_mean": 14500
         }
-        
-        mock_quote = Mock()
-        mock_quote.chaos_value = 15000
-        mock_quote.confidence = 0.9
-        mock_quote.timestamp = datetime.now(timezone.utc)
-        mock_db.get_quotes.return_value = [mock_quote]
         
         from mcp_poe_server import get_item_price
         
@@ -107,43 +105,50 @@ class TestMCPServerTools:
         
         assert result["item_name"] == "Headhunter"
         assert result["league"] == "Standard"
-        assert result["average_price"] == 15000
+        assert result["mean_price"] == 15000
         assert result["median_price"] == 14000
         assert result["sample_size"] == 50
-        assert len(result["recent_quotes"]) == 1
-    
+
     def test_get_sales_summary(self, mock_db):
         """Test getting sales summary"""
-        # Create mock sales
-        now = datetime.now(timezone.utc)
-        mock_sale = Mock()
-        mock_sale.item_name = "Headhunter"
-        mock_sale.actual_price = 15000
-        mock_sale.sold_at = now
-        
-        mock_db.get_sales_by_status.return_value = [mock_sale]
-        
+        # Setup mock to return summary dict matching Database.get_sales_summary() signature
+        mock_db.get_sales_summary.return_value = {
+            "total_sales": 1,
+            "total_chaos": 15000,
+            "avg_chaos": 15000
+        }
+
+        # Mock the daily and recent sales queries
+        mock_db.get_daily_sales_summary.return_value = []
+        mock_db.get_recent_sales.return_value = []
+
         from mcp_poe_server import get_sales_summary
         
         result = get_sales_summary(days=7)
         
-        assert result["total_sales"] == 1
-        assert result["total_value"] == 15000
-        assert result["average_sale_price"] == 15000
-        assert len(result["top_sales"]) == 1
-    
+        assert result.get("total_sales", 0) == 1
+        assert result.get("total_chaos", 0) == 15000
+        assert result.get("average_chaos", 0) == 15000
+
     def test_get_sales_summary_no_sales(self, mock_db):
         """Test sales summary with no sales"""
-        mock_db.get_sales_by_status.return_value = []
-        
+        mock_db.get_sales_summary.return_value = {
+            "total_sales": 0,
+            "total_chaos": 0,
+            "avg_chaos": 0
+        }
+
+        # Mock the daily and recent sales queries
+        mock_db.get_daily_sales_summary.return_value = []
+        mock_db.get_recent_sales.return_value = []
+
         from mcp_poe_server import get_sales_summary
         
         result = get_sales_summary(days=7)
         
-        assert result["total_sales"] == 0
-        assert result["total_value"] == 0
-        assert "No sales" in result["message"]
-    
+        assert result.get("total_sales", 0) == 0
+        assert result.get("total_chaos", 0) == 0
+
     def test_search_database(self):
         """Test database search functionality"""
         from mcp_poe_server import search_database

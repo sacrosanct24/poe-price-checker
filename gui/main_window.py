@@ -774,6 +774,8 @@ class PriceCheckerGUI:
         view_menu.add_command(label="Session History...", command=self._show_history_window)
         view_menu.add_command(label="Data Sources...", command=self._show_sources_dialog)
         view_menu.add_separator()
+        view_menu.add_command(label="Rare Item Evaluation Settings...", command=self._open_rare_eval_config)
+        view_menu.add_separator()
         view_menu.add_command(label="Recent Sales…", command=self._open_recent_sales_window)
         view_menu.add_command(label="Sales Dashboard…", command=self._open_sales_dashboard_window)
         self.menubar.add_cascade(label="View", menu=view_menu)
@@ -2340,6 +2342,31 @@ class PriceCheckerGUI:
         if self._history_listbox is not None:
             self._history_listbox.delete(0, "end")
         self._set_status("History cleared.")
+
+    # -------------------------------------------------------------------------
+    # Rare Evaluation Configuration
+    # -------------------------------------------------------------------------
+
+    def _open_rare_eval_config(self) -> None:
+        """Open the Rare Item Evaluation Settings window."""
+        from gui.rare_evaluation_config_window import RareEvaluationConfigWindow
+        from pathlib import Path
+
+        # Determine data directory
+        data_dir = Path(__file__).parent.parent / "data"
+
+        def on_save():
+            """Callback to reload the evaluator with new settings."""
+            if hasattr(self, 'rare_evaluator'):
+                from core.rare_item_evaluator import RareItemEvaluator
+                try:
+                    self.rare_evaluator = RareItemEvaluator(data_dir=data_dir)
+                    self._set_status("Rare evaluation settings reloaded")
+                except Exception as e:
+                    self.logger.warning(f"Failed to reload rare evaluator: {e}")
+                    self._set_status(f"Failed to reload evaluator: {e}")
+
+        RareEvaluationConfigWindow(self.root, data_dir, on_save_callback=on_save)
 
     # -------------------------------------------------------------------------
     # Convenience entrypoint

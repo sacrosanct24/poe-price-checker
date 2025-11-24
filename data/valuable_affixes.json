@@ -1,8 +1,16 @@
 {
   "_comment": "Evergreen valuable affixes for rare items - commonly sought across leagues",
+  "_version": "2.0 - Added tier2/tier3, value ranges, synergies, and influence mods",
   "life": {
     "tier1": ["+# to maximum Life"],
+    "tier2": ["+# to maximum Life"],
+    "tier3": ["+# to maximum Life"],
+    "tier1_range": [100, 109],
+    "tier2_range": [90, 99],
+    "tier3_range": [80, 89],
     "weight": 10,
+    "tier2_weight": 8,
+    "tier3_weight": 6,
     "min_value": 70,
     "categories": ["body_armour", "helmet", "gloves", "boots", "belt", "ring", "amulet"]
   },
@@ -12,20 +20,49 @@
       "+#% to Cold Resistance", 
       "+#% to Lightning Resistance"
     ],
+    "tier2": [
+      "+#% to Fire Resistance",
+      "+#% to Cold Resistance",
+      "+#% to Lightning Resistance"
+    ],
+    "tier3": [
+      "+#% to Fire Resistance",
+      "+#% to Cold Resistance",
+      "+#% to Lightning Resistance"
+    ],
+    "tier1_range": [46, 48],
+    "tier2_range": [42, 45],
+    "tier3_range": [36, 41],
     "weight": 8,
-    "min_value": 40,
+    "tier2_weight": 7,
+    "tier3_weight": 5,
+    "min_value": 35,
     "categories": ["body_armour", "helmet", "gloves", "boots", "belt", "ring", "amulet"]
   },
   "chaos_resistance": {
     "tier1": ["+#% to Chaos Resistance"],
+    "tier2": ["+#% to Chaos Resistance"],
+    "tier3": ["+#% to Chaos Resistance"],
+    "tier1_range": [31, 35],
+    "tier2_range": [26, 30],
+    "tier3_range": [21, 25],
     "weight": 7,
-    "min_value": 25,
+    "tier2_weight": 6,
+    "tier3_weight": 4,
+    "min_value": 20,
     "categories": ["body_armour", "helmet", "gloves", "boots", "belt", "ring", "amulet"]
   },
   "energy_shield": {
-    "tier1": ["+# to maximum Energy Shield"],
+    "tier1": ["+# to maximum Energy Shield", "#% increased Energy Shield"],
+    "tier2": ["+# to maximum Energy Shield", "#% increased Energy Shield"],
+    "tier3": ["+# to maximum Energy Shield", "#% increased Energy Shield"],
+    "tier1_range": [80, 110],
+    "tier2_range": [60, 79],
+    "tier3_range": [45, 59],
     "weight": 9,
-    "min_value": 50,
+    "tier2_weight": 7,
+    "tier3_weight": 5,
+    "min_value": 40,
     "categories": ["body_armour", "helmet", "gloves", "boots"]
   },
   "spell_suppression": {
@@ -60,8 +97,127 @@
   },
   "cooldown_recovery": {
     "tier1": ["#% increased Cooldown Recovery Rate"],
+    "tier2": ["#% increased Cooldown Recovery Rate"],
+    "tier3": ["#% increased Cooldown Recovery Rate"],
+    "tier1_range": [18, 20],
+    "tier2_range": [15, 17],
+    "tier3_range": [12, 14],
     "weight": 8,
-    "min_value": 15,
+    "tier2_weight": 6,
+    "tier3_weight": 4,
+    "min_value": 12,
     "categories": ["boots", "belt"]
+  },
+  "_synergies": {
+    "life_triple_res": {
+      "description": "Life + triple resistance - universal value",
+      "required": {
+        "life": 1,
+        "resistances": 3
+      },
+      "bonus_score": 20,
+      "value_multiplier": 1.5
+    },
+    "es_scaling": {
+      "description": "ES% + flat ES + intelligence - ES build synergy",
+      "required": {
+        "energy_shield": 2,
+        "intelligence": 1
+      },
+      "bonus_score": 15,
+      "value_multiplier": 1.4
+    },
+    "boots_perfect": {
+      "description": "Movement speed + life + resistances on boots",
+      "required": {
+        "movement_speed": 1,
+        "life": 1,
+        "resistances": 2
+      },
+      "bonus_score": 25,
+      "value_multiplier": 1.6
+    },
+    "crit_multi_damage": {
+      "description": "Critical multiplier with attack/spell damage",
+      "required": {
+        "critical_strike_multiplier": 1,
+        "added_physical_damage": 1
+      },
+      "bonus_score": 15,
+      "value_multiplier": 1.3
+    }
+  },
+  "_red_flags": {
+    "life_es_hybrid": {
+      "description": "Mixed life + ES (anti-synergy)",
+      "check": "has_both",
+      "affixes": ["life", "energy_shield"],
+      "penalty_score": -20,
+      "value_multiplier": 0.5
+    },
+    "boots_no_movement": {
+      "description": "Boots without movement speed",
+      "check": "missing_required",
+      "slot": "boots",
+      "required_affix": "movement_speed",
+      "penalty_score": -30,
+      "value_multiplier": 0.3
+    }
+  },
+  "_influence_mods": {
+    "hunter": {
+      "high_value": [
+        "+#% to maximum Life",
+        "Nearby Enemies have -#% to Chaos Resistance",
+        "#% increased Damage over Time",
+        "#% to Chaos Damage over Time Multiplier"
+      ],
+      "weight": 10
+    },
+    "warlord": {
+      "high_value": [
+        "+# to Maximum Endurance Charges",
+        "#% of Physical Damage taken as Fire Damage",
+        "Nearby Enemies are Intimidated",
+        "#% to Fire Damage over Time Multiplier"
+      ],
+      "weight": 10
+    },
+    "crusader": {
+      "high_value": [
+        "Enemies you Kill Explode",
+        "#% of Physical Damage as Extra Cold Damage",
+        "#% of Physical Damage as Extra Lightning Damage",
+        "+#% to Critical Strike Multiplier"
+      ],
+      "weight": 10
+    },
+    "redeemer": {
+      "high_value": [
+        "You have Tailwind if you have dealt a Critical Strike Recently",
+        "Gain a Frenzy Charge on Hit",
+        "#% to Cold Damage over Time Multiplier",
+        "#% of Physical Damage as Extra Cold Damage"
+      ],
+      "weight": 10
+    },
+    "elder": {
+      "high_value": [
+        "#% increased Life Recovery Rate",
+        "+# to Level of Socketed Gems",
+        "#% of Maximum Life as Extra Maximum Energy Shield",
+        "Socketed Gems are Supported by Level # Faster Attacks"
+      ],
+      "weight": 10
+    },
+    "shaper": {
+      "high_value": [
+        "Socketed Gems have -# to Total Mana Cost",
+        "#% increased Spell Damage",
+        "#% to Global Critical Strike Multiplier",
+        "#% to Cold Damage over Time Multiplier"
+      ],
+      "weight": 10
+    }
   }
 }

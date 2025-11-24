@@ -86,6 +86,7 @@ def test_check_item_with_no_poe_ninja_returns_zero_price():
         parser=FakeParser(),
         db=FakeDB(),
         poe_ninja=None,
+        poe_watch=None,
         trade_source=None,
     )
     
@@ -94,7 +95,7 @@ def test_check_item_with_no_poe_ninja_returns_zero_price():
     assert len(rows) == 1
     assert rows[0]["chaos_value"] == "0.0"
     assert rows[0]["listing_count"] == "0"
-    assert "no poe.ninja" in rows[0]["source"].lower()
+    assert "no pricing sources" in rows[0]["source"].lower()
 
 
 def test_save_trade_quotes_skips_invalid_quotes():

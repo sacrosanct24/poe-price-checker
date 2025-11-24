@@ -65,6 +65,34 @@ Map Tier: 5
 Item Level: 72
 --------
 Travel to this Map by using it in a personal Map Device.""",
+
+    "influenced_rare_boots": """Item Class: Boots
+Rarity: Rare
+Carrion Spark
+Precursor Greaves
+--------
+Quality: +20% (augmented)
+Armour: 582 (augmented)
+--------
+Requirements:
+Level: 78
+Str: 155
+--------
+Sockets: R-R-R-R 
+--------
+Item Level: 81
+--------
+7% increased Life Regeneration rate (implicit)
++15% to Fire Resistance (implicit)
+--------
++36 to Strength
++90 to maximum Life
+Regenerate 49 Life per second
++34% to Chaos Resistance
+30% increased Movement Speed
+44% increased Armour (crafted)
+Searing Exarch Item
+Eater of Worlds Item""",
 }
 
 
@@ -120,6 +148,56 @@ Some Item Name"""
     assert result is not None
     assert result.rarity == "NORMAL"
     assert result.name == "Some Item Name"
+
+
+def test_item_class_prefix():
+    """Test items with Item Class: prefix (PoE clipboard format)"""
+    parser = ItemParser()
+
+    # With Item Class prefix
+    text = """Item Class: Boots
+Rarity: Rare
+Speed Treads
+Sorcerer Boots
+--------
+Item Level: 75"""
+
+    result = parser.parse(text)
+    assert result is not None
+    assert result.rarity == "RARE"
+    assert result.name == "Speed Treads"
+    assert result.base_type == "Sorcerer Boots"
+    assert result.item_level == 75
+
+
+def test_item_class_only():
+    """Test incomplete clipboard with only Item Class line"""
+    parser = ItemParser()
+
+    # Only Item Class, no Rarity (incomplete clipboard)
+    text = "Item Class: Boots"
+
+    result = parser.parse(text)
+    # Should return None because there's no Rarity line
+    assert result is None
+
+
+def test_item_class_with_blank_lines():
+    """Test Item Class with blank lines before Rarity"""
+    parser = ItemParser()
+
+    # With blank lines between Item Class and Rarity
+    text = """Item Class: Weapons
+
+
+Rarity: Unique
+Some Unique Weapon
+Two Hand Sword"""
+
+    result = parser.parse(text)
+    assert result is not None
+    assert result.rarity == "UNIQUE"
+    assert result.name == "Some Unique Weapon"
 
 
 if __name__ == "__main__":

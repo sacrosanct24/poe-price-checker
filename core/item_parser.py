@@ -57,8 +57,14 @@ class ParsedItem:
     implicits: List[str] = field(default_factory=list)
     enchants: List[str] = field(default_factory=list)
 
+    # Influences
+    influences: List[str] = field(default_factory=list)
+
     # Flags
     is_corrupted: bool = False
+    is_fractured: bool = False
+    is_synthesised: bool = False
+    is_mirrored: bool = False
 
     def get_display_name(self) -> str:
         """
@@ -145,11 +151,12 @@ class ItemParser:
         if not lines:
             return None
 
-        # Skip "Item Class:" line if present (PoE includes this in clipboard)
-        if lines and lines[0].startswith("Item Class:"):
+        # Skip "Item Class:" line(s) if present (PoE includes this in clipboard)
+        # Also skip any blank lines between Item Class and Rarity
+        while lines and (lines[0].startswith("Item Class:") or not lines[0]):
             lines = lines[1:]
 
-        # Must begin with Rarity (after skipping Item Class)
+        # Must begin with Rarity (after skipping Item Class and blanks)
         if not lines or not re.match(self.RARITY_PATTERN, lines[0]):
             return None
 
@@ -369,11 +376,15 @@ class ItemParser:
                 continue
 
             # Influences
+            found_influence = False
             for keyword in self.INFLUENCE_KEYWORDS:
                 if keyword in line:
                     normalized = self.INFLUENCE_NORMALIZATION.get(keyword, keyword)
                     item.influences.append(normalized)
+                    found_influence = True
                     break
+            if found_influence:
+                continue
 
             # ───────────────────────────────────────────────
             # Mods: implicit / enchant / explicit

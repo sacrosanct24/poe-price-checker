@@ -8,8 +8,10 @@
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Continue](https://img.shields.io/badge/AI-Continue%20enabled-purple?logo=ai)
 
-PoE Price Checker is a fully-featured desktop application for pricing Path of Exile items using **multiple sources**, a **modern parser**, **sales tracking**, and a **plugin system**.
+PoE Price Checker is a fully-featured desktop application for pricing Path of Exile items using **multiple sources**, a **modern parser**, **rare item evaluation**, **sales tracking**, and a **plugin system**.
 Designed as an **over-engineered portfolio project**, it showcases clean architecture, strong testing, and extensibility.
+
+> **Latest:** Phase 1.1 complete with rare item evaluation configuration UI! Customize affix weights and use build-focused presets.
 
 ---
 
@@ -29,7 +31,9 @@ Designed as an **over-engineered portfolio project**, it showcases clean archite
 ### 🪄 Modern GUI (Tkinter)
 
 * Paste item → auto-parse → price instantly
-* Item Inspector sidebar
+* **Rare Item Evaluator** - Scores rare items (0-100) with tier badges
+* **Evaluation Config UI** - Customize affix weights and use build presets
+* Item Inspector sidebar with evaluation panel
 * Right-click: copy row, open trade URL, copy TSV
 * Sample-item buttons for development
 
@@ -64,13 +68,21 @@ python poe_price_checker.py
 
 Runs with GUI on all major OSes.
 
-### 3. Run the full test suite
+### 3. Test rare item evaluation
+
+```bash
+python test_rare_config_gui.py
+```
+
+Opens the configuration UI to test affix weight adjustments and presets.
+
+### 4. Run the full test suite
 
 ```bash
 pytest
 ```
 
-### 4. (Optional) Setup Continue AI Assistant in PyCharm
+### 5. (Optional) Setup Continue AI Assistant in PyCharm
 
 This project includes [Continue](https://continue.dev) configuration for AI-assisted development.
 
@@ -150,6 +162,13 @@ When contributing:
 * Add/update tests
 * Keep PRs focused & small
 * Update docs where appropriate
+
+### Documentation Policy
+
+* **Minimize documentation files** - update existing docs rather than create new ones
+* **Only README.md in root** - all other docs in `docs/` subdirectories
+* **Consolidate information** - fewer, well-organized documents preferred
+* **Continuation work**: update `CONTINUATION.md`, don't create session summaries
 
 ---
 
