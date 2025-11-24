@@ -1,3 +1,4 @@
+
 """
 Custom MCP Server for PoE Price Checker
 Exposes database queries and item parsing capabilities to AI assistants via MCP.
@@ -9,7 +10,7 @@ from core.database import Database
 from core.item_parser import ItemParser
 from core.config import Config
 from core.game_version import GameVersion
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import json
 
 # Create the MCP server
@@ -37,11 +38,11 @@ def parse_item(item_text: str) -> dict:
     
     return {
         "name": parsed.name,
-        "rarity": parsed.rarity.name if parsed.rarity else "Unknown",
+        "rarity": parsed.rarity if parsed.rarity else "Unknown",
         "base_type": parsed.base_type,
         "item_level": parsed.item_level,
-        "corrupted": parsed.corrupted,
-        "influenced": bool(parsed.influence),
+        "corrupted": parsed.is_corrupted,
+        "influenced": bool(getattr(parsed, 'influences', None)),
         "sockets": parsed.sockets,
         "links": parsed.links
     }
@@ -62,31 +63,33 @@ def get_item_price(item_name: str, league: str = None, game: str = "POE1") -> di
     game_version = GameVersion.POE1 if game == "POE1" else GameVersion.POE2
     
     if league is None:
-        league = config.get_league(game_version)
-    
-    # Get price stats
-    stats = db.get_price_stats(game_version, league, item_name)
-    
-    # Get recent quotes
-    quotes = db.get_quotes(game_version, league, item_name, limit=5)
-    
+        league = config.get_game_config(game_version).league
+
+    # Get price stats using the actual database method
+    stats = db.get_latest_price_stats_for_item(game_version, league, item_name, days=7)
+
+    if not stats:
+        return {
+            "item_name": item_name,
+            "league": league,
+            "game": game,
+            "error": "No price data found",
+            "suggestion": "Try checking the item in-game first to populate the database"
+        }
+
     return {
         "item_name": item_name,
         "league": league,
         "game": game,
-        "average_price": stats.get("average", 0) if stats else 0,
-        "median_price": stats.get("median", 0) if stats else 0,
-        "min_price": stats.get("min", 0) if stats else 0,
-        "max_price": stats.get("max", 0) if stats else 0,
-        "sample_size": stats.get("count", 0) if stats else 0,
-        "recent_quotes": [
-            {
-                "price": q.chaos_value,
-                "confidence": q.confidence,
-                "timestamp": q.timestamp.isoformat() if q.timestamp else None
-            }
-            for q in quotes
-        ]
+        "mean_price": stats.get("mean", 0),
+        "median_price": stats.get("median", 0),
+        "trimmed_mean": stats.get("trimmed_mean", 0),
+        "min_price": stats.get("min", 0),
+        "max_price": stats.get("max", 0),
+        "p25": stats.get("p25", 0),
+        "p75": stats.get("p75", 0),
+        "sample_size": stats.get("count", 0),
+        "stddev": stats.get("stddev", 0)
     }
 
 @mcp.tool()
@@ -100,34 +103,37 @@ def get_sales_summary(days: int = 7) -> dict:
     Returns:
         Sales statistics and top items
     """
-    cutoff = datetime.now() - timedelta(days=days)
-    
-    # Get completed sales
-    sales = db.get_sales_by_status("completed", limit=100)
-    recent_sales = [s for s in sales if s.sold_at and s.sold_at >= cutoff]
-    
-    if not recent_sales:
-        return {
-            "days": days,
-            "total_sales": 0,
-            "total_value": 0,
-            "message": "No sales in the specified period"
-        }
-    
-    total_value = sum(s.actual_price for s in recent_sales if s.actual_price)
-    
+    # Get overall sales summary
+    summary = db.get_sales_summary()
+
+    # Get daily breakdown
+    daily = db.get_daily_sales_summary(days=days)
+
+    # Get recent sales
+    recent = db.get_recent_sales(limit=10)
+
     return {
         "days": days,
-        "total_sales": len(recent_sales),
-        "total_value": total_value,
-        "average_sale_price": total_value / len(recent_sales) if recent_sales else 0,
-        "top_sales": [
+        "total_sales": summary.get("total_sales", 0),
+        "total_chaos": summary.get("total_chaos", 0),
+        "average_chaos": summary.get("avg_chaos", 0),
+        "daily_breakdown": [
             {
-                "item": s.item_name,
-                "price": s.actual_price,
-                "date": s.sold_at.isoformat() if s.sold_at else None
+                "day": row["day"],
+                "sales": row["sale_count"],
+                "total_chaos": float(row["total_chaos"]),
+                "avg_chaos": float(row["avg_chaos"])
             }
-            for s in sorted(recent_sales, key=lambda x: x.actual_price or 0, reverse=True)[:5]
+            for row in daily
+        ],
+        "recent_sales": [
+            {
+                "item": row["item_name"],
+                "price": float(row["price_chaos"]),
+                "source": row["source"],
+                "sold_at": row["sold_at"]
+            }
+            for row in recent[:5]
         ]
     }
 
@@ -153,8 +159,8 @@ def search_database(
     game_version = GameVersion.POE1 if game == "POE1" else GameVersion.POE2
     
     if league is None:
-        league = config.get_league(game_version)
-    
+        league = config.get_game_config(game_version).league
+
     # This is a simplified search - you'd need to add a proper search method to Database
     # For now, we'll just show the concept
     
@@ -170,10 +176,11 @@ def search_database(
 def get_current_config() -> str:
     """Get the current PoE Price Checker configuration."""
     return json.dumps({
-        "poe1_league": config.get_league(GameVersion.POE1),
-        "poe2_league": config.get_league(GameVersion.POE2),
+        "poe1_league": config.get_game_config(GameVersion.POE1).league,
+        "poe2_league": config.get_game_config(GameVersion.POE2).league,
         "current_game": config.current_game.name,
-        "database_path": str(config.db_path),
+        "config_file": str(config.config_file),
+        "database_path": str(db.db_path),
     }, indent=2)
 
 @mcp.prompt()
@@ -202,6 +209,24 @@ Tasks:
 
 if __name__ == "__main__":
     # Run the MCP server
-    # For Claude Desktop: mcp install mcp_poe_server.py
-    # For testing: mcp dev mcp_poe_server.py
-    mcp.run()
+    #
+    # Direct Python execution (no Node.js needed):
+    #   python mcp_poe_server.py
+    #
+    # With MCP CLI (requires Node.js):
+    #   mcp dev mcp_poe_server.py      # Testing with inspector
+    #   mcp install mcp_poe_server.py  # Install to Claude Desktop
+    #
+    # The server will start and listen for MCP connections
+    print("Starting PoE Price Checker MCP Server...")
+    print(f"Config: {config.config_file}")
+    print(f"Database: {db.db_path}")
+    print(f"POE1 League: {config.get_game_config(GameVersion.POE1).league}")
+    print(f"POE2 League: {config.get_game_config(GameVersion.POE2).league}")
+    print("\nServer ready for MCP connections.")
+    print("Press Ctrl+C to stop.\n")
+
+    try:
+        mcp.run()
+    except KeyboardInterrupt:
+        print("\nShutting down MCP server...")
