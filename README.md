@@ -78,31 +78,33 @@ This project includes [Continue](https://continue.dev) configuration for AI-assi
 
 ---
 
-# 📚 Project Documentation
+# 📚 Documentation
 
-All documentation now lives under the `docs/` folder:
+All documentation is organized in the `docs/` directory:
 
-### **Architecture & Development**
+## Development
+- **[Development Guide](docs/development/DEVELOPMENT_GUIDE.md)** - Architecture & development practices
+- **[PyCharm Setup](docs/development/PYCHARM_SETUP.md)** - AI assistant integration (Continue)
+- **[Plugin Spec](docs/development/PLUGIN_SPEC.md)** - Plugin API documentation
 
-* [DEVELOPMENT_GUIDE.md](docs/DEVELOPMENT_GUIDE.md)
-* [PYCHARM_SETUP.md](docs/PYCHARM_SETUP.md) - AI assistant setup
+## Testing
+- **[Test Suite Guide](docs/testing/TEST_SUITE_GUIDE.md)** - Running and writing tests
+- **[Testing History](docs/testing/TESTING_HISTORY.md)** - Test suite evolution (109 → 163 tests)
+- **[Coverage Gaps](docs/testing/COVERAGE_GAPS.md)** - Areas needing more tests
 
-### **Plugin API**
+## MCP Integration (AI Assistant)
+- **[MCP Integration](docs/mcp/MCP_INTEGRATION.md)** - Complete guide to AI integration
+- **[Quick Start](docs/mcp/QUICK_START.md)** - 5-minute setup
+- **[Why MCP?](docs/mcp/WHY_MCP.md)** - Benefits and analysis
 
-* [PLUGIN_SPEC.md](docs/PLUGIN_SPEC.md)
+## Troubleshooting
+- **[Parser Issues](docs/troubleshooting/PARSER_ISSUES.md)** - "Unknown Item" problems
+- **[Item Class Bug](docs/troubleshooting/ITEM_CLASS_BUG.md)** - Fixed: PoE item format
 
-### **Test System Overview**
-
-* [TESTING_GUIDE.md](docs/TESTING_GUIDE.md)
-
-### **Roadmap**
-
-* [ROADMAP.md](docs/ROADMAP.md)
-
-### **Design Context & Notes**
-
-* [Context.md](docs/Context.md)
-* [code_review.md](docs/code_review.md)
+## Project Management
+- **[Roadmap](docs/roadmap.md)** - Future features
+- **[Context](docs/Context.md)** - Design decisions
+- **[Code Review](docs/code_review.md)** - Code quality notes
 
 ---
 

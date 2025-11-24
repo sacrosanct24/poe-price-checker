@@ -145,8 +145,12 @@ class ItemParser:
         if not lines:
             return None
 
-        # Must begin with Rarity
-        if not re.match(self.RARITY_PATTERN, lines[0]):
+        # Skip "Item Class:" line if present (PoE includes this in clipboard)
+        if lines and lines[0].startswith("Item Class:"):
+            lines = lines[1:]
+
+        # Must begin with Rarity (after skipping Item Class)
+        if not lines or not re.match(self.RARITY_PATTERN, lines[0]):
             return None
 
         item = ParsedItem(raw_text=text)
