@@ -9,6 +9,7 @@ from core.item_parser import ItemParser
 from core.database import Database
 from core.game_version import GameVersion
 from data_sources.pricing.poe_ninja import PoeNinjaAPI
+from data_sources.pricing.poe_watch import PoeWatchAPI
 from data_sources.pricing.trade_api import TradeApiSource
 
 LOG = logging.getLogger(__name__)
@@ -40,6 +41,7 @@ class PriceService:
         parser: ItemParser,
         db: Database,
         poe_ninja: PoeNinjaAPI | None,
+        poe_watch: PoeWatchAPI | None = None,
         trade_source: TradeApiSource | None = None,
         logger: logging.Logger | None = None,
     ) -> None:
@@ -47,6 +49,7 @@ class PriceService:
         self.parser = parser
         self.db = db
         self.poe_ninja = poe_ninja
+        self.poe_watch = poe_watch
         self.trade_source = trade_source
         self.logger = logger or LOG
 
@@ -72,19 +75,20 @@ class PriceService:
         # 1) Parse item text → ParsedItem
         parsed = self.parser.parse(item_text)
 
-        # 2) Look up an aggregate price from poe.ninja
+        # 2) Look up aggregate price from poe.ninja + poe.watch (multi-source)
         chaos_value: float
         listing_count: int
         source_label: str
+        confidence: str = "unknown"
 
-        if self.poe_ninja is None:
+        if self.poe_ninja is None and self.poe_watch is None:
             # PoE2 or pricing disabled
-            self.logger.info("poe_ninja is None; returning zero-price result.")
+            self.logger.info("No pricing sources available; returning zero-price result.")
             chaos_value = 0.0
             listing_count = 0
-            source_label = "no poe.ninja (PoE2 or disabled)"
+            source_label = "no pricing sources"
         else:
-            chaos_value, listing_count, source_label = self._lookup_price_with_poe_ninja(
+            chaos_value, listing_count, source_label, confidence = self._lookup_price_multi_source(
                 parsed
             )
 
@@ -127,9 +131,18 @@ class PriceService:
             rounded = price_info.get("rounded_price")
             if rounded is not None:
                 chaos_value = float(rounded)
-                # Optionally enrich source_label with confidence
-                conf = price_info.get("confidence", "unknown")
-                source_label = f"{source_label} ({conf})"
+                # Use stats confidence, but fallback to multi-source confidence
+                stats_conf = price_info.get("confidence", "unknown")
+                # Combine both confidence indicators
+                if stats_conf != "unknown" and confidence != "unknown":
+                    # Use the lower confidence level
+                    conf_order = {"none": 0, "low": 1, "medium": 2, "high": 3}
+                    final_conf = min(stats_conf, confidence, key=lambda c: conf_order.get(c, 0))
+                    source_label = f"{source_label} ({final_conf})"
+                elif stats_conf != "unknown":
+                    source_label = f"{source_label} ({stats_conf})"
+                elif confidence != "unknown":
+                    source_label = f"{source_label} ({confidence})"
 
         # 6) Divine conversion (if we can)
         divine_value = self._convert_chaos_to_divines(chaos_value)
@@ -469,6 +482,175 @@ class PriceService:
             "confidence": confidence,
             "reason": f"{reason} (center={center_used}, iqr_ratio={iqr_ratio:.2f}, cv={cv:.2f})",
         }
+
+    # ------------------------------------------------------------------ #
+    # Multi-source pricing helpers
+    # ------------------------------------------------------------------ #
+
+    def _lookup_price_multi_source(
+        self, parsed: Any
+    ) -> tuple[float, int, str, str]:
+        """
+        Look up price using multiple sources (poe.ninja + poe.watch).
+
+        Strategy:
+        1. Get price from poe.ninja (primary, faster updates)
+        2. Get price from poe.watch (secondary, validation)
+        3. Compare and validate:
+           - If both agree (within 20%), use ninja price with high confidence
+           - If diverge significantly, average them with medium confidence
+           - If one is low confidence, prefer the other
+           - If only one source available, use it with appropriate confidence
+
+        Returns:
+            (chaos_value, listing_count, source_label, confidence)
+        """
+        item_name = self._get_item_display_name(parsed)
+        base_type = self._get_base_type(parsed)
+        rarity = (self._get_rarity(parsed) or "").upper()
+
+        # DEBUG LOGGING
+        self.logger.info(f"[MULTI-SOURCE] Looking up price for '{item_name}' (rarity: {rarity}, base: {base_type})")
+        self.logger.info(f"[MULTI-SOURCE] Available sources: poe.ninja={self.poe_ninja is not None}, poe.watch={self.poe_watch is not None}")
+
+        ninja_price: Optional[float] = None
+        ninja_count: int = 0
+        watch_price: Optional[float] = None
+        watch_confidence: str = "unknown"
+        watch_daily: int = 0
+
+        # Get poe.ninja price
+        if self.poe_ninja:
+            self.logger.info(f"[MULTI-SOURCE] Querying poe.ninja...")
+            try:
+                ninja_price, ninja_count, _ = self._lookup_price_with_poe_ninja(parsed)
+                if ninja_price == 0.0:
+                    ninja_price = None
+                if ninja_price is not None:
+                    self.logger.info(f"[MULTI-SOURCE]   poe.ninja result: {ninja_price:.1f}c (count: {ninja_count})")
+                else:
+                    self.logger.info(f"[MULTI-SOURCE]   poe.ninja result: No data found")
+            except Exception as e:
+                self.logger.warning(f"[MULTI-SOURCE]   poe.ninja lookup failed: {e}")
+                ninja_price = None
+        else:
+            self.logger.info(f"[MULTI-SOURCE] Skipping poe.ninja (not initialized)")
+
+        # Get poe.watch price
+        if self.poe_watch:
+            self.logger.info(f"[MULTI-SOURCE] Querying poe.watch...")
+            try:
+                watch_data = self.poe_watch.find_item_price(
+                    item_name=item_name,
+                    base_type=base_type,
+                    rarity=rarity,
+                    gem_level=self._get_gem_level(parsed),
+                    gem_quality=self._get_gem_quality(parsed),
+                    corrupted=self._get_corrupted_flag(parsed),
+                    links=self._parse_links(parsed),
+                )
+
+                if watch_data:
+                    watch_price = float(watch_data.get('mean', 0) or 0)
+                    if watch_price == 0.0:
+                        watch_price = None
+                    watch_daily = watch_data.get('daily', 0)
+                    watch_low_conf = watch_data.get('lowConfidence', False)
+
+                    # Assess poe.watch confidence
+                    if watch_low_conf:
+                        watch_confidence = "low"
+                    elif watch_daily > 10:
+                        watch_confidence = "high"
+                    else:
+                        watch_confidence = "medium"
+
+                    if watch_price is not None:
+                        self.logger.info(f"[MULTI-SOURCE]   poe.watch result: {watch_price:.1f}c (daily: {watch_daily}, confidence: {watch_confidence})")
+                    else:
+                        self.logger.info(f"[MULTI-SOURCE]   poe.watch result: No price data (mean=0)")
+                else:
+                    self.logger.info(f"[MULTI-SOURCE]   poe.watch result: No matching item found")
+
+            except Exception as e:
+                self.logger.warning(f"[MULTI-SOURCE]   poe.watch lookup failed: {e}", exc_info=True)
+                watch_price = None
+        else:
+            self.logger.info(f"[MULTI-SOURCE] Skipping poe.watch (not initialized)")
+
+        # Decision logic
+        self.logger.info(f"[MULTI-SOURCE] Making pricing decision...")
+
+        if ninja_price is not None and watch_price is not None:
+            # Both sources available - compare and validate
+            diff_pct = abs(ninja_price - watch_price) / max(ninja_price, watch_price)
+            self.logger.info(f"[MULTI-SOURCE] Both sources available - price difference: {diff_pct*100:.1f}%")
+
+            if diff_pct <= 0.20:  # Within 20% - good agreement
+                # Use poe.ninja (faster updates) but note validation
+                self.logger.info(f"[MULTI-SOURCE] ✓ Decision: Using poe.ninja {ninja_price:.1f}c (validated by poe.watch, high confidence)")
+                return (
+                    ninja_price,
+                    ninja_count,
+                    f"poe.ninja (validated by poe.watch)",
+                    "high"
+                )
+            elif watch_confidence == "low":
+                # poe.watch flagged as low confidence, trust ninja
+                self.logger.info(f"[MULTI-SOURCE] ✓ Decision: Using poe.ninja {ninja_price:.1f}c (poe.watch low confidence, medium confidence)")
+                return (
+                    ninja_price,
+                    ninja_count,
+                    f"poe.ninja (poe.watch: low confidence)",
+                    "medium"
+                )
+            else:
+                # Significant divergence - average them
+                avg_price = (ninja_price + watch_price) / 2
+                self.logger.info(
+                    f"[MULTI-SOURCE] ⚠ Price divergence for {item_name}: "
+                    f"ninja={ninja_price:.1f}c, watch={watch_price:.1f}c, "
+                    f"using average={avg_price:.1f}c (medium confidence)"
+                )
+                return (
+                    avg_price,
+                    max(ninja_count, watch_daily),
+                    f"averaged (ninja: {ninja_price:.1f}c, watch: {watch_price:.1f}c)",
+                    "medium"
+                )
+
+        elif ninja_price is not None:
+            # Only poe.ninja available
+            self.logger.info(f"[MULTI-SOURCE] ✓ Decision: Using poe.ninja only {ninja_price:.1f}c (medium confidence)")
+            return (
+                ninja_price,
+                ninja_count,
+                "poe.ninja only",
+                "medium"
+            )
+
+        elif watch_price is not None:
+            # Only poe.watch available
+            self.logger.info(f"[MULTI-SOURCE] ✓ Decision: Using poe.watch only {watch_price:.1f}c ({watch_confidence} confidence)")
+            return (
+                watch_price,
+                watch_daily,
+                f"poe.watch only",
+                watch_confidence
+            )
+
+        else:
+            # No prices found
+            self.logger.info(f"[MULTI-SOURCE] ✗ Decision: No prices found from any source")
+            return (0.0, 0, "not found", "none")
+
+    def _parse_links(self, parsed: Any) -> Optional[int]:
+        """Extract link count as integer."""
+        links_str = self._get_item_links(parsed)
+        try:
+            return int(links_str)
+        except (TypeError, ValueError):
+            return None
 
     # ------------------------------------------------------------------ #
     # poe.ninja pricing helpers

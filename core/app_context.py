@@ -10,6 +10,7 @@ from core.item_parser import ItemParser
 from core.database import Database
 from core.game_version import GameVersion, GameConfig
 from data_sources.pricing.poe_ninja import PoeNinjaAPI
+from data_sources.pricing.poe_watch import PoeWatchAPI
 from core.price_service import PriceService
 from core.price_multi import (
     MultiSourcePriceService,
@@ -38,6 +39,7 @@ class AppContext:
     parser: ItemParser
     db: Database
     poe_ninja: PoeNinjaAPI | None  # None when current game is PoE2 (until PoE2 support exists)
+    poe_watch: PoeWatchAPI | None  # None when disabled or PoE2
     price_service: MultiSourcePriceService
 
 
@@ -50,12 +52,14 @@ def create_app_context() -> AppContext:
     game_cfg: GameConfig = config.get_game_config(game)
 
     poe_ninja: PoeNinjaAPI | None = None
+    poe_watch: PoeWatchAPI | None = None
+    logger = logging.getLogger(__name__)
+
     if game == GameVersion.POE1:
         # Start with whatever league is in the config
         poe_ninja = PoeNinjaAPI(league=game_cfg.league)
 
         # Optionally auto-detect the active temp league via poe.ninja
-        logger = logging.getLogger(__name__)
         if config.auto_detect_league:
             try:
                 detected = poe_ninja.detect_current_league()
@@ -80,6 +84,19 @@ def create_app_context() -> AppContext:
                     # Keep the API client in sync
                     poe_ninja.league = detected
 
+        # Initialize poe.watch as secondary pricing source
+        try:
+            logger.info("Initializing poe.watch API for league: %s", game_cfg.league)
+            poe_watch = PoeWatchAPI(league=game_cfg.league)
+            logger.info("[OK] poe.watch API initialized successfully")
+        except Exception as exc:
+            logger.warning(
+                "Failed to initialize poe.watch API; "
+                "continuing with poe.ninja only. Error: %s",
+                exc,
+            )
+            poe_watch = None
+
     # ------------------------------------------------------------------
     # Trade API source (PoE1 only) – wired into PriceService
     # ------------------------------------------------------------------
@@ -98,8 +115,8 @@ def create_app_context() -> AppContext:
         )
 
     # ------------------------------------------------------------------
-    # Base single-source price service (existing implementation)
-    # Now owns poe.ninja + trade integration.
+    # Base price service with multi-source support
+    # Now integrates poe.ninja + poe.watch + trade API
     # ------------------------------------------------------------------
     price_logger = logging.getLogger("poe_price_checker.price_service")
     base_price_service = PriceService(
@@ -107,7 +124,8 @@ def create_app_context() -> AppContext:
         parser=parser,
         db=db,
         poe_ninja=poe_ninja,
-        trade_source=trade_source,  # <— IMPORTANT: hook in TradeApiSource
+        poe_watch=poe_watch,  # <— NEW: secondary pricing source
+        trade_source=trade_source,
         logger=price_logger,
     )
 
@@ -144,5 +162,6 @@ def create_app_context() -> AppContext:
         parser=parser,
         db=db,
         poe_ninja=poe_ninja,
+        poe_watch=poe_watch,
         price_service=multi_price_service,
     )

@@ -1,0 +1,67 @@
+{
+  "_comment": "Evergreen valuable affixes for rare items - commonly sought across leagues",
+  "life": {
+    "tier1": ["+# to maximum Life"],
+    "weight": 10,
+    "min_value": 70,
+    "categories": ["body_armour", "helmet", "gloves", "boots", "belt", "ring", "amulet"]
+  },
+  "resistances": {
+    "tier1": [
+      "+#% to Fire Resistance",
+      "+#% to Cold Resistance", 
+      "+#% to Lightning Resistance"
+    ],
+    "weight": 8,
+    "min_value": 40,
+    "categories": ["body_armour", "helmet", "gloves", "boots", "belt", "ring", "amulet"]
+  },
+  "chaos_resistance": {
+    "tier1": ["+#% to Chaos Resistance"],
+    "weight": 7,
+    "min_value": 25,
+    "categories": ["body_armour", "helmet", "gloves", "boots", "belt", "ring", "amulet"]
+  },
+  "energy_shield": {
+    "tier1": ["+# to maximum Energy Shield"],
+    "weight": 9,
+    "min_value": 50,
+    "categories": ["body_armour", "helmet", "gloves", "boots"]
+  },
+  "spell_suppression": {
+    "tier1": ["+#% chance to Suppress Spell Damage"],
+    "weight": 10,
+    "min_value": 15,
+    "categories": ["body_armour", "helmet", "gloves", "boots"]
+  },
+  "critical_strike_multiplier": {
+    "tier1": ["+#% to Global Critical Strike Multiplier"],
+    "weight": 9,
+    "min_value": 25,
+    "categories": ["amulet", "ring"]
+  },
+  "added_physical_damage": {
+    "tier1": ["Adds # to # Physical Damage to Attacks"],
+    "weight": 8,
+    "min_value": 10,
+    "categories": ["ring", "amulet", "gloves"]
+  },
+  "movement_speed": {
+    "tier1": ["#% increased Movement Speed"],
+    "weight": 9,
+    "min_value": 25,
+    "categories": ["boots"]
+  },
+  "flask_charges": {
+    "tier1": ["#% increased Flask Charges gained"],
+    "weight": 7,
+    "min_value": 15,
+    "categories": ["belt"]
+  },
+  "cooldown_recovery": {
+    "tier1": ["#% increased Cooldown Recovery Rate"],
+    "weight": 8,
+    "min_value": 15,
+    "categories": ["boots", "belt"]
+  }
+}

@@ -31,6 +31,9 @@ from urllib.parse import quote_plus  # currently unused but kept for future URL 
 
 from gui.recent_sales_window import RecentSalesWindow
 from gui.sales_dashboard_window import SalesDashboardWindow
+from gui.rare_evaluation_panel import RareEvaluationPanel
+from core.rare_item_evaluator import RareItemEvaluator
+from core.build_matcher import BuildMatcher
 
 if TYPE_CHECKING:  # pragma: no cover
     from core.app_context import AppContext  # type: ignore
@@ -636,6 +639,15 @@ class PriceCheckerGUI:
         # Async check state
         self._check_in_progress: bool = False
 
+        # Initialize rare evaluator
+        try:
+            self.rare_evaluator = RareItemEvaluator()
+            self.build_matcher = BuildMatcher()
+        except Exception as e:
+            self.logger.warning(f"Failed to initialize rare evaluator: {e}")
+            self.rare_evaluator = None
+            self.build_matcher = None
+
         # Build UI pieces
         self._create_menu()
         self._create_input_area()
@@ -835,6 +847,13 @@ class PriceCheckerGUI:
         )
         self.item_inspector_text.grid(row=0, column=0, sticky="nsew")
 
+        # Add rare evaluation panel below
+        if hasattr(self, 'rare_evaluator') and self.rare_evaluator is not None:
+            self.rare_eval_panel = RareEvaluationPanel(inspector_frame)
+            self.rare_eval_panel.grid(row=1, column=0, sticky="nsew", pady=(8, 0))
+            self.rare_eval_panel.hide()  # Hidden initially
+            inspector_frame.rowconfigure(1, weight=1)
+
         inspector_frame.rowconfigure(0, weight=1)
         inspector_frame.columnconfigure(0, weight=1)
 
@@ -924,6 +943,30 @@ class PriceCheckerGUI:
         self.item_inspector_text.delete("1.0", "end")
         self.item_inspector_text.insert("1.0", text)
         self.item_inspector_text.configure(state="disabled")
+
+        # Rare item evaluation
+        if hasattr(self, 'rare_eval_panel') and hasattr(self, 'rare_evaluator'):
+            if parsed and hasattr(parsed, 'rarity') and parsed.rarity:
+                if parsed.rarity.upper() == "RARE":
+                    try:
+                        evaluation = self.rare_evaluator.evaluate(parsed)
+                        self.rare_eval_panel.display_evaluation(evaluation)
+                        self.rare_eval_panel.show()
+
+                        # Optional: Show in status bar too
+                        if evaluation.tier in ("EXCELLENT", "GOOD"):
+                            self._set_status(
+                                f"Rare: {evaluation.tier} - {evaluation.estimated_value} "
+                                f"(score: {evaluation.total_score}/100)"
+                            )
+                    except Exception as e:
+                        self.logger.warning(f"Rare evaluation failed: {e}")
+                        self.rare_eval_panel.hide()
+                else:
+                    # Not a rare item
+                    self.rare_eval_panel.hide()
+            else:
+                self.rare_eval_panel.hide()
 
     def _create_results_area(self) -> None:
         """Create the results frame, filter bar, summary banner, and attach a ResultsTable."""

@@ -1,0 +1,82 @@
+{
+  "_comment": "High-value base types that are valuable with good item level and rolls",
+  "body_armour": {
+    "high_tier": [
+      "Vaal Regalia",
+      "Carnal Armour",
+      "Sadist Garb",
+      "Assassin's Garb"
+    ],
+    "min_ilvl": 84
+  },
+  "helmet": {
+    "high_tier": [
+      "Hubris Circlet",
+      "Bone Helmet",
+      "Eternal Burgonet",
+      "Blizzard Crown"
+    ],
+    "min_ilvl": 84
+  },
+  "gloves": {
+    "high_tier": [
+      "Sorcerer Gloves",
+      "Fingerless Silk Gloves",
+      "Titan Gauntlets",
+      "Spiked Gloves"
+    ],
+    "min_ilvl": 84
+  },
+  "boots": {
+    "high_tier": [
+      "Sorcerer Boots",
+      "Two-Toned Boots",
+      "Dragonscale Boots",
+      "Slink Boots"
+    ],
+    "min_ilvl": 84
+  },
+  "ring": {
+    "high_tier": [
+      "Opal Ring",
+      "Steel Ring",
+      "Vermillion Ring",
+      "Cerulean Ring"
+    ],
+    "min_ilvl": 84
+  },
+  "amulet": {
+    "high_tier": [
+      "Jade Amulet",
+      "Onyx Amulet",
+      "Amber Amulet",
+      "Agate Amulet"
+    ],
+    "min_ilvl": 84
+  },
+  "belt": {
+    "high_tier": [
+      "Stygian Vise",
+      "Crystal Belt",
+      "Leather Belt"
+    ],
+    "min_ilvl": 84
+  },
+  "weapon_phys": {
+    "high_tier": [
+      "Jewelled Foil",
+      "Vaal Axe",
+      "Karui Chopper",
+      "Imperial Claw"
+    ],
+    "min_ilvl": 83
+  },
+  "weapon_ele": {
+    "high_tier": [
+      "Opal Sceptre",
+      "Imbued Wand",
+      "Tornado Wand"
+    ],
+    "min_ilvl": 82
+  }
+}
