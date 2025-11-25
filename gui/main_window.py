@@ -32,8 +32,10 @@ from urllib.parse import quote_plus  # currently unused but kept for future URL 
 from gui.recent_sales_window import RecentSalesWindow
 from gui.sales_dashboard_window import SalesDashboardWindow
 from gui.rare_evaluation_panel import RareEvaluationPanel
+from gui.pob_character_window import PoBCharacterWindow
 from core.rare_item_evaluator import RareItemEvaluator
 from core.build_matcher import BuildMatcher
+from core.pob_integration import CharacterManager, UpgradeChecker
 
 if TYPE_CHECKING:  # pragma: no cover
     from core.app_context import AppContext  # type: ignore
@@ -48,6 +50,7 @@ RESULT_COLUMNS: tuple[str, ...] = (
     "divine_value",
     "listing_count",
     "source",
+    "upgrade",
 )
 
 # ----------------------------------------------------------------------
@@ -359,6 +362,13 @@ class ResultsTable:
             background="#e5e5ff",
         )
 
+        # Potential upgrade items: gold/yellow background with bold
+        self.tree.tag_configure(
+            "upgrade",
+            background="#fff3cd",  # light gold/yellow
+            foreground="#856404",  # dark gold text
+        )
+
     def _compute_tags_for_values(self, values: list[str]) -> tuple[str, ...]:
         """
         Decide which tags should apply to a row based on its values.
@@ -368,6 +378,11 @@ class ResultsTable:
         tags: list[str] = []
 
         data = {col: (values[idx] if idx < len(values) else "") for idx, col in enumerate(self.columns)}
+
+        # Upgrade indicator: check the upgrade column for non-empty value
+        upgrade_str = (data.get("upgrade") or "").strip().lower()
+        if upgrade_str and upgrade_str not in ("", "no", "-", "false"):
+            tags.append("upgrade")
 
         # High / medium value based on chaos_value column
         chaos_str = (data.get("chaos_value") or "").strip()
@@ -588,6 +603,11 @@ class PriceCheckerGUI:
         # Child windows
         self._recent_sales_window: RecentSalesWindow | None = None
         self._sales_dashboard_window: SalesDashboardWindow | None = None
+        self._pob_character_window: PoBCharacterWindow | None = None
+
+        # PoB Integration
+        self._character_manager: CharacterManager | None = None
+        self._upgrade_checker: UpgradeChecker | None = None
 
         # Logger & window basics
         self.logger = self._resolve_logger()
@@ -746,6 +766,51 @@ class PriceCheckerGUI:
         )
         self._sales_dashboard_window.focus_set()
 
+    def _open_pob_character_window(self) -> None:
+        """Open (or focus) the PoB Character Manager panel."""
+        if (
+            self._pob_character_window is not None
+            and self._pob_character_window.winfo_exists()
+        ):
+            self._pob_character_window.deiconify()
+            self._pob_character_window.lift()
+            self._pob_character_window.focus_set()
+            return
+
+        # Initialize character manager if needed
+        if self._character_manager is None:
+            self._character_manager = CharacterManager()
+
+        self._pob_character_window = PoBCharacterWindow(
+            master=self.root,
+            character_manager=self._character_manager,
+            on_profile_selected=self._on_pob_profile_selected,
+        )
+        self._pob_character_window.focus_set()
+
+    def _on_pob_profile_selected(self, profile_name: str) -> None:
+        """Handle PoB profile selection - initialize upgrade checker."""
+        if self._character_manager is None:
+            return
+
+        self._upgrade_checker = UpgradeChecker(self._character_manager)
+        self._set_status(f"Upgrade checking enabled for '{profile_name}'")
+
+    def _get_upgrade_checker(self) -> UpgradeChecker | None:
+        """Get or create the upgrade checker if a profile is active."""
+        if self._character_manager is None:
+            self._character_manager = CharacterManager()
+
+        # Check if there's an active profile
+        active = self._character_manager.get_active_profile()
+        if not active:
+            return None
+
+        if self._upgrade_checker is None:
+            self._upgrade_checker = UpgradeChecker(self._character_manager)
+
+        return self._upgrade_checker
+
     def _create_menu(self) -> None:
         """Create the main menubar and all top-level menus."""
 
@@ -774,6 +839,7 @@ class PriceCheckerGUI:
         view_menu.add_command(label="Session History...", command=self._show_history_window)
         view_menu.add_command(label="Data Sources...", command=self._show_sources_dialog)
         view_menu.add_separator()
+        view_menu.add_command(label="PoB Characters...", command=self._open_pob_character_window)
         view_menu.add_command(label="Rare Item Evaluation Settings...", command=self._open_rare_eval_config)
         view_menu.add_separator()
         view_menu.add_command(label="Recent Sales…", command=self._open_recent_sales_window)
@@ -1374,6 +1440,7 @@ class PriceCheckerGUI:
                             "divine_value": "0",
                             "listing_count": "0",
                             "source": "no price_service",
+                            "upgrade": "",
                         }
                     ],
                     input_text=text,
@@ -1389,10 +1456,132 @@ class PriceCheckerGUI:
                 self._set_status("Error during price check.")
                 return
 
+            # Check for upgrades if we have an active PoB profile
+            upgrade_info = self._check_item_upgrade(text)
+
+            # Add upgrade info to results
+            results_with_upgrade = []
+            for result in results:
+                if isinstance(result, Mapping):
+                    row = dict(result)
+                else:
+                    row = {col: getattr(result, col, "") for col in RESULT_COLUMNS}
+
+                # Add upgrade column
+                if upgrade_info:
+                    row["upgrade"] = upgrade_info
+                else:
+                    row["upgrade"] = ""
+
+                results_with_upgrade.append(row)
+
             self._clear_results()
-            self._insert_result_rows(results, input_text=text)
+            self._insert_result_rows(results_with_upgrade, input_text=text)
         finally:
             self._check_in_progress = False
+
+    def _check_item_upgrade(self, item_text: str) -> str:
+        """
+        Check if the item is a potential upgrade for the active PoB character.
+
+        Returns a short string like "Body Armour" if it's an upgrade, or "" if not.
+        """
+        upgrade_checker = self._get_upgrade_checker()
+        if not upgrade_checker:
+            return ""
+
+        # Parse the item to get base type and mods
+        parser = getattr(self.app_context, "parser", None)
+        if parser is None:
+            return ""
+
+        try:
+            parsed = parser.parse(item_text)
+        except Exception:
+            return ""
+
+        if not parsed:
+            return ""
+
+        # Get the item's base type and mods
+        base_type = getattr(parsed, "base_type", "") or getattr(parsed, "type_line", "") or ""
+
+        # Collect mods
+        all_mods: list[str] = []
+        implicits = getattr(parsed, "implicits", []) or []
+        explicits = getattr(parsed, "explicits", []) or []
+        if implicits:
+            all_mods.extend(implicits)
+        if explicits:
+            all_mods.extend(explicits)
+
+        if not base_type:
+            return ""
+
+        # Map base type to item class for slot matching
+        item_class = self._infer_item_class_from_base(base_type)
+        if not item_class:
+            return ""
+
+        try:
+            is_upgrade, reasons, slot = upgrade_checker.check_upgrade(
+                item_class=item_class,
+                item_mods=all_mods,
+            )
+
+            if is_upgrade and slot:
+                return slot
+            return ""
+        except Exception as e:
+            self.logger.debug(f"Upgrade check failed: {e}")
+            return ""
+
+    def _infer_item_class_from_base(self, base_type: str) -> str:
+        """Infer item class from base type for upgrade checking."""
+        base_lower = base_type.lower()
+
+        # Body armour patterns
+        if any(x in base_lower for x in ["regalia", "robe", "vest", "plate", "brigandine", "jacket",
+                                          "coat", "lamellar", "hauberk", "chestplate", "garb", "tunic",
+                                          "wyrmscale", "doublet", "carnal armour", "occultist"]):
+            return "Body Armour"
+
+        # Helmet patterns
+        if any(x in base_lower for x in ["helmet", "helm", "circlet", "cap", "hood", "crown",
+                                          "mask", "burgonet", "bascinet", "coif", "tricorne",
+                                          "sallet", "cage", "great crown"]):
+            return "Helmet"
+
+        # Gloves patterns
+        if any(x in base_lower for x in ["gloves", "gauntlets", "mitts", "wraps", "grips", "vambrace"]):
+            return "Gloves"
+
+        # Boots patterns
+        if any(x in base_lower for x in ["boots", "greaves", "shoes", "slippers", "leggings"]):
+            return "Boots"
+
+        # Belt patterns
+        if any(x in base_lower for x in ["belt", "sash", "stygian", "rustic"]):
+            return "Belt"
+
+        # Amulet patterns
+        if any(x in base_lower for x in ["amulet", "talisman", "pendant"]):
+            return "Amulet"
+
+        # Ring patterns
+        if any(x in base_lower for x in ["ring"]):
+            return "Ring"
+
+        # Shield patterns
+        if any(x in base_lower for x in ["shield", "buckler", "kite", "spiked bundle", "tower"]):
+            return "Shield"
+
+        # Weapon patterns (simplified)
+        if any(x in base_lower for x in ["sword", "axe", "mace", "staff", "wand", "sceptre",
+                                          "dagger", "claw", "bow", "thrusting", "foil", "rapier"]):
+            return "Weapon"
+
+        return ""
 
     def _build_aggregate_rows_for_check(
             self,

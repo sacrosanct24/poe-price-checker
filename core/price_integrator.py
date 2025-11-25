@@ -22,6 +22,16 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
+class UpgradeInfo:
+    """Information about whether an item is an upgrade for a character."""
+    is_upgrade: bool
+    reasons: List[str] = field(default_factory=list)
+    compared_slot: Optional[str] = None
+    compared_item_name: Optional[str] = None
+    character_name: Optional[str] = None
+
+
+@dataclass
 class PriceResult:
     """Result of price lookup or estimation."""
     chaos_value: float
@@ -31,6 +41,7 @@ class PriceResult:
     notes: List[str] = field(default_factory=list)
     ml_confidence_score: Optional[float] = None  # 0-100 from poeprices.info
     price_range: Optional[Tuple[float, float]] = None  # (min, max) for ML predictions
+    upgrade_info: Optional[UpgradeInfo] = None  # Upgrade status for character
 
     @property
     def display_price(self) -> str:
@@ -71,6 +82,7 @@ class PriceIntegrator:
         league: str = "Standard",
         evaluator: Optional[RareItemEvaluator] = None,
         use_poeprices: bool = True,
+        enable_upgrade_check: bool = True,
     ):
         """
         Initialize the price integrator.
@@ -79,15 +91,21 @@ class PriceIntegrator:
             league: League for pricing data
             evaluator: RareItemEvaluator instance (creates new if None)
             use_poeprices: Enable poeprices.info ML pricing (default: True)
+            enable_upgrade_check: Enable upgrade checking against PoB characters (default: True)
         """
         self.league = league
         self.evaluator = evaluator or RareItemEvaluator()
         self.use_poeprices = use_poeprices
+        self.enable_upgrade_check = enable_upgrade_check
 
         # Lazy-load API clients
         self._ninja_client = None
         self._poeprices_client = None
         self._divine_value: float = 180.0  # Default fallback
+
+        # Lazy-load upgrade checker
+        self._character_manager = None
+        self._upgrade_checker = None
 
         # Cache for unique prices
         self._unique_prices: Dict[str, float] = {}
@@ -121,6 +139,35 @@ class PriceIntegrator:
                 logger.warning(f"Failed to load PoePricesAPI: {e}")
                 self._poeprices_client = None
         return self._poeprices_client
+
+    @property
+    def character_manager(self):
+        """Lazy-load character manager for PoB profiles."""
+        if self._character_manager is None and self.enable_upgrade_check:
+            try:
+                from core.pob_integration import CharacterManager
+                self._character_manager = CharacterManager()
+                profiles = self._character_manager.list_profiles()
+                if profiles:
+                    logger.info(f"Loaded CharacterManager with {len(profiles)} profiles")
+                else:
+                    logger.info("CharacterManager loaded (no profiles)")
+            except Exception as e:
+                logger.warning(f"Failed to load CharacterManager: {e}")
+                self._character_manager = None
+        return self._character_manager
+
+    @property
+    def upgrade_checker(self):
+        """Lazy-load upgrade checker."""
+        if self._upgrade_checker is None and self.character_manager:
+            try:
+                from core.pob_integration import UpgradeChecker
+                self._upgrade_checker = UpgradeChecker(self.character_manager)
+            except Exception as e:
+                logger.warning(f"Failed to load UpgradeChecker: {e}")
+                self._upgrade_checker = None
+        return self._upgrade_checker
 
     def _ensure_prices_loaded(self) -> None:
         """Load unique item prices from poe.ninja."""
@@ -363,10 +410,158 @@ class PriceIntegrator:
 
         return base_chaos, notes
 
+    # Base type to item class mapping for upgrade checking
+    BASE_TYPE_TO_CLASS = {
+        # Body Armours
+        "vaal regalia": "Body Armour", "astral plate": "Body Armour",
+        "glorious plate": "Body Armour", "sadist garb": "Body Armour",
+        "assassin's garb": "Body Armour", "zodiac leather": "Body Armour",
+        "triumphant lamellar": "Body Armour", "full dragonscale": "Body Armour",
+        # Helmets
+        "hubris circlet": "Helmet", "royal burgonet": "Helmet",
+        "lion pelt": "Helmet", "eternal burgonet": "Helmet",
+        "nightmare bascinet": "Helmet", "pig-faced bascinet": "Helmet",
+        "raven mask": "Helmet", "harlequin mask": "Helmet",
+        # Gloves
+        "sorcerer gloves": "Gloves", "titan gauntlets": "Gloves",
+        "slink gloves": "Gloves", "fingerless silk gloves": "Gloves",
+        "apothecary's gloves": "Gloves", "goathide gloves": "Gloves",
+        # Boots
+        "sorcerer boots": "Boots", "titan greaves": "Boots",
+        "slink boots": "Boots", "two-toned boots": "Boots",
+        "zealot boots": "Boots", "dragonscale boots": "Boots",
+        # Belts
+        "stygian vise": "Belt", "leather belt": "Belt",
+        "heavy belt": "Belt", "crystal belt": "Belt",
+        # Amulets
+        "turquoise amulet": "Amulet", "onyx amulet": "Amulet",
+        "jade amulet": "Amulet", "citrine amulet": "Amulet",
+        "marble amulet": "Amulet", "lapis amulet": "Amulet",
+        # Rings
+        "two-stone ring": "Ring", "diamond ring": "Ring",
+        "coral ring": "Ring", "opal ring": "Ring",
+        "vermillion ring": "Ring", "steel ring": "Ring",
+        "amethyst ring": "Ring", "topaz ring": "Ring",
+        "sapphire ring": "Ring", "ruby ring": "Ring",
+        "prismatic ring": "Ring", "unset ring": "Ring",
+    }
+
+    def _get_item_class_from_base(self, base_type: str) -> str:
+        """Infer item class from base type name."""
+        if not base_type:
+            return ""
+        base_lower = base_type.lower()
+
+        # Try exact match first
+        if base_lower in self.BASE_TYPE_TO_CLASS:
+            return self.BASE_TYPE_TO_CLASS[base_lower]
+
+        # Pattern-based inference
+        if any(word in base_lower for word in ["regalia", "plate", "garb", "vest", "robe", "mail", "coat"]):
+            return "Body Armour"
+        if any(word in base_lower for word in ["circlet", "burgonet", "helmet", "mask", "crown", "hood", "cap"]):
+            return "Helmet"
+        if any(word in base_lower for word in ["gloves", "gauntlets", "mitts"]):
+            return "Gloves"
+        if any(word in base_lower for word in ["boots", "greaves", "slippers", "shoes"]):
+            return "Boots"
+        if any(word in base_lower for word in ["belt", "vise", "sash", "stygian"]):
+            return "Belt"
+        if any(word in base_lower for word in ["amulet", "talisman"]):
+            return "Amulet"
+        if "ring" in base_lower:
+            return "Ring"
+        if any(word in base_lower for word in ["shield", "buckler", "kite"]):
+            return "Shield"
+        if any(word in base_lower for word in ["quiver"]):
+            return "Quiver"
+        if any(word in base_lower for word in ["bow"]):
+            return "Bow"
+        if any(word in base_lower for word in ["sword", "rapier", "sabre"]):
+            return "Sword"
+        if any(word in base_lower for word in ["axe", "chopper", "cleaver"]):
+            return "Axe"
+        if any(word in base_lower for word in ["mace", "sceptre", "club", "gavel"]):
+            return "Mace"
+        if any(word in base_lower for word in ["wand"]):
+            return "Wand"
+        if any(word in base_lower for word in ["dagger", "stiletto"]):
+            return "Dagger"
+        if any(word in base_lower for word in ["claw", "fright claw"]):
+            return "Claw"
+        if any(word in base_lower for word in ["staff", "quarterstaff"]):
+            return "Staff"
+
+        return ""
+
+    def check_upgrade(
+        self,
+        item: ParsedItem,
+        profile_name: Optional[str] = None,
+    ) -> Optional[UpgradeInfo]:
+        """
+        Check if an item is an upgrade for a character.
+
+        Args:
+            item: ParsedItem to check
+            profile_name: Specific character profile name (uses active if None)
+
+        Returns:
+            UpgradeInfo if check was performed, None if no profiles loaded
+        """
+        if not self.enable_upgrade_check or not self.upgrade_checker:
+            return None
+
+        # Get the item class for slot matching (infer from base type)
+        item_class = self._get_item_class_from_base(item.base_type or "")
+        if not item_class:
+            return None
+
+        # Get item mods for comparison
+        all_mods = []
+        if hasattr(item, 'implicits') and item.implicits:
+            all_mods.extend(item.implicits)
+        if hasattr(item, 'explicits') and item.explicits:
+            all_mods.extend(item.explicits)
+
+        if not all_mods:
+            return None
+
+        # Perform the upgrade check
+        is_upgrade, reasons, compared_slot = self.upgrade_checker.check_upgrade(
+            item_class=item_class,
+            item_mods=all_mods,
+            profile_name=profile_name,
+        )
+
+        # Get the compared item name if applicable
+        compared_item_name = None
+        character_name = None
+        if compared_slot:
+            if profile_name:
+                profile = self.character_manager.get_profile(profile_name)
+            else:
+                profile = self.character_manager.get_active_profile()
+
+            if profile:
+                character_name = profile.name
+                current_item = profile.get_item_for_slot(compared_slot)
+                if current_item:
+                    compared_item_name = current_item.display_name
+
+        return UpgradeInfo(
+            is_upgrade=is_upgrade,
+            reasons=reasons,
+            compared_slot=compared_slot,
+            compared_item_name=compared_item_name,
+            character_name=character_name,
+        )
+
     def price_item(
         self,
         item: ParsedItem,
         item_text: Optional[str] = None,
+        check_upgrade: bool = True,
     ) -> PriceResult:
         """
         Get price for any item type.
@@ -374,47 +569,57 @@ class PriceIntegrator:
         Args:
             item: ParsedItem to price
             item_text: Raw item text for ML pricing (optional, for rares)
+            check_upgrade: Check if item is an upgrade for character (default: True)
 
         Returns:
-            PriceResult with value
+            PriceResult with value and optional upgrade info
         """
+        result: PriceResult
+
         if not item.rarity:
-            return PriceResult(
+            result = PriceResult(
                 chaos_value=0,
                 divine_value=0,
                 confidence="unknown",
                 source="none",
                 notes=["Unknown item rarity"]
             )
+        else:
+            rarity = item.rarity.upper()
 
-        rarity = item.rarity.upper()
+            # Unique items - use poe.ninja
+            if rarity == "UNIQUE":
+                result = self.get_unique_price(item)
+                if not result:
+                    # Fallback for unpriced uniques
+                    result = PriceResult(
+                        chaos_value=1,
+                        divine_value=0,
+                        confidence="unknown",
+                        source="fallback",
+                        notes=["Unique not found in poe.ninja"]
+                    )
 
-        # Unique items - use poe.ninja
-        if rarity == "UNIQUE":
-            result = self.get_unique_price(item)
-            if result:
-                return result
-            # Fallback for unpriced uniques
-            return PriceResult(
-                chaos_value=1,
-                divine_value=0,
-                confidence="unknown",
-                source="fallback",
-                notes=["Unique not found in poe.ninja"]
-            )
+            # Rare items - use ML prediction + evaluator
+            elif rarity == "RARE":
+                result = self.get_rare_price(item, item_text=item_text)
 
-        # Rare items - use ML prediction + evaluator
-        if rarity == "RARE":
-            return self.get_rare_price(item, item_text=item_text)
+            # Magic/Normal items - generally worthless except special cases
+            else:
+                result = PriceResult(
+                    chaos_value=0,
+                    divine_value=0,
+                    confidence="exact",
+                    source="static",
+                    notes=["Non-rare/unique items are typically vendor trash"]
+                )
 
-        # Magic/Normal items - generally worthless except special cases
-        return PriceResult(
-            chaos_value=0,
-            divine_value=0,
-            confidence="exact",
-            source="static",
-            notes=["Non-rare/unique items are typically vendor trash"]
-        )
+        # Check if item is an upgrade for character
+        if check_upgrade and self.enable_upgrade_check:
+            upgrade_info = self.check_upgrade(item)
+            result.upgrade_info = upgrade_info
+
+        return result
 
     def get_high_value_uniques(
         self,
@@ -493,6 +698,27 @@ class PriceIntegrator:
             lines.append("Details:")
             for note in result.notes:
                 lines.append(f"  - {note}")
+
+        # Show upgrade info if available
+        if result.upgrade_info:
+            lines.append("")
+            lines.append("=== Upgrade Check ===")
+            if result.upgrade_info.character_name:
+                lines.append(f"Character: {result.upgrade_info.character_name}")
+            if result.upgrade_info.is_upgrade:
+                lines.append("*** POTENTIAL UPGRADE ***")
+                if result.upgrade_info.compared_slot:
+                    lines.append(f"Slot: {result.upgrade_info.compared_slot}")
+                if result.upgrade_info.compared_item_name:
+                    lines.append(f"Current: {result.upgrade_info.compared_item_name}")
+                if result.upgrade_info.reasons:
+                    lines.append("Why:")
+                    for reason in result.upgrade_info.reasons:
+                        lines.append(f"  + {reason}")
+            else:
+                lines.append("Not an upgrade")
+                if result.upgrade_info.reasons:
+                    lines.append(f"Reason: {result.upgrade_info.reasons[0]}")
 
         return "\n".join(lines)
 
