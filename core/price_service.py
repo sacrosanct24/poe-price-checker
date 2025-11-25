@@ -96,47 +96,35 @@ class PriceService:
                 parsed
             )
 
-        # 2b) For rare items: use rare_item_evaluator if no price found
+        # 2b) For rare items: evaluate and attach evaluation for trade API filtering
         rarity = self._get_rarity(parsed)
-        if rarity and rarity.upper() == "RARE":
-            # Check if we should use rare evaluator
-            use_rare_evaluator = False
+        rare_evaluation = None
 
-            if self.rare_evaluator is not None:
-                # Use evaluator if:
-                # - No price found (chaos_value == 0)
-                # - OR price is very low (<5c) which might be incorrect for good rares
-                if chaos_value == 0.0:
-                    use_rare_evaluator = True
-                    self.logger.info(
-                        "Rare item with no market price found, using rare_item_evaluator"
-                    )
-                elif chaos_value < 5.0:
-                    use_rare_evaluator = True
-                    self.logger.info(
-                        "Rare item with low market price (%.1fc), checking rare_item_evaluator",
-                        chaos_value
-                    )
+        if rarity and rarity.upper() == "RARE" and self.rare_evaluator is not None:
+            try:
+                # Always evaluate rares to get affix data for trade API
+                rare_evaluation = self.rare_evaluator.evaluate(parsed)
 
-            if use_rare_evaluator:
-                try:
-                    evaluation = self.rare_evaluator.evaluate(parsed)
+                # Attach evaluation to parsed item for trade API to use
+                parsed._rare_evaluation = rare_evaluation
 
+                # Only use evaluator price if market price is missing or very low
+                if chaos_value == 0.0 or chaos_value < 5.0:
                     # Convert estimated_value to chaos
                     evaluator_chaos = self._parse_estimated_value_to_chaos(
-                        evaluation.estimated_value
+                        rare_evaluation.estimated_value
                     )
 
                     if evaluator_chaos is not None and evaluator_chaos > chaos_value:
-                        # Use evaluator price if it's higher than market price
+                        # Use evaluator price as initial estimate
                         old_chaos = chaos_value
                         chaos_value = evaluator_chaos
-                        listing_count = 0  # Evaluator doesn't provide listing count
+                        listing_count = 0
 
                         # Build source label with tier and score
                         source_label = (
-                            f"rare_evaluator ({evaluation.tier}, "
-                            f"score: {evaluation.total_score}/100)"
+                            f"rare_evaluator ({rare_evaluation.tier}, "
+                            f"score: {rare_evaluation.total_score}/100)"
                         )
 
                         # Map tier to confidence
@@ -146,30 +134,37 @@ class PriceService:
                             "average": "low",
                             "vendor": "low"
                         }
-                        confidence = tier_confidence.get(evaluation.tier, "low")
+                        confidence = tier_confidence.get(rare_evaluation.tier, "low")
 
                         self.logger.info(
                             "Rare item '%s' priced by evaluator: %.1fc (was: %.1fc) "
-                            "[tier=%s, score=%d]",
+                            "[tier=%s, score=%d, will check trade API]",
                             self._get_item_display_name(parsed),
                             chaos_value,
                             old_chaos,
-                            evaluation.tier,
-                            evaluation.total_score
+                            rare_evaluation.tier,
+                            rare_evaluation.total_score
                         )
                     elif evaluator_chaos is not None:
                         self.logger.info(
                             "Rare item '%s' evaluator price (%.1fc) not used "
-                            "(market price %.1fc is higher)",
+                            "(market price %.1fc is higher, will check trade API)",
                             self._get_item_display_name(parsed),
                             evaluator_chaos,
                             chaos_value
                         )
-
-                except Exception as exc:
-                    self.logger.warning(
-                        "Failed to evaluate rare item: %s", exc, exc_info=True
+                else:
+                    self.logger.info(
+                        "Rare item '%s' has market price %.1fc, "
+                        "but will use trade API with affix filters for validation",
+                        self._get_item_display_name(parsed),
+                        chaos_value
                     )
+
+            except Exception as exc:
+                self.logger.warning(
+                    "Failed to evaluate rare item: %s", exc, exc_info=True
+                )
 
         # 3) Optionally gather trade quotes
         trade_quotes: list[dict[str, Any]] = []

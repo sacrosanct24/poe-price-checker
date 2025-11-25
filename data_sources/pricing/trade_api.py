@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Mapping, Optional
 import requests
 
 from data_sources.base_api import BaseAPIClient
+from data_sources.pricing.trade_stat_ids import build_stat_filters
 from core.price_multi import RESULT_COLUMNS
 
 logger = logging.getLogger(__name__)
@@ -311,11 +312,11 @@ class TradeApiSource:
 
     def _build_query(self, parsed_item: Any) -> Dict[str, Any]:
         """
-        Very basic query builder.
+        Build trade API search query from ParsedItem.
 
-        For uniques, we usually specify name + type.
-        For now we assume PoE1 uniques like Tabula Rasa; you can extend
-        this to handle rares, maps, etc. as your ParsedItem grows.
+        For uniques: specify name + type
+        For rares: specify type (base) + affix filters (if evaluation available)
+        For other items: basic name/type search
         """
         name = getattr(parsed_item, "name", None) or getattr(
             parsed_item, "display_name", None
@@ -323,6 +324,7 @@ class TradeApiSource:
         base_type = getattr(parsed_item, "base_type", None) or getattr(
             parsed_item, "base_name", None
         )
+        rarity = str(getattr(parsed_item, "rarity", "") or "").upper()
 
         name_str = str(name or "").strip()
         base_str = str(base_type or "").strip()
@@ -335,10 +337,31 @@ class TradeApiSource:
             "sort": {"price": "asc"},
         }
 
-        if name_str:
-            query["query"]["name"] = name_str
-        if base_str:
-            query["query"]["type"] = base_str
+        # RARE items: use base type + affix filters (not name, since it's random)
+        if rarity == "RARE":
+            if base_str:
+                query["query"]["type"] = base_str
+
+            # Add affix filters if evaluation data is available
+            rare_evaluation = getattr(parsed_item, "_rare_evaluation", None)
+            if rare_evaluation is not None:
+                matched_affixes = getattr(rare_evaluation, "matched_affixes", None)
+                if matched_affixes:
+                    stat_filters = build_stat_filters(matched_affixes, max_filters=4)
+                    if stat_filters:
+                        query["query"]["stats"][0]["filters"] = stat_filters
+                        self.logger.info(
+                            "Built rare item query with %d affix filters for base '%s'",
+                            len(stat_filters),
+                            base_str
+                        )
+
+        # UNIQUE/OTHER items: use name + type
+        else:
+            if name_str:
+                query["query"]["name"] = name_str
+            if base_str:
+                query["query"]["type"] = base_str
 
         return query
 
