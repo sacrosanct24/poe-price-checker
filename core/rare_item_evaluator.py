@@ -51,6 +51,25 @@ class RareItemEvaluation:
     synergies_found: List[str] = None  # Names of synergies detected
     red_flags_found: List[str] = None  # Names of red flags detected
 
+    # Slot-specific bonuses (Phase 1.3)
+    slot_bonus: int = 0  # Bonus from slot-specific rules
+    slot_bonus_reasons: List[str] = None  # Reasons for slot bonuses
+
+    # Crafting potential (Phase 1.3)
+    open_prefixes: int = 0  # Estimated open prefix slots
+    open_suffixes: int = 0  # Estimated open suffix slots
+    crafting_bonus: int = 0  # Bonus for crafting potential
+
+    # Fractured items (Phase 1.3)
+    is_fractured: bool = False
+    fractured_bonus: int = 0  # Bonus for fractured T1 mods
+    fractured_mod: str = None  # The fractured mod if detected
+
+    # Build archetype matching (Phase 2)
+    matched_archetypes: List[str] = None  # Which build archetypes this item fits
+    archetype_bonus: int = 0  # Bonus for fitting meta archetypes
+    meta_bonus: int = 0  # Bonus from current meta popularity
+
     # Build matching (if provided)
     matches_build: bool = False
     build_name: Optional[str] = None
@@ -61,6 +80,10 @@ class RareItemEvaluation:
             self.synergies_found = []
         if self.red_flags_found is None:
             self.red_flags_found = []
+        if self.slot_bonus_reasons is None:
+            self.slot_bonus_reasons = []
+        if self.matched_archetypes is None:
+            self.matched_archetypes = []
 
 
 class RareItemEvaluator:
@@ -92,6 +115,11 @@ class RareItemEvaluator:
         self.red_flags = self.config.get("_red_flags", {})
         self.influence_mods = self.config.get("_influence_mods", {})
         self.valuable_bases = self._load_valuable_bases()
+        self.slot_rules = self.valuable_bases.get("_slot_rules", {})
+
+        # Phase 2: Build archetypes and meta integration
+        self.build_archetypes = self._load_build_archetypes()
+        self.meta_weights = self._load_meta_weights()
 
     def _load_valuable_affixes(self) -> Dict:
         """Load valuable affixes configuration."""
@@ -107,6 +135,39 @@ class RareItemEvaluator:
         if base_file.exists():
             with open(base_file) as f:
                 return json.load(f)
+        return {}
+
+    def _load_build_archetypes(self) -> Dict:
+        """Load build archetype definitions."""
+        archetype_file = self.data_dir / "build_archetypes.json"
+        if archetype_file.exists():
+            with open(archetype_file) as f:
+                data = json.load(f)
+                return data.get("archetypes", {})
+        return {}
+
+    def _load_meta_weights(self) -> Dict:
+        """Load meta-based weight adjustments."""
+        # First try meta_affixes.json (from MetaAnalyzer)
+        meta_file = self.data_dir / "meta_affixes.json"
+        if meta_file.exists():
+            try:
+                with open(meta_file) as f:
+                    data = json.load(f)
+                    return data.get("affixes", {})
+            except Exception:
+                pass
+
+        # Fallback to build_archetypes.json meta section
+        archetype_file = self.data_dir / "build_archetypes.json"
+        if archetype_file.exists():
+            try:
+                with open(archetype_file) as f:
+                    data = json.load(f)
+                    return data.get("_meta_weights", {}).get("popularity_boosts", {})
+            except Exception:
+                pass
+
         return {}
 
     def evaluate(self, item: ParsedItem) -> RareItemEvaluation:
@@ -150,13 +211,34 @@ class RareItemEvaluator:
         red_flags_found, red_flag_penalty = self._check_red_flags(
             item, matched_affixes)
 
-        # Calculate total score
+        # Phase 1.3: Slot-specific rules
+        slot_bonus, slot_bonus_reasons = self._check_slot_rules(
+            item, matched_affixes)
+
+        # Phase 1.3: Open affix detection (crafting potential)
+        open_prefixes, open_suffixes, crafting_bonus = self._detect_open_affixes(
+            item, matched_affixes)
+
+        # Phase 1.3: Fractured item handling
+        is_fractured, fractured_bonus, fractured_mod = self._check_fractured(
+            item, matched_affixes)
+
+        # Phase 2: Build archetype matching
+        matched_archetypes, archetype_bonus = self._match_archetypes(
+            matched_affixes)
+
+        # Phase 2: Meta popularity bonus
+        meta_bonus = self._calculate_meta_bonus(matched_affixes)
+
+        # Calculate total score (now includes Phase 2 bonuses)
         total_score = self._calculate_total_score(
-            base_score, affix_score, has_high_ilvl, synergy_bonus, red_flag_penalty)
+            base_score, affix_score, has_high_ilvl, synergy_bonus, red_flag_penalty,
+            slot_bonus, crafting_bonus, fractured_bonus, archetype_bonus, meta_bonus)
 
         # Determine tier and estimated value
         tier, estimated_value = self._determine_tier(
-            total_score, matched_affixes, synergies_found)
+            total_score, matched_affixes, synergies_found,
+            is_fractured, crafting_bonus, matched_archetypes)
 
         return RareItemEvaluation(
             item=item,
@@ -170,6 +252,17 @@ class RareItemEvaluator:
             matched_affixes=matched_affixes,
             synergies_found=synergies_found,
             red_flags_found=red_flags_found,
+            slot_bonus=slot_bonus,
+            slot_bonus_reasons=slot_bonus_reasons,
+            open_prefixes=open_prefixes,
+            open_suffixes=open_suffixes,
+            crafting_bonus=crafting_bonus,
+            is_fractured=is_fractured,
+            fractured_bonus=fractured_bonus,
+            fractured_mod=fractured_mod,
+            matched_archetypes=matched_archetypes,
+            archetype_bonus=archetype_bonus,
+            meta_bonus=meta_bonus,
             tier=tier,
             estimated_value=estimated_value
         )
@@ -474,9 +567,226 @@ class RareItemEvaluator:
 
         return None
 
+    def _check_slot_rules(
+        self, item: ParsedItem, matches: List[AffixMatch]
+    ) -> Tuple[int, List[str]]:
+        """
+        Apply slot-specific evaluation rules.
+
+        Returns:
+            (bonus_score, list_of_reasons)
+        """
+        bonus = 0
+        reasons = []
+
+        item_slot = self._determine_item_slot(item)
+        if not item_slot or item_slot not in self.slot_rules:
+            return bonus, reasons
+
+        slot_config = self.slot_rules[item_slot]
+        affix_types = set(match.affix_type for match in matches)
+
+        # Check for premium bases (e.g., Stygian Vise)
+        premium_bases = slot_config.get("premium_bases", [])
+        if item.base_type and item.base_type in premium_bases:
+            premium_bonus = slot_config.get("premium_bonus", 0)
+            bonus += premium_bonus
+            reasons.append(f"Premium base ({item.base_type}): +{premium_bonus}")
+
+        # Check if item has all bonus affixes for the slot
+        bonus_affixes = slot_config.get("bonus_affixes", [])
+        if bonus_affixes:
+            matched_bonus = [a for a in bonus_affixes if a in affix_types]
+            if len(matched_bonus) >= 3:
+                all_bonus = slot_config.get("all_bonus_score", 0)
+                bonus += all_bonus
+                reasons.append(
+                    f"Slot-optimal affixes ({len(matched_bonus)}): +{all_bonus}")
+
+        # Check for 6-link bonus on body armour
+        if item_slot == "body_armour":
+            # Detect 6-link from sockets field
+            if hasattr(item, 'sockets') and item.sockets:
+                socket_str = str(item.sockets)
+                # Count max linked group (look for 6 consecutive linked sockets)
+                if "-" in socket_str:
+                    groups = socket_str.replace(" ", "").split("-")
+                    # This is simplified - real detection would parse socket groups
+                    linked_count = socket_str.count("-") + 1
+                    if linked_count >= 6 or "6L" in socket_str.upper():
+                        six_link_bonus = slot_config.get("six_link_bonus", 0)
+                        bonus += six_link_bonus
+                        reasons.append(f"6-Link: +{six_link_bonus}")
+
+        return bonus, reasons
+
+    def _detect_open_affixes(
+        self, item: ParsedItem, matches: List[AffixMatch]
+    ) -> Tuple[int, int, int]:
+        """
+        Estimate open prefix/suffix slots for crafting potential.
+
+        Returns:
+            (open_prefixes, open_suffixes, crafting_bonus)
+        """
+        # Typical rare can have 3 prefixes and 3 suffixes (6 total affixes)
+        total_explicits = len(item.explicits) if item.explicits else 0
+
+        # Estimate based on total mod count
+        # This is simplified - proper detection requires knowing prefix vs suffix
+        estimated_filled = min(6, total_explicits)
+
+        # Rough heuristic: assume roughly equal prefix/suffix split
+        filled_prefixes = estimated_filled // 2
+        filled_suffixes = estimated_filled - filled_prefixes
+
+        open_prefixes = max(0, 3 - filled_prefixes)
+        open_suffixes = max(0, 3 - filled_suffixes)
+
+        # Calculate bonus for crafting potential
+        crafting_bonus = 0
+
+        # Items with open slots have crafting potential
+        if open_prefixes >= 1 or open_suffixes >= 1:
+            # Base bonus for having any open slot
+            crafting_bonus = 5
+
+            # Extra bonus for multiple open slots
+            if open_prefixes + open_suffixes >= 2:
+                crafting_bonus = 10
+
+            # High-value crafting base (2+ open with good existing mods)
+            if open_prefixes + open_suffixes >= 2 and len(matches) >= 2:
+                t1_count = len([m for m in matches if m.tier == "tier1"])
+                if t1_count >= 1:
+                    crafting_bonus = 15
+
+        return open_prefixes, open_suffixes, crafting_bonus
+
+    def _check_fractured(
+        self, item: ParsedItem, matches: List[AffixMatch]
+    ) -> Tuple[bool, int, Optional[str]]:
+        """
+        Check for fractured items and evaluate fractured mod value.
+
+        Returns:
+            (is_fractured, bonus_score, fractured_mod_text)
+        """
+        is_fractured = getattr(item, 'is_fractured', False)
+        if not is_fractured:
+            return False, 0, None
+
+        bonus = 0
+        fractured_mod = None
+
+        # Try to identify the fractured mod
+        # Fractured mods are typically marked in the item text
+        # For now, we'll check if any T1 mods exist (likely the fractured one)
+        t1_matches = [m for m in matches if m.tier == "tier1"]
+
+        if t1_matches:
+            # Assume the best T1 mod is fractured (simplified)
+            best_t1 = max(t1_matches, key=lambda m: m.weight)
+            fractured_mod = best_t1.mod_text
+
+            # T1 fractured mod = significant crafting base value
+            bonus = 25  # Base bonus for T1 fractured
+
+            # Extra bonus for high-weight fractured mods
+            if best_t1.weight >= 9:
+                bonus = 35  # Premium fractured mod (life, MS, etc.)
+            elif best_t1.weight >= 7:
+                bonus = 30  # Good fractured mod (res, ES, etc.)
+
+        elif matches:
+            # T2/T3 fractured still has some value
+            best_match = max(matches, key=lambda m: m.weight)
+            fractured_mod = best_match.mod_text
+            bonus = 10  # Lower tier fractured
+
+        return True, bonus, fractured_mod
+
+    def _match_archetypes(
+        self, matches: List[AffixMatch]
+    ) -> Tuple[List[str], int]:
+        """
+        Match item against build archetypes to determine fit.
+
+        Returns:
+            (list_of_matching_archetypes, bonus_score)
+        """
+        matched = []
+        total_bonus = 0
+
+        if not self.build_archetypes:
+            return matched, total_bonus
+
+        # Get affix types present on item
+        affix_types = set(match.affix_type for match in matches)
+
+        for archetype_key, archetype in self.build_archetypes.items():
+            priority_affixes = set(archetype.get("priority_affixes", []))
+            anti_affixes = set(archetype.get("anti_affixes", []))
+
+            # Check for anti-affixes (disqualifiers)
+            if anti_affixes & affix_types:
+                continue
+
+            # Count how many priority affixes match
+            matching_priority = priority_affixes & affix_types
+
+            # Need at least 2 priority affixes to match archetype
+            if len(matching_priority) >= 2:
+                matched.append(archetype_key)
+
+                # Bonus based on how well item fits
+                if len(matching_priority) >= 4:
+                    total_bonus = max(total_bonus, 15)  # Excellent fit
+                elif len(matching_priority) >= 3:
+                    total_bonus = max(total_bonus, 10)  # Good fit
+                else:
+                    total_bonus = max(total_bonus, 5)   # Decent fit
+
+        return matched, total_bonus
+
+    def _calculate_meta_bonus(self, matches: List[AffixMatch]) -> int:
+        """
+        Calculate bonus based on current meta popularity.
+
+        Returns:
+            Meta bonus score (0-10)
+        """
+        if not self.meta_weights:
+            return 0
+
+        bonus = 0
+        affix_types = set(match.affix_type for match in matches)
+
+        # Check for meta-boosted affixes
+        for affix_type in affix_types:
+            if affix_type in self.meta_weights:
+                # Meta weights can be either a dict with popularity_percent or a simple int
+                meta_data = self.meta_weights[affix_type]
+                if isinstance(meta_data, dict):
+                    # From meta_affixes.json (MetaAnalyzer output)
+                    popularity = meta_data.get("popularity_percent", 0)
+                    if popularity >= 50:
+                        bonus += 3
+                    elif popularity >= 30:
+                        bonus += 2
+                    elif popularity >= 10:
+                        bonus += 1
+                else:
+                    # Simple boost value from build_archetypes.json
+                    bonus += int(meta_data)
+
+        return min(10, bonus)  # Cap at 10
+
     def _calculate_total_score(
         self, base_score: int, affix_score: int, has_high_ilvl: bool,
-        synergy_bonus: int = 0, red_flag_penalty: int = 0
+        synergy_bonus: int = 0, red_flag_penalty: int = 0,
+        slot_bonus: int = 0, crafting_bonus: int = 0, fractured_bonus: int = 0,
+        archetype_bonus: int = 0, meta_bonus: int = 0
     ) -> int:
         """
         Calculate total item score.
@@ -487,6 +797,11 @@ class RareItemEvaluator:
             has_high_ilvl: Boolean
             synergy_bonus: Bonus from synergies
             red_flag_penalty: Penalty from red flags (negative number)
+            slot_bonus: Bonus from slot-specific rules
+            crafting_bonus: Bonus for open affixes/crafting potential
+            fractured_bonus: Bonus for fractured items
+            archetype_bonus: Bonus for matching build archetypes
+            meta_bonus: Bonus from current meta popularity
 
         Returns:
             Total score 0-100
@@ -498,13 +813,24 @@ class RareItemEvaluator:
             (10 if has_high_ilvl else 0)
         )
 
-        # Add synergy bonus and red flag penalty
-        final_score = weighted_score + synergy_bonus + red_flag_penalty
+        # Add all bonuses and penalties
+        final_score = (
+            weighted_score +
+            synergy_bonus +
+            red_flag_penalty +
+            slot_bonus +
+            crafting_bonus +
+            fractured_bonus +
+            archetype_bonus +
+            meta_bonus
+        )
 
         return max(0, min(100, int(final_score)))
 
     def _determine_tier(
-        self, total_score: int, matches: List[AffixMatch], synergies: List[str]
+        self, total_score: int, matches: List[AffixMatch], synergies: List[str],
+        is_fractured: bool = False, crafting_bonus: int = 0,
+        matched_archetypes: List[str] = None
     ) -> Tuple[str, str]:
         """
         Determine item tier and estimated value.
@@ -516,18 +842,33 @@ class RareItemEvaluator:
         num_t1_affixes = len([m for m in matches if m.tier == "tier1"])
         has_synergy = len(synergies) > 0
         has_influence_mod = any(m.is_influence_mod for m in matches)
+        has_crafting_potential = crafting_bonus >= 10
+        fits_meta = matched_archetypes and len(matched_archetypes) >= 1
+
+        # Fractured T1 items are crafting bases - special tier
+        if is_fractured and num_t1_affixes >= 1:
+            if total_score >= 70:
+                return "excellent", "1-5div (crafting base)"
+            elif total_score >= 50:
+                return "good", "50c-1div (crafting base)"
 
         # Excellent tier: high score + T1 mods + synergies
         if total_score >= 80 and (num_t1_affixes >= 2 or has_influence_mod):
             return "excellent", "200c-5div"
         elif total_score >= 75 and num_good_affixes >= 3:
             return "excellent", "1div+"
+        elif total_score >= 75 and fits_meta and num_t1_affixes >= 1:
+            return "excellent", "100c-2div (meta)"
 
         # Good tier: decent score + good mods or synergies
         elif total_score >= 65 and (has_synergy or has_influence_mod):
             return "good", "50-200c"
         elif total_score >= 60 and num_good_affixes >= 2:
             return "good", "50c+"
+        elif total_score >= 55 and has_crafting_potential:
+            return "good", "30-100c (craftable)"
+        elif total_score >= 55 and fits_meta:
+            return "good", "30-80c (meta fit)"
 
         # Average tier: usable items
         elif total_score >= 45:
@@ -556,6 +897,8 @@ class RareItemEvaluator:
                 f"Influences: {
                     ', '.join(
                         evaluation.item.influences)}")
+        if evaluation.is_fractured:
+            lines.append("Fractured: Yes")
         lines.append("")
 
         lines.append(f"Tier: {evaluation.tier.upper()}")
@@ -568,6 +911,16 @@ class RareItemEvaluator:
         if evaluation.red_flag_penalty < 0:
             lines.append(
                 f"  - Red Flag Penalty: {evaluation.red_flag_penalty}")
+        if evaluation.slot_bonus > 0:
+            lines.append(f"  - Slot Bonus: +{evaluation.slot_bonus}")
+        if evaluation.crafting_bonus > 0:
+            lines.append(f"  - Crafting Bonus: +{evaluation.crafting_bonus}")
+        if evaluation.fractured_bonus > 0:
+            lines.append(f"  - Fractured Bonus: +{evaluation.fractured_bonus}")
+        if evaluation.archetype_bonus > 0:
+            lines.append(f"  - Archetype Bonus: +{evaluation.archetype_bonus}")
+        if evaluation.meta_bonus > 0:
+            lines.append(f"  - Meta Bonus: +{evaluation.meta_bonus}")
         lines.append("")
 
         if evaluation.matched_affixes:
@@ -603,6 +956,44 @@ class RareItemEvaluator:
                 desc = flag_data.get("description", flag)
                 penalty = flag_data.get("penalty_score", 0)
                 lines.append(f"  [!] {desc} ({penalty} score)")
+
+        if evaluation.slot_bonus_reasons:
+            lines.append("")
+            lines.append("Slot Bonuses:")
+            for reason in evaluation.slot_bonus_reasons:
+                lines.append(f"  [+] {reason}")
+
+        # Crafting potential section
+        if evaluation.open_prefixes > 0 or evaluation.open_suffixes > 0:
+            lines.append("")
+            lines.append("Crafting Potential:")
+            lines.append(
+                f"  Open Slots: ~{evaluation.open_prefixes}P / "
+                f"~{evaluation.open_suffixes}S")
+            if evaluation.crafting_bonus > 0:
+                lines.append(
+                    f"  Crafting Value: +{evaluation.crafting_bonus} score")
+
+        # Fractured item section
+        if evaluation.is_fractured and evaluation.fractured_mod:
+            lines.append("")
+            lines.append("Fractured Mod:")
+            lines.append(f"  {evaluation.fractured_mod}")
+            lines.append(
+                f"  Crafting Base Value: +{evaluation.fractured_bonus} score")
+
+        # Build archetype matching section
+        if evaluation.matched_archetypes:
+            lines.append("")
+            lines.append(
+                f"Build Archetypes ({len(evaluation.matched_archetypes)}):")
+            for archetype_key in evaluation.matched_archetypes:
+                archetype = self.build_archetypes.get(archetype_key, {})
+                name = archetype.get("name", archetype_key)
+                desc = archetype.get("description", "")
+                lines.append(f"  [+] {name}")
+                if desc:
+                    lines.append(f"      {desc}")
 
         lines.append("")
         lines.append(

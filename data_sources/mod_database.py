@@ -33,12 +33,14 @@ class ModDatabase:
     -- Mod data table
     CREATE TABLE IF NOT EXISTS mods (
         id TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
+        name TEXT,
         stat_text TEXT,
+        stat_text_raw TEXT,
         domain INTEGER,
         generation_type INTEGER,
         mod_group TEXT,
         required_level INTEGER,
+        tier_text TEXT,
         stat1_id TEXT,
         stat1_min INTEGER,
         stat1_max INTEGER,
@@ -159,24 +161,27 @@ class ModDatabase:
 
         for mod in mods:
             try:
+                # Handle both space-separated (API) and underscore (local) field names
                 cursor.execute(
                     """
                     INSERT OR REPLACE INTO mods (
-                        id, name, stat_text, domain, generation_type,
-                        mod_group, required_level,
+                        id, name, stat_text, stat_text_raw, domain, generation_type,
+                        mod_group, required_level, tier_text,
                         stat1_id, stat1_min, stat1_max,
                         stat2_id, stat2_min, stat2_max,
                         tags
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         mod.get('id'),
                         mod.get('name'),
                         mod.get('stat text') or mod.get('stat_text'),
+                        mod.get('stat text raw') or mod.get('stat_text_raw'),
                         mod.get('domain'),
                         mod.get('generation type') or mod.get('generation_type'),
-                        mod.get('mod group') or mod.get('mod_group'),
+                        mod.get('mod groups') or mod.get('mod_group'),
                         mod.get('required level') or mod.get('required_level'),
+                        mod.get('tier text') or mod.get('tier_text'),
                         mod.get('stat1 id') or mod.get('stat1_id'),
                         mod.get('stat1 min') or mod.get('stat1_min'),
                         mod.get('stat1 max') or mod.get('stat1_max'),
@@ -210,14 +215,13 @@ class ModDatabase:
         Returns:
             List of matching mod dictionaries
         """
-        query = "SELECT * FROM mods WHERE stat_text LIKE ?"
-        params = [stat_text_pattern]
+        # Search in stat_text_raw (plain text) for better pattern matching
+        query = "SELECT * FROM mods WHERE (stat_text_raw LIKE ? OR stat_text LIKE ?)"
+        params = [stat_text_pattern, stat_text_pattern]
 
         if generation_type is not None:
             query += " AND generation_type = ?"
             params.append(generation_type)
-
-        query += " ORDER BY stat1_max DESC"
 
         cursor = self.conn.execute(query, params)
         return [dict(row) for row in cursor.fetchall()]
@@ -239,27 +243,55 @@ class ModDatabase:
         Returns:
             List of (tier, min, max) tuples, sorted best to worst
         """
+        import re
+
         mods = self.find_mods_by_stat_text(stat_text_pattern, generation_type)
 
         if not mods:
             return []
 
-        # Sort by max value (highest first = T1)
-        mods_sorted = sorted(
-            mods,
-            key=lambda m: (m.get('stat1_max') or 0),
-            reverse=True
-        )
+        # Extract tier info and value ranges from mods
+        tier_data = []
+        for mod in mods:
+            tier_text = mod.get('tier_text') or ''
+            stat_text = mod.get('stat_text_raw') or mod.get('stat_text') or ''
 
-        # Assign tier numbers
-        tiers = []
-        for tier_num, mod in enumerate(mods_sorted[:10], start=1):  # Top 10 tiers
-            min_val = mod.get('stat1_min')
-            max_val = mod.get('stat1_max')
-            if min_val is not None and max_val is not None:
-                tiers.append((tier_num, min_val, max_val))
+            # Parse tier number from tier_text (e.g., "Tier 1", "Tier 2")
+            tier_match = re.search(r'Tier\s*(\d+)', tier_text, re.IGNORECASE)
+            tier_num = int(tier_match.group(1)) if tier_match else 99
 
-        return tiers
+            # Parse value range from stat_text (e.g., "+(80-89) to maximum Life")
+            # Patterns: (min-max), +min, min%
+            range_match = re.search(r'\((\d+)-(\d+)\)', stat_text)
+            if range_match:
+                min_val = int(range_match.group(1))
+                max_val = int(range_match.group(2))
+            else:
+                # Try single value pattern
+                single_match = re.search(r'[+\-]?(\d+)', stat_text)
+                if single_match:
+                    val = int(single_match.group(1))
+                    min_val = max_val = val
+                else:
+                    continue  # Skip if no values found
+
+            tier_data.append((tier_num, min_val, max_val, mod.get('name')))
+
+        if not tier_data:
+            return []
+
+        # Sort by tier number (T1 first)
+        tier_data.sort(key=lambda x: (x[0], -x[2]))  # Sort by tier, then by max value descending
+
+        # Return unique tiers
+        seen_tiers = set()
+        result = []
+        for tier_num, min_val, max_val, name in tier_data:
+            if tier_num not in seen_tiers:
+                seen_tiers.add(tier_num)
+                result.append((tier_num, min_val, max_val))
+
+        return result
 
     def get_mod_count(self) -> int:
         """Get total number of mods in database."""

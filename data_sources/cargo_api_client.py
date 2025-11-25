@@ -184,15 +184,17 @@ class CargoAPIClient:
         self,
         generation_type: Optional[int] = None,
         batch_size: int = 500,
-        max_total: int = 5000,
+        max_total: int = 40000,
+        domain: Optional[int] = 1,
     ) -> List[Dict[str, Any]]:
         """
         Get all item mods with pagination.
 
         Args:
-            generation_type: Filter by type (6=prefix, 7=suffix, None=all)
+            generation_type: Filter by type (1=prefix, 2=suffix, None=all)
             batch_size: Results per batch (default: 500)
-            max_total: Maximum total results (default: 5000)
+            max_total: Maximum total results (default: 20000)
+            domain: Domain filter (1=items, None=all)
 
         Returns:
             List of all matching mods
@@ -200,23 +202,20 @@ class CargoAPIClient:
         all_mods = []
         offset = 0
 
+        # Use only fields that actually exist in the mods table
         fields = (
-            "mods.id,mods.name,mods.stat_text,mods.required_level,"
-            "mods.domain,mods.generation_type,mods.mod_group,"
-            "mods.stat1_id,mods.stat1_min,mods.stat1_max,"
-            "mods.stat2_id,mods.stat2_min,mods.stat2_max,"
-            "mods.tags"
+            "mods.id,mods.name,mods.stat_text,mods.stat_text_raw,"
+            "mods.required_level,mods.domain,mods.generation_type,"
+            "mods.mod_groups,mods.tier_text,mods.tags"
         )
 
-        where_clauses = ["mods.domain=1"]  # domain=1 for items
-        if generation_type is not None:
-            where_clauses.append(f"mods.generation_type={generation_type}")
-
+        # Note: WHERE clauses cause MWException errors on the wiki API
+        # So we fetch all mods and filter client-side
         while offset < max_total:
             batch = self.query(
                 tables="mods",
                 fields=fields,
-                where=" AND ".join(where_clauses),
+                where=None,  # Can't use WHERE - causes API errors
                 limit=batch_size,
                 offset=offset,
             )
@@ -224,8 +223,27 @@ class CargoAPIClient:
             if not batch:
                 break
 
-            all_mods.extend(batch)
-            logger.info(f"Fetched {len(batch)} mods (total: {len(all_mods)})")
+            # Filter client-side
+            for mod in batch:
+                mod_domain = mod.get('domain')
+                mod_gen = mod.get('generation type')
+
+                # Convert to int for comparison
+                try:
+                    mod_domain = int(mod_domain) if mod_domain else None
+                    mod_gen = int(mod_gen) if mod_gen else None
+                except (ValueError, TypeError):
+                    pass
+
+                # Apply filters
+                if domain is not None and mod_domain != domain:
+                    continue
+                if generation_type is not None and mod_gen != generation_type:
+                    continue
+
+                all_mods.append(mod)
+
+            logger.info(f"Fetched batch at offset {offset}, filtered to {len(all_mods)} mods")
 
             if len(batch) < batch_size:
                 break

@@ -65,7 +65,7 @@ class ModDataLoader:
     def load_all_mods(
         self,
         current_league: str,
-        max_mods: int = 5000,
+        max_mods: int = 40000,
         batch_size: int = 500,
     ) -> int:
         """

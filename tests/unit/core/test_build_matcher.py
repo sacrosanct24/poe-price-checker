@@ -84,11 +84,16 @@ def create_mock_parsed_item(
 class TestBuildMatcherInitialization:
     """Test build matcher initialization."""
 
-    def test_creates_matcher_with_default_file(self):
+    def test_creates_matcher_with_default_file(self, tmp_path, monkeypatch):
         """Should create matcher with default builds file path."""
+        # Use a temp path to avoid loading real builds.json from user home
+        fake_home = tmp_path / "fake_home"
+        fake_home.mkdir()
+        monkeypatch.setattr(Path, "home", lambda: fake_home)
+
         matcher = BuildMatcher()
 
-        expected_path = Path.home() / ".poe_price_checker" / "builds.json"
+        expected_path = fake_home / ".poe_price_checker" / "builds.json"
         assert matcher.builds_file == expected_path
         assert matcher.builds == []
 

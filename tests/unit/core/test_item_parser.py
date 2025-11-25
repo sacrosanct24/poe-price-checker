@@ -183,10 +183,6 @@ Sockets: R-G-B R-R
 # Influences (xfail)
 # --------------------------------------
 
-@pytest.mark.xfail(
-    reason="Influence parsing not implemented yet",
-    strict=True,
-)
 def test_parse_influences_normalized():
     parser = ItemParser()
 

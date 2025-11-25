@@ -1,5 +1,47 @@
 {
   "_comment": "High-value base types that are valuable with good item level and rolls",
+  "_slot_rules": {
+    "boots": {
+      "mandatory_affixes": ["movement_speed"],
+      "missing_penalty": -30,
+      "bonus_affixes": ["life", "resistances", "spell_suppression"],
+      "all_bonus_score": 10,
+      "description": "Boots without movement speed lose significant value"
+    },
+    "belt": {
+      "premium_bases": ["Stygian Vise"],
+      "premium_bonus": 25,
+      "bonus_affixes": ["life", "resistances", "flask_charges"],
+      "all_bonus_score": 10,
+      "description": "Stygian Vise adds abyssal socket value"
+    },
+    "helmet": {
+      "bonus_affixes": ["life", "resistances", "energy_shield"],
+      "enchant_multiplier": 1.5,
+      "description": "Helmet enchants can significantly boost value"
+    },
+    "gloves": {
+      "bonus_affixes": ["attack_speed", "life", "resistances", "spell_suppression"],
+      "all_bonus_score": 10,
+      "description": "Attack speed on gloves is highly sought"
+    },
+    "body_armour": {
+      "six_link_bonus": 50,
+      "bonus_affixes": ["life", "resistances", "energy_shield", "spell_suppression"],
+      "all_bonus_score": 15,
+      "description": "Body armour benefits most from 6-link and defensive stats"
+    },
+    "ring": {
+      "bonus_affixes": ["life", "resistances", "critical_strike_multiplier", "added_physical_damage"],
+      "all_bonus_score": 10,
+      "description": "Rings value offensive stats highly"
+    },
+    "amulet": {
+      "bonus_affixes": ["life", "critical_strike_multiplier", "added_physical_damage", "spell_damage"],
+      "all_bonus_score": 10,
+      "description": "Amulets are prime slots for damage stats"
+    }
+  },
   "body_armour": {
     "high_tier": [
       "Vaal Regalia",

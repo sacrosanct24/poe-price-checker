@@ -1,0 +1,103 @@
+{
+  "_comment": "Common build archetypes for rare item evaluation matching",
+  "_version": "1.0",
+  "archetypes": {
+    "life_attack": {
+      "name": "Life-Based Attack",
+      "description": "Physical/Elemental attack builds with life pool",
+      "priority_affixes": ["life", "resistances", "attack_speed", "critical_strike_multiplier", "added_physical_damage"],
+      "required_stats": {
+        "life": 70,
+        "resistances": 35
+      },
+      "bonus_affixes": ["movement_speed", "accuracy"],
+      "examples": ["Lightning Strike", "Cyclone", "Boneshatter", "Spectral Helix"]
+    },
+    "life_spell": {
+      "name": "Life-Based Spell Caster",
+      "description": "Spell casters with life pool",
+      "priority_affixes": ["life", "resistances", "cast_speed", "spell_damage", "critical_strike_multiplier"],
+      "required_stats": {
+        "life": 70,
+        "resistances": 35
+      },
+      "bonus_affixes": ["mana", "mana_regeneration"],
+      "examples": ["Arc", "Spark", "Ball Lightning", "Fireball"]
+    },
+    "es_caster": {
+      "name": "ES/CI Caster",
+      "description": "Energy shield based casters (CI or hybrid)",
+      "priority_affixes": ["energy_shield", "chaos_resistance", "cast_speed", "spell_damage", "intelligence"],
+      "required_stats": {
+        "energy_shield": 40,
+        "chaos_resistance": 20
+      },
+      "bonus_affixes": ["mana", "critical_strike_multiplier"],
+      "anti_affixes": ["life"],
+      "examples": ["Spark CI", "Winter Orb", "Vortex Occultist"]
+    },
+    "dot_build": {
+      "name": "Damage Over Time",
+      "description": "Builds focused on DoT damage",
+      "priority_affixes": ["life", "resistances", "chaos_resistance"],
+      "required_stats": {
+        "life": 70
+      },
+      "bonus_affixes": ["movement_speed", "cast_speed"],
+      "examples": ["Righteous Fire", "Toxic Rain", "Caustic Arrow", "ED/Contagion"]
+    },
+    "minion_build": {
+      "name": "Summoner/Minion",
+      "description": "Minion-based builds",
+      "priority_affixes": ["life", "resistances", "movement_speed", "mana"],
+      "required_stats": {
+        "life": 70,
+        "resistances": 35
+      },
+      "bonus_affixes": ["chaos_resistance", "energy_shield"],
+      "examples": ["SRS", "Summon Raging Spirits", "Zombies", "Spectres", "Golems"]
+    },
+    "evasion_suppression": {
+      "name": "Evasion/Suppression",
+      "description": "Dex-based builds with spell suppression",
+      "priority_affixes": ["life", "spell_suppression", "resistances", "movement_speed", "dexterity"],
+      "required_stats": {
+        "life": 70,
+        "spell_suppression": 12
+      },
+      "bonus_affixes": ["attack_speed", "critical_strike_multiplier"],
+      "examples": ["Lightning Strike", "Spectral Helix", "Tornado Shot"]
+    },
+    "attribute_stacker": {
+      "name": "Attribute Stacker",
+      "description": "Builds stacking single attribute",
+      "priority_affixes": ["strength", "dexterity", "intelligence", "resistances"],
+      "required_stats": {
+        "resistances": 35
+      },
+      "bonus_affixes": ["life", "energy_shield"],
+      "examples": ["Whispering Ice", "Iron Commander", "Replica Alberons"]
+    },
+    "armour_tank": {
+      "name": "Armour Tank",
+      "description": "High armour defensive builds",
+      "priority_affixes": ["life", "resistances", "strength"],
+      "required_stats": {
+        "life": 80,
+        "resistances": 40
+      },
+      "bonus_affixes": ["chaos_resistance", "life_regeneration"],
+      "examples": ["RF Jugg", "Shield Crush", "Molten Strike"]
+    }
+  },
+  "_meta_weights": {
+    "_comment": "Dynamic weight adjustments based on current meta (updated periodically)",
+    "current_league": "Settlers",
+    "last_updated": null,
+    "popularity_boosts": {
+      "spell_suppression": 2,
+      "chaos_resistance": 1,
+      "movement_speed": 1
+    }
+  }
+}
