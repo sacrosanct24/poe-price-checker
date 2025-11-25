@@ -7,8 +7,16 @@ Runs on first startup or when league changes.
 from __future__ import annotations
 
 import logging
+import sys
 from datetime import datetime
+from pathlib import Path
 from typing import Optional
+
+# Add parent directory to path for imports when running as script
+_script_dir = Path(__file__).parent
+_project_root = _script_dir.parent
+if str(_project_root) not in sys.path:
+    sys.path.insert(0, str(_project_root))
 
 from data_sources.cargo_api_client import CargoAPIClient
 from data_sources.mod_database import ModDatabase
