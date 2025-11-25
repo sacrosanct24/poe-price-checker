@@ -339,7 +339,7 @@ class TestRareItemIntegration:
     def test_keeps_market_price_when_higher(
         self, price_service_with_evaluator, mock_rare_item, mock_poe_ninja
     ):
-        """Should keep market price if higher than evaluator."""
+        """Should keep market price if higher than evaluator estimate."""
         # Need poe_ninja so _lookup_price_multi_source gets called
         price_service_with_evaluator.poe_ninja = mock_poe_ninja
         price_service_with_evaluator.parser.parse = Mock(return_value=mock_rare_item)
@@ -352,12 +352,13 @@ class TestRareItemIntegration:
         ):
             result = price_service_with_evaluator.check_item("Rarity: RARE\nTest")
 
-        # Should NOT have checked evaluator (price is high, >5c)
-        price_service_with_evaluator.rare_evaluator.evaluate.assert_not_called()
+        # Evaluator IS called (to get affix data for Trade API), but price is NOT used
+        price_service_with_evaluator.rare_evaluator.evaluate.assert_called_once()
 
-        # Should keep market price
+        # Should keep market price (not use evaluator price)
         assert float(result[0]['chaos_value']) == 500.0
         assert 'poe.ninja' in result[0]['source']
+        assert 'rare_evaluator' not in result[0]['source']
 
     def test_skips_evaluator_for_unique_items(
         self, price_service_with_evaluator, mock_unique_item
