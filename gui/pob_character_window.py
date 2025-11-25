@@ -194,25 +194,49 @@ class PoBCharacterWindow(tk.Toplevel):
         self.profile_listbox.delete(0, "end")
         self._profiles_cache.clear()
 
-        profiles = self.character_manager.list_profiles()
+        profile_names = self.character_manager.list_profiles()
         active = self.character_manager.get_active_profile()
+        active_name = active.name if active else None
 
-        for profile in profiles:
-            name = profile.get("name", "Unknown")
+        for name in profile_names:
+            # Get the actual profile object
+            profile = self.character_manager.get_profile(name)
+            if not profile:
+                continue
+
             display = name
-            if active and name == active.get("name"):
+            if active_name and name == active_name:
                 display = f"{name} (active)"
             self.profile_listbox.insert("end", display)
-            self._profiles_cache[name] = profile
+
+            # Cache the profile data as a dict for display
+            self._profiles_cache[name] = {
+                "name": profile.name,
+                "build_info": {
+                    "class_name": profile.build.class_name if profile.build else "",
+                    "ascendancy": profile.build.ascendancy if profile.build else "",
+                    "level": profile.build.level if profile.build else 0,
+                },
+                "items": {
+                    slot: {
+                        "name": item.name,
+                        "base_type": item.base_type,
+                        "rarity": item.rarity,
+                        "implicit_mods": item.implicit_mods,
+                        "explicit_mods": item.explicit_mods,
+                    }
+                    for slot, item in (profile.build.items.items() if profile.build else {})
+                },
+            }
 
         # Update active label
         if active:
-            self.active_label.config(text=f"Active Character: {active.get('name', 'Unknown')}")
+            self.active_label.config(text=f"Active Character: {active.name}")
         else:
             self.active_label.config(text="Active Character: None")
 
         # Clear details if no selection
-        if not profiles:
+        if not profile_names:
             self._clear_details()
 
     def _clear_details(self) -> None:
@@ -411,7 +435,7 @@ class PoBCharacterWindow(tk.Toplevel):
             return
 
         try:
-            self.character_manager.remove_profile(self._selected_profile)
+            self.character_manager.delete_profile(self._selected_profile)
             self._selected_profile = None
             self._load_profiles()
             self._clear_details()
@@ -562,8 +586,8 @@ class ImportPoBDialog(tk.Toplevel):
             self.code_text.focus_set()
             return
 
-        # Check for duplicate name
-        existing = [p.get("name") for p in self.character_manager.list_profiles()]
+        # Check for duplicate name - list_profiles() returns list of names (strings)
+        existing = self.character_manager.list_profiles()
         if name in existing:
             confirm = messagebox.askyesno(
                 "Duplicate Name",
@@ -572,7 +596,7 @@ class ImportPoBDialog(tk.Toplevel):
             if not confirm:
                 return
             # Remove existing profile first
-            self.character_manager.remove_profile(name)
+            self.character_manager.delete_profile(name)
 
         try:
             # Attempt to import
@@ -586,15 +610,15 @@ class ImportPoBDialog(tk.Toplevel):
             )
 
             if profile:
-                build_info = profile.build_info or {}
-                item_count = len(profile.items)
+                build = profile.build
+                item_count = len(build.items) if build else 0
 
                 messagebox.showinfo(
                     "Import Success",
                     f"Successfully imported '{name}'!\n\n"
-                    f"Class: {build_info.get('class_name', 'Unknown')} "
-                    f"({build_info.get('ascendancy', '')})\n"
-                    f"Level: {build_info.get('level', '?')}\n"
+                    f"Class: {build.class_name if build else 'Unknown'} "
+                    f"({build.ascendancy if build else ''})\n"
+                    f"Level: {build.level if build else '?'}\n"
                     f"Items: {item_count} equipped",
                 )
 
