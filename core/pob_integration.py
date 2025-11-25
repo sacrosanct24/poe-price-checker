@@ -457,6 +457,7 @@ class CharacterManager:
         """
         self.storage_path = storage_path or Path(__file__).parent.parent / "data" / "characters.json"
         self._profiles: Dict[str, CharacterProfile] = {}
+        self._active_profile_name: Optional[str] = None
         self._load_profiles()
 
     def _load_profiles(self):
@@ -465,7 +466,13 @@ class CharacterManager:
             try:
                 with open(self.storage_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
-                for name, profile_data in data.items():
+                # Handle both old format (flat dict) and new format (with _meta)
+                if "_meta" in data:
+                    self._active_profile_name = data["_meta"].get("active_profile")
+                    profiles_data = data.get("profiles", {})
+                else:
+                    profiles_data = data
+                for name, profile_data in profiles_data.items():
                     self._profiles[name] = self._deserialize_profile(profile_data)
                 logger.info(f"Loaded {len(self._profiles)} character profiles")
             except Exception as e:
@@ -476,8 +483,13 @@ class CharacterManager:
         try:
             self.storage_path.parent.mkdir(parents=True, exist_ok=True)
             data = {
-                name: self._serialize_profile(profile)
-                for name, profile in self._profiles.items()
+                "_meta": {
+                    "active_profile": self._active_profile_name,
+                },
+                "profiles": {
+                    name: self._serialize_profile(profile)
+                    for name, profile in self._profiles.items()
+                },
             }
             with open(self.storage_path, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2)
@@ -595,10 +607,32 @@ class CharacterManager:
         return False
 
     def get_active_profile(self) -> Optional[CharacterProfile]:
-        """Get the first/active profile (for simple single-character use)."""
+        """Get the active profile for upgrade checking."""
+        if self._active_profile_name and self._active_profile_name in self._profiles:
+            return self._profiles[self._active_profile_name]
+        # Fallback to first profile if no active set
         if self._profiles:
             return next(iter(self._profiles.values()))
         return None
+
+    def set_active_profile(self, name: str) -> bool:
+        """
+        Set the active profile for upgrade checking.
+
+        Args:
+            name: Name of the profile to set as active
+
+        Returns:
+            True if successful, False if profile not found
+        """
+        if name not in self._profiles:
+            logger.warning(f"Cannot set active profile: '{name}' not found")
+            return False
+
+        self._active_profile_name = name
+        self._save_profiles()
+        logger.info(f"Set active profile: {name}")
+        return True
 
 
 class UpgradeChecker:
