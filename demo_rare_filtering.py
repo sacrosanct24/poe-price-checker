@@ -22,35 +22,33 @@ def demo_rare_pricing():
     """Demonstrate the rare pricing pipeline."""
 
     # Real rare item from user
-    item_text = """Item Class: Gloves
+    item_text = """Item Class: Boots
 Rarity: Rare
-Vengeance Grasp
-Precursor Gauntlets
+Carrion Spark
+Precursor Greaves
 --------
 Quality: +20% (augmented)
-Armour: 540 (augmented)
+Armour: 582 (augmented)
 --------
 Requirements:
 Level: 78
 Str: 155
-Int: 68
 --------
-Sockets: G-R-R-R
+Sockets: R-R-R-R
 --------
-Item Level: 86
+Item Level: 81
 --------
-Ignites you inflict spread to other Enemies within 1.2 metres (implicit)
+7% increased Life Regeneration rate (implicit)
++15% to Fire Resistance (implicit)
 --------
-+48% to Fire Resistance (fractured)
-+43 to Armour
-14% increased Armour
-+157 to maximum Life
-Regenerate 47.4 Life per second
-9% increased Stun and Block Recovery
-+13% to Fire and Chaos Resistances (crafted)
++36 to Strength
++90 to maximum Life
+Regenerate 49 Life per second
++34% to Chaos Resistance
+30% increased Movement Speed
+44% increased Armour (crafted)
 Searing Exarch Item
---------
-Fractured Item"""
+Eater of Worlds Item"""
 
     print("=" * 80)
     print("RARE ITEM PRICING DEMONSTRATION")
