@@ -2,12 +2,14 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any, Optional
 from datetime import datetime, timezone
 from core.config import Config
 from core.item_parser import ItemParser
 from core.database import Database
 from core.game_version import GameVersion
+from core.rare_item_evaluator import RareItemEvaluator
 from data_sources.pricing.poe_ninja import PoeNinjaAPI
 from data_sources.pricing.poe_watch import PoeWatchAPI
 from data_sources.pricing.trade_api import TradeApiSource
@@ -43,6 +45,7 @@ class PriceService:
         poe_ninja: PoeNinjaAPI | None,
         poe_watch: PoeWatchAPI | None = None,
         trade_source: TradeApiSource | None = None,
+        rare_evaluator: RareItemEvaluator | None = None,
         logger: logging.Logger | None = None,
     ) -> None:
         self.config = config
@@ -51,6 +54,7 @@ class PriceService:
         self.poe_ninja = poe_ninja
         self.poe_watch = poe_watch
         self.trade_source = trade_source
+        self.rare_evaluator = rare_evaluator
         self.logger = logger or LOG
 
     # ------------------------------------------------------------------ #
@@ -91,6 +95,76 @@ class PriceService:
             chaos_value, listing_count, source_label, confidence = self._lookup_price_multi_source(
                 parsed
             )
+
+        # 2b) For rare items: evaluate and attach evaluation for trade API filtering
+        rarity = self._get_rarity(parsed)
+        rare_evaluation = None
+
+        if rarity and rarity.upper() == "RARE" and self.rare_evaluator is not None:
+            try:
+                # Always evaluate rares to get affix data for trade API
+                rare_evaluation = self.rare_evaluator.evaluate(parsed)
+
+                # Attach evaluation to parsed item for trade API to use
+                parsed._rare_evaluation = rare_evaluation
+
+                # Only use evaluator price if market price is missing or very low
+                if chaos_value == 0.0 or chaos_value < 5.0:
+                    # Convert estimated_value to chaos
+                    evaluator_chaos = self._parse_estimated_value_to_chaos(
+                        rare_evaluation.estimated_value
+                    )
+
+                    if evaluator_chaos is not None and evaluator_chaos > chaos_value:
+                        # Use evaluator price as initial estimate
+                        old_chaos = chaos_value
+                        chaos_value = evaluator_chaos
+                        listing_count = 0
+
+                        # Build source label with tier and score
+                        source_label = (
+                            f"rare_evaluator ({rare_evaluation.tier}, "
+                            f"score: {rare_evaluation.total_score}/100)"
+                        )
+
+                        # Map tier to confidence
+                        tier_confidence = {
+                            "excellent": "high",
+                            "good": "medium",
+                            "average": "low",
+                            "vendor": "low"
+                        }
+                        confidence = tier_confidence.get(rare_evaluation.tier, "low")
+
+                        self.logger.info(
+                            "Rare item '%s' priced by evaluator: %.1fc (was: %.1fc) "
+                            "[tier=%s, score=%d, will check trade API]",
+                            self._get_item_display_name(parsed),
+                            chaos_value,
+                            old_chaos,
+                            rare_evaluation.tier,
+                            rare_evaluation.total_score
+                        )
+                    elif evaluator_chaos is not None:
+                        self.logger.info(
+                            "Rare item '%s' evaluator price (%.1fc) not used "
+                            "(market price %.1fc is higher, will check trade API)",
+                            self._get_item_display_name(parsed),
+                            evaluator_chaos,
+                            chaos_value
+                        )
+                else:
+                    self.logger.info(
+                        "Rare item '%s' has market price %.1fc, "
+                        "but will use trade API with affix filters for validation",
+                        self._get_item_display_name(parsed),
+                        chaos_value
+                    )
+
+            except Exception as exc:
+                self.logger.warning(
+                    "Failed to evaluate rare item: %s", exc, exc_info=True
+                )
 
         # 3) Optionally gather trade quotes
         trade_quotes: list[dict[str, Any]] = []
@@ -158,6 +232,116 @@ class PriceService:
             "source": source_label,
         }
         return [row]
+
+    # ------------------------------------------------------------------ #
+    # Rare item pricing helpers
+    # ------------------------------------------------------------------ #
+
+    def _parse_estimated_value_to_chaos(self, estimated_value: str) -> Optional[float]:
+        """
+        Convert rare item evaluator's estimated_value string to numeric chaos.
+
+        Examples:
+            "50-200c" → 125.0 (midpoint)
+            "1div+" → chaos equivalent of 1 divine
+            "200c-5div" → midpoint between 200c and 5div in chaos
+            "<5c" → 2.5
+            "5-10c" → 7.5
+
+        Args:
+            estimated_value: String like "50-200c", "1div+", etc.
+
+        Returns:
+            Chaos value as float, or None if unparseable
+        """
+        if not estimated_value:
+            return None
+
+        estimated_value = estimated_value.strip().lower()
+
+        # Pattern: "<5c" → use half the value
+        match = re.match(r'<(\d+(?:\.\d+)?)c', estimated_value)
+        if match:
+            return float(match.group(1)) / 2.0
+
+        # Pattern: "50c+" → use the value as-is
+        match = re.match(r'(\d+(?:\.\d+)?)c\+', estimated_value)
+        if match:
+            return float(match.group(1))
+
+        # Pattern: "1div+" → convert divine to chaos
+        match = re.match(r'(\d+(?:\.\d+)?)div\+', estimated_value)
+        if match:
+            divines = float(match.group(1))
+            divine_rate = self._get_divine_chaos_rate()
+            if divine_rate > 0:
+                return divines * divine_rate
+            return None
+
+        # Pattern: "50-200c" or "5-10c" → use midpoint
+        match = re.match(r'(\d+(?:\.\d+)?)-(\d+(?:\.\d+)?)c', estimated_value)
+        if match:
+            low = float(match.group(1))
+            high = float(match.group(2))
+            return (low + high) / 2.0
+
+        # Pattern: "200c-5div" → convert both to chaos and take midpoint
+        match = re.match(r'(\d+(?:\.\d+)?)c-(\d+(?:\.\d+)?)div', estimated_value)
+        if match:
+            chaos_low = float(match.group(1))
+            divines_high = float(match.group(2))
+            divine_rate = self._get_divine_chaos_rate()
+            if divine_rate > 0:
+                chaos_high = divines_high * divine_rate
+                return (chaos_low + chaos_high) / 2.0
+            return chaos_low  # Fallback to chaos value
+
+        # Pattern: "1div" → exact divine value
+        match = re.match(r'(\d+(?:\.\d+)?)div', estimated_value)
+        if match:
+            divines = float(match.group(1))
+            divine_rate = self._get_divine_chaos_rate()
+            if divine_rate > 0:
+                return divines * divine_rate
+            return None
+
+        # Unknown format
+        self.logger.warning(f"Could not parse estimated_value: '{estimated_value}'")
+        return None
+
+    def _get_divine_chaos_rate(self) -> float:
+        """
+        Get current divine to chaos conversion rate.
+
+        Returns:
+            Chaos per divine, or 0.0 if unavailable
+        """
+        if self.poe_ninja is not None:
+            try:
+                rate = self.poe_ninja.ensure_divine_rate()
+                if rate > 10.0:  # Sanity check
+                    return rate
+            except (AttributeError, Exception):
+                pass
+
+        # Fallback to config
+        try:
+            current_game = getattr(self.config, "current_game", None)
+            games = getattr(self.config, "games", {}) or {}
+            if isinstance(games, dict):
+                if isinstance(current_game, GameVersion):
+                    game_key = current_game.value
+                else:
+                    game_key = str(current_game or "poe1")
+                if game_key in games:
+                    game_cfg = games.get(game_key) or {}
+                    rate = float(game_cfg.get("divine_chaos_rate", 0))
+                    if rate > 10.0:
+                        return rate
+        except (TypeError, ValueError, AttributeError):
+            pass
+
+        return 0.0
 
     # ------------------------------------------------------------------ #
     # Price check / quote persistence
