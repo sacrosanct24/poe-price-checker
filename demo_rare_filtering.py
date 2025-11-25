@@ -104,15 +104,24 @@ Eater of Worlds Item"""
         for flag in red_flags:
             print(f"  - {flag}")
 
-    # Step 3: Build Trade API query
+    # Step 3: Build Trade API query using the actual TradeApiSource
     print("\n[STEP 3] Trade API Query Generation")
     print("-" * 80)
 
     # Attach evaluation to parsed item (like PriceService does)
     parsed._rare_evaluation = evaluation
 
-    # Build stat filters from matched affixes
-    stat_filters = build_stat_filters(evaluation.matched_affixes, max_filters=4)
+    # Import TradeApiSource to use the real _build_query method
+    from data_sources.pricing.trade_api import TradeApiSource
+
+    # Create a minimal TradeApiSource instance (just for query building)
+    trade_source = TradeApiSource(league="Standard")
+
+    # Use the actual _build_query method
+    query = trade_source._build_query(parsed)
+
+    # Extract stat filters for display
+    stat_filters = query.get("query", {}).get("stats", [{}])[0].get("filters", [])
 
     print(f"Generated {len(stat_filters)} affix filters:")
     for i, filter_dict in enumerate(stat_filters, 1):
@@ -131,15 +140,23 @@ Eater of Worlds Item"""
         print(f"  {i}. {name} >= {min_val}")
         print(f"     (stat_id: {stat_id})")
 
-    # Build the complete query
-    query = {
-        "query": {
-            "status": {"option": "online"},
-            "type": parsed.base_type,  # Precursor Gauntlets
-            "stats": [{"type": "and", "filters": stat_filters}]
-        },
-        "sort": {"price": "asc"}
-    }
+    # Display influence filters if present
+    influence_filters = query.get("query", {}).get("filters", {}).get("type_filters", {}).get("filters", {})
+    if influence_filters:
+        print(f"\nInfluence Filters ({len(influence_filters)}):")
+        influence_names = {
+            "searing_exarch_item": "Searing Exarch",
+            "eater_of_worlds_item": "Eater of Worlds",
+            "shaper_item": "Shaper",
+            "elder_item": "Elder",
+            "crusader_item": "Crusader",
+            "hunter_item": "Hunter",
+            "redeemer_item": "Redeemer",
+            "warlord_item": "Warlord",
+        }
+        for filter_key in influence_filters:
+            name = influence_names.get(filter_key, filter_key)
+            print(f"  - {name}")
 
     print("\nComplete Trade API Query:")
     print(json.dumps(query, indent=2))
@@ -150,6 +167,13 @@ Eater of Worlds Item"""
 
     print("This query will search for:")
     print(f"  Base Type: {parsed.base_type}")
+
+    if influence_filters:
+        print("  With influences:")
+        for filter_key in influence_filters:
+            name = influence_names.get(filter_key, filter_key)
+            print(f"    - {name}")
+
     print("  With affixes:")
     for filter_dict in stat_filters:
         stat_id = filter_dict["id"]
@@ -164,9 +188,11 @@ Eater of Worlds Item"""
         print(f"    - {name} >= {min_val}")
 
     print("\nExpected Results:")
-    print("  - Only Precursor Gauntlets (not random gloves)")
-    print("  - With similar high life roll (125+ life)")
-    print("  - With decent fire resistance (38+ fire res)")
+    print(f"  - Only {parsed.base_type}")
+    if influence_filters:
+        influence_list = [influence_names.get(k, k) for k in influence_filters]
+        print(f"  - With {' + '.join(influence_list)} influence")
+    print("  - With similar affix rolls")
     print("  - Sorted by price (cheapest first)")
     print("  - Real market data from actual listings")
 
@@ -185,15 +211,37 @@ Eater of Worlds Item"""
     # Special notes
     print("\n[NOTES]")
     print("-" * 80)
-    print("✓ Fractured mod detected: +48% fire res")
-    print("✓ High life roll (+157) is T1 affix")
-    print("✓ Life regen adds value but not in trade filters (niche mod)")
-    print("✓ Searing Exarch influence adds value (not yet in filters)")
-    print("✓ Item level 86 allows all T1 mods")
-    print("\nPotential enhancements:")
-    print("  - Add life regen to stat mappings")
-    print("  - Add influence filtering for Exarch/Eater items")
+
+    # Dynamically generate notes based on item properties
+    if parsed.influences:
+        print(f"✓ Dual influence detected: {' + '.join(parsed.influences)}")
+        print("✓ Influence filters applied to Trade API query")
+
+    # Check for T1 affixes
+    t1_affixes = [m for m in evaluation.matched_affixes if getattr(m, 'tier', '') == 'tier1']
+    if t1_affixes:
+        t1_names = [m.affix_type for m in t1_affixes]
+        print(f"✓ {len(t1_affixes)} T1 affix(es): {', '.join(t1_names)}")
+
+    # Check for life regen
+    if any(m.affix_type == 'life_regeneration' for m in evaluation.matched_affixes):
+        print("✓ Life regeneration detected and included in filters")
+
+    # Check for movement speed on boots
+    if parsed.base_type and 'boots' in parsed.base_type.lower():
+        ms_affixes = [m for m in evaluation.matched_affixes if m.affix_type == 'movement_speed']
+        if ms_affixes:
+            print(f"✓ Movement speed: {int(ms_affixes[0].value)}% (essential for boots)")
+
+    print("\nCompleted enhancements:")
+    print("  ✓ Life regen and 8 new affix types added to detection")
+    print("  ✓ Tier ranges fixed for movement speed and 4 other affixes")
+    print("  ✓ Influence filtering added to Trade API queries")
+
+    print("\nPotential future enhancements:")
     print("  - Add fractured mod prioritization")
+    print("  - Improve synergy detection (e.g., boots_perfect)")
+    print("  - Add influence mod detection (Exarch/Eater specific mods)")
 
     print("\n" + "=" * 80)
 

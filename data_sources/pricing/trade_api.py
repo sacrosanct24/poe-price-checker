@@ -13,6 +13,19 @@ from core.price_multi import RESULT_COLUMNS
 logger = logging.getLogger(__name__)
 
 
+# Mapping: ParsedItem influence names → Trade API filter keys
+INFLUENCE_TO_FILTER_KEY = {
+    "Shaper": "shaper_item",
+    "Elder": "elder_item",
+    "Crusader": "crusader_item",
+    "Hunter": "hunter_item",
+    "Redeemer": "redeemer_item",
+    "Warlord": "warlord_item",
+    "Exarch": "searing_exarch_item",
+    "Eater": "eater_of_worlds_item",
+}
+
+
 class PoeTradeClient(BaseAPIClient):
     """
     Low-level HTTP client for the official Path of Exile trade API.
@@ -336,6 +349,27 @@ class TradeApiSource:
             },
             "sort": {"price": "asc"},
         }
+
+        # Add influence filters if item has influences
+        influences = getattr(parsed_item, "influences", None) or []
+        if influences:
+            influence_filters = {}
+            for influence in influences:
+                filter_key = INFLUENCE_TO_FILTER_KEY.get(influence)
+                if filter_key:
+                    influence_filters[filter_key] = {"option": "true"}
+
+            if influence_filters:
+                if "filters" not in query["query"]:
+                    query["query"]["filters"] = {}
+                query["query"]["filters"]["type_filters"] = {
+                    "filters": influence_filters
+                }
+                self.logger.info(
+                    "Added %d influence filters: %s",
+                    len(influence_filters),
+                    list(influences)
+                )
 
         # RARE items: use base type + affix filters (not name, since it's random)
         if rarity == "RARE":
