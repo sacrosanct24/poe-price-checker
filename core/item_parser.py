@@ -22,9 +22,9 @@ import re
 from dataclasses import dataclass, field
 from typing import Optional, List
 
-from core.game_version import GameVersion
 LEVEL_RE = re.compile(r"^Level:\s*(\d+)")
 QUALITY_RE = re.compile(r"^Quality:\s*\+?(-?\d+)%")
+
 
 @dataclass
 class ParsedItem:
@@ -109,6 +109,7 @@ class ParsedItem:
 # ----------------------------------------------------------------------
 # Parser Implementation
 # ----------------------------------------------------------------------
+
 
 class ItemParser:
     """

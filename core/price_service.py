@@ -479,6 +479,7 @@ class PriceService:
             price_check_id,
             league,
         )
+
     def _get_latest_price_stats_for_item(self, parsed: Any) -> Optional[dict[str, Any]]:
         """
         Pull robust stats for the most recent price_check for this item
@@ -705,7 +706,7 @@ class PriceService:
 
         # Get poe.ninja price
         if self.poe_ninja:
-            self.logger.info(f"[MULTI-SOURCE] Querying poe.ninja...")
+            self.logger.info("[MULTI-SOURCE] Querying poe.ninja...")
             try:
                 ninja_price, ninja_count, _ = self._lookup_price_with_poe_ninja(parsed)
                 if ninja_price == 0.0:
@@ -713,16 +714,16 @@ class PriceService:
                 if ninja_price is not None:
                     self.logger.info(f"[MULTI-SOURCE]   poe.ninja result: {ninja_price:.1f}c (count: {ninja_count})")
                 else:
-                    self.logger.info(f"[MULTI-SOURCE]   poe.ninja result: No data found")
+                    self.logger.info("[MULTI-SOURCE]   poe.ninja result: No data found")
             except Exception as e:
                 self.logger.warning(f"[MULTI-SOURCE]   poe.ninja lookup failed: {e}")
                 ninja_price = None
         else:
-            self.logger.info(f"[MULTI-SOURCE] Skipping poe.ninja (not initialized)")
+            self.logger.info("[MULTI-SOURCE] Skipping poe.ninja (not initialized)")
 
         # Get poe.watch price
         if self.poe_watch:
-            self.logger.info(f"[MULTI-SOURCE] Querying poe.watch...")
+            self.logger.info("[MULTI-SOURCE] Querying poe.watch...")
             try:
                 watch_data = self.poe_watch.find_item_price(
                     item_name=item_name,
@@ -752,18 +753,18 @@ class PriceService:
                     if watch_price is not None:
                         self.logger.info(f"[MULTI-SOURCE]   poe.watch result: {watch_price:.1f}c (daily: {watch_daily}, confidence: {watch_confidence})")
                     else:
-                        self.logger.info(f"[MULTI-SOURCE]   poe.watch result: No price data (mean=0)")
+                        self.logger.info("[MULTI-SOURCE]   poe.watch result: No price data (mean=0)")
                 else:
-                    self.logger.info(f"[MULTI-SOURCE]   poe.watch result: No matching item found")
+                    self.logger.info("[MULTI-SOURCE]   poe.watch result: No matching item found")
 
             except Exception as e:
                 self.logger.warning(f"[MULTI-SOURCE]   poe.watch lookup failed: {e}", exc_info=True)
                 watch_price = None
         else:
-            self.logger.info(f"[MULTI-SOURCE] Skipping poe.watch (not initialized)")
+            self.logger.info("[MULTI-SOURCE] Skipping poe.watch (not initialized)")
 
         # Decision logic
-        self.logger.info(f"[MULTI-SOURCE] Making pricing decision...")
+        self.logger.info("[MULTI-SOURCE] Making pricing decision...")
 
         if ninja_price is not None and watch_price is not None:
             # Both sources available - compare and validate
@@ -776,7 +777,7 @@ class PriceService:
                 return (
                     ninja_price,
                     ninja_count,
-                    f"poe.ninja (validated by poe.watch)",
+                    "poe.ninja (validated by poe.watch)",
                     "high"
                 )
             elif watch_confidence == "low":
@@ -785,7 +786,7 @@ class PriceService:
                 return (
                     ninja_price,
                     ninja_count,
-                    f"poe.ninja (poe.watch: low confidence)",
+                    "poe.ninja (poe.watch: low confidence)",
                     "medium"
                 )
             else:
@@ -819,13 +820,13 @@ class PriceService:
             return (
                 watch_price,
                 watch_daily,
-                f"poe.watch only",
+                "poe.watch only",
                 watch_confidence
             )
 
         else:
             # No prices found
-            self.logger.info(f"[MULTI-SOURCE] ✗ Decision: No prices found from any source")
+            self.logger.info("[MULTI-SOURCE] ✗ Decision: No prices found from any source")
             return (0.0, 0, "not found", "none")
 
     def _parse_links(self, parsed: Any) -> Optional[int]:

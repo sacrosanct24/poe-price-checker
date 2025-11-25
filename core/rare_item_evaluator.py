@@ -38,7 +38,7 @@ class RareItemEvaluation:
     synergy_bonus: int  # Bonus from mod combinations
     red_flag_penalty: int  # Penalty from anti-synergies
     total_score: int  # Combined score
-    
+
     is_valuable_base: bool
     has_high_ilvl: bool
     matched_affixes: List[AffixMatch]
@@ -46,7 +46,7 @@ class RareItemEvaluation:
     # Categorization
     tier: str  # "excellent", "good", "average", "vendor"
     estimated_value: str  # "10c+", "50c+", "1div+", etc.
-    
+
     # Fields with defaults must come last
     synergies_found: List[str] = None  # Names of synergies detected
     red_flags_found: List[str] = None  # Names of red flags detected
@@ -66,32 +66,33 @@ class RareItemEvaluation:
 class RareItemEvaluator:
     """
     Evaluates rare items for potential value.
-    
+
     Uses:
     - Valuable base types
     - Item level requirements
     - Evergreen valuable affixes
     - Optional build requirements
     """
-    
+
     def __init__(self, data_dir: Path = None):
         """
         Initialize evaluator with data files.
-        
+
         Args:
             data_dir: Directory containing valuable_affixes.json and valuable_bases.json
         """
         if data_dir is None:
             data_dir = Path(__file__).parent.parent / "data"
-        
+
         self.data_dir = data_dir
         self.config = self._load_valuable_affixes()
-        self.valuable_affixes = {k: v for k, v in self.config.items() if not k.startswith("_")}
+        self.valuable_affixes = {
+            k: v for k, v in self.config.items() if not k.startswith("_")}
         self.synergies = self.config.get("_synergies", {})
         self.red_flags = self.config.get("_red_flags", {})
         self.influence_mods = self.config.get("_influence_mods", {})
         self.valuable_bases = self._load_valuable_bases()
-        
+
     def _load_valuable_affixes(self) -> Dict:
         """Load valuable affixes configuration."""
         affix_file = self.data_dir / "valuable_affixes.json"
@@ -99,7 +100,7 @@ class RareItemEvaluator:
             with open(affix_file) as f:
                 return json.load(f)
         return {}
-    
+
     def _load_valuable_bases(self) -> Dict:
         """Load valuable base types configuration."""
         base_file = self.data_dir / "valuable_bases.json"
@@ -107,14 +108,14 @@ class RareItemEvaluator:
             with open(base_file) as f:
                 return json.load(f)
         return {}
-    
+
     def evaluate(self, item: ParsedItem) -> RareItemEvaluation:
         """
         Evaluate a rare item for potential value.
-        
+
         Args:
             item: Parsed item to evaluate
-            
+
         Returns:
             RareItemEvaluation with scores and matched affixes
         """
@@ -133,28 +134,29 @@ class RareItemEvaluator:
                 tier="not_rare",
                 estimated_value="N/A"
             )
-        
+
         # Evaluate base
         is_valuable_base, base_score = self._evaluate_base(item)
         has_high_ilvl = self._check_ilvl(item)
-        
+
         # Evaluate affixes (including influence mods)
         matched_affixes = self._match_affixes(item)
         affix_score = self._calculate_affix_score(matched_affixes)
-        
+
         # Check for synergies
         synergies_found, synergy_bonus = self._check_synergies(matched_affixes)
 
         # Check for red flags
-        red_flags_found, red_flag_penalty = self._check_red_flags(item, matched_affixes)
+        red_flags_found, red_flag_penalty = self._check_red_flags(
+            item, matched_affixes)
 
         # Calculate total score
         total_score = self._calculate_total_score(
-            base_score, affix_score, has_high_ilvl, synergy_bonus, red_flag_penalty
-        )
-        
+            base_score, affix_score, has_high_ilvl, synergy_bonus, red_flag_penalty)
+
         # Determine tier and estimated value
-        tier, estimated_value = self._determine_tier(total_score, matched_affixes, synergies_found)
+        tier, estimated_value = self._determine_tier(
+            total_score, matched_affixes, synergies_found)
 
         return RareItemEvaluation(
             item=item,
@@ -171,34 +173,34 @@ class RareItemEvaluator:
             tier=tier,
             estimated_value=estimated_value
         )
-    
+
     def _evaluate_base(self, item: ParsedItem) -> Tuple[bool, int]:
         """
         Check if item is on a valuable base type.
-        
+
         Returns:
             (is_valuable, score_0_to_50)
         """
         if not item.base_type:
             return False, 0
-        
+
         base_type = item.base_type.strip()
-        
+
         # Check each category
         for category, data in self.valuable_bases.items():
             if category.startswith("_"):
                 continue
-            
+
             high_tier = data.get("high_tier", [])
             if base_type in high_tier:
                 return True, 50
-        
+
         return False, 10  # Not a top-tier base, but still give some points
-    
+
     def _check_ilvl(self, item: ParsedItem) -> bool:
         """Check if item level is high enough for top-tier mods."""
         return item.item_level and item.item_level >= 84
-    
+
     def _match_affixes(self, item: ParsedItem) -> List[AffixMatch]:
         """
         Match item's explicit mods against valuable affixes (all tiers).
@@ -207,7 +209,7 @@ class RareItemEvaluator:
             List of AffixMatch objects
         """
         matches = []
-        
+
         # First check influence mods if item has influences
         if item.influences:
             influence_matches = self._match_influence_mods(item)
@@ -218,23 +220,27 @@ class RareItemEvaluator:
             for affix_type, affix_data in self.valuable_affixes.items():
                 if affix_type.startswith("_"):
                     continue
-                
+
                 # Try each tier (T1, T2, T3)
                 for tier_name in ["tier1", "tier2", "tier3"]:
                     tier_patterns = affix_data.get(tier_name, [])
                     if not tier_patterns:
                         continue
 
-                    weight = affix_data.get(f"{tier_name}_weight", affix_data.get("weight", 5))
+                    weight = affix_data.get(
+                        f"{tier_name}_weight", affix_data.get(
+                            "weight", 5))
                     min_value = affix_data.get("min_value", 0)
 
                     for pattern in tier_patterns:
                         # Convert pattern to regex
                         regex_pattern = pattern.replace("#", "__NUMBER__")
                         regex_pattern = re.escape(regex_pattern)
-                        regex_pattern = regex_pattern.replace("__NUMBER__", r"(\d+(?:\.\d+)?)")
+                        regex_pattern = regex_pattern.replace(
+                            "__NUMBER__", r"(\d+(?:\.\d+)?)")
 
-                        match = re.search(regex_pattern, mod_text, re.IGNORECASE)
+                        match = re.search(
+                            regex_pattern, mod_text, re.IGNORECASE)
                         if match:
                             # Extract value
                             value = None
@@ -250,7 +256,8 @@ class RareItemEvaluator:
                             )
 
                             # Get weight for actual tier
-                            tier_weight = affix_data.get(f"{actual_tier}_weight", weight)
+                            tier_weight = affix_data.get(
+                                f"{actual_tier}_weight", weight)
 
                             # Check minimum value requirement
                             if value and value >= min_value:
@@ -321,7 +328,8 @@ class RareItemEvaluator:
                     # Convert pattern to regex
                     regex_pattern = pattern.replace("#", "__NUMBER__")
                     regex_pattern = re.escape(regex_pattern)
-                    regex_pattern = regex_pattern.replace("__NUMBER__", r"(\d+(?:\.\d+)?)")
+                    regex_pattern = regex_pattern.replace(
+                        "__NUMBER__", r"(\d+(?:\.\d+)?)")
 
                     if re.search(regex_pattern, mod_text, re.IGNORECASE):
                         matches.append(AffixMatch(
@@ -336,35 +344,36 @@ class RareItemEvaluator:
                         break
 
         return matches
-    
+
     def _calculate_affix_score(self, matches: List[AffixMatch]) -> int:
         """
         Calculate score based on matched affixes.
-        
+
         Returns:
             Score from 0-100
         """
         if not matches:
             return 0
-        
+
         # Sum weighted scores
         total_weight = sum(m.weight for m in matches)
-        
+
         # Normalize to 0-100
         # Consider 3+ high-weight affixes as "excellent" (90+)
         # 2 high-weight affixes as "good" (70+)
         # 1 high-weight affix as "decent" (50+)
-        
+
         if len(matches) >= 3 and total_weight >= 25:
             return min(100, 60 + total_weight)
         elif len(matches) >= 2 and total_weight >= 16:
             return min(100, 40 + total_weight * 2)
         elif len(matches) >= 1:
             return min(100, 20 + total_weight * 3)
-        
+
         return 0
-    
-    def _check_synergies(self, matches: List[AffixMatch]) -> Tuple[List[str], int]:
+
+    def _check_synergies(
+            self, matches: List[AffixMatch]) -> Tuple[List[str], int]:
         """
         Check for synergistic mod combinations.
 
@@ -377,7 +386,8 @@ class RareItemEvaluator:
         # Count affixes by type
         affix_counts = {}
         for match in matches:
-            affix_counts[match.affix_type] = affix_counts.get(match.affix_type, 0) + 1
+            affix_counts[match.affix_type] = affix_counts.get(
+                match.affix_type, 0) + 1
 
         # Check each synergy
         for synergy_name, synergy_data in self.synergies.items():
@@ -397,7 +407,8 @@ class RareItemEvaluator:
 
         return found_synergies, total_bonus
 
-    def _check_red_flags(self, item: ParsedItem, matches: List[AffixMatch]) -> Tuple[List[str], int]:
+    def _check_red_flags(self, item: ParsedItem,
+                         matches: List[AffixMatch]) -> Tuple[List[str], int]:
         """
         Check for anti-synergies and red flags.
 
@@ -469,7 +480,7 @@ class RareItemEvaluator:
     ) -> int:
         """
         Calculate total item score.
-        
+
         Args:
             base_score: 0-50
             affix_score: 0-100
@@ -486,7 +497,7 @@ class RareItemEvaluator:
             affix_score * 0.6 +
             (10 if has_high_ilvl else 0)
         )
-        
+
         # Add synergy bonus and red flag penalty
         final_score = weighted_score + synergy_bonus + red_flag_penalty
 
@@ -497,7 +508,7 @@ class RareItemEvaluator:
     ) -> Tuple[str, str]:
         """
         Determine item tier and estimated value.
-        
+
         Returns:
             (tier, estimated_value)
         """
@@ -531,19 +542,22 @@ class RareItemEvaluator:
     def get_summary(self, evaluation: RareItemEvaluation) -> str:
         """
         Get human-readable summary of evaluation.
-        
+
         Returns:
             Multi-line string summary
         """
         lines = []
-        lines.append(f"=== Rare Item Evaluation ===")
+        lines.append("=== Rare Item Evaluation ===")
         lines.append(f"Item: {evaluation.item.get_display_name()}")
         lines.append(f"Base: {evaluation.item.base_type}")
         lines.append(f"iLvl: {evaluation.item.item_level or 'Unknown'}")
         if evaluation.item.influences:
-            lines.append(f"Influences: {', '.join(evaluation.item.influences)}")
+            lines.append(
+                f"Influences: {
+                    ', '.join(
+                        evaluation.item.influences)}")
         lines.append("")
-        
+
         lines.append(f"Tier: {evaluation.tier.upper()}")
         lines.append(f"Estimated Value: {evaluation.estimated_value}")
         lines.append(f"Total Score: {evaluation.total_score}/100")
@@ -552,22 +566,29 @@ class RareItemEvaluator:
         if evaluation.synergy_bonus > 0:
             lines.append(f"  - Synergy Bonus: +{evaluation.synergy_bonus}")
         if evaluation.red_flag_penalty < 0:
-            lines.append(f"  - Red Flag Penalty: {evaluation.red_flag_penalty}")
+            lines.append(
+                f"  - Red Flag Penalty: {evaluation.red_flag_penalty}")
         lines.append("")
-        
+
         if evaluation.matched_affixes:
-            lines.append(f"Valuable Affixes ({len(evaluation.matched_affixes)}):")
+            lines.append(
+                f"Valuable Affixes ({len(evaluation.matched_affixes)}):")
             for match in evaluation.matched_affixes:
                 value_str = f" [{match.value}]" if match.value else ""
-                tier_str = f" ({match.tier})" if not match.is_influence_mod else " (influence)"
+                tier_str = f" ({
+                    match.tier})" if not match.is_influence_mod else " (influence)"
                 weight_str = f" weight:{match.weight}"
-                lines.append(f"  [OK] {match.affix_type}: {match.mod_text}{value_str}{tier_str}{weight_str}")
+                lines.append(
+                    f"  [OK] {
+                        match.affix_type}: {
+                        match.mod_text}{value_str}{tier_str}{weight_str}")
         else:
             lines.append("No valuable affixes found")
-        
+
         if evaluation.synergies_found:
             lines.append("")
-            lines.append(f"Synergies Detected ({len(evaluation.synergies_found)}):")
+            lines.append(
+                f"Synergies Detected ({len(evaluation.synergies_found)}):")
             for synergy in evaluation.synergies_found:
                 synergy_data = self.synergies.get(synergy, {})
                 desc = synergy_data.get("description", synergy)
@@ -584,19 +605,22 @@ class RareItemEvaluator:
                 lines.append(f"  [!] {desc} ({penalty} score)")
 
         lines.append("")
-        lines.append(f"Valuable Base: {'Yes' if evaluation.is_valuable_base else 'No'}")
-        lines.append(f"High iLvl (84+): {'Yes' if evaluation.has_high_ilvl else 'No'}")
-        
+        lines.append(
+            f"Valuable Base: {
+                'Yes' if evaluation.is_valuable_base else 'No'}")
+        lines.append(
+            f"High iLvl (84+): {'Yes' if evaluation.has_high_ilvl else 'No'}")
+
         return "\n".join(lines)
 
 
 if __name__ == "__main__":
     # Test the evaluator
     from core.item_parser import ItemParser
-    
+
     parser = ItemParser()
     evaluator = RareItemEvaluator()
-    
+
     # Test item 1: Good rare helmet
     sample1 = """Rarity: RARE
 Doom Visor
@@ -612,14 +636,14 @@ Item Level: 86
 +15% to Chaos Resistance
 +85 to maximum Energy Shield
 """
-    
+
     item1 = parser.parse(sample1)
     if item1:
         eval1 = evaluator.evaluate(item1)
         print(evaluator.get_summary(eval1))
-    
-    print("\n" + "="*50 + "\n")
-    
+
+    print("\n" + "=" * 50 + "\n")
+
     # Test item 2: Mediocre rare
     sample2 = """Rarity: RARE
 Bad Ring
@@ -631,7 +655,7 @@ Item Level: 45
 +10% to Fire Resistance
 +8 to Strength
 """
-    
+
     item2 = parser.parse(sample2)
     if item2:
         eval2 = evaluator.evaluate(item2)
