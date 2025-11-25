@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import logging
-from typing import Any
 
 from core.config import Config
 from core.item_parser import ItemParser
