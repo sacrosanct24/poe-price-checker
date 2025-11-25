@@ -9,6 +9,7 @@ from core.config import Config
 from core.item_parser import ItemParser
 from core.database import Database
 from core.game_version import GameVersion, GameConfig
+from core.rare_item_evaluator import RareItemEvaluator
 from data_sources.pricing.poe_ninja import PoeNinjaAPI
 from data_sources.pricing.poe_watch import PoeWatchAPI
 from core.price_service import PriceService
@@ -115,8 +116,25 @@ def create_app_context() -> AppContext:
         )
 
     # ------------------------------------------------------------------
+    # Rare item evaluator (PoE1 only)
+    # ------------------------------------------------------------------
+    rare_evaluator: RareItemEvaluator | None = None
+    if game == GameVersion.POE1:
+        try:
+            logger.info("Initializing rare item evaluator")
+            rare_evaluator = RareItemEvaluator()
+            logger.info("[OK] Rare item evaluator initialized successfully")
+        except Exception as exc:
+            logger.warning(
+                "Failed to initialize rare item evaluator; "
+                "rare pricing will be unavailable. Error: %s",
+                exc,
+            )
+            rare_evaluator = None
+
+    # ------------------------------------------------------------------
     # Base price service with multi-source support
-    # Now integrates poe.ninja + poe.watch + trade API
+    # Now integrates poe.ninja + poe.watch + trade API + rare evaluator
     # ------------------------------------------------------------------
     price_logger = logging.getLogger("poe_price_checker.price_service")
     base_price_service = PriceService(
@@ -124,8 +142,9 @@ def create_app_context() -> AppContext:
         parser=parser,
         db=db,
         poe_ninja=poe_ninja,
-        poe_watch=poe_watch,  # <— NEW: secondary pricing source
+        poe_watch=poe_watch,  # secondary pricing source
         trade_source=trade_source,
+        rare_evaluator=rare_evaluator,  # NEW: rare item pricing
         logger=price_logger,
     )
 
