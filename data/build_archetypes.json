@@ -1,6 +1,6 @@
 {
   "_comment": "Common build archetypes for rare item evaluation matching",
-  "_version": "1.0",
+  "_version": "1.1",
   "archetypes": {
     "life_attack": {
       "name": "Life-Based Attack",
@@ -88,16 +88,46 @@
       },
       "bonus_affixes": ["chaos_resistance", "life_regeneration"],
       "examples": ["RF Jugg", "Shield Crush", "Molten Strike"]
+    },
+    "crit_bow": {
+      "name": "Crit Bow Build",
+      "description": "Bow-based crit builds",
+      "priority_affixes": ["life", "resistances", "critical_strike_multiplier", "attack_speed", "dexterity"],
+      "required_stats": {
+        "life": 70,
+        "resistances": 35
+      },
+      "bonus_affixes": ["movement_speed", "spell_suppression"],
+      "examples": ["Tornado Shot", "Ice Shot", "Burning Arrow"]
+    },
+    "ward_build": {
+      "name": "Ward Build",
+      "description": "Ward-based defensive builds",
+      "priority_affixes": ["life", "resistances", "movement_speed"],
+      "required_stats": {
+        "life": 60
+      },
+      "bonus_affixes": ["dexterity", "intelligence"],
+      "examples": ["Olroth's Ward", "Wardloop"]
     }
   },
   "_meta_weights": {
     "_comment": "Dynamic weight adjustments based on current meta (updated periodically)",
-    "current_league": "Settlers",
-    "last_updated": null,
+    "current_league": "Phrecia",
+    "last_updated": "2025-11-25",
     "popularity_boosts": {
       "spell_suppression": 2,
-      "chaos_resistance": 1,
-      "movement_speed": 1
+      "chaos_resistance": 2,
+      "movement_speed": 1,
+      "life": 2,
+      "critical_strike_multiplier": 1,
+      "energy_shield": 1
     }
+  },
+  "_high_value_bases": {
+    "_comment": "High-value base items from poe.ninja meta analysis",
+    "weapons": ["Void Battery", "Mageblood", "Headhunter", "Ashes of the Stars"],
+    "armour": ["Stygian Vise", "Crystal Belt", "Opal Ring", "Vermillion Ring"],
+    "notes": "These are items commonly used in meta builds - affixes that complement them are more valuable"
   }
 }

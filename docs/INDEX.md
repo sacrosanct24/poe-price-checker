@@ -25,6 +25,7 @@
 ### Rare Item Evaluator
 - **[Rare Evaluator Quick Start](features/RARE_EVALUATOR_QUICK_START.md)** ⭐ - Get started quickly
 - [GUI Integration Guide](features/GUI_INTEGRATION_GUIDE.md) - How evaluation integrates with GUI
+- [Integration Guide](features/INTEGRATION_GUIDE.md) - Meta integration and build archetypes
 
 ---
 
@@ -35,6 +36,10 @@
 - [PyCharm Setup](development/PYCHARM_SETUP.md) - IDE configuration with Continue AI
 - [Context](development/Context.md) - Design decisions and rationale
 - [Code Review](development/code_review.md) - Code quality notes
+
+### Data Integration
+- **[Cargo API Guide](development/CARGO_API_GUIDE.md)** - PoE Wiki Cargo API for mod/item data
+- [Continuation Guide](development/CONTINUATION.md) - Session continuation notes
 
 ### Plugin System
 - [Plugin Specification](development/PLUGIN_SPEC.md) - How to create plugins

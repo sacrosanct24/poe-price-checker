@@ -252,3 +252,207 @@ class CargoAPIClient:
 
         logger.info(f"Fetched {len(all_mods)} total mods from Cargo API")
         return all_mods
+
+    def get_unique_items(
+        self,
+        batch_size: int = 500,
+        max_total: int = 5000,
+    ) -> List[Dict[str, Any]]:
+        """
+        Get all unique items from the wiki with pagination.
+
+        Args:
+            batch_size: Results per batch (default: 500)
+            max_total: Maximum total results (default: 5000)
+
+        Returns:
+            List of unique item dictionaries with fields:
+                - name: Item name (e.g., "Headhunter")
+                - base_item: Base type (e.g., "Leather Belt")
+                - class: Item class (e.g., "Belt")
+                - rarity: "Unique"
+                - required_level: Level requirement
+                - drop_enabled: Whether item can drop
+        """
+        all_items = []
+        offset = 0
+
+        fields = (
+            "items.name,"
+            "items.base_item,"
+            "items.class,"
+            "items.rarity,"
+            "items.required_level,"
+            "items.drop_enabled"
+        )
+
+        while offset < max_total:
+            batch = self.query(
+                tables="items",
+                fields=fields,
+                where='items.rarity="Unique"',
+                limit=batch_size,
+                offset=offset,
+            )
+
+            if not batch:
+                break
+
+            all_items.extend(batch)
+            logger.info(f"Fetched {len(batch)} unique items at offset {offset}")
+
+            if len(batch) < batch_size:
+                break
+
+            offset += batch_size
+
+        logger.info(f"Fetched {len(all_items)} total unique items from Cargo API")
+        return all_items
+
+    def get_items_by_class(
+        self,
+        item_class: str,
+        batch_size: int = 500,
+        max_total: int = 2000,
+    ) -> List[Dict[str, Any]]:
+        """
+        Get all items of a specific class from the wiki.
+
+        Args:
+            item_class: Item class to filter (e.g., "Belt", "Helmet")
+            batch_size: Results per batch (default: 500)
+            max_total: Maximum total results (default: 2000)
+
+        Returns:
+            List of item dictionaries
+        """
+        all_items = []
+        offset = 0
+
+        fields = (
+            "items.name,"
+            "items.base_item,"
+            "items.class,"
+            "items.rarity,"
+            "items.required_level,"
+            "items.drop_enabled"
+        )
+
+        while offset < max_total:
+            batch = self.query(
+                tables="items",
+                fields=fields,
+                where=f'items.class="{item_class}"',
+                limit=batch_size,
+                offset=offset,
+            )
+
+            if not batch:
+                break
+
+            all_items.extend(batch)
+
+            if len(batch) < batch_size:
+                break
+
+            offset += batch_size
+
+        logger.info(f"Fetched {len(all_items)} {item_class} items from Cargo API")
+        return all_items
+
+    def get_all_items(
+        self,
+        item_classes: List[str] = None,
+        batch_size: int = 500,
+        max_total: int = 10000,
+    ) -> List[Dict[str, Any]]:
+        """
+        Get all items from specified classes with pagination.
+
+        Args:
+            item_classes: List of item classes to fetch. If None, fetches common valuable types.
+            batch_size: Results per batch (default: 500)
+            max_total: Maximum total results (default: 10000)
+
+        Returns:
+            List of item dictionaries
+        """
+        if item_classes is None:
+            # Default to valuable/tradeable item types
+            item_classes = [
+                "Unique",  # Unique items (rarity filter)
+                "Divination Card",
+                "Skill Gem",
+                "Support Gem",
+                "Map Fragment",  # Includes scarabs
+                "Currency Item",
+                "Map",
+                "Incubator",
+                "Resonator",
+                "Breachstone",
+            ]
+
+        all_items = []
+
+        fields = (
+            "items.name,"
+            "items.base_item,"
+            "items.class,"
+            "items.rarity,"
+            "items.required_level,"
+            "items.drop_enabled"
+        )
+
+        for item_class in item_classes:
+            offset = 0
+            class_items = []
+
+            # Handle "Unique" as a rarity filter instead of class
+            if item_class == "Unique":
+                where_clause = 'items.rarity="Unique"'
+            else:
+                where_clause = f'items.class="{item_class}"'
+
+            while offset < max_total:
+                batch = self.query(
+                    tables="items",
+                    fields=fields,
+                    where=where_clause,
+                    limit=batch_size,
+                    offset=offset,
+                )
+
+                if not batch:
+                    break
+
+                class_items.extend(batch)
+
+                if len(batch) < batch_size:
+                    break
+
+                offset += batch_size
+
+            logger.info(f"Fetched {len(class_items)} {item_class} items")
+            all_items.extend(class_items)
+
+        logger.info(f"Fetched {len(all_items)} total items from Cargo API")
+        return all_items
+
+    def get_divination_cards(self, batch_size: int = 500) -> List[Dict[str, Any]]:
+        """Get all divination cards."""
+        return self.get_items_by_class("Divination Card", batch_size=batch_size)
+
+    def get_skill_gems(self, batch_size: int = 500) -> List[Dict[str, Any]]:
+        """Get all skill gems (both active and support)."""
+        active = self.get_items_by_class("Skill Gem", batch_size=batch_size)
+        support = self.get_items_by_class("Support Gem", batch_size=batch_size)
+        return active + support
+
+    def get_scarabs(self, batch_size: int = 500) -> List[Dict[str, Any]]:
+        """Get all scarabs (classified as Map Fragment with 'Scarab' in name)."""
+        all_frags = self.get_items_by_class("Map Fragment", batch_size=batch_size)
+        return [item for item in all_frags if "Scarab" in item.get("name", "")]
+
+    def get_currency(self, batch_size: int = 500) -> List[Dict[str, Any]]:
+        """Get all currency items."""
+        return self.get_items_by_class("Currency Item", batch_size=batch_size)

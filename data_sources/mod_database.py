@@ -57,6 +57,22 @@ class ModDatabase:
     CREATE INDEX IF NOT EXISTS idx_mods_generation_type ON mods(generation_type);
     CREATE INDEX IF NOT EXISTS idx_mods_domain ON mods(domain);
 
+    -- Items table (unique items, etc.)
+    CREATE TABLE IF NOT EXISTS items (
+        name TEXT PRIMARY KEY,
+        base_item TEXT,
+        item_class TEXT,
+        rarity TEXT,
+        required_level INTEGER,
+        drop_enabled INTEGER DEFAULT 1,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- Indexes for items
+    CREATE INDEX IF NOT EXISTS idx_items_base_item ON items(base_item);
+    CREATE INDEX IF NOT EXISTS idx_items_class ON items(item_class);
+    CREATE INDEX IF NOT EXISTS idx_items_rarity ON items(rarity);
+
     -- Metadata table for tracking updates
     CREATE TABLE IF NOT EXISTS metadata (
         key TEXT PRIMARY KEY,
@@ -297,6 +313,183 @@ class ModDatabase:
         """Get total number of mods in database."""
         cursor = self.conn.execute("SELECT COUNT(*) as count FROM mods")
         return cursor.fetchone()['count']
+
+    # =========================================================================
+    # Items table methods
+    # =========================================================================
+
+    def insert_items(self, items: List[Dict[str, Any]]) -> int:
+        """
+        Insert or update item records in bulk.
+
+        Args:
+            items: List of item dictionaries from Cargo API
+
+        Returns:
+            Number of items inserted/updated
+        """
+        cursor = self.conn.cursor()
+        count = 0
+
+        for item in items:
+            try:
+                # Handle both space-separated (API) and underscore (local) field names
+                cursor.execute(
+                    """
+                    INSERT OR REPLACE INTO items (
+                        name, base_item, item_class, rarity, required_level, drop_enabled
+                    ) VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        item.get('name'),
+                        item.get('base item') or item.get('base_item'),
+                        item.get('class') or item.get('item_class'),
+                        item.get('rarity'),
+                        item.get('required level') or item.get('required_level'),
+                        item.get('drop enabled') or item.get('drop_enabled', 1),
+                    )
+                )
+                count += 1
+            except sqlite3.Error as e:
+                logger.warning(f"Failed to insert item {item.get('name')}: {e}")
+                continue
+
+        self.conn.commit()
+        logger.info(f"Inserted/updated {count} items")
+        return count
+
+    def find_unique_by_name(self, name: str) -> Optional[Dict[str, Any]]:
+        """
+        Find a unique item by its name.
+
+        Args:
+            name: Unique item name (e.g., "Headhunter")
+
+        Returns:
+            Item dictionary or None if not found
+        """
+        cursor = self.conn.execute(
+            "SELECT * FROM items WHERE name = ? AND rarity = 'Unique'",
+            (name,)
+        )
+        row = cursor.fetchone()
+        return dict(row) if row else None
+
+    def find_items_by_base(self, base_item: str) -> List[Dict[str, Any]]:
+        """
+        Find all items that use a specific base type.
+
+        Args:
+            base_item: Base item name (e.g., "Leather Belt")
+
+        Returns:
+            List of matching item dictionaries
+        """
+        cursor = self.conn.execute(
+            "SELECT * FROM items WHERE base_item = ?",
+            (base_item,)
+        )
+        return [dict(row) for row in cursor.fetchall()]
+
+    def get_unique_items_by_class(self, item_class: str) -> List[Dict[str, Any]]:
+        """
+        Get all unique items of a specific class.
+
+        Args:
+            item_class: Item class (e.g., "Belt", "Helmet", "Body Armour")
+
+        Returns:
+            List of unique item dictionaries
+        """
+        cursor = self.conn.execute(
+            "SELECT * FROM items WHERE item_class = ? AND rarity = 'Unique'",
+            (item_class,)
+        )
+        return [dict(row) for row in cursor.fetchall()]
+
+    def get_item_count(self) -> int:
+        """Get total number of items in database."""
+        cursor = self.conn.execute("SELECT COUNT(*) as count FROM items")
+        return cursor.fetchone()['count']
+
+    def get_unique_item_count(self) -> int:
+        """Get number of unique items in database."""
+        cursor = self.conn.execute(
+            "SELECT COUNT(*) as count FROM items WHERE rarity = 'Unique'"
+        )
+        return cursor.fetchone()['count']
+
+    def get_items_by_class(self, item_class: str) -> List[Dict[str, Any]]:
+        """
+        Get all items of a specific class.
+
+        Args:
+            item_class: Item class (e.g., "Divination Card", "Skill Gem")
+
+        Returns:
+            List of item dictionaries
+        """
+        cursor = self.conn.execute(
+            "SELECT * FROM items WHERE item_class = ?",
+            (item_class,)
+        )
+        return [dict(row) for row in cursor.fetchall()]
+
+    def get_divination_cards(self) -> List[Dict[str, Any]]:
+        """Get all divination cards."""
+        return self.get_items_by_class("Divination Card")
+
+    def get_skill_gems(self) -> List[Dict[str, Any]]:
+        """Get all skill gems (active and support)."""
+        cursor = self.conn.execute(
+            "SELECT * FROM items WHERE item_class IN ('Skill Gem', 'Support Gem')"
+        )
+        return [dict(row) for row in cursor.fetchall()]
+
+    def get_scarabs(self) -> List[Dict[str, Any]]:
+        """Get all scarabs."""
+        cursor = self.conn.execute(
+            "SELECT * FROM items WHERE name LIKE '%Scarab%'"
+        )
+        return [dict(row) for row in cursor.fetchall()]
+
+    def get_currency_items(self) -> List[Dict[str, Any]]:
+        """Get all currency items."""
+        return self.get_items_by_class("Currency Item")
+
+    def find_item_by_name(self, name: str) -> Optional[Dict[str, Any]]:
+        """
+        Find any item by exact name.
+
+        Args:
+            name: Item name (e.g., "House of Mirrors", "Enlighten Support")
+
+        Returns:
+            Item dictionary or None if not found
+        """
+        cursor = self.conn.execute(
+            "SELECT * FROM items WHERE name = ?",
+            (name,)
+        )
+        row = cursor.fetchone()
+        return dict(row) if row else None
+
+    def search_items(self, name_pattern: str, limit: int = 50) -> List[Dict[str, Any]]:
+        """
+        Search items by name pattern.
+
+        Args:
+            name_pattern: SQL LIKE pattern (e.g., "%Scarab%", "House of%")
+            limit: Maximum results to return
+
+        Returns:
+            List of matching item dictionaries
+        """
+        cursor = self.conn.execute(
+            "SELECT * FROM items WHERE name LIKE ? LIMIT ?",
+            (name_pattern, limit)
+        )
+        return [dict(row) for row in cursor.fetchall()]
 
     def close(self) -> None:
         """Close database connection."""

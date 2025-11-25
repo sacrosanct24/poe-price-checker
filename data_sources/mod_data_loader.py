@@ -158,6 +158,97 @@ class ModDataLoader:
         logger.info(f"Loaded {total_count} mods total")
         return total_count
 
+    def load_unique_items(self) -> int:
+        """
+        Load all unique items from Cargo API into database.
+
+        Returns:
+            Number of items loaded
+        """
+        logger.info("Loading unique items from Cargo API...")
+
+        try:
+            items = self.api.get_unique_items(
+                batch_size=500,
+                max_total=5000,
+            )
+
+            if not items:
+                logger.warning("No unique items returned from Cargo API")
+                return 0
+
+            # Insert into database
+            logger.info(f"Inserting {len(items)} unique items into database...")
+            count = self.db.insert_items(items)
+
+            # Update metadata
+            self.db.set_metadata('unique_item_count', str(count))
+            self.db.set_metadata('items_last_update', datetime.now().isoformat())
+
+            logger.info(f"Successfully loaded {count} unique items")
+            return count
+
+        except Exception as e:
+            logger.error(f"Failed to load unique items: {e}")
+            raise
+
+    def load_all_items(self) -> int:
+        """
+        Load all valuable item types from Cargo API into database.
+
+        This includes: unique items, divination cards, gems, scarabs, currency, etc.
+
+        Returns:
+            Number of items loaded
+        """
+        logger.info("Loading all item types from Cargo API...")
+
+        try:
+            items = self.api.get_all_items()
+
+            if not items:
+                logger.warning("No items returned from Cargo API")
+                return 0
+
+            # Insert into database
+            logger.info(f"Inserting {len(items)} items into database...")
+            count = self.db.insert_items(items)
+
+            # Update metadata
+            self.db.set_metadata('total_item_count', str(count))
+            self.db.set_metadata('items_last_update', datetime.now().isoformat())
+
+            logger.info(f"Successfully loaded {count} items")
+            return count
+
+        except Exception as e:
+            logger.error(f"Failed to load items: {e}")
+            raise
+
+    def load_divination_cards(self) -> int:
+        """Load all divination cards."""
+        logger.info("Loading divination cards...")
+        items = self.api.get_divination_cards()
+        return self.db.insert_items(items)
+
+    def load_gems(self) -> int:
+        """Load all skill and support gems."""
+        logger.info("Loading skill gems...")
+        items = self.api.get_skill_gems()
+        return self.db.insert_items(items)
+
+    def load_scarabs(self) -> int:
+        """Load all scarabs."""
+        logger.info("Loading scarabs...")
+        items = self.api.get_scarabs()
+        return self.db.insert_items(items)
+
+    def load_currency(self) -> int:
+        """Load all currency items."""
+        logger.info("Loading currency items...")
+        items = self.api.get_currency()
+        return self.db.insert_items(items)
+
     def get_stats(self) -> dict:
         """
         Get database statistics.
@@ -167,6 +258,8 @@ class ModDataLoader:
         """
         return {
             'mod_count': self.db.get_mod_count(),
+            'item_count': self.db.get_item_count(),
+            'unique_item_count': self.db.get_unique_item_count(),
             'last_update': self.db.get_last_update_time(),
             'league': self.db.get_current_league(),
         }
@@ -175,6 +268,7 @@ class ModDataLoader:
 def ensure_mod_database_updated(
     current_league: str = "Standard",
     force_update: bool = False,
+    load_items: bool = True,
 ) -> ModDatabase:
     """
     Ensure mod database is initialized and up-to-date.
@@ -185,6 +279,7 @@ def ensure_mod_database_updated(
     Args:
         current_league: Current active league
         force_update: Force update even if not needed
+        load_items: Also load unique items data (default: True)
 
     Returns:
         ModDatabase instance ready for use
@@ -196,6 +291,8 @@ def ensure_mod_database_updated(
         logger.info("Mod database needs updating")
         try:
             loader.load_all_mods(current_league)
+            if load_items:
+                loader.load_unique_items()
         except Exception as e:
             logger.error(f"Failed to update mod database: {e}")
             logger.info("Continuing with existing data (if any)")
@@ -203,8 +300,17 @@ def ensure_mod_database_updated(
         stats = loader.get_stats()
         logger.info(
             f"Mod database is up-to-date: {stats['mod_count']} mods, "
+            f"{stats['unique_item_count']} unique items, "
             f"league={stats['league']}, last_update={stats['last_update']}"
         )
+
+        # Load items if not yet loaded
+        if load_items and stats['unique_item_count'] == 0:
+            logger.info("Loading unique items (not yet in database)...")
+            try:
+                loader.load_unique_items()
+            except Exception as e:
+                logger.warning(f"Failed to load unique items: {e}")
 
     return loader.db
 
