@@ -295,7 +295,6 @@ if __name__ == "__main__":
             param_str = str(sorted(params.items())) if params else ""
             return f"{endpoint}:{param_str}"
 
-
     # Test it
     api = DummyAPI(
         base_url="https://httpbin.org",

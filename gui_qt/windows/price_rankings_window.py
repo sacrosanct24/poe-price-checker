@@ -8,12 +8,11 @@ from __future__ import annotations
 
 import hashlib
 import logging
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 from PyQt6.QtCore import Qt, QAbstractTableModel, QModelIndex, QThread, pyqtSignal, QUrl, QSize
-from PyQt6.QtGui import QColor, QBrush, QFont, QPixmap, QIcon, QImage
+from PyQt6.QtGui import QColor, QBrush, QPixmap, QImage
 from PyQt6.QtNetwork import QNetworkAccessManager, QNetworkRequest, QNetworkReply
 from PyQt6.QtWidgets import (
     QWidget,
@@ -24,16 +23,11 @@ from PyQt6.QtWidgets import (
     QComboBox,
     QPushButton,
     QTableView,
-    QHeaderView,
     QAbstractItemView,
-    QGroupBox,
     QTabWidget,
     QProgressBar,
     QCheckBox,
-    QSpinBox,
     QMessageBox,
-    QSplitter,
-    QStyledItemDelegate,
 )
 
 from gui_qt.styles import COLORS
@@ -450,7 +444,7 @@ class PriceRankingsWindow(QDialog):
             leagues = api.get_current_leagues()
 
             # Add temp leagues first
-            temp_leagues = [l for l in leagues if l['name'] not in ['Standard', 'Hardcore']]
+            temp_leagues = [lg for lg in leagues if lg['name'] not in ['Standard', 'Hardcore']]
             for league in temp_leagues:
                 self.league_combo.addItem(league['displayName'], league['name'])
 

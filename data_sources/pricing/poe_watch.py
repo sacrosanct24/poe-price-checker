@@ -106,7 +106,7 @@ class PoeWatchAPI(BaseAPIClient):
             'category': category,
             **filters
         }
-        
+
         return self.get("get", params=params)
 
     def search_items(self, query: str) -> List[Dict[str, Any]]:
@@ -206,16 +206,16 @@ class PoeWatchAPI(BaseAPIClient):
             logger.info(f"Loading compact data for {self.league}...")
             compact = self.get_compact_data()
             items = compact.get('items', [])
-            
+
             logger.info(f"Loaded {len(items)} items from poe.watch")
 
             # Organize by category
             for item in items:
                 category = item.get('category', 'unknown')
-                
+
                 if category not in cache:
                     cache[category] = {}
-                
+
                 # Use name as key (lowercase for matching)
                 name_key = item.get('name', '').lower()
                 if name_key:
@@ -273,13 +273,13 @@ class PoeWatchAPI(BaseAPIClient):
                         item for item in candidates
                         if item.get('gemLevel') == gem_level
                     ]
-                
+
                 if gem_quality is not None:
                     candidates = [
                         item for item in candidates
                         if item.get('gemQuality') == gem_quality
                     ]
-                
+
                 if corrupted is not None:
                     candidates = [
                         item for item in candidates
@@ -329,7 +329,7 @@ class PoeWatchAPI(BaseAPIClient):
             - 'low': lowConfidence=True
         """
         item = self.find_item_price(item_name, **kwargs)
-        
+
         if not item:
             return None
 
@@ -345,7 +345,7 @@ class PoeWatchAPI(BaseAPIClient):
             confidence = 'medium'
 
         item['confidence'] = confidence
-        
+
         return item
 
 
@@ -362,8 +362,8 @@ if __name__ == "__main__":
         print("\n1. Testing leagues endpoint...")
         leagues = api.get_leagues()
         print(f"   Found {len(leagues)} leagues")
-        current = [l for l in leagues if l['end_date'].startswith('0001')]
-        print(f"   Current leagues: {[l['name'] for l in current[:3]]}")
+        current = [league for league in leagues if league['end_date'].startswith('0001')]
+        print(f"   Current leagues: {[league['name'] for league in current[:3]]}")
 
         # Test categories
         print("\n2. Testing categories endpoint...")
@@ -375,7 +375,7 @@ if __name__ == "__main__":
         print("\n3. Testing currency prices...")
         currency = api.get_items_by_category("currency")
         print(f"   Found {len(currency)} currency items")
-        
+
         divine = next((c for c in currency if c['name'] == 'Divine Orb'), None)
         if divine:
             print(f"   Divine Orb: {divine['mean']:.1f} chaos")
@@ -405,7 +405,7 @@ if __name__ == "__main__":
         print(f"   Change ID: {status['changeID']}")
         print(f"   Success rate: {status['computedStashes']}/{status['requestedStashes']}")
 
-        print(f"\n7. Cache statistics...")
+        print("\n7. Cache statistics...")
         print(f"   Cache size: {api.get_cache_size()} entries")
 
         print("\n" + "=" * 60)

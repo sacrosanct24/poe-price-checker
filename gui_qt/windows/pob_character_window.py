@@ -6,7 +6,7 @@ PyQt6 window for managing Path of Building character imports.
 
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, Optional
 
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QFont
@@ -19,7 +19,6 @@ from PyQt6.QtWidgets import (
     QGroupBox,
     QLabel,
     QLineEdit,
-    QTextEdit,
     QPlainTextEdit,
     QPushButton,
     QComboBox,

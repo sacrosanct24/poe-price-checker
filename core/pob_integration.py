@@ -20,7 +20,7 @@ import zlib
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import requests
 
@@ -378,7 +378,7 @@ class PoBDecoder:
 
         implicit_count = 0
         implicits_remaining = 0
-        parsing_explicits = False
+        _ = False  # parsing_explicits - intentionally unused
 
         for i, line in enumerate(lines):
             # Skip empty lines
@@ -430,7 +430,7 @@ class PoBDecoder:
                     item.implicit_mods.append(mod)
                 implicits_remaining -= 1
                 if implicits_remaining == 0:
-                    parsing_explicits = True
+                    _ = True  # parsing_explicits - intentionally unused
                 continue
 
             # If we've parsed all implicits (or there were none), this is an explicit mod

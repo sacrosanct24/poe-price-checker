@@ -7,21 +7,19 @@ Shows characters and equipment in a compact sidebar format.
 
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QColor, QFont
+from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
     QWidget,
     QVBoxLayout,
     QHBoxLayout,
-    QGroupBox,
     QLabel,
     QComboBox,
     QTreeWidget,
     QTreeWidgetItem,
     QPushButton,
-    QSplitter,
     QHeaderView,
 )
 

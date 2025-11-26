@@ -338,13 +338,13 @@ if __name__ == "__main__":
 
         # Show some stats
         stats = loader.get_stats()
-        print(f"\nDatabase stats:")
+        print("\nDatabase stats:")
         print(f"  Total mods: {stats['mod_count']}")
         print(f"  League: {stats['league']}")
         print(f"  Last update: {stats['last_update']}")
 
         # Test query
-        print(f"\nTesting query for 'maximum Life' affixes...")
+        print("\nTesting query for 'maximum Life' affixes...")
         life_tiers = loader.db.get_affix_tiers("%to maximum Life")
         print(f"Found {len(life_tiers)} tiers:")
         for tier, min_val, max_val in life_tiers[:5]:

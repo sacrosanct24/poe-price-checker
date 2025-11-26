@@ -8,8 +8,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFont, QColor
+from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -17,7 +16,6 @@ from PyQt6.QtWidgets import (
     QLabel,
     QGroupBox,
     QTextEdit,
-    QFrame,
 )
 
 from gui_qt.styles import COLORS

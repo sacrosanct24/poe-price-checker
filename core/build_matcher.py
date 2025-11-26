@@ -10,7 +10,6 @@ Supports:
 import json
 import base64
 import zlib
-import re
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import List, Dict, Optional

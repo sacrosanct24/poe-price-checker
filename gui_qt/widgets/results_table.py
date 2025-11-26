@@ -9,13 +9,11 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from PyQt6.QtCore import Qt, pyqtSignal, QAbstractTableModel, QModelIndex, QVariant
+from PyQt6.QtCore import Qt, pyqtSignal, QAbstractTableModel, QModelIndex
 from PyQt6.QtGui import QColor, QBrush
 from PyQt6.QtWidgets import (
     QTableView,
-    QHeaderView,
     QWidget,
-    QVBoxLayout,
     QAbstractItemView,
 )
 

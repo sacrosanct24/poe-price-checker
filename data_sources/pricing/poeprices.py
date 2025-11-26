@@ -354,23 +354,23 @@ Item Level: 86
 14% increased Stun and Block Recovery"""
 
     print("\n1. Testing price prediction...")
-    print(f"Item: Vaal Regalia with Life + ES + Triple Res")
+    print("Item: Vaal Regalia with Life + ES + Triple Res")
 
     try:
         prediction = api.predict_price(test_item)
 
         if prediction.is_valid:
-            print(f"\n[OK] Prediction successful!")
+            print("\n[OK] Prediction successful!")
             print(f"  Price range: {prediction.price_range_str}")
             print(f"  Average: {prediction.average_price:.2f} {prediction.currency}")
             print(f"  Confidence: {prediction.confidence_score:.1f}% ({prediction.confidence_tier})")
 
-            print(f"\n  Top contributing mods:")
+            print("\n  Top contributing mods:")
             top_mods = api.get_top_contributing_mods(prediction)
             for mod, contribution in top_mods:
                 print(f"    {mod}: {contribution:.4f}")
         else:
-            print(f"\n[FAIL] Prediction failed!")
+            print("\n[FAIL] Prediction failed!")
             print(f"  Error code: {prediction.error_code}")
             print(f"  Error: {prediction.error_msg}")
 

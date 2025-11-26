@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import Any, Optional
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QColor, QFont
+from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -156,7 +156,7 @@ class ItemInspectorWidget(QWidget):
 
                 # Check for crafted mods
                 if "(crafted)" in mod.lower():
-                    mod_label.setStyleSheet(f"color: #b4b4ff;")
+                    mod_label.setStyleSheet("color: #b4b4ff;")
                 else:
                     mod_label.setStyleSheet(f"color: {COLORS['text']};")
 

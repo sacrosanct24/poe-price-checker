@@ -504,7 +504,7 @@ class TradeApiSource:
         batch_size = 10
 
         for i in range(0, len(result_ids), batch_size):
-            batch_ids = result_ids[i : i + batch_size]
+            batch_ids = result_ids[i:i + batch_size]
             ids_str = ",".join(batch_ids)
             url = f"{self.BASE_URL}/fetch/{ids_str}"
             params = {"query": search_id}
@@ -556,11 +556,11 @@ class TradeApiSource:
         Returns None if no price is present (e.g. "mirrored", not-for-sale, etc.).
         """
         listing_id = listing.get("id")
-        l = listing.get("listing") or {}
+        listing_info = listing.get("listing") or {}
         item = listing.get("item") or {}
 
         try:
-            price = l.get("price")
+            price = listing_info.get("price")
             if not price:
                 return None
 
@@ -575,8 +575,8 @@ class TradeApiSource:
             if amount is None or not currency:
                 return None
 
-            account = (l.get("account") or {}).get("name")
-            listed_at = l.get("indexed")
+            account = (listing_info.get("account") or {}).get("name")
+            listed_at = listing_info.get("indexed")
             stack_size = item.get("stackSize")
 
             return {

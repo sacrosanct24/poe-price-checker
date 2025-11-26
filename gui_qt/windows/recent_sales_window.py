@@ -10,7 +10,6 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 from PyQt6.QtCore import Qt, QAbstractTableModel, QModelIndex
-from PyQt6.QtGui import QColor, QBrush
 from PyQt6.QtWidgets import (
     QWidget,
     QDialog,
@@ -22,11 +21,8 @@ from PyQt6.QtWidgets import (
     QSpinBox,
     QPushButton,
     QTableView,
-    QHeaderView,
     QAbstractItemView,
 )
-
-from gui_qt.styles import COLORS
 
 if TYPE_CHECKING:
     from core.app_context import AppContext

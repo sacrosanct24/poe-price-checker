@@ -1092,7 +1092,7 @@ def print_trending(trending: List[Dict[str, Any]], category: str) -> None:
 
     for item in trending:
         arrow = "↑" if item["trend"] == "up" else "↓"
-        color_code = "" # Could add ANSI colors here
+        # Could add ANSI colors here
         print(f"  {arrow} {item['name']}: {item['old_price']:,.0f}c → {item['new_price']:,.0f}c ({item['change_percent']:+.1f}%)")
 
 
@@ -1218,7 +1218,7 @@ Examples:
                 history_db = PriceRankingHistory()
                 history_db.save_snapshot(ranking, league)
                 history_db.close()
-                print(f"\nSnapshot saved to database.")
+                print("\nSnapshot saved to database.")
     elif args.slots:
         # All equipment slots
         rankings = calculator.refresh_all_slots(force=args.refresh)
@@ -1228,7 +1228,7 @@ Examples:
             history_db = PriceRankingHistory()
             history_db.save_all_snapshots(rankings, league)
             history_db.close()
-            print(f"\nSnapshots saved to database.")
+            print("\nSnapshots saved to database.")
     elif args.category:
         ranking = calculator.refresh_category(args.category, force=args.refresh)
         if ranking:
@@ -1237,7 +1237,7 @@ Examples:
                 history_db = PriceRankingHistory()
                 history_db.save_snapshot(ranking, league)
                 history_db.close()
-                print(f"\nSnapshot saved to database.")
+                print("\nSnapshot saved to database.")
     elif args.group:
         rankings = get_rankings_by_group(args.group, league=league, force_refresh=args.refresh)
         for ranking in rankings.values():
@@ -1246,7 +1246,7 @@ Examples:
             history_db = PriceRankingHistory()
             history_db.save_all_snapshots(rankings, league)
             history_db.close()
-            print(f"\nSnapshots saved to database.")
+            print("\nSnapshots saved to database.")
     else:
         rankings = calculator.refresh_all(force=args.refresh)
         for ranking in rankings.values():
@@ -1255,7 +1255,7 @@ Examples:
             history_db = PriceRankingHistory()
             history_db.save_all_snapshots(rankings, league)
             history_db.close()
-            print(f"\nSnapshots saved to database.")
+            print("\nSnapshots saved to database.")
 
     # Show cache status
     age = cache.get_cache_age_days()

@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 import re
 import time
-from typing import Dict, List, Optional, Any
+from typing import List, Optional
 from dataclasses import dataclass, field
 from datetime import datetime
 
@@ -132,11 +132,11 @@ class PoeNinjaBuildScraper:
                 if script.string and 'builds' in script.string:
                     # Try to extract JSON data
                     # This is simplified - actual implementation may need regex/json parsing
-                    logger.debug(f"Found potential build data in script tag")
+                    logger.debug("Found potential build data in script tag")
 
             # Alternative: Use poe.ninja API directly
             # poe.ninja has an undocumented API we could use
-            api_url = f"https://poe.ninja/api/builds/overview"
+            api_url = "https://poe.ninja/api/builds/overview"
             api_params = {
                 'league': self.league,
                 'type': 'depth-solo',  # or 'dps'
@@ -278,7 +278,7 @@ class PobbinScraper:
                 logger.info(f"Successfully fetched PoB code ({len(pob_code)} chars)")
                 return pob_code
             else:
-                logger.warning(f"Invalid PoB code format from pobb.in")
+                logger.warning("Invalid PoB code format from pobb.in")
                 return None
 
         except requests.RequestException as e:

@@ -610,7 +610,7 @@ class RareItemEvaluator:
                 socket_str = str(item.sockets)
                 # Count max linked group (look for 6 consecutive linked sockets)
                 if "-" in socket_str:
-                    groups = socket_str.replace(" ", "").split("-")
+                    _ = socket_str.replace(" ", "").split("-")
                     # This is simplified - real detection would parse socket groups
                     linked_count = socket_str.count("-") + 1
                     if linked_count >= 6 or "6L" in socket_str.upper():

@@ -20,14 +20,12 @@ import logging
 import os
 import random
 import sys
-import webbrowser
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Optional, TYPE_CHECKING
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QThread, QObject, QUrl
-from PyQt6.QtGui import QAction, QClipboard, QKeySequence, QShortcut, QFont
-from PyQt6.QtNetwork import QNetworkAccessManager, QNetworkRequest, QNetworkReply
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QThread, QObject
+from PyQt6.QtGui import QAction, QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -41,21 +39,14 @@ from PyQt6.QtWidgets import (
     QPlainTextEdit,
     QPushButton,
     QComboBox,
-    QTableView,
-    QHeaderView,
     QMenu,
-    QMenuBar,
     QStatusBar,
     QMessageBox,
     QFileDialog,
     QDialog,
-    QFormLayout,
-    QSpinBox,
-    QDoubleSpinBox,
-    QCheckBox,
 )
 
-from gui_qt.styles import APP_STYLESHEET, COLORS, get_rarity_color, get_value_color
+from gui_qt.styles import APP_STYLESHEET, COLORS
 from gui_qt.widgets.results_table import ResultsTableWidget
 from gui_qt.widgets.item_inspector import ItemInspectorWidget
 from gui_qt.widgets.rare_evaluation_panel import RareEvaluationPanelWidget
@@ -197,7 +188,6 @@ class RankingsPopulationWorker(QThread):
                 PriceRankingCache,
                 Top20Calculator,
                 PriceRankingHistory,
-                CACHE_EXPIRY_DAYS,
             )
             from data_sources.pricing.poe_ninja import PoeNinjaAPI
 
@@ -627,17 +617,6 @@ class PriceCheckerWindow(QMainWindow):
     # -------------------------------------------------------------------------
     # Price Checking
     # -------------------------------------------------------------------------
-
-    def _on_pob_price_check(self, item_text: str) -> None:
-        """Handle price check request from PoB panel."""
-        if not item_text:
-            return
-
-        # Populate the input field with the item text
-        self.input_text.setPlainText(item_text)
-
-        # Trigger the price check
-        self._on_check_price()
 
     def _on_check_price(self) -> None:
         """Handle Check Price button click."""

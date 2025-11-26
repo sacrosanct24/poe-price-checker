@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Iterable, Mapping
+from typing import Any, Mapping
 
 from core.price_multi import PriceSource, RESULT_COLUMNS
 from core.price_service import PriceService

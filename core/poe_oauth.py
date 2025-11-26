@@ -12,7 +12,7 @@ import hashlib
 import base64
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlencode, parse_qs, urlparse
-from typing import Optional, Dict, Any
+from typing import Optional, Any
 import requests
 import json
 from pathlib import Path

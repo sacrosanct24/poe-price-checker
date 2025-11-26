@@ -360,7 +360,7 @@ class MetaAnalyzer:
         print("=" * 80)
         print(f"Builds Analyzed: {self.builds_analyzed}")
         print(f"Last Analysis: {self.last_analysis}")
-        print(f"\nTop Meta Affixes:")
+        print("\nTop Meta Affixes:")
         print("-" * 80)
 
         for i, (affix_type, pop) in enumerate(self.get_top_affixes(10), 1):

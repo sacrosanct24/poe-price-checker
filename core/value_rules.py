@@ -212,7 +212,7 @@ def _iter_mod_lines(item: ParsedItem):
 
 
 def _pattern_to_regex(pattern: str) -> re.Pattern:
-    """
+    r"""
     Convert a simple pattern with '#' placeholders into a regex.
 
     Example:

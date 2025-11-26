@@ -242,7 +242,7 @@ class PoeNinjaAPI(BaseAPIClient):
                 logger.info(
                     "Fetched %d leagues from trade API (pc realm): %s",
                     len(leagues),
-                    ", ".join(l["name"] for l in leagues),
+                    ", ".join(league["name"] for league in leagues),
                 )
                 return leagues
 
@@ -266,7 +266,7 @@ class PoeNinjaAPI(BaseAPIClient):
         leagues = self.get_current_leagues()
 
         # Filter out permanent leagues
-        temp_leagues = [l for l in leagues if l['name'] not in ['Standard', 'Hardcore']]
+        temp_leagues = [league for league in leagues if league['name'] not in ['Standard', 'Hardcore']]
 
         if temp_leagues:
             detected = temp_leagues[0]['name']
@@ -385,6 +385,7 @@ class PoeNinjaAPI(BaseAPIClient):
 
         logger.info(f"Loaded all prices for {self.league}")
         return cache
+
     def _find_from_overview_by_name(self, overview_type: str, item_name: str) -> dict | None:
         """
         Look up a poe.ninja itemoverview entry by name.
@@ -542,7 +543,6 @@ class PoeNinjaAPI(BaseAPIClient):
         # Rares and other categories we don't explicitly know how to map
         # will fall through here.
         return None
-
 
     def _find_gem_price(
         self,

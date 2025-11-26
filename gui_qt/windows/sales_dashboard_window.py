@@ -20,12 +20,9 @@ from PyQt6.QtWidgets import (
     QSpinBox,
     QPushButton,
     QTableView,
-    QHeaderView,
     QAbstractItemView,
     QFormLayout,
 )
-
-from gui_qt.styles import COLORS
 
 if TYPE_CHECKING:
     from core.app_context import AppContext
@@ -237,7 +234,7 @@ class SalesDashboardWindow(QDialog):
 
             self._model.set_data(daily_list)
 
-        except Exception as e:
+        except Exception:
             self.total_sales_label.setText("Error")
             self.total_chaos_label.setText("-")
             self.avg_chaos_label.setText("-")
