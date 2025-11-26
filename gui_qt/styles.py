@@ -2,6 +2,7 @@
 gui_qt.styles - Qt Style Sheets and color definitions for PoE Price Checker.
 
 Uses Path of Exile's color scheme for item rarities and values.
+Icon theme: Split Chaos Orb (gold/brown) / Divine Orb (blue)
 """
 
 # PoE Rarity Colors
@@ -21,16 +22,24 @@ COLORS = {
     "medium_value": "#dddd22",    # Medium value items (yellow)
     "low_value": "#888888",       # Low value items (gray)
 
-    # UI colors
-    "background": "#1a1a1a",      # Dark background
-    "surface": "#2d2d2d",         # Slightly lighter surface
-    "border": "#444444",          # Border color
-    "text": "#e0e0e0",            # Primary text
-    "text_secondary": "#a0a0a0",  # Secondary text
-    "accent": "#c8a656",          # PoE gold accent
+    # UI colors - Icon theme inspired
+    "background": "#1a1a1e",      # Dark background with slight blue tint
+    "surface": "#2a2a30",         # Slightly lighter surface
+    "surface_alt": "#252530",     # Alternative surface (panels)
+    "border": "#3a3a45",          # Border color
+    "text": "#e8e8ec",            # Primary text
+    "text_secondary": "#9898a8",  # Secondary text
+    "accent": "#c8a656",          # Chaos orb gold accent (primary)
+    "accent_blue": "#3ba4d8",     # Divine orb blue accent (secondary)
+    "accent_hover": "#d8b666",    # Gold hover state
+
+    # Stat colors for build panel
+    "life": "#e85050",            # Life red
+    "es": "#7888ff",              # Energy shield blue
+    "mana": "#5080d0",            # Mana blue
 
     # Status colors
-    "upgrade": "#44aaff",         # Upgrade indicator (blue)
+    "upgrade": "#3ba4d8",         # Upgrade indicator (divine blue)
     "fractured": "#a29162",       # Fractured items
     "synthesised": "#6a1b9a",     # Synthesised items
     "corrupted": "#d20000",       # Corrupted items
@@ -78,16 +87,18 @@ QMenu::item:selected {{
 
 QGroupBox {{
     border: 1px solid {COLORS["border"]};
-    border-radius: 4px;
-    margin-top: 8px;
-    padding-top: 8px;
+    border-radius: 6px;
+    margin-top: 12px;
+    padding-top: 10px;
     font-weight: bold;
+    background-color: {COLORS["surface_alt"]};
 }}
 
 QGroupBox::title {{
     subcontrol-origin: margin;
     left: 10px;
-    padding: 0 4px;
+    padding: 2px 8px;
+    color: {COLORS["accent"]};
 }}
 
 QLineEdit, QTextEdit, QPlainTextEdit {{
@@ -99,7 +110,7 @@ QLineEdit, QTextEdit, QPlainTextEdit {{
 }}
 
 QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus {{
-    border-color: {COLORS["accent"]};
+    border-color: {COLORS["accent_blue"]};
 }}
 
 QPushButton {{
@@ -170,16 +181,18 @@ QTableView::item, QTreeView::item, QListView::item {{
 }}
 
 QHeaderView::section {{
-    background-color: #383838;
+    background-color: {COLORS["surface_alt"]};
     border: none;
     border-right: 1px solid {COLORS["border"]};
-    border-bottom: 1px solid {COLORS["border"]};
-    padding: 6px;
+    border-bottom: 2px solid {COLORS["accent"]};
+    padding: 8px 6px;
     font-weight: bold;
+    color: {COLORS["accent"]};
 }}
 
 QHeaderView::section:hover {{
-    background-color: #454545;
+    background-color: {COLORS["surface"]};
+    color: {COLORS["accent_hover"]};
 }}
 
 QScrollBar:vertical {{
@@ -196,7 +209,7 @@ QScrollBar::handle:vertical {{
 }}
 
 QScrollBar::handle:vertical:hover {{
-    background-color: #555555;
+    background-color: {COLORS["accent_blue"]};
 }}
 
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
@@ -217,7 +230,7 @@ QScrollBar::handle:horizontal {{
 }}
 
 QScrollBar::handle:horizontal:hover {{
-    background-color: #555555;
+    background-color: {COLORS["accent_blue"]};
 }}
 
 QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{
@@ -247,7 +260,8 @@ QTabBar::tab:selected {{
 }}
 
 QTabBar::tab:hover:!selected {{
-    background-color: #3d3d3d;
+    background-color: {COLORS["surface"]};
+    border-color: {COLORS["accent_blue"]};
 }}
 
 QCheckBox {{
