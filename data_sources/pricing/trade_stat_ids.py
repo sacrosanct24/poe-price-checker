@@ -22,8 +22,9 @@ AFFIX_TO_STAT_ID: Dict[str, Tuple[str, bool]] = {
     "life": ("pseudo.pseudo_total_life", True),
     "life_regeneration": ("explicit.stat_3299347043", False),  # Life Regeneration per second
     "energy_shield": ("pseudo.pseudo_total_energy_shield", True),
-    "armour": ("pseudo.pseudo_total_armour", True),
-    "evasion": ("pseudo.pseudo_total_evasion", True),
+    # Note: armour/evasion pseudo totals don't exist in trade API
+    # "armour": - use explicit stats if needed
+    # "evasion": - use explicit stats if needed
 
     # === Resistances ===
     "resistances": ("pseudo.pseudo_total_elemental_resistance", True),
@@ -47,8 +48,8 @@ AFFIX_TO_STAT_ID: Dict[str, Tuple[str, bool]] = {
     "critical_strike_chance": ("pseudo.pseudo_global_critical_strike_chance", True),
     "added_physical_damage": ("pseudo.pseudo_adds_physical_damage", True),
     "increased_physical_damage": ("pseudo.pseudo_increased_physical_damage", True),
-    "attack_speed": ("pseudo.pseudo_increased_attack_speed", True),
-    "cast_speed": ("pseudo.pseudo_increased_cast_speed", True),
+    "attack_speed": ("pseudo.pseudo_total_attack_speed", True),
+    "cast_speed": ("pseudo.pseudo_total_cast_speed", True),
 
     # === Spell Damage ===
     "spell_damage": ("explicit.stat_2974417149", False),  # increased Spell Damage
@@ -59,7 +60,7 @@ AFFIX_TO_STAT_ID: Dict[str, Tuple[str, bool]] = {
     "flask_charges": ("explicit.stat_2213025270", False),  # Flask Charges gained
     "cooldown_recovery": ("explicit.stat_838869912", False),  # Cooldown Recovery Rate
     "mana": ("pseudo.pseudo_total_mana", True),
-    "mana_regeneration": ("pseudo.pseudo_total_mana_regen", True),
+    "mana_regeneration": ("pseudo.pseudo_increased_mana_regen", True),
 }
 
 
@@ -70,8 +71,7 @@ AFFIX_MIN_VALUES: Dict[str, int] = {
     "life": 70,  # T2+ life
     "life_regeneration": 30,  # T2+ life regen
     "energy_shield": 45,  # T3+ ES
-    "armour": 200,  # T2+ flat armour
-    "evasion": 200,  # T2+ flat evasion
+    # Note: armour/evasion not supported as pseudo stats
 
     # Resistances
     "resistances": 35,  # T3+ single res

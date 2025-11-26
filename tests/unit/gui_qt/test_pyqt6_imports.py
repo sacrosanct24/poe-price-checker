@@ -53,11 +53,13 @@ def test_gui_qt_windows_imports():
         SalesDashboardWindow,
         PoBCharacterWindow,
         RareEvalConfigWindow,
+        PriceRankingsWindow,
     )
     assert RecentSalesWindow is not None
     assert SalesDashboardWindow is not None
     assert PoBCharacterWindow is not None
     assert RareEvalConfigWindow is not None
+    assert PriceRankingsWindow is not None
 
 
 def test_gui_qt_dialogs_imports():

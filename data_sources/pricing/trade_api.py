@@ -14,15 +14,17 @@ logger = logging.getLogger(__name__)
 
 
 # Mapping: ParsedItem influence names → Trade API filter keys
+# Note: shaper/elder/conqueror influences go in type_filters
+#       searing exarch/eater of worlds go in misc_filters
 INFLUENCE_TO_FILTER_KEY = {
-    "Shaper": "shaper_item",
-    "Elder": "elder_item",
-    "Crusader": "crusader_item",
-    "Hunter": "hunter_item",
-    "Redeemer": "redeemer_item",
-    "Warlord": "warlord_item",
-    "Exarch": "searing_exarch_item",
-    "Eater": "eater_of_worlds_item",
+    "Shaper": ("shaper_item", "type_filters"),
+    "Elder": ("elder_item", "type_filters"),
+    "Crusader": ("crusader_item", "type_filters"),
+    "Hunter": ("hunter_item", "type_filters"),
+    "Redeemer": ("redeemer_item", "type_filters"),
+    "Warlord": ("warlord_item", "type_filters"),
+    "Exarch": ("searing_item", "misc_filters"),  # Note: NOT searing_exarch_item
+    "Eater": ("tangled_item", "misc_filters"),    # Note: NOT eater_of_worlds_item
 }
 
 
@@ -353,21 +355,36 @@ class TradeApiSource:
         # Add influence filters if item has influences
         influences = getattr(parsed_item, "influences", None) or []
         if influences:
-            influence_filters = {}
-            for influence in influences:
-                filter_key = INFLUENCE_TO_FILTER_KEY.get(influence)
-                if filter_key:
-                    influence_filters[filter_key] = {"option": "true"}
+            # Group filters by their target filter group
+            type_filters = {}
+            misc_filters = {}
 
-            if influence_filters:
+            for influence in influences:
+                mapping = INFLUENCE_TO_FILTER_KEY.get(influence)
+                if mapping:
+                    filter_key, filter_group = mapping
+                    if filter_group == "type_filters":
+                        type_filters[filter_key] = {"option": "true"}
+                    elif filter_group == "misc_filters":
+                        misc_filters[filter_key] = {"option": "true"}
+
+            if type_filters or misc_filters:
                 if "filters" not in query["query"]:
                     query["query"]["filters"] = {}
-                query["query"]["filters"]["type_filters"] = {
-                    "filters": influence_filters
-                }
+
+                if type_filters:
+                    query["query"]["filters"]["type_filters"] = {
+                        "filters": type_filters
+                    }
+                if misc_filters:
+                    query["query"]["filters"]["misc_filters"] = {
+                        "filters": misc_filters
+                    }
+
                 self.logger.info(
-                    "Added %d influence filters: %s",
-                    len(influence_filters),
+                    "Added influence filters: type=%s, misc=%s for influences %s",
+                    list(type_filters.keys()),
+                    list(misc_filters.keys()),
                     list(influences)
                 )
 
@@ -419,6 +436,15 @@ class TradeApiSource:
 
         resp = self.session.post(url, json=query, timeout=15)
         self.logger.debug("Trade API search status=%s", resp.status_code)
+
+        # Log error details before raising
+        if resp.status_code >= 400:
+            self.logger.error(
+                "Trade API search failed: status=%s, query=%s, response=%s",
+                resp.status_code,
+                json.dumps(query)[:500],
+                resp.text[:500]
+            )
         resp.raise_for_status()
 
         try:

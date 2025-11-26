@@ -47,17 +47,20 @@ class PoBCharacterWindow(QDialog):
     """Window for managing PoB character profiles."""
 
     profile_selected = pyqtSignal(str)  # Emits profile name
+    price_check_requested = pyqtSignal(str)  # Emits item text for price checking
 
     def __init__(
         self,
         character_manager: Any,
         parent: Optional[QWidget] = None,
         on_profile_selected: Optional[Callable[[str], None]] = None,
+        on_price_check: Optional[Callable[[str], None]] = None,
     ):
         super().__init__(parent)
 
         self.character_manager = character_manager
         self.on_profile_selected = on_profile_selected
+        self.on_price_check = on_price_check
 
         self._selected_profile: Optional[str] = None
         self._profiles_cache: Dict[str, Dict[str, Any]] = {}
@@ -355,8 +358,19 @@ class PoBCharacterWindow(QDialog):
         if not item_data:
             return
 
-        dialog = ItemDetailsDialog(self, item.text(0), item_data)
+        dialog = ItemDetailsDialog(
+            self,
+            item.text(0),
+            item_data,
+            on_price_check=self._request_price_check,
+        )
         dialog.exec()
+
+    def _request_price_check(self, item_text: str) -> None:
+        """Request price check for an item."""
+        self.price_check_requested.emit(item_text)
+        if self.on_price_check:
+            self.on_price_check(item_text)
 
     def _on_import(self) -> None:
         """Open import dialog."""
@@ -431,8 +445,12 @@ class ItemDetailsDialog(QDialog):
         parent: Optional[QWidget],
         slot: str,
         item_data: Dict[str, Any],
+        on_price_check: Optional[Callable[[str], None]] = None,
     ):
         super().__init__(parent)
+
+        self.item_data = item_data
+        self.on_price_check = on_price_check
 
         self.setWindowTitle(f"Item Details: {slot}")
         self.setMinimumWidth(350)
@@ -489,11 +507,70 @@ class ItemDetailsDialog(QDialog):
                     mod_label.setStyleSheet("color: #b4b4ff;")
                 layout.addWidget(mod_label)
 
-        # Close button
+        # Buttons
         layout.addSpacing(8)
+        btn_layout = QHBoxLayout()
+
+        price_check_btn = QPushButton("Price Check")
+        price_check_btn.setStyleSheet(f"background-color: {COLORS['accent']}; color: black;")
+        price_check_btn.clicked.connect(self._on_price_check)
+        btn_layout.addWidget(price_check_btn)
+
         close_btn = QPushButton("Close")
         close_btn.clicked.connect(self.accept)
-        layout.addWidget(close_btn)
+        btn_layout.addWidget(close_btn)
+
+        layout.addLayout(btn_layout)
+
+    def _on_price_check(self) -> None:
+        """Handle price check button click."""
+        item_text = self._generate_item_text()
+        if self.on_price_check:
+            self.on_price_check(item_text)
+        self.accept()
+
+    def _generate_item_text(self) -> str:
+        """Generate PoE-format item text from item data."""
+        lines = []
+
+        name = self.item_data.get("name", "Unknown")
+        base = self.item_data.get("base_type", "")
+        rarity = self.item_data.get("rarity", "RARE").upper()
+
+        # Rarity line
+        lines.append(f"Rarity: {rarity.title()}")
+
+        # Name and base
+        if rarity == "UNIQUE":
+            lines.append(name)
+            if base and base != name:
+                lines.append(base)
+        elif rarity == "RARE":
+            lines.append(name)
+            if base:
+                lines.append(base)
+        else:
+            if base:
+                lines.append(base)
+            else:
+                lines.append(name)
+
+        # Separator
+        lines.append("--------")
+
+        # Implicit mods
+        implicit_mods = self.item_data.get("implicit_mods", [])
+        if implicit_mods:
+            for mod in implicit_mods:
+                lines.append(mod)
+            lines.append("--------")
+
+        # Explicit mods
+        explicit_mods = self.item_data.get("explicit_mods", [])
+        for mod in explicit_mods:
+            lines.append(mod)
+
+        return "\n".join(lines)
 
 
 class ManageCategoriesDialog(QDialog):

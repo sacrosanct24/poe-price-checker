@@ -25,8 +25,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, TYPE_CHECKING
 
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QThread, QObject
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QThread, QObject, QUrl
 from PyQt6.QtGui import QAction, QClipboard, QKeySequence, QShortcut, QFont
+from PyQt6.QtNetwork import QNetworkAccessManager, QNetworkRequest, QNetworkReply
 from PyQt6.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -166,15 +167,73 @@ class PriceCheckWorker(QObject):
         """Run the price check."""
         try:
             # Parse item
-            parsed = self.ctx.parser.parse_item(self.item_text)
+            parsed = self.ctx.parser.parse(self.item_text)
             if not parsed:
                 self.error.emit("Could not parse item text")
                 return
 
-            # Get price
-            results = self.ctx.price_service.check_price(parsed)
+            # Get price (pass item text, not parsed object)
+            results = self.ctx.price_service.check_item(self.item_text)
             self.finished.emit((parsed, results))
         except Exception as e:
+            self.error.emit(str(e))
+
+
+class RankingsPopulationWorker(QThread):
+    """Background worker to populate price rankings on startup."""
+
+    finished = pyqtSignal(int)  # Emits number of categories populated
+    progress = pyqtSignal(str)  # Emits status message
+    error = pyqtSignal(str)
+
+    def __init__(self, parent: Optional[QObject] = None):
+        super().__init__(parent)
+        self._league: Optional[str] = None
+
+    def run(self):
+        """Check and populate rankings if needed."""
+        try:
+            from core.price_rankings import (
+                PriceRankingCache,
+                Top20Calculator,
+                PriceRankingHistory,
+                CACHE_EXPIRY_DAYS,
+            )
+            from data_sources.pricing.poe_ninja import PoeNinjaAPI
+
+            self.progress.emit("Checking price rankings cache...")
+
+            # Detect current league
+            api = PoeNinjaAPI()
+            league = api.detect_current_league()
+            self._league = league
+
+            # Check if cache is valid
+            cache = PriceRankingCache(league=league)
+
+            if cache.is_cache_valid():
+                age = cache.get_cache_age_days()
+                self.progress.emit(f"Rankings cache valid ({age:.1f} days old)")
+                self.finished.emit(0)
+                return
+
+            # Need to populate
+            self.progress.emit(f"Fetching Top 20 rankings for {league}...")
+
+            calculator = Top20Calculator(cache, poe_ninja_api=api)
+            rankings = calculator.refresh_all(force=False)
+
+            # Save to history database
+            self.progress.emit("Saving rankings to database...")
+            history = PriceRankingHistory()
+            history.save_all_snapshots(rankings, league)
+            history.close()
+
+            self.progress.emit(f"Populated {len(rankings)} categories")
+            self.finished.emit(len(rankings))
+
+        except Exception as e:
+            logging.getLogger(__name__).exception("Failed to populate rankings")
             self.error.emit(str(e))
 
 
@@ -197,6 +256,7 @@ class PriceCheckerWindow(QMainWindow):
         self._sales_dashboard_window = None
         self._pob_character_window = None
         self._rare_eval_config_window = None
+        self._price_rankings_window = None
 
         # PoB integration
         self._character_manager = None
@@ -208,6 +268,9 @@ class PriceCheckerWindow(QMainWindow):
 
         # Initialize PoB character manager
         self._init_character_manager()
+
+        # Rankings population worker
+        self._rankings_worker: Optional[RankingsPopulationWorker] = None
 
         # Setup UI
         self.setWindowTitle("PoE Price Checker")
@@ -223,6 +286,35 @@ class PriceCheckerWindow(QMainWindow):
         self.setStyleSheet(APP_STYLESHEET)
 
         self._set_status("Ready")
+
+        # Start background rankings population check
+        self._start_rankings_population()
+
+    def _start_rankings_population(self) -> None:
+        """Start background task to populate price rankings if needed."""
+        try:
+            self._rankings_worker = RankingsPopulationWorker(self)
+            self._rankings_worker.progress.connect(self._on_rankings_progress)
+            self._rankings_worker.finished.connect(self._on_rankings_finished)
+            self._rankings_worker.error.connect(self._on_rankings_error)
+            self._rankings_worker.start()
+        except Exception as e:
+            self.logger.warning(f"Failed to start rankings population: {e}")
+
+    def _on_rankings_progress(self, message: str) -> None:
+        """Handle rankings population progress."""
+        self.logger.info(f"Rankings: {message}")
+
+    def _on_rankings_finished(self, count: int) -> None:
+        """Handle rankings population completion."""
+        if count > 0:
+            self.logger.info(f"Rankings: Populated {count} categories")
+        self._rankings_worker = None
+
+    def _on_rankings_error(self, error: str) -> None:
+        """Handle rankings population error."""
+        self.logger.warning(f"Rankings population failed: {error}")
+        self._rankings_worker = None
 
     def _init_rare_evaluator(self) -> None:
         """Initialize the rare item evaluator."""
@@ -304,12 +396,17 @@ class PriceCheckerWindow(QMainWindow):
         view_menu.addSeparator()
 
         pob_action = QAction("&PoB Characters", self)
+        pob_action.setShortcut(QKeySequence("Ctrl+B"))
         pob_action.triggered.connect(self._show_pob_characters)
         view_menu.addAction(pob_action)
 
         rare_eval_action = QAction("Rare Item &Settings", self)
         rare_eval_action.triggered.connect(self._show_rare_eval_config)
         view_menu.addAction(rare_eval_action)
+
+        price_rankings_action = QAction("Price &Rankings (Top 20)", self)
+        price_rankings_action.triggered.connect(self._show_price_rankings)
+        view_menu.addAction(price_rankings_action)
 
         view_menu.addSeparator()
 
@@ -362,12 +459,36 @@ class PriceCheckerWindow(QMainWindow):
     # -------------------------------------------------------------------------
 
     def _create_central_widget(self) -> None:
-        """Create the main content area."""
+        """Create the main content area with integrated PoB panel."""
         central = QWidget()
         self.setCentralWidget(central)
 
-        layout = QVBoxLayout(central)
-        layout.setContentsMargins(8, 8, 8, 8)
+        # Main horizontal splitter: PoB panel (left) | Price check (right)
+        main_layout = QHBoxLayout(central)
+        main_layout.setContentsMargins(8, 8, 8, 8)
+        main_layout.setSpacing(8)
+
+        main_splitter = QSplitter(Qt.Orientation.Horizontal)
+
+        # ========== LEFT SIDE: PoB Panel ==========
+        pob_group = QGroupBox("PoB Equipment")
+        pob_layout = QVBoxLayout(pob_group)
+        pob_layout.setContentsMargins(4, 4, 4, 4)
+
+        # Create embedded PoB panel
+        from gui_qt.widgets.pob_panel import PoBPanel
+        self.pob_panel = PoBPanel(self._character_manager, parent=self)
+        self.pob_panel.price_check_requested.connect(self._on_pob_price_check)
+        pob_layout.addWidget(self.pob_panel)
+
+        pob_group.setMinimumWidth(250)
+        pob_group.setMaximumWidth(400)
+        main_splitter.addWidget(pob_group)
+
+        # ========== RIGHT SIDE: Price Check Panel ==========
+        right_panel = QWidget()
+        layout = QVBoxLayout(right_panel)
+        layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(8)
 
         # Top area: input + item inspector (horizontal split)
@@ -379,9 +500,10 @@ class PriceCheckerWindow(QMainWindow):
 
         self.input_text = QPlainTextEdit()
         self.input_text.setPlaceholderText(
-            "Paste item text here (Ctrl+C from game, then Ctrl+V here)..."
+            "Paste item text here (Ctrl+C from game, then Ctrl+V here)...\n\n"
+            "Or select an item from PoB Equipment panel on the left."
         )
-        self.input_text.setMinimumHeight(120)
+        self.input_text.setMinimumHeight(100)
         input_layout.addWidget(self.input_text)
 
         # Button row
@@ -404,7 +526,7 @@ class PriceCheckerWindow(QMainWindow):
         inspector_layout.addWidget(self.item_inspector)
         top_splitter.addWidget(inspector_group)
 
-        top_splitter.setSizes([500, 300])
+        top_splitter.setSizes([450, 250])
         layout.addWidget(top_splitter)
 
         # Middle: Results area
@@ -442,6 +564,15 @@ class PriceCheckerWindow(QMainWindow):
         self.rare_eval_panel.setVisible(False)
         layout.addWidget(self.rare_eval_panel)
 
+        # Add right panel to main splitter
+        main_splitter.addWidget(right_panel)
+
+        # Set initial splitter sizes (PoB panel: 280, Price check: rest)
+        main_splitter.setSizes([280, 800])
+
+        # Add main splitter to central layout
+        main_layout.addWidget(main_splitter)
+
     # -------------------------------------------------------------------------
     # Status Bar
     # -------------------------------------------------------------------------
@@ -465,7 +596,14 @@ class PriceCheckerWindow(QMainWindow):
         if count == 0:
             self.summary_label.setText("No results")
         else:
-            total_chaos = sum(r.get("chaos_value", 0) or 0 for r in self._all_results)
+            # Ensure chaos_value is numeric
+            total_chaos = 0.0
+            for r in self._all_results:
+                val = r.get("chaos_value", 0)
+                try:
+                    total_chaos += float(val) if val else 0.0
+                except (ValueError, TypeError):
+                    pass
             self.summary_label.setText(f"{count} items | {total_chaos:.1f}c total")
 
     # -------------------------------------------------------------------------
@@ -490,6 +628,17 @@ class PriceCheckerWindow(QMainWindow):
     # Price Checking
     # -------------------------------------------------------------------------
 
+    def _on_pob_price_check(self, item_text: str) -> None:
+        """Handle price check request from PoB panel."""
+        if not item_text:
+            return
+
+        # Populate the input field with the item text
+        self.input_text.setPlainText(item_text)
+
+        # Trigger the price check
+        self._on_check_price()
+
     def _on_check_price(self) -> None:
         """Handle Check Price button click."""
         if self._check_in_progress:
@@ -506,7 +655,7 @@ class PriceCheckerWindow(QMainWindow):
 
         # Run price check
         try:
-            parsed = self.ctx.parser.parse_item(item_text)
+            parsed = self.ctx.parser.parse(item_text)
             if not parsed:
                 self._set_status("Could not parse item text")
                 self._check_in_progress = False
@@ -516,22 +665,48 @@ class PriceCheckerWindow(QMainWindow):
             # Update item inspector
             self.item_inspector.set_item(parsed)
 
-            # Get price results
-            results = self.ctx.price_service.check_price(parsed)
+            # Get price results (pass item text, not parsed object)
+            results = self.ctx.price_service.check_item(item_text)
 
-            # Convert to display format
+            # Convert to display format (results are dicts from check_item)
             self._all_results = []
             for result in results:
+                # Handle explanation - could be dict or object
+                explanation = result.get("explanation")
+                if explanation:
+                    if isinstance(explanation, dict):
+                        explanation_str = json.dumps(explanation)
+                    elif hasattr(explanation, "__dict__"):
+                        explanation_str = json.dumps(explanation.__dict__)
+                    else:
+                        explanation_str = str(explanation)
+                else:
+                    explanation_str = ""
+
+                # Convert numeric values safely
+                try:
+                    chaos_val = float(result.get("chaos_value") or 0)
+                except (ValueError, TypeError):
+                    chaos_val = 0.0
+                try:
+                    divine_val = float(result.get("divine_value") or 0)
+                except (ValueError, TypeError):
+                    divine_val = 0.0
+                try:
+                    listing_count = int(result.get("listing_count") or 0)
+                except (ValueError, TypeError):
+                    listing_count = 0
+
                 row = {
-                    "item_name": result.item_name or parsed.name or "",
-                    "variant": result.variant or "",
-                    "links": result.links or "",
-                    "chaos_value": result.chaos_value or 0,
-                    "divine_value": result.divine_value or 0,
-                    "listing_count": result.listing_count or 0,
-                    "source": result.source or "",
+                    "item_name": result.get("item_name") or parsed.name or "",
+                    "variant": result.get("variant") or "",
+                    "links": result.get("links") or "",
+                    "chaos_value": chaos_val,
+                    "divine_value": divine_val,
+                    "listing_count": listing_count,
+                    "source": result.get("source") or "",
                     "upgrade": "",
-                    "price_explanation": json.dumps(result.explanation.__dict__) if result.explanation else "",
+                    "price_explanation": explanation_str,
                 }
 
                 # Check for upgrade potential
@@ -673,31 +848,76 @@ class PriceCheckerWindow(QMainWindow):
 
     def _explain_price(self) -> None:
         """Show price explanation dialog."""
+        from core.price_service import PriceExplanation
+
         row = self.results_table.get_selected_row()
         if not row:
             return
 
         explanation_json = row.get("price_explanation", "")
-        if not explanation_json:
-            QMessageBox.information(
-                self, "Price Explanation",
-                "No detailed explanation available for this price."
-            )
+        if not explanation_json or explanation_json == "{}":
+            # Show basic info even without explanation
+            item_name = row.get("item_name", "Unknown")
+            source = row.get("source", "Unknown")
+            chaos = row.get("chaos_value", 0)
+            divine = row.get("divine_value", 0)
+
+            text = f"Item: {item_name}\n"
+            text += f"Source: {source}\n"
+            text += f"Price: {chaos:.1f}c"
+            if divine:
+                text += f" ({divine:.2f} divine)"
+            text += "\n\nNo detailed explanation available for this price."
+
+            QMessageBox.information(self, "Price Explanation", text)
             return
 
         try:
-            explanation = json.loads(explanation_json)
-            text = f"Source: {explanation.get('source', 'Unknown')}\n"
-            text += f"Method: {explanation.get('method', 'Unknown')}\n"
-            text += f"Confidence: {explanation.get('confidence', 'Unknown')}\n"
-            if explanation.get('notes'):
-                text += f"\nNotes: {explanation.get('notes')}"
+            explanation = PriceExplanation.from_json(explanation_json)
+            lines = explanation.to_summary_lines()
 
-            QMessageBox.information(self, "Price Explanation", text)
-        except json.JSONDecodeError:
+            if not lines:
+                lines = ["No explanation details available."]
+
+            # Build header
+            item_name = row.get("item_name", "Unknown")
+            chaos = row.get("chaos_value", 0)
+            divine = row.get("divine_value", 0)
+
+            header = f"Item: {item_name}\n"
+            header += f"Price: {chaos:.1f}c"
+            if divine:
+                header += f" ({divine:.2f} divine)"
+            header += "\n" + "─" * 40 + "\n"
+
+            text = header + "\n".join(lines)
+
+            # Use a dialog with more room for text
+            dialog = QDialog(self)
+            dialog.setWindowTitle("Price Explanation")
+            dialog.setMinimumSize(450, 350)
+
+            layout = QVBoxLayout(dialog)
+
+            # Text display
+            from PyQt6.QtWidgets import QTextEdit
+            text_widget = QTextEdit()
+            text_widget.setReadOnly(True)
+            text_widget.setPlainText(text)
+            text_widget.setStyleSheet(f"background-color: {COLORS['background']}; color: {COLORS['text']};")
+            layout.addWidget(text_widget)
+
+            # Close button
+            close_btn = QPushButton("Close")
+            close_btn.clicked.connect(dialog.accept)
+            layout.addWidget(close_btn)
+
+            dialog.exec()
+
+        except Exception as e:
             QMessageBox.information(
                 self, "Price Explanation",
-                "Could not parse price explanation."
+                f"Could not parse price explanation: {e}"
             )
 
     def _record_sale(self) -> None:
@@ -835,10 +1055,12 @@ class PriceCheckerWindow(QMainWindow):
                 self._character_manager,
                 self,
                 on_profile_selected=self._on_pob_profile_selected,
+                on_price_check=self._on_pob_price_check,
             )
 
         self._pob_character_window.show()
         self._pob_character_window.raise_()
+        self._pob_character_window.activateWindow()
 
     def _on_pob_profile_selected(self, profile_name: str) -> None:
         """Handle PoB profile selection."""
@@ -850,6 +1072,50 @@ class PriceCheckerWindow(QMainWindow):
                 self._set_status(f"Upgrade checking enabled for: {profile_name}")
         except Exception as e:
             self.logger.warning(f"Failed to setup upgrade checker: {e}")
+
+    def _on_pob_price_check(self, item_text: str) -> None:
+        """Handle price check request from PoB window."""
+        # Populate the input text
+        self.input_text.setPlainText(item_text)
+
+        # Bring main window to front (Windows requires extra steps)
+        self._bring_to_front()
+
+        # Auto-run the price check after a brief delay to let UI update
+        QTimer.singleShot(100, self._on_check_price)
+
+    def _bring_to_front(self) -> None:
+        """Aggressively bring this window to front on Windows."""
+        # Save current state
+        old_state = self.windowState()
+
+        # Method 1: Show normal first
+        self.showNormal()
+
+        # Method 2: Temporarily set always on top, then remove it
+        from PyQt6.QtCore import Qt
+        self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
+        self.show()
+        self.setWindowFlags(self.windowFlags() & ~Qt.WindowType.WindowStaysOnTopHint)
+        self.show()
+
+        # Method 3: Standard Qt activation
+        self.raise_()
+        self.activateWindow()
+
+        # Method 4: Try Windows API if available
+        try:
+            import ctypes
+            hwnd = int(self.winId())
+            # SW_RESTORE = 9, brings window to foreground
+            ctypes.windll.user32.ShowWindow(hwnd, 9)
+            ctypes.windll.user32.SetForegroundWindow(hwnd)
+        except Exception:
+            pass  # Not on Windows or failed
+
+        # Restore maximized state if needed
+        if old_state & Qt.WindowState.WindowMaximized:
+            self.showMaximized()
 
     def _show_rare_eval_config(self) -> None:
         """Show rare evaluation config window."""
@@ -871,6 +1137,16 @@ class PriceCheckerWindow(QMainWindow):
         """Reload the rare item evaluator."""
         self._init_rare_evaluator()
         self._set_status("Rare evaluation settings reloaded")
+
+    def _show_price_rankings(self) -> None:
+        """Show price rankings window."""
+        from gui_qt.windows.price_rankings_window import PriceRankingsWindow
+
+        if self._price_rankings_window is None or not self._price_rankings_window.isVisible():
+            self._price_rankings_window = PriceRankingsWindow(self.ctx, self)
+
+        self._price_rankings_window.show()
+        self._price_rankings_window.raise_()
 
     def _paste_sample(self, item_type: str) -> None:
         """Paste a sample item of the given type."""

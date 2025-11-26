@@ -22,6 +22,7 @@ Designed as an **over-engineered portfolio project**, it showcases clean archite
 * PoE Ninja
 * Derived sources (undercut / heuristic pricing)
 * Plugin system for custom pricing sources
+* **Top 20 Price Rankings** - Cached rankings by category with 5-day auto-refresh, historical tracking, and trend analysis
 
 ### 🧠 Smart Item Parsing
 
@@ -146,7 +147,7 @@ poe-price-checker/
 ├── plugins/             # Third-party plugins & examples
 │
 ├── docs/                # All documentation
-├── tests/               # Unit + integration tests (567 tests)
+├── tests/               # Unit + integration tests (608 tests)
 │
 ├── .continue/           # Continue AI assistant configuration
 └── main.py              # Application entrypoint

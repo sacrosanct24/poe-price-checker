@@ -225,9 +225,16 @@ class PriceService:
                 # Extract valuable mods from matched_affixes
                 if hasattr(rare_evaluation, 'matched_affixes') and rare_evaluation.matched_affixes:
                     for affix in rare_evaluation.matched_affixes[:5]:
-                        mod_name = affix.get('mod', '') or affix.get('name', '')
-                        tier = affix.get('tier', '')
-                        score = affix.get('score', 0)
+                        # Handle both dict and AffixMatch object
+                        if isinstance(affix, dict):
+                            mod_name = affix.get('mod', '') or affix.get('name', '')
+                            tier = affix.get('tier', '')
+                            score = affix.get('score', 0)
+                        else:
+                            # AffixMatch dataclass
+                            mod_name = getattr(affix, 'mod_text', '') or getattr(affix, 'affix_type', '')
+                            tier = getattr(affix, 'tier', '')
+                            score = getattr(affix, 'weight', 0)
                         if mod_name:
                             if tier:
                                 explanation.valuable_mods.append(f"{mod_name} ({tier}, +{score})")
