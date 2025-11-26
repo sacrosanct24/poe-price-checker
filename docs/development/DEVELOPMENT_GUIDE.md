@@ -4,7 +4,7 @@ Here’s a development doc you can drop into `docs/` or the repo root as somethi
 
 # PoE Price Checker – Development Guide
 
-*Last updated: 2025-11-22*
+*Last updated: 2025-11-26*
 
 ## 1. Project Goals & Non-Functional Requirements
 
@@ -56,14 +56,22 @@ Top-level structure (excluding virtualenv and tooling artifacts):
   * `item_parser.py` – parsing PoE item text into structured models.
   * `price_service.py` – single-source pricing service (currently PoE Ninja).
   * `price_multi.py` – multi-source aggregation (PoE Ninja, undercut logic, etc.).
-  * `value_rules.py` – heuristics & flags about item “value”.
+  * `price_rankings.py` – Top 20 price rankings with caching and historical tracking.
+  * `pob_integration.py` – Path of Building code decoding, character profiles, upgrade checking.
+  * `build_comparison.py` – Build-to-build comparison and skill analysis.
+  * `rare_item_evaluator.py` – Rare item scoring with tier badges and affix analysis.
+  * `value_rules.py` – heuristics & flags about item "value".
   * `derived_sources.py` – logic that derives extra metrics from other sources (e.g., undercut).
   * `logging_setup.py` – centralized logging configuration for the app.
 * `data_sources/` – integration with external APIs:
 
   * `base_api.py` – base API client with rate limiting, caching, retry logic.
   * `pricing/poe_ninja.py` – PoE Ninja API client and source adapter.
-  * `pricing/trade_api.py` – stubbed official Trade API source.
+  * `pricing/poe_watch.py` – poe.watch API client for additional pricing data.
+  * `pricing/trade_api.py` – Official Trade API source for live market searches.
+  * `pricing/trade_stat_ids.py` – Mapping of affix types to Trade API stat IDs.
+  * `pricing/poeprices.py` – PoePrices.info API for rare item evaluation.
+  * `build_scrapers.py` – Maxroll.gg build scraper integration.
   * `official/` – placeholder for official API integrations.
   * `wiki/` – placeholder for wiki integrations.
 * `gui/` – Legacy Tkinter GUI (use `--tk` flag):
@@ -71,10 +79,19 @@ Top-level structure (excluding virtualenv and tooling artifacts):
   * `main_window.py` – Tkinter GUI (`PriceCheckerGUI` and related widgets).
 * `gui_qt/` – PyQt6 GUI (default):
 
-  * `main_window.py` – Main window (`PriceCheckerWindow`).
+  * `main_window.py` – Main window (`PriceCheckerWindow`) with integrated PoB panel.
   * `styles.py` – Qt stylesheets and PoE color definitions.
-  * `widgets/` – Reusable widgets (ResultsTable, ItemInspector, RareEvaluationPanel).
-  * `windows/` – Secondary windows (RecentSales, SalesDashboard, PoBCharacter, RareEvalConfig).
+  * `widgets/` – Reusable widgets:
+    * `results_table.py` – Price results table with sorting and context menus.
+    * `item_inspector.py` – Parsed item details sidebar.
+    * `rare_evaluation_panel.py` – Rare item scoring display.
+    * `pob_panel.py` – Embedded PoB character panel for equipment price checking.
+  * `windows/` – Secondary windows:
+    * `recent_sales_window.py` – Sales history viewer.
+    * `sales_dashboard_window.py` – Sales analytics dashboard.
+    * `pob_character_window.py` – Standalone PoB character management.
+    * `price_rankings_window.py` – Top 20 item rankings by category.
+    * `rare_eval_config_window.py` – Evaluation configuration.
   * `dialogs/` – Dialog boxes (RecordSale).
 * `plugins/`:
 
@@ -363,17 +380,14 @@ Recommended future structure:
 
 ### 3.7 Entry Points & Scripts
 
-**File:** `poe_price_checker.py`
-
-* Primary console entrypoint:
-
-  * Sets up logging via `core.logging_setup`.
-  * Calls `create_app_context()`.
-  * Launches the Tkinter GUI (`PriceCheckerGUI`).
-
 **File:** `main.py`
 
-* Present, but appears to be a legacy/alternate entry; `poe_price_checker.py` is preferred and consistent with tests and docs.
+* Primary entrypoint:
+
+  * Sets up logging via `core.logging_setup`.
+  * Parses command line arguments (`--qt` for PyQt6, `--tk` for Tkinter).
+  * Calls `create_app_context()`.
+  * Launches the PyQt6 GUI by default, with Tkinter fallback.
 
 **scripts/**
 

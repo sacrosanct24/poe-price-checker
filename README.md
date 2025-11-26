@@ -35,8 +35,13 @@ Designed as an **over-engineered portfolio project**, it showcases clean archite
 * Paste item → auto-parse → price instantly
 * **Rare Item Evaluator** - Scores rare items (0-100) with tier badges
 * **Evaluation Config UI** - Customize affix weights and use build presets
+* **Integrated PoB Panel** - Character profiles embedded in main window sidebar
+  - Select character profiles from dropdown
+  - View all equipped items with rarity colors
+  - Double-click or "Check Selected" to price check equipment
 * **PoB Integration** - Import builds, track upgrades, manage character profiles
 * **Maxroll Integration** - Import builds from Maxroll.gg guides, compare against meta builds
+* **Price Rankings Window** - View top items by category with cached pricing data
 * Item Inspector sidebar with evaluation panel
 * Right-click context menus: copy row, record sale, explain price
 * Sample-item buttons for development
@@ -147,7 +152,7 @@ poe-price-checker/
 ├── plugins/             # Third-party plugins & examples
 │
 ├── docs/                # All documentation
-├── tests/               # Unit + integration tests (608 tests)
+├── tests/               # Unit + integration tests (669+ tests)
 │
 ├── .continue/           # Continue AI assistant configuration
 └── main.py              # Application entrypoint

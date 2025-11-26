@@ -23,7 +23,7 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    # Initialize logging once for the whole app8
+    # Initialize logging once for the whole app
     setup_logging()
     logging.getLogger(__name__).info("Starting PoE Price Checker GUI")
 

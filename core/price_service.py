@@ -16,7 +16,7 @@ from data_sources.pricing.poe_ninja import PoeNinjaAPI
 from data_sources.pricing.poe_watch import PoeWatchAPI
 from data_sources.pricing.trade_api import TradeApiSource
 
-LOG = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -155,7 +155,7 @@ class PriceService:
         self.poe_watch = poe_watch
         self.trade_source = trade_source
         self.rare_evaluator = rare_evaluator
-        self.logger = logger or LOG
+        self.logger = logger or logging.getLogger(__name__)
 
     # ------------------------------------------------------------------ #
     # Public API
