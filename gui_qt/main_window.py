@@ -25,7 +25,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QThread, QObject
-from PyQt6.QtGui import QAction, QKeySequence, QShortcut
+from PyQt6.QtGui import QAction, QKeySequence, QShortcut, QIcon
 from PyQt6.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -1198,8 +1198,28 @@ Built with PyQt6.
 
 def run(ctx: "AppContext") -> None:
     """Run the PyQt6 application."""
+    # Set Windows AppUserModelID for proper taskbar icon grouping
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
+                "sacrosanct.poe-price-checker.1.0"
+            )
+        except Exception:
+            pass  # Not critical if this fails
+
     app = QApplication(sys.argv)
     app.setStyle("Fusion")  # Consistent cross-platform look
+
+    # Set application icon
+    icon_path = Path(__file__).parent.parent / "assets" / "icon.ico"
+    if icon_path.exists():
+        app.setWindowIcon(QIcon(str(icon_path)))
+    else:
+        # Fallback to PNG
+        png_path = Path(__file__).parent.parent / "assets" / "icon.png"
+        if png_path.exists():
+            app.setWindowIcon(QIcon(str(png_path)))
 
     window = PriceCheckerWindow(ctx)
     window.show()
