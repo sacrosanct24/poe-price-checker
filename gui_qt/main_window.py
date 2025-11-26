@@ -265,8 +265,8 @@ class PriceCheckerWindow(QMainWindow):
 
         # Setup UI
         self.setWindowTitle("PoE Price Checker")
-        self.setMinimumSize(1100, 650)
-        self.resize(1200, 700)
+        self.setMinimumSize(1200, 800)
+        self.resize(1600, 900)
 
         self._create_menu_bar()
         self._create_central_widget()
@@ -330,18 +330,23 @@ class PriceCheckerWindow(QMainWindow):
 
     def _update_build_stats_for_inspector(self) -> None:
         """Update the item inspector with build stats from the active PoB profile."""
+        self.logger.info("Updating build stats for item inspector")
         if not self._character_manager:
+            self.logger.info("No character manager available")
             return
 
         try:
             profile = self._character_manager.get_active_profile()
+            self.logger.info(f"Active profile: {profile.name if profile else None}")
             if profile and profile.build and profile.build.stats:
+                self.logger.info(f"Profile has {len(profile.build.stats)} build stats")
                 build_stats = BuildStats.from_pob_stats(profile.build.stats)
                 self.item_inspector.set_build_stats(build_stats)
-                self.logger.debug(
-                    f"Updated item inspector with build stats from '{profile.name}'"
+                self.logger.info(
+                    f"Set build stats: life={build_stats.total_life}, life_inc={build_stats.life_inc}%"
                 )
             else:
+                self.logger.info(f"No build stats available")
                 self.item_inspector.set_build_stats(None)
         except Exception as e:
             self.logger.warning(f"Failed to update build stats: {e}")
@@ -542,7 +547,8 @@ class PriceCheckerWindow(QMainWindow):
         inspector_layout.addWidget(self.item_inspector)
         top_splitter.addWidget(inspector_group)
 
-        top_splitter.setSizes([450, 250])
+        # Give Item Inspector more space (it shows build-effective values)
+        top_splitter.setSizes([300, 500])
         layout.addWidget(top_splitter)
 
         # Middle: Results area
@@ -583,8 +589,8 @@ class PriceCheckerWindow(QMainWindow):
         # Add right panel to main splitter
         main_splitter.addWidget(right_panel)
 
-        # Set initial splitter sizes (PoB panel: 280, Price check: rest)
-        main_splitter.setSizes([280, 800])
+        # Set initial splitter sizes (PoB panel: 300, Price check: rest)
+        main_splitter.setSizes([300, 1100])
 
         # Add main splitter to central layout
         main_layout.addWidget(main_splitter)
@@ -669,6 +675,9 @@ class PriceCheckerWindow(QMainWindow):
 
             # Update item inspector
             self.item_inspector.set_item(parsed)
+
+            # Clear the paste window - item is now shown in inspector
+            self.input_text.clear()
 
             # Get price results (pass item text, not parsed object)
             results = self.ctx.price_service.check_item(item_text)
@@ -1262,6 +1271,6 @@ def run(ctx: "AppContext") -> None:
             app.setWindowIcon(QIcon(str(png_path)))
 
     window = PriceCheckerWindow(ctx)
-    window.show()
+    window.showMaximized()
 
     sys.exit(app.exec())
