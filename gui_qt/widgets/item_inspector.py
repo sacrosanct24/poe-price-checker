@@ -35,24 +35,50 @@ class ItemInspectorWidget(QWidget):
         self._build_stats: Optional[BuildStats] = None
         self._calculator: Optional[BuildStatCalculator] = None
 
+        # Set minimum size to ensure scrolling works
+        self.setMinimumHeight(200)
+
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(4)
 
         # Scroll area for content
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self._scroll = QScrollArea()
+        self._scroll.setWidgetResizable(True)
+        self._scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self._scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self._scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
+        self._scroll.setStyleSheet(f"""
+            QScrollArea {{
+                background-color: {COLORS['background']};
+                border: none;
+            }}
+            QScrollBar:vertical {{
+                background-color: {COLORS['surface']};
+                width: 12px;
+                border-radius: 6px;
+            }}
+            QScrollBar::handle:vertical {{
+                background-color: {COLORS['border']};
+                min-height: 30px;
+                border-radius: 5px;
+                margin: 2px;
+            }}
+            QScrollBar::handle:vertical:hover {{
+                background-color: {COLORS['text_secondary']};
+            }}
+        """)
 
-        # Content widget
+        # Content widget - needs minimum size hint for scroll to work
         self._content = QWidget()
+        self._content.setStyleSheet(f"background-color: {COLORS['background']};")
         self._content_layout = QVBoxLayout(self._content)
         self._content_layout.setContentsMargins(8, 8, 8, 8)
-        self._content_layout.setSpacing(4)
+        self._content_layout.setSpacing(6)
         self._content_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
 
-        scroll.setWidget(self._content)
-        layout.addWidget(scroll)
+        self._scroll.setWidget(self._content)
+        layout.addWidget(self._scroll, stretch=1)
 
         # Placeholder
         self._placeholder = QLabel("No item selected")
@@ -88,6 +114,7 @@ class ItemInspectorWidget(QWidget):
         name_font.setBold(True)
         name_label.setFont(name_font)
         name_label.setStyleSheet(f"color: {get_rarity_color(rarity)};")
+        self._make_selectable(name_label)
         self._content_layout.addWidget(name_label)
 
         # Base type (if different from name)
@@ -95,11 +122,13 @@ class ItemInspectorWidget(QWidget):
         if base_type and base_type != name:
             base_label = QLabel(base_type)
             base_label.setStyleSheet(f"color: {COLORS['text_secondary']};")
+            self._make_selectable(base_label)
             self._content_layout.addWidget(base_label)
 
         # Rarity
         rarity_label = QLabel(f"Rarity: {rarity}")
         rarity_label.setStyleSheet(f"color: {get_rarity_color(rarity)};")
+        self._make_selectable(rarity_label)
         self._content_layout.addWidget(rarity_label)
 
         # Build-effective values section - SHOW PROMINENTLY AT TOP
@@ -156,6 +185,7 @@ class ItemInspectorWidget(QWidget):
         if corrupted:
             corrupted_label = QLabel("Corrupted")
             corrupted_label.setStyleSheet(f"color: {COLORS['corrupted']}; font-weight: bold;")
+            self._make_selectable(corrupted_label)
             self._content_layout.addWidget(corrupted_label)
 
         # Implicit mods
@@ -166,6 +196,7 @@ class ItemInspectorWidget(QWidget):
                 mod_label = QLabel(mod)
                 mod_label.setWordWrap(True)
                 mod_label.setStyleSheet(f"color: {COLORS['magic']};")
+                self._make_selectable(mod_label)
                 self._content_layout.addWidget(mod_label)
 
         # Explicit mods
@@ -182,6 +213,7 @@ class ItemInspectorWidget(QWidget):
                 else:
                     mod_label.setStyleSheet(f"color: {COLORS['text']};")
 
+                self._make_selectable(mod_label)
                 self._content_layout.addWidget(mod_label)
 
         # Flavor text
@@ -191,10 +223,8 @@ class ItemInspectorWidget(QWidget):
             flavor_label = QLabel(flavor)
             flavor_label.setWordWrap(True)
             flavor_label.setStyleSheet(f"color: {COLORS['unique']}; font-style: italic;")
+            self._make_selectable(flavor_label)
             self._content_layout.addWidget(flavor_label)
-
-        # Add stretch at end
-        self._content_layout.addStretch()
 
     def clear(self) -> None:
         """Clear the inspector."""
@@ -210,6 +240,15 @@ class ItemInspectorWidget(QWidget):
             if child.widget():
                 child.widget().deleteLater()
 
+    def _make_selectable(self, label: QLabel) -> QLabel:
+        """Make a label's text selectable for copy/paste."""
+        label.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextSelectableByMouse |
+            Qt.TextInteractionFlag.TextSelectableByKeyboard
+        )
+        label.setCursor(Qt.CursorShape.IBeamCursor)
+        return label
+
     def _add_separator(self) -> None:
         """Add a horizontal separator line."""
         line = QFrame()
@@ -224,10 +263,12 @@ class ItemInspectorWidget(QWidget):
 
         lbl = QLabel(f"{label}:")
         lbl.setStyleSheet(f"color: {COLORS['text_secondary']};")
+        self._make_selectable(lbl)
         row.addWidget(lbl)
 
         val = QLabel(value)
         val.setStyleSheet(f"color: {COLORS['text']};")
+        self._make_selectable(val)
         row.addWidget(val)
 
         row.addStretch()
@@ -252,6 +293,7 @@ class ItemInspectorWidget(QWidget):
         header_font.setBold(True)
         header.setFont(header_font)
         header.setStyleSheet(f"color: {COLORS['currency']};")
+        self._make_selectable(header)
         self._content_layout.addWidget(header)
 
         # Show build summary
@@ -262,6 +304,7 @@ class ItemInspectorWidget(QWidget):
             )
             summary_label = QLabel(summary)
             summary_label.setStyleSheet(f"color: {COLORS['text_secondary']}; font-size: 10px;")
+            self._make_selectable(summary_label)
             self._content_layout.addWidget(summary_label)
 
         # Show effective values for each scalable mod
@@ -298,4 +341,5 @@ class ItemInspectorWidget(QWidget):
                 eff_label = QLabel(f"  {text}")
                 eff_label.setWordWrap(True)
                 eff_label.setStyleSheet(f"color: {color}; font-size: 11px;")
+                self._make_selectable(eff_label)
                 self._content_layout.addWidget(eff_label)
