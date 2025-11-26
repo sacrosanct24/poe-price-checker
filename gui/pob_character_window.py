@@ -106,7 +106,7 @@ class PoBCharacterWindow(tk.Toplevel):
         self.info_frame = ttk.Frame(self.right_frame)
         self.info_labels: Dict[str, ttk.Label] = {}
 
-        for label_name in ["Name:", "Class:", "Level:", "Items:"]:
+        for label_name in ["Name:", "Class:", "Level:", "Items:", "Categories:", "Status:"]:
             row = ttk.Frame(self.info_frame)
             lbl = ttk.Label(row, text=label_name, width=10, anchor="w")
             val = ttk.Label(row, text="-", anchor="w")
@@ -198,15 +198,45 @@ class PoBCharacterWindow(tk.Toplevel):
         active = self.character_manager.get_active_profile()
         active_name = active.name if active else None
 
+        # Get upgrade target
+        upgrade_target = self.character_manager.get_upgrade_target()
+        upgrade_target_name = upgrade_target.name if upgrade_target else None
+
         for name in profile_names:
             # Get the actual profile object
             profile = self.character_manager.get_profile(name)
             if not profile:
                 continue
 
+            # Build display name with status indicators
             display = name
+            tags = []
+
             if active_name and name == active_name:
-                display = f"{name} (active)"
+                tags.append("active")
+            if upgrade_target_name and name == upgrade_target_name:
+                tags.append("upgrade")
+            if hasattr(profile, 'categories') and profile.categories:
+                # Show categories in abbreviated form
+                cat_abbrev = []
+                for cat in profile.categories[:3]:  # Show max 3
+                    # Convert to short form: "league_starter" -> "LS", "meta" -> "M", etc.
+                    abbrev_map = {
+                        "league_starter": "LS",
+                        "endgame": "EG",
+                        "boss_killer": "BK",
+                        "mapper": "MAP",
+                        "budget": "BUD",
+                        "meta": "META",
+                        "experimental": "EXP",
+                        "reference": "REF",
+                    }
+                    cat_abbrev.append(abbrev_map.get(cat, cat[:3].upper()))
+                tags.extend(cat_abbrev)
+
+            if tags:
+                display = f"{name} [{', '.join(tags)}]"
+
             self.profile_listbox.insert("end", display)
 
             # Cache the profile data as a dict for display
@@ -227,6 +257,8 @@ class PoBCharacterWindow(tk.Toplevel):
                     }
                     for slot, item in (profile.build.items.items() if profile.build else {})
                 },
+                "categories": getattr(profile, 'categories', []) or [],
+                "is_upgrade_target": getattr(profile, 'is_upgrade_target', False),
             }
 
         # Update active label
@@ -253,9 +285,13 @@ class PoBCharacterWindow(tk.Toplevel):
         if not selection:
             return
 
-        # Get the actual profile name (strip "(active)" suffix if present)
+        # Get the actual profile name (strip "[tags]" suffix if present)
         display_name = self.profile_listbox.get(selection[0])
-        name = display_name.replace(" (active)", "").strip()
+        # Remove any bracketed tags at the end: "Name [active, META]" -> "Name"
+        if " [" in display_name:
+            name = display_name.rsplit(" [", 1)[0].strip()
+        else:
+            name = display_name.strip()
 
         self._selected_profile = name
         self._show_profile_details(name)
@@ -281,6 +317,25 @@ class PoBCharacterWindow(tk.Toplevel):
 
         items = profile.get("items", {})
         self.info_labels["Items"].config(text=f"{len(items)} equipped")
+
+        # Display categories
+        categories = profile.get("categories", [])
+        if categories:
+            # Format category names nicely: "league_starter" -> "League Starter"
+            cat_display = ", ".join(
+                cat.replace("_", " ").title() for cat in categories
+            )
+            self.info_labels["Categories"].config(text=cat_display)
+        else:
+            self.info_labels["Categories"].config(text="None")
+
+        # Display status (upgrade target, active)
+        status_parts = []
+        if profile.get("is_upgrade_target"):
+            status_parts.append("Upgrade Target")
+        if name == (self.character_manager.get_active_profile().name if self.character_manager.get_active_profile() else None):
+            status_parts.append("Active")
+        self.info_labels["Status"].config(text=", ".join(status_parts) if status_parts else "None")
 
         # Populate equipment tree
         for item in self.equipment_tree.get_children():
@@ -313,11 +368,11 @@ class PoBCharacterWindow(tk.Toplevel):
                 tags=(item_data.get("rarity", "").lower(),),
             )
 
-        # Configure rarity-based colors
-        self.equipment_tree.tag_configure("unique", foreground="#af6025")
-        self.equipment_tree.tag_configure("rare", foreground="#ffff77")
-        self.equipment_tree.tag_configure("magic", foreground="#8888ff")
-        self.equipment_tree.tag_configure("normal", foreground="#c8c8c8")
+        # Configure rarity-based colors (using PoE-style colors with better readability)
+        self.equipment_tree.tag_configure("unique", foreground="#af6025")  # Unique orange
+        self.equipment_tree.tag_configure("rare", foreground="#ccaa00")    # Gold/tan (readable on dark/light)
+        self.equipment_tree.tag_configure("magic", foreground="#8888ff")   # Magic blue
+        self.equipment_tree.tag_configure("normal", foreground="#808080")  # Normal gray
 
     def _on_equipment_double_click(self, event: tk.Event) -> None:
         """Show item details on double-click."""
