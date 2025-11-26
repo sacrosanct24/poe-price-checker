@@ -11,7 +11,7 @@
 PoE Price Checker is a fully-featured desktop application for pricing Path of Exile items using **multiple sources**, a **modern parser**, **rare item evaluation**, **sales tracking**, and a **plugin system**.
 Designed as an **over-engineered portfolio project**, it showcases clean architecture, strong testing, and extensibility.
 
-> **Latest:** Phase 1.1 complete with rare item evaluation configuration UI! Customize affix weights and use build-focused presets.
+> **Latest:** Migrated to PyQt6 for a modern, polished UI with PoE-style theming! Tkinter still available as fallback.
 
 ---
 
@@ -28,14 +28,17 @@ Designed as an **over-engineered portfolio project**, it showcases clean archite
 * Detects rarity, mods, sockets, influences, tags, and more
 * Supports PoE1 and PoE2 item formats
 
-### 🪄 Modern GUI (Tkinter)
+### 🪄 Modern GUI (PyQt6)
 
+* **Dark theme** with PoE-style colors (unique orange, rare yellow, etc.)
 * Paste item → auto-parse → price instantly
 * **Rare Item Evaluator** - Scores rare items (0-100) with tier badges
 * **Evaluation Config UI** - Customize affix weights and use build presets
+* **PoB Integration** - Import builds, track upgrades, manage character profiles
 * Item Inspector sidebar with evaluation panel
-* Right-click: copy row, open trade URL, copy TSV
+* Right-click context menus: copy row, record sale, explain price
 * Sample-item buttons for development
+* Tkinter fallback available with `--tk` flag
 
 ### 💾 Persistent Database
 
@@ -63,7 +66,11 @@ pip install -r requirements.txt
 ### 2. Run the application
 
 ```bash
-python poe_price_checker.py
+# PyQt6 GUI (default - modern dark theme)
+python main.py
+
+# Or use the legacy tkinter GUI
+python main.py --tk
 ```
 
 Runs with GUI on all major OSes.
@@ -126,15 +133,19 @@ All documentation is organized in the `docs/` directory:
 poe-price-checker/
 │
 ├── core/                # AppContext, database, parsing, pricing services
-├── gui/                 # Tkinter GUI
+├── gui/                 # Legacy Tkinter GUI (use --tk flag)
+├── gui_qt/              # PyQt6 GUI (default)
+│   ├── widgets/         # Reusable widgets (ResultsTable, ItemInspector, etc.)
+│   ├── windows/         # Secondary windows (Sales, PoB, Settings)
+│   └── dialogs/         # Dialog boxes
 ├── data_sources/        # PoE Ninja + framework for more APIs
 ├── plugins/             # Third-party plugins & examples
 │
 ├── docs/                # All documentation
-├── tests/               # Unit + integration tests
+├── tests/               # Unit + integration tests (544 tests)
 │
 ├── .continue/           # Continue AI assistant configuration
-└── poe_price_checker.py # Application entrypoint
+└── main.py              # Application entrypoint
 ```
 
 ---

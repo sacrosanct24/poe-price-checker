@@ -16,7 +16,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
 from typing import Any, Dict, List, Optional, Callable
 
-from core.pob_integration import CharacterManager, PoBDecoder, PoBBuild, PoBItem
+from core.pob_integration import CharacterManager, PoBDecoder, PoBBuild, PoBItem, BuildCategory
 
 
 class PoBCharacterWindow(tk.Toplevel):
@@ -61,6 +61,21 @@ class PoBCharacterWindow(tk.Toplevel):
         # --- Left panel: profile list ---
         self.left_frame = ttk.LabelFrame(self, text="Characters", padding=8)
 
+        # Filter dropdown
+        self.filter_frame = ttk.Frame(self.left_frame)
+        ttk.Label(self.filter_frame, text="Filter:").pack(side="left", padx=(0, 4))
+        self.filter_var = tk.StringVar(value="All")
+        filter_values = ["All", "---"] + [cat.value.replace("_", " ").title() for cat in BuildCategory]
+        self.filter_combo = ttk.Combobox(
+            self.filter_frame,
+            textvariable=self.filter_var,
+            values=filter_values,
+            state="readonly",
+            width=15,
+        )
+        self.filter_combo.pack(side="left", fill="x", expand=True)
+        self.filter_combo.bind("<<ComboboxSelected>>", self._on_filter_change)
+
         self.profile_listbox = tk.Listbox(
             self.left_frame,
             height=15,
@@ -97,6 +112,11 @@ class PoBCharacterWindow(tk.Toplevel):
             self.profile_buttons,
             text="Set Active",
             command=self._on_set_active,
+        )
+        self.categories_btn = ttk.Button(
+            self.profile_buttons,
+            text="Categories...",
+            command=self._on_manage_categories,
         )
 
         # --- Right panel: character details ---
@@ -164,18 +184,26 @@ class PoBCharacterWindow(tk.Toplevel):
         self.grid_rowconfigure(0, weight=1)
 
         # Left panel layout
-        self.profile_listbox.grid(row=0, column=0, sticky="nsew")
-        self.profile_scrollbar.grid(row=0, column=1, sticky="ns")
-        self.profile_buttons.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(8, 0))
+        self.filter_frame.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 4))
+        self.profile_listbox.grid(row=1, column=0, sticky="nsew")
+        self.profile_scrollbar.grid(row=1, column=1, sticky="ns")
+        self.profile_buttons.grid(row=2, column=0, columnspan=2, sticky="sew", pady=(8, 0))
 
         self.left_frame.grid_columnconfigure(0, weight=1)
-        self.left_frame.grid_rowconfigure(0, weight=1)
+        self.left_frame.grid_rowconfigure(1, weight=1)
+        self.left_frame.grid_rowconfigure(2, minsize=60)  # Ensure buttons have space
 
-        # Profile buttons
-        self.import_btn.pack(side="left", padx=(0, 4))
-        self.delete_btn.pack(side="left", padx=(0, 4))
-        self.refresh_btn.pack(side="left", padx=(0, 4))
-        self.set_active_btn.pack(side="left")
+        # Profile buttons (two rows for better fit)
+        btn_row1 = ttk.Frame(self.profile_buttons)
+        btn_row1.pack(fill="x")
+        btn_row2 = ttk.Frame(self.profile_buttons)
+        btn_row2.pack(fill="x", pady=(4, 0))
+
+        self.import_btn.pack(in_=btn_row1, side="left", padx=(0, 4))
+        self.delete_btn.pack(in_=btn_row1, side="left", padx=(0, 4))
+        self.refresh_btn.pack(in_=btn_row1, side="left")
+        self.set_active_btn.pack(in_=btn_row2, side="left", padx=(0, 4))
+        self.categories_btn.pack(in_=btn_row2, side="left")
 
         # Right panel layout
         self.info_frame.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 8))
@@ -188,6 +216,10 @@ class PoBCharacterWindow(tk.Toplevel):
 
         # Status bar
         self.active_label.pack(side="left")
+
+    def _on_filter_change(self, event: tk.Event = None) -> None:
+        """Handle filter dropdown change."""
+        self._load_profiles()
 
     def _load_profiles(self) -> None:
         """Load all saved profiles from the character manager."""
@@ -202,11 +234,28 @@ class PoBCharacterWindow(tk.Toplevel):
         upgrade_target = self.character_manager.get_upgrade_target()
         upgrade_target_name = upgrade_target.name if upgrade_target else None
 
+        # Get current filter
+        filter_value = self.filter_var.get()
+        filter_category = None
+        if filter_value not in ("All", "---"):
+            # Convert display name back to category value: "League Starter" -> "league_starter"
+            filter_category = filter_value.lower().replace(" ", "_")
+
         for name in profile_names:
             # Get the actual profile object
             profile = self.character_manager.get_profile(name)
             if not profile:
                 continue
+
+            # Get profile categories
+            profile_categories = getattr(profile, 'categories', []) or []
+
+            # Apply filter
+            if filter_category:
+                if filter_category not in profile_categories:
+                    # Cache even filtered profiles for details view
+                    self._profiles_cache[name] = self._build_profile_cache(profile)
+                    continue
 
             # Build display name with status indicators
             display = name
@@ -216,10 +265,10 @@ class PoBCharacterWindow(tk.Toplevel):
                 tags.append("active")
             if upgrade_target_name and name == upgrade_target_name:
                 tags.append("upgrade")
-            if hasattr(profile, 'categories') and profile.categories:
+            if profile_categories:
                 # Show categories in abbreviated form
                 cat_abbrev = []
-                for cat in profile.categories[:3]:  # Show max 3
+                for cat in profile_categories[:3]:  # Show max 3
                     # Convert to short form: "league_starter" -> "LS", "meta" -> "M", etc.
                     abbrev_map = {
                         "league_starter": "LS",
@@ -240,26 +289,7 @@ class PoBCharacterWindow(tk.Toplevel):
             self.profile_listbox.insert("end", display)
 
             # Cache the profile data as a dict for display
-            self._profiles_cache[name] = {
-                "name": profile.name,
-                "build_info": {
-                    "class_name": profile.build.class_name if profile.build else "",
-                    "ascendancy": profile.build.ascendancy if profile.build else "",
-                    "level": profile.build.level if profile.build else 0,
-                },
-                "items": {
-                    slot: {
-                        "name": item.name,
-                        "base_type": item.base_type,
-                        "rarity": item.rarity,
-                        "implicit_mods": item.implicit_mods,
-                        "explicit_mods": item.explicit_mods,
-                    }
-                    for slot, item in (profile.build.items.items() if profile.build else {})
-                },
-                "categories": getattr(profile, 'categories', []) or [],
-                "is_upgrade_target": getattr(profile, 'is_upgrade_target', False),
-            }
+            self._profiles_cache[name] = self._build_profile_cache(profile)
 
         # Update active label
         if active:
@@ -270,6 +300,29 @@ class PoBCharacterWindow(tk.Toplevel):
         # Clear details if no selection
         if not profile_names:
             self._clear_details()
+
+    def _build_profile_cache(self, profile: Any) -> Dict[str, Any]:
+        """Build a cache dict for a profile."""
+        return {
+            "name": profile.name,
+            "build_info": {
+                "class_name": profile.build.class_name if profile.build else "",
+                "ascendancy": profile.build.ascendancy if profile.build else "",
+                "level": profile.build.level if profile.build else 0,
+            },
+            "items": {
+                slot: {
+                    "name": item.name,
+                    "base_type": item.base_type,
+                    "rarity": item.rarity,
+                    "implicit_mods": item.implicit_mods,
+                    "explicit_mods": item.explicit_mods,
+                }
+                for slot, item in (profile.build.items.items() if profile.build else {})
+            },
+            "categories": getattr(profile, 'categories', []) or [],
+            "is_upgrade_target": getattr(profile, 'is_upgrade_target', False),
+        }
 
     def _clear_details(self) -> None:
         """Clear the character details panel."""
@@ -517,6 +570,135 @@ class PoBCharacterWindow(tk.Toplevel):
         except Exception as exc:
             messagebox.showerror("Error", f"Failed to set active profile:\n{exc}")
 
+    def _on_manage_categories(self) -> None:
+        """Open dialog to manage categories for the selected profile."""
+        if not self._selected_profile:
+            messagebox.showinfo("Manage Categories", "No profile selected.")
+            return
+
+        ManageCategoriesDialog(
+            self,
+            self.character_manager,
+            self._selected_profile,
+            on_save=self._load_profiles,
+        )
+
+    def _center_over_parent(self) -> None:
+        if not self.master or not self.winfo_ismapped():
+            return
+
+        self.update_idletasks()
+
+        parent_x = self.master.winfo_rootx()
+        parent_y = self.master.winfo_rooty()
+        parent_w = self.master.winfo_width()
+        parent_h = self.master.winfo_height()
+
+        width = self.winfo_width()
+        height = self.winfo_height()
+
+        x = parent_x + (parent_w - width) // 2
+        y = parent_y + (parent_h - height) // 2
+
+        self.geometry(f"+{x}+{y}")
+
+
+class ManageCategoriesDialog(tk.Toplevel):
+    """Dialog for managing categories on an existing profile."""
+
+    def __init__(
+        self,
+        master: tk.Misc,
+        character_manager: CharacterManager,
+        profile_name: str,
+        *,
+        on_save: Optional[Callable[[], None]] = None,
+    ) -> None:
+        super().__init__(master)
+
+        self.character_manager = character_manager
+        self.profile_name = profile_name
+        self.on_save = on_save
+
+        self.title(f"Categories: {profile_name}")
+        self.transient(master)
+        self.grab_set()
+        self.resizable(False, False)
+
+        # Get current categories for this profile
+        profile = self.character_manager.get_profile(profile_name)
+        self.current_categories = set(getattr(profile, 'categories', []) or [])
+
+        self._create_widgets()
+
+        # Center over parent
+        self.update_idletasks()
+        self._center_over_parent()
+
+        self.bind("<Escape>", lambda _event: self.destroy())
+
+    def _create_widgets(self) -> None:
+        content = ttk.Frame(self, padding=16)
+        content.pack(fill="both", expand=True)
+
+        ttk.Label(
+            content,
+            text="Select categories for this build:",
+            font=("", 10, "bold"),
+        ).pack(anchor="w", pady=(0, 8))
+
+        # Category checkboxes
+        self.category_vars: Dict[str, tk.BooleanVar] = {}
+
+        for cat in BuildCategory:
+            var = tk.BooleanVar(value=cat.value in self.current_categories)
+            self.category_vars[cat.value] = var
+
+            # Format display name: "league_starter" -> "League Starter"
+            display_name = cat.value.replace("_", " ").title()
+
+            cb = ttk.Checkbutton(content, text=display_name, variable=var)
+            cb.pack(anchor="w", pady=2)
+
+        # Buttons
+        button_frame = ttk.Frame(content)
+        button_frame.pack(fill="x", pady=(16, 0))
+
+        ttk.Button(
+            button_frame,
+            text="Save",
+            command=self._on_save,
+        ).pack(side="right", padx=(8, 0))
+
+        ttk.Button(
+            button_frame,
+            text="Cancel",
+            command=self.destroy,
+        ).pack(side="right")
+
+    def _on_save(self) -> None:
+        """Save selected categories to the profile."""
+        # Gather selected categories
+        selected = [
+            cat_value
+            for cat_value, var in self.category_vars.items()
+            if var.get()
+        ]
+
+        try:
+            self.character_manager.set_build_categories(self.profile_name, selected)
+
+            if self.on_save:
+                self.on_save()
+
+            self.destroy()
+
+        except Exception as exc:
+            messagebox.showerror(
+                "Save Error",
+                f"Failed to save categories:\n{exc}",
+            )
+
     def _center_over_parent(self) -> None:
         if not self.master or not self.winfo_ismapped():
             return
@@ -555,12 +737,17 @@ class ImportPoBDialog(tk.Toplevel):
         self.title("Import PoB Character")
         self.transient(master)
         self.grab_set()
-        self.resizable(True, False)
+        self.resizable(True, True)
 
         self._create_widgets()
 
-        # Center over parent
+        # Set explicit size to ensure all content is visible
         self.update_idletasks()
+        req_height = self.winfo_reqheight()
+        # Ensure minimum height of 550 to fit all content including buttons
+        height = max(req_height, 550)
+        self.geometry(f"450x{height}")
+        self.minsize(400, 500)
         self._center_over_parent()
 
         self.bind("<Escape>", lambda _event: self.destroy())
@@ -600,11 +787,47 @@ class ImportPoBDialog(tk.Toplevel):
         ttk.Label(content, text="Notes (optional):").grid(row=5, column=0, sticky="w", pady=(0, 4))
         self.notes_var = tk.StringVar()
         self.notes_entry = ttk.Entry(content, textvariable=self.notes_var, width=40)
-        self.notes_entry.grid(row=6, column=0, sticky="ew", pady=(0, 16))
+        self.notes_entry.grid(row=6, column=0, sticky="ew", pady=(0, 12))
+
+        # Categories (optional)
+        ttk.Label(
+            content,
+            text="Categories (optional):",
+        ).grid(row=7, column=0, sticky="w", pady=(0, 4))
+
+        # Create a frame with two columns for category checkboxes
+        cat_frame = ttk.Frame(content)
+        cat_frame.grid(row=8, column=0, sticky="ew", pady=(0, 16))
+
+        self.category_vars: Dict[str, tk.BooleanVar] = {}
+        categories = list(BuildCategory)
+
+        # Split into two columns
+        mid = (len(categories) + 1) // 2
+        left_cats = categories[:mid]
+        right_cats = categories[mid:]
+
+        left_frame = ttk.Frame(cat_frame)
+        left_frame.pack(side="left", anchor="nw")
+
+        right_frame = ttk.Frame(cat_frame)
+        right_frame.pack(side="left", anchor="nw", padx=(16, 0))
+
+        for cat in left_cats:
+            var = tk.BooleanVar(value=False)
+            self.category_vars[cat.value] = var
+            display_name = cat.value.replace("_", " ").title()
+            ttk.Checkbutton(left_frame, text=display_name, variable=var).pack(anchor="w")
+
+        for cat in right_cats:
+            var = tk.BooleanVar(value=False)
+            self.category_vars[cat.value] = var
+            display_name = cat.value.replace("_", " ").title()
+            ttk.Checkbutton(right_frame, text=display_name, variable=var).pack(anchor="w")
 
         # Buttons
         button_frame = ttk.Frame(content)
-        button_frame.grid(row=7, column=0, sticky="e")
+        button_frame.grid(row=9, column=0, sticky="e")
 
         self.import_btn = ttk.Button(
             button_frame,
@@ -641,6 +864,13 @@ class ImportPoBDialog(tk.Toplevel):
             self.code_text.focus_set()
             return
 
+        # Gather selected categories
+        selected_categories = [
+            cat_value
+            for cat_value, var in self.category_vars.items()
+            if var.get()
+        ]
+
         # Check for duplicate name - list_profiles() returns list of names (strings)
         existing = self.character_manager.list_profiles()
         if name in existing:
@@ -668,13 +898,25 @@ class ImportPoBDialog(tk.Toplevel):
                 build = profile.build
                 item_count = len(build.items) if build else 0
 
+                # Apply selected categories if any
+                if selected_categories:
+                    self.character_manager.set_build_categories(name, selected_categories)
+
+                # Build success message
+                cat_info = ""
+                if selected_categories:
+                    cat_display = ", ".join(
+                        cat.replace("_", " ").title() for cat in selected_categories
+                    )
+                    cat_info = f"\nCategories: {cat_display}"
+
                 messagebox.showinfo(
                     "Import Success",
                     f"Successfully imported '{name}'!\n\n"
                     f"Class: {build.class_name if build else 'Unknown'} "
                     f"({build.ascendancy if build else ''})\n"
                     f"Level: {build.level if build else '?'}\n"
-                    f"Items: {item_count} equipped",
+                    f"Items: {item_count} equipped{cat_info}",
                 )
 
                 if self.on_import:

@@ -46,8 +46,7 @@ PoE Price Checker is a desktop-first tool for Path of Exile 1 & 2 that aims to b
 
 Top-level structure (excluding virtualenv and tooling artifacts):
 
-* `poe_price_checker.py` – primary entrypoint to launch the app.
-* `main.py` – older/secondary entrypoint; currently present but `poe_price_checker.py` is the canonical one.
+* `main.py` – primary entrypoint to launch the app. Supports `--qt` (default) and `--tk` flags.
 * `core/` – core domain logic and services:
 
   * `app_context.py` – wiring factory / dependency injection for the app.
@@ -67,9 +66,16 @@ Top-level structure (excluding virtualenv and tooling artifacts):
   * `pricing/trade_api.py` – stubbed official Trade API source.
   * `official/` – placeholder for official API integrations.
   * `wiki/` – placeholder for wiki integrations.
-* `gui/`:
+* `gui/` – Legacy Tkinter GUI (use `--tk` flag):
 
   * `main_window.py` – Tkinter GUI (`PriceCheckerGUI` and related widgets).
+* `gui_qt/` – PyQt6 GUI (default):
+
+  * `main_window.py` – Main window (`PriceCheckerWindow`).
+  * `styles.py` – Qt stylesheets and PoE color definitions.
+  * `widgets/` – Reusable widgets (ResultsTable, ItemInspector, RareEvaluationPanel).
+  * `windows/` – Secondary windows (RecentSales, SalesDashboard, PoBCharacter, RareEvalConfig).
+  * `dialogs/` – Dialog boxes (RecordSale).
 * `plugins/`:
 
   * `examples/` – currently only an empty `__init__.py`; future plugin examples go here.
