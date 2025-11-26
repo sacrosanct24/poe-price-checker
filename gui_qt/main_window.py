@@ -50,6 +50,7 @@ from gui_qt.styles import APP_STYLESHEET, COLORS
 from gui_qt.widgets.results_table import ResultsTableWidget
 from gui_qt.widgets.item_inspector import ItemInspectorWidget
 from gui_qt.widgets.rare_evaluation_panel import RareEvaluationPanelWidget
+from core.build_stat_calculator import BuildStats
 
 if TYPE_CHECKING:
     from core.app_context import AppContext
@@ -280,6 +281,9 @@ class PriceCheckerWindow(QMainWindow):
         # Start background rankings population check
         self._start_rankings_population()
 
+        # Initialize build stats for item inspector from active PoB profile
+        self._update_build_stats_for_inspector()
+
     def _start_rankings_population(self) -> None:
         """Start background task to populate price rankings if needed."""
         try:
@@ -323,6 +327,24 @@ class PriceCheckerWindow(QMainWindow):
             self._character_manager = CharacterManager(storage_path=storage_path)
         except Exception as e:
             self.logger.warning(f"Failed to initialize character manager: {e}")
+
+    def _update_build_stats_for_inspector(self) -> None:
+        """Update the item inspector with build stats from the active PoB profile."""
+        if not self._character_manager:
+            return
+
+        try:
+            profile = self._character_manager.get_active_profile()
+            if profile and profile.build and profile.build.stats:
+                build_stats = BuildStats.from_pob_stats(profile.build.stats)
+                self.item_inspector.set_build_stats(build_stats)
+                self.logger.debug(
+                    f"Updated item inspector with build stats from '{profile.name}'"
+                )
+            else:
+                self.item_inspector.set_build_stats(None)
+        except Exception as e:
+            self.logger.warning(f"Failed to update build stats: {e}")
 
     # -------------------------------------------------------------------------
     # Menu Bar
@@ -469,6 +491,10 @@ class PriceCheckerWindow(QMainWindow):
         from gui_qt.widgets.pob_panel import PoBPanel
         self.pob_panel = PoBPanel(self._character_manager, parent=self)
         self.pob_panel.price_check_requested.connect(self._on_pob_price_check)
+        # Update build stats when profile changes
+        self.pob_panel.profile_combo.currentTextChanged.connect(
+            self._on_pob_profile_changed
+        )
         pob_layout.addWidget(self.pob_panel)
 
         pob_group.setMinimumWidth(250)
@@ -1062,6 +1088,20 @@ class PriceCheckerWindow(QMainWindow):
 
         # Auto-run the price check after a brief delay to let UI update
         QTimer.singleShot(100, self._on_check_price)
+
+    def _on_pob_profile_changed(self, profile_name: str) -> None:
+        """Handle PoB profile selection change - update build stats for inspector."""
+        if not profile_name or profile_name.startswith("("):
+            # Invalid selection (empty or placeholder like "(No profiles)")
+            self.item_inspector.set_build_stats(None)
+            return
+
+        # Set the active profile in the character manager
+        if self._character_manager:
+            self._character_manager.set_active_profile(profile_name)
+
+        # Update build stats for the item inspector
+        self._update_build_stats_for_inspector()
 
     def _bring_to_front(self) -> None:
         """Aggressively bring this window to front on Windows."""

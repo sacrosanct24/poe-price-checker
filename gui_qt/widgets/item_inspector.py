@@ -2,11 +2,12 @@
 gui_qt.widgets.item_inspector
 
 PyQt6 widget for displaying parsed item details.
+Optionally shows effective values based on PoB build stats.
 """
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any, List, Optional
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
@@ -17,9 +18,11 @@ from PyQt6.QtWidgets import (
     QLabel,
     QScrollArea,
     QFrame,
+    QGroupBox,
 )
 
 from gui_qt.styles import COLORS, get_rarity_color
+from core.build_stat_calculator import BuildStatCalculator, BuildStats
 
 
 class ItemInspectorWidget(QWidget):
@@ -27,6 +30,10 @@ class ItemInspectorWidget(QWidget):
 
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
+
+        # Build stats for calculating effective values
+        self._build_stats: Optional[BuildStats] = None
+        self._calculator: Optional[BuildStatCalculator] = None
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -51,6 +58,14 @@ class ItemInspectorWidget(QWidget):
         self._placeholder = QLabel("No item selected")
         self._placeholder.setStyleSheet(f"color: {COLORS['text_secondary']};")
         self._content_layout.addWidget(self._placeholder)
+
+    def set_build_stats(self, stats: Optional[BuildStats]) -> None:
+        """Set build stats for calculating effective values."""
+        self._build_stats = stats
+        if stats:
+            self._calculator = BuildStatCalculator(stats)
+        else:
+            self._calculator = None
 
     def set_item(self, item: Any) -> None:
         """Display parsed item information."""
@@ -162,6 +177,11 @@ class ItemInspectorWidget(QWidget):
 
                 self._content_layout.addWidget(mod_label)
 
+        # Build-effective values section
+        all_mods = list(implicit_mods) + list(explicit_mods)
+        if all_mods and self._calculator:
+            self._add_effective_values_section(all_mods)
+
         # Flavor text
         flavor = getattr(item, "flavor_text", None)
         if flavor:
@@ -210,3 +230,70 @@ class ItemInspectorWidget(QWidget):
 
         row.addStretch()
         self._content_layout.addLayout(row)
+
+    def _add_effective_values_section(self, mods: List[str]) -> None:
+        """Add section showing effective values based on build stats."""
+        if not self._calculator:
+            return
+
+        # Calculate effective values
+        results = self._calculator.calculate_effective_values(mods)
+        if not results:
+            return
+
+        # Add separator and header
+        self._add_separator()
+
+        # Header with build info
+        header = QLabel("Build-Effective Values")
+        header_font = QFont()
+        header_font.setBold(True)
+        header.setFont(header_font)
+        header.setStyleSheet(f"color: {COLORS['currency']};")
+        self._content_layout.addWidget(header)
+
+        # Show build summary
+        if self._build_stats:
+            summary = (
+                f"Life: {int(self._build_stats.total_life)} "
+                f"(+{int(self._build_stats.life_inc)}% inc)"
+            )
+            summary_label = QLabel(summary)
+            summary_label.setStyleSheet(f"color: {COLORS['text_secondary']}; font-size: 10px;")
+            self._content_layout.addWidget(summary_label)
+
+        # Show effective values for each scalable mod
+        for result in results:
+            # Only show mods that have meaningful scaling (multiplier > 1 or special display)
+            if result.multiplier > 1.0 or result.mod_type in (
+                "fire_res", "cold_res", "lightning_res", "chaos_res",
+                "strength", "intelligence", "all_ele_res"
+            ):
+                # Create compact effective value display
+                if result.mod_type == "life" and result.multiplier > 1:
+                    text = f"+{int(result.raw_value)} life -> {int(result.effective_value)} effective"
+                    color = COLORS['life'] if 'life' in COLORS else "#ff6666"
+                elif result.mod_type == "es" and result.multiplier > 1:
+                    text = f"+{int(result.raw_value)} ES -> {int(result.effective_value)} effective"
+                    color = COLORS.get('es', "#8888ff")
+                elif result.mod_type == "armour" and result.multiplier > 1:
+                    text = f"+{int(result.raw_value)} armour -> {int(result.effective_value)} effective"
+                    color = COLORS.get('armour', "#ccaa66")
+                elif result.mod_type == "strength":
+                    life_from_str = (result.raw_value / 2) * (1 + self._build_stats.life_inc / 100)
+                    text = f"+{int(result.raw_value)} str = +{int(life_from_str)} effective life"
+                    color = COLORS.get('strength', "#ff8866")
+                elif result.mod_type == "intelligence":
+                    text = result.explanation
+                    color = COLORS.get('intelligence', "#6688ff")
+                elif result.mod_type in ("fire_res", "cold_res", "lightning_res", "chaos_res"):
+                    text = result.explanation
+                    color = COLORS.get('text', "#ffffff")
+                else:
+                    text = result.explanation
+                    color = COLORS.get('text', "#ffffff")
+
+                eff_label = QLabel(f"  {text}")
+                eff_label.setWordWrap(True)
+                eff_label.setStyleSheet(f"color: {color}; font-size: 11px;")
+                self._content_layout.addWidget(eff_label)

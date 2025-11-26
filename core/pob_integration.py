@@ -323,6 +323,19 @@ class PoBDecoder:
                     if name and value:
                         build.config[name] = value
 
+            # Extract PlayerStat values (calculated build stats from PoB)
+            if build_elem is not None:
+                for stat_elem in build_elem.findall("PlayerStat"):
+                    stat_name = stat_elem.get("stat", "")
+                    stat_value = stat_elem.get("value", "")
+                    if stat_name and stat_value:
+                        try:
+                            build.stats[stat_name] = float(stat_value)
+                        except ValueError:
+                            pass  # Skip non-numeric stats
+
+                logger.debug(f"Extracted {len(build.stats)} PlayerStats from PoB")
+
         except ET.ParseError as e:
             logger.error(f"Failed to parse PoB XML: {e}")
             raise ValueError(f"Invalid PoB XML: {e}")
@@ -540,6 +553,7 @@ class CharacterManager:
                 "ascendancy": profile.build.ascendancy,
                 "level": profile.build.level,
                 "main_skill": profile.build.main_skill,
+                "stats": profile.build.stats,  # PoB calculated stats
                 "items": {
                     slot: {
                         "slot": item.slot,
@@ -565,6 +579,7 @@ class CharacterManager:
             ascendancy=build_data.get("ascendancy", ""),
             level=build_data.get("level", 1),
             main_skill=build_data.get("main_skill", ""),
+            stats=build_data.get("stats", {}),  # PoB calculated stats
         )
 
         for slot, item_data in build_data.get("items", {}).items():
