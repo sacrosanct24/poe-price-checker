@@ -1,198 +1,154 @@
-# 📦 PoE Price Checker
+<p align="center">
+  <img src="assets/banner.png" alt="PoE Price Checker" width="600">
+</p>
 
-*A modern multi-source economy tool for Path of Exile (PoE1 + PoE2)*
+<p align="center">
+  <strong>A modern multi-source economy tool for Path of Exile</strong>
+</p>
 
-![Python](https://img.shields.io/badge/Python-3.12+-blue?logo=python)
-![Tests](https://img.shields.io/badge/tests-passing-brightgreen?logo=pytest)
-![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey)
-![License](https://img.shields.io/badge/license-MIT-green)
-![Continue](https://img.shields.io/badge/AI-Continue%20enabled-purple?logo=ai)
+<p align="center">
+  <a href="#download"><img src="https://img.shields.io/badge/Download-Windows-blue?style=for-the-badge&logo=windows" alt="Download"></a>
+  <a href="#features"><img src="https://img.shields.io/badge/PoE1%20%2B%20PoE2-Supported-orange?style=for-the-badge" alt="PoE1 + PoE2"></a>
+</p>
 
-PoE Price Checker is a fully-featured desktop application for pricing Path of Exile items using **multiple sources**, a **modern parser**, **rare item evaluation**, **sales tracking**, and a **plugin system**.
-Designed as an **over-engineered portfolio project**, it showcases clean architecture, strong testing, and extensibility.
-
-> **Latest:** Migrated to PyQt6 for a modern, polished UI with PoE-style theming! Tkinter still available as fallback.
-
----
-
-# ✨ Features
-
-### 🔍 Multi-Source Pricing
-
-* PoE Ninja
-* Derived sources (undercut / heuristic pricing)
-* Plugin system for custom pricing sources
-* **Top 20 Price Rankings** - Cached rankings by category with 5-day auto-refresh, historical tracking, and trend analysis
-
-### 🧠 Smart Item Parsing
-
-* Detects rarity, mods, sockets, influences, tags, and more
-* Supports PoE1 and PoE2 item formats
-
-### 🪄 Modern GUI (PyQt6)
-
-* **Dark theme** with PoE-style colors (unique orange, rare yellow, etc.)
-* Paste item → auto-parse → price instantly
-* **Rare Item Evaluator** - Scores rare items (0-100) with tier badges
-* **Evaluation Config UI** - Customize affix weights and use build presets
-* **Integrated PoB Panel** - Character profiles embedded in main window sidebar
-  - Select character profiles from dropdown
-  - View all equipped items with rarity colors
-  - Double-click or "Check Selected" to price check equipment
-* **PoB Integration** - Import builds, track upgrades, manage character profiles
-* **Maxroll Integration** - Import builds from Maxroll.gg guides, compare against meta builds
-* **Price Rankings Window** - View top items by category with cached pricing data
-* Item Inspector sidebar with evaluation panel
-* Right-click context menus: copy row, record sale, explain price
-* Sample-item buttons for development
-* Tkinter fallback available with `--tk` flag
-
-### 💾 Persistent Database
-
-* Checked item history
-* Sales tracking (listing → sold)
-* Price snapshot history
-* Plugin state/config
-
-### 🧩 Plugin System
-
-* Add your own pricing sources
-* Add hooks that run after parse or after pricing
-* Simple Python module interface
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.12+-3776ab?logo=python&logoColor=white" alt="Python">
+  <img src="https://img.shields.io/badge/Tests-671%20passing-brightgreen?logo=pytest" alt="Tests">
+  <img src="https://img.shields.io/badge/GUI-PyQt6-41cd52?logo=qt" alt="PyQt6">
+  <img src="https://img.shields.io/github/license/sacrosanct24/poe-price-checker" alt="License">
+</p>
 
 ---
 
-# 🚀 Getting Started
+## Download
 
-### 1. Install dependencies
+**Windows users:** Download the latest release and run - no Python installation required!
+
+| Platform | Download | Size |
+|----------|----------|------|
+| Windows | [PoEPriceChecker.zip](https://github.com/sacrosanct24/poe-price-checker/releases/latest) | ~120 MB |
+| macOS | Build from source (see below) | - |
+| Linux | Build from source (see below) | - |
+
+> **Note:** The Windows build includes everything needed to run the application. Just extract and double-click `PoEPriceChecker.exe`.
+
+---
+
+## Features
+
+### Multi-Source Pricing
+- **PoE Ninja** integration for real-time pricing
+- **poe.watch** as secondary data source
+- **Top 20 Price Rankings** by category with trend analysis
+- Plugin system for custom pricing sources
+
+### Smart Item Parsing
+- Detects rarity, mods, sockets, influences, and more
+- Supports both **PoE1** and **PoE2** item formats
+- Paste from clipboard, instant results
+
+### Path of Building Integration
+- Import builds from PoB paste codes
+- **Build-aware item evaluation** - see effective values based on your skill tree
+- Character profile management with equipped item viewing
+- Upgrade checking against your current gear
+
+### Maxroll Integration
+- Import builds directly from Maxroll.gg guides
+- Compare against meta builds
+
+### Modern Interface
+- Dark theme with PoE-style colors
+- **Rare Item Evaluator** - scores items 0-100 with tier badges
+- Item Inspector with mod breakdown
+- Sales tracking and history
+- Right-click menus for quick actions
+
+---
+
+## Quick Start
+
+### Option 1: Download (Windows)
+1. Download from [Releases](https://github.com/sacrosanct24/poe-price-checker/releases/latest)
+2. Extract the zip file
+3. Run `PoEPriceChecker.exe`
+
+### Option 2: Run from Source
 
 ```bash
+# Clone the repository
+git clone https://github.com/sacrosanct24/poe-price-checker.git
+cd poe-price-checker
+
+# Install dependencies
 pip install -r requirements.txt
-```
 
-### 2. Run the application
-
-```bash
-# PyQt6 GUI (default - modern dark theme)
+# Run the application
 python main.py
-
-# Or use the legacy tkinter GUI
-python main.py --tk
 ```
 
-Runs with GUI on all major OSes.
-
-### 3. Test rare item evaluation
+### Build Your Own Executable
 
 ```bash
-python test_rare_config_gui.py
+python build.py
+# Output: dist/PoEPriceChecker/
 ```
-
-Opens the configuration UI to test affix weight adjustments and presets.
-
-### 4. Run the full test suite
-
-```bash
-pytest
-```
-
-### 5. (Optional) Setup Continue AI Assistant in PyCharm
-
-This project includes [Continue](https://continue.dev) configuration for AI-assisted development.
-
-👉 See **[PYCHARM_SETUP.md](docs/PYCHARM_SETUP.md)** for setup instructions.
 
 ---
 
-# 📚 Documentation
+## Usage
 
-All documentation is organized in the `docs/` directory:
+1. **Copy an item** from Path of Exile (Ctrl+C on item)
+2. **Paste into the app** (Ctrl+V or click Paste)
+3. **View prices** from multiple sources instantly
 
-## Development
-- **[Development Guide](docs/development/DEVELOPMENT_GUIDE.md)** - Architecture & development practices
-- **[PyCharm Setup](docs/development/PYCHARM_SETUP.md)** - AI assistant integration (Continue)
-- **[Plugin Spec](docs/development/PLUGIN_SPEC.md)** - Plugin API documentation
-
-## Testing
-- **[Test Suite Guide](docs/testing/TEST_SUITE_GUIDE.md)** - Running and writing tests
-- **[Testing History](docs/testing/TESTING_HISTORY.md)** - Test suite evolution (109 → 163 tests)
-- **[Coverage Gaps](docs/testing/COVERAGE_GAPS.md)** - Areas needing more tests
-
-## MCP Integration (AI Assistant)
-- **[MCP Integration](docs/mcp/MCP_INTEGRATION.md)** - Complete guide to AI integration
-- **[Quick Start](docs/mcp/QUICK_START.md)** - 5-minute setup
-- **[Why MCP?](docs/mcp/WHY_MCP.md)** - Benefits and analysis
-
-## External Integrations
-- **[Maxroll Integration](docs/integration/MAXROLL_INTEGRATION.md)** - Import builds from Maxroll.gg, build comparison
-
-## Troubleshooting
-- **[Parser Issues](docs/troubleshooting/PARSER_ISSUES.md)** - "Unknown Item" problems
-- **[Item Class Bug](docs/troubleshooting/ITEM_CLASS_BUG.md)** - Fixed: PoE item format
-
-## Project Management
-- **[Roadmap](docs/roadmap.md)** - Future features
-- **[Context](docs/Context.md)** - Design decisions
-- **[Code Review](docs/code_review.md)** - Code quality notes
+### Pro Tips
+- Use the **PoB Panel** to import your build and check upgrades
+- Enable **Price Rankings** to see top items by category
+- Right-click results for additional options (copy, record sale, explain price)
 
 ---
 
-# 🗂️ Repository Structure
+## Documentation
 
-```text
+| Guide | Description |
+|-------|-------------|
+| [Development Guide](docs/development/DEVELOPMENT_GUIDE.md) | Architecture & code style |
+| [Plugin Spec](docs/development/PLUGIN_SPEC.md) | Create custom plugins |
+| [Test Suite Guide](docs/testing/TEST_SUITE_GUIDE.md) | Running & writing tests |
+| [Maxroll Integration](docs/integration/MAXROLL_INTEGRATION.md) | Import builds from Maxroll |
+
+---
+
+## Project Structure
+
+```
 poe-price-checker/
-│
-├── core/                # AppContext, database, parsing, pricing services
-├── gui/                 # Legacy Tkinter GUI (use --tk flag)
-├── gui_qt/              # PyQt6 GUI (default)
-│   ├── widgets/         # Reusable widgets (ResultsTable, ItemInspector, etc.)
-│   ├── windows/         # Secondary windows (Sales, PoB, Settings)
-│   └── dialogs/         # Dialog boxes
-├── data_sources/        # PoE Ninja + framework for more APIs
-├── plugins/             # Third-party plugins & examples
-│
-├── docs/                # All documentation
-├── tests/               # Unit + integration tests (669+ tests)
-│
-├── .continue/           # Continue AI assistant configuration
-└── main.py              # Application entrypoint
+├── core/           # Parsing, pricing, database services
+├── gui_qt/         # PyQt6 interface (default)
+├── data_sources/   # PoE Ninja, poe.watch, and more
+├── plugins/        # Custom pricing sources
+├── tests/          # 671+ unit & integration tests
+└── docs/           # Documentation
 ```
 
 ---
 
-# 🧩 Want to Create Plugins?
+## Contributing
 
-The plugin system is intentionally simple:
-
-* Drop a Python file into `plugins/`
-* Implement `register_plugin(...)`
-* Register pricing sources or hooks
-
-See:
-👉 **`docs/PLUGIN_SPEC.md`**
+Contributions are welcome! Please:
+- Follow the existing code style
+- Add tests for new features
+- Keep PRs focused and small
 
 ---
 
-# 🛠️ Contributing
+## License
 
-Pull requests, bug reports, and plugin ideas are welcome.
-
-When contributing:
-
-* Follow project structure
-* Add/update tests
-* Keep PRs focused & small
-* Update docs where appropriate
-
-### Documentation Policy
-
-* **Minimize documentation files** - update existing docs rather than create new ones
-* **Only README.md in root** - all other docs in `docs/` subdirectories
-* **Consolidate information** - fewer, well-organized documents preferred
-* **Continuation work**: update `CONTINUATION.md`, don't create session summaries
+[MIT License](LICENSE) - see LICENSE file for details.
 
 ---
 
-# 📄 License
-
-This project is licensed under the **MIT License**.
+<p align="center">
+  <sub>Not affiliated with Grinding Gear Games. Path of Exile is a trademark of Grinding Gear Games.</sub>
+</p>
