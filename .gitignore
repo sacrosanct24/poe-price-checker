@@ -57,3 +57,12 @@ oauth_config.json
 
 # Logs
 *.log
+
+# Claude Code local settings
+.claude/
+
+# User data files
+data/characters.json
+
+# Dev test files
+test_pob_workflow.py
