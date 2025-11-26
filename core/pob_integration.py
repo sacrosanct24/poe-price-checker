@@ -22,6 +22,10 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
+import requests
+
+logger = logging.getLogger(__name__)
+
 
 class BuildCategory(str, Enum):
     """Categories for organizing builds."""
@@ -33,10 +37,6 @@ class BuildCategory(str, Enum):
     META = "meta"
     EXPERIMENTAL = "experimental"
     REFERENCE = "reference"  # For reference builds you're comparing against
-
-import requests
-
-logger = logging.getLogger(__name__)
 
 
 @dataclass

@@ -35,6 +35,7 @@ Designed as an **over-engineered portfolio project**, it showcases clean archite
 * **Rare Item Evaluator** - Scores rare items (0-100) with tier badges
 * **Evaluation Config UI** - Customize affix weights and use build presets
 * **PoB Integration** - Import builds, track upgrades, manage character profiles
+* **Maxroll Integration** - Import builds from Maxroll.gg guides, compare against meta builds
 * Item Inspector sidebar with evaluation panel
 * Right-click context menus: copy row, record sale, explain price
 * Sample-item buttons for development
@@ -116,6 +117,9 @@ All documentation is organized in the `docs/` directory:
 - **[Quick Start](docs/mcp/QUICK_START.md)** - 5-minute setup
 - **[Why MCP?](docs/mcp/WHY_MCP.md)** - Benefits and analysis
 
+## External Integrations
+- **[Maxroll Integration](docs/integration/MAXROLL_INTEGRATION.md)** - Import builds from Maxroll.gg, build comparison
+
 ## Troubleshooting
 - **[Parser Issues](docs/troubleshooting/PARSER_ISSUES.md)** - "Unknown Item" problems
 - **[Item Class Bug](docs/troubleshooting/ITEM_CLASS_BUG.md)** - Fixed: PoE item format
@@ -142,7 +146,7 @@ poe-price-checker/
 ├── plugins/             # Third-party plugins & examples
 │
 ├── docs/                # All documentation
-├── tests/               # Unit + integration tests (544 tests)
+├── tests/               # Unit + integration tests (567 tests)
 │
 ├── .continue/           # Continue AI assistant configuration
 └── main.py              # Application entrypoint
