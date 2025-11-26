@@ -18,8 +18,21 @@ import re
 import xml.etree.ElementTree as ET
 import zlib
 from dataclasses import dataclass, field
+from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
+
+
+class BuildCategory(str, Enum):
+    """Categories for organizing builds."""
+    LEAGUE_STARTER = "league_starter"
+    ENDGAME = "endgame"
+    BOSS_KILLER = "boss_killer"
+    MAPPER = "mapper"
+    BUDGET = "budget"
+    META = "meta"
+    EXPERIMENTAL = "experimental"
+    REFERENCE = "reference"  # For reference builds you're comparing against
 
 import requests
 
@@ -91,10 +104,26 @@ class CharacterProfile:
     created_at: str = ""
     updated_at: str = ""
     notes: str = ""
+    categories: List[str] = field(default_factory=list)  # List of BuildCategory values
+    is_upgrade_target: bool = False  # Mark as the build to check upgrades against
 
     def get_item_for_slot(self, slot: str) -> Optional[PoBItem]:
         """Get the item equipped in a specific slot."""
         return self.build.items.get(slot)
+
+    def has_category(self, category: BuildCategory) -> bool:
+        """Check if profile has a specific category."""
+        return category.value in self.categories
+
+    def add_category(self, category: BuildCategory) -> None:
+        """Add a category to the profile."""
+        if category.value not in self.categories:
+            self.categories.append(category.value)
+
+    def remove_category(self, category: BuildCategory) -> None:
+        """Remove a category from the profile."""
+        if category.value in self.categories:
+            self.categories.remove(category.value)
 
 
 class PoBDecoder:
@@ -504,6 +533,8 @@ class CharacterManager:
             "created_at": profile.created_at,
             "updated_at": profile.updated_at,
             "notes": profile.notes,
+            "categories": profile.categories,
+            "is_upgrade_target": profile.is_upgrade_target,
             "build": {
                 "class_name": profile.build.class_name,
                 "ascendancy": profile.build.ascendancy,
@@ -556,6 +587,8 @@ class CharacterManager:
             created_at=data.get("created_at", ""),
             updated_at=data.get("updated_at", ""),
             notes=data.get("notes", ""),
+            categories=data.get("categories", []),
+            is_upgrade_target=data.get("is_upgrade_target", False),
         )
 
     def add_from_pob_code(self, name: str, pob_code: str, notes: str = "") -> CharacterProfile:
@@ -633,6 +666,101 @@ class CharacterManager:
         self._save_profiles()
         logger.info(f"Set active profile: {name}")
         return True
+
+    def set_build_categories(self, name: str, categories: List[str]) -> bool:
+        """
+        Set categories for a build profile.
+
+        Args:
+            name: Profile name
+            categories: List of category values (from BuildCategory enum)
+
+        Returns:
+            True if successful, False if profile not found
+        """
+        if name not in self._profiles:
+            return False
+
+        # Validate categories
+        valid_categories = [c.value for c in BuildCategory]
+        profile = self._profiles[name]
+        profile.categories = [c for c in categories if c in valid_categories]
+        self._save_profiles()
+        logger.info(f"Set categories for '{name}': {profile.categories}")
+        return True
+
+    def add_build_category(self, name: str, category: str) -> bool:
+        """Add a single category to a build."""
+        if name not in self._profiles:
+            return False
+
+        try:
+            cat = BuildCategory(category)
+            self._profiles[name].add_category(cat)
+            self._save_profiles()
+            return True
+        except ValueError:
+            logger.warning(f"Invalid category: {category}")
+            return False
+
+    def remove_build_category(self, name: str, category: str) -> bool:
+        """Remove a single category from a build."""
+        if name not in self._profiles:
+            return False
+
+        try:
+            cat = BuildCategory(category)
+            self._profiles[name].remove_category(cat)
+            self._save_profiles()
+            return True
+        except ValueError:
+            return False
+
+    def set_upgrade_target(self, name: str, is_target: bool = True) -> bool:
+        """
+        Mark a build as the upgrade target (the build you're actively gearing).
+
+        Args:
+            name: Profile name
+            is_target: Whether this build is the upgrade target
+
+        Returns:
+            True if successful
+        """
+        if name not in self._profiles:
+            return False
+
+        # Clear previous upgrade target if setting a new one
+        if is_target:
+            for profile in self._profiles.values():
+                profile.is_upgrade_target = False
+
+        self._profiles[name].is_upgrade_target = is_target
+        self._save_profiles()
+        logger.info(f"Set upgrade target: {name} = {is_target}")
+        return True
+
+    def get_upgrade_target(self) -> Optional[CharacterProfile]:
+        """Get the build marked as upgrade target."""
+        for profile in self._profiles.values():
+            if profile.is_upgrade_target:
+                return profile
+        # Fall back to active profile
+        return self.get_active_profile()
+
+    def get_builds_by_category(self, category: str) -> List[CharacterProfile]:
+        """Get all builds with a specific category."""
+        return [
+            p for p in self._profiles.values()
+            if category in p.categories
+        ]
+
+    def get_available_categories(self) -> List[dict]:
+        """Get list of available categories with descriptions."""
+        return [
+            {"value": c.value, "name": c.name.replace("_", " ").title()}
+            for c in BuildCategory
+        ]
 
 
 class UpgradeChecker:

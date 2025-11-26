@@ -36,6 +36,7 @@ from gui.pob_character_window import PoBCharacterWindow
 from core.rare_item_evaluator import RareItemEvaluator
 from core.build_matcher import BuildMatcher
 from core.pob_integration import CharacterManager, UpgradeChecker
+from core.price_service import PriceExplanation
 
 if TYPE_CHECKING:  # pragma: no cover
     from core.app_context import AppContext  # type: ignore
@@ -51,6 +52,7 @@ RESULT_COLUMNS: tuple[str, ...] = (
     "listing_count",
     "source",
     "upgrade",
+    "price_explanation",  # JSON blob, hidden by default, used by "Why This Price?" feature
 )
 
 # ----------------------------------------------------------------------
@@ -305,6 +307,9 @@ class ResultsTable:
             selectmode="extended",
         )
 
+        # Columns that should be hidden by default (internal data, not user-facing)
+        default_hidden = {"price_explanation"}
+
         for col in self.columns:
             # Use a heading command so clicking the header sorts by that column.
             self.tree.heading(
@@ -312,9 +317,15 @@ class ResultsTable:
                 text=col.replace("_", " ").title(),
                 command=lambda c=col: self._on_heading_click(c),
             )
-            self.tree.column(col, width=100, anchor="w")
-            # Remember an initial base width; autosize will refine it later.
-            self._base_column_widths[col] = 100
+            # Hide certain columns by default (set width to 0)
+            if col in default_hidden:
+                self.tree.column(col, width=0, minwidth=0, stretch=False, anchor="w")
+                self._hidden_columns.add(col)
+                self._base_column_widths[col] = 0
+            else:
+                self.tree.column(col, width=100, anchor="w")
+                # Remember an initial base width; autosize will refine it later.
+                self._base_column_widths[col] = 100
 
         vsb = ttk.Scrollbar(parent, orient="vertical", command=self.tree.yview)
         self.tree.configure(yscrollcommand=vsb.set)
@@ -1128,6 +1139,10 @@ class PriceCheckerGUI:
         self.tree_menu.add_command(
             label="View Details...",
             command=self._view_selected_row_details,
+        )
+        self.tree_menu.add_command(
+            label="Why This Price?",
+            command=self._view_price_explanation,
         )
         self.tree_menu.add_separator()
         self.tree_menu.add_command(label="Copy Row", command=self._copy_selected_row)
@@ -2343,6 +2358,152 @@ class PriceCheckerGUI:
             return
 
         messagebox.showinfo("Item Details", "\n".join(lines))
+
+    def _view_price_explanation(self, event: tk.Event | None = None) -> None:
+        """
+        Show a detailed explanation of why the price was suggested.
+
+        This displays the PriceExplanation data stored in the price_explanation
+        field of the result row.
+        """
+        del event
+
+        row = self._get_selected_row()
+        if not row:
+            self._set_status("No row selected.")
+            messagebox.showinfo("Price Explanation", "No row is currently selected.")
+            return
+
+        if hasattr(self, "results_table"):
+            columns = self.results_table.columns
+        else:
+            columns = RESULT_COLUMNS
+
+        # Build a dict from the row values
+        row_data = {col: (row[idx] if idx < len(row) else "") for idx, col in enumerate(columns)}
+
+        # Get the price_explanation JSON if present
+        explanation_json = row_data.get("price_explanation", "")
+
+        if not explanation_json or explanation_json == "{}":
+            # No explanation data - show basic info
+            item_name = row_data.get("item_name", "Unknown")
+            chaos = row_data.get("chaos_value", "?")
+            source = row_data.get("source", "Unknown")
+            messagebox.showinfo(
+                "Price Explanation",
+                f"Item: {item_name}\n"
+                f"Price: {chaos}c\n"
+                f"Source: {source}\n\n"
+                "No detailed explanation available for this item."
+            )
+            return
+
+        # Parse the explanation
+        try:
+            explanation = PriceExplanation.from_json(explanation_json)
+        except Exception:
+            messagebox.showinfo(
+                "Price Explanation",
+                "Unable to parse price explanation data."
+            )
+            return
+
+        # Build a nice display using the explanation's to_summary_lines
+        lines = explanation.to_summary_lines()
+
+        if not lines:
+            lines = ["No explanation details available."]
+
+        # Add item name header
+        item_name = row_data.get("item_name", "Unknown")
+        header = f"=== {item_name} ===\n"
+
+        # Show in a larger dialog using a custom toplevel
+        self._show_explanation_dialog(header, lines, explanation)
+
+    def _show_explanation_dialog(
+        self,
+        header: str,
+        lines: list[str],
+        explanation: PriceExplanation
+    ) -> None:
+        """
+        Show a modal dialog with the price explanation details.
+
+        Uses a Text widget for better formatting of longer explanations.
+        """
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Price Explanation")
+        dialog.geometry("500x400")
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        # Main frame with padding
+        main_frame = ttk.Frame(dialog, padding=10)
+        main_frame.pack(fill="both", expand=True)
+
+        # Header label
+        header_label = ttk.Label(main_frame, text=header.strip(), font=("TkDefaultFont", 11, "bold"))
+        header_label.pack(anchor="w", pady=(0, 10))
+
+        # Text widget with scrollbar for explanation content
+        text_frame = ttk.Frame(main_frame)
+        text_frame.pack(fill="both", expand=True)
+
+        text_widget = tk.Text(
+            text_frame,
+            wrap="word",
+            width=60,
+            height=15,
+            font=("TkDefaultFont", 10),
+            padx=5,
+            pady=5,
+        )
+        scrollbar = ttk.Scrollbar(text_frame, orient="vertical", command=text_widget.yview)
+        text_widget.configure(yscrollcommand=scrollbar.set)
+
+        text_widget.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+        # Insert the content
+        content = "\n".join(lines)
+        text_widget.insert("1.0", content)
+
+        # Add stats section if available
+        if explanation.stats_used and any(v is not None for v in explanation.stats_used.values()):
+            text_widget.insert("end", "\n\n--- Statistical Details ---\n")
+            stats = explanation.stats_used
+            if stats.get("count"):
+                text_widget.insert("end", f"Sample size: {stats['count']}\n")
+            if stats.get("min") is not None and stats.get("max") is not None:
+                text_widget.insert("end", f"Price range: {stats['min']:.1f}c - {stats['max']:.1f}c\n")
+            if stats.get("median") is not None:
+                text_widget.insert("end", f"Median: {stats['median']:.1f}c\n")
+            if stats.get("mean") is not None:
+                text_widget.insert("end", f"Mean: {stats['mean']:.1f}c\n")
+            if stats.get("p25") is not None and stats.get("p75") is not None:
+                text_widget.insert("end", f"25th-75th percentile: {stats['p25']:.1f}c - {stats['p75']:.1f}c\n")
+
+        text_widget.configure(state="disabled")  # Make read-only
+
+        # Close button
+        button_frame = ttk.Frame(main_frame)
+        button_frame.pack(fill="x", pady=(10, 0))
+
+        close_btn = ttk.Button(button_frame, text="Close", command=dialog.destroy)
+        close_btn.pack(side="right")
+
+        # Center the dialog on the parent
+        dialog.update_idletasks()
+        x = self.root.winfo_x() + (self.root.winfo_width() - dialog.winfo_width()) // 2
+        y = self.root.winfo_y() + (self.root.winfo_height() - dialog.winfo_height()) // 2
+        dialog.geometry(f"+{x}+{y}")
+
+        # Focus on close button
+        close_btn.focus_set()
+        dialog.bind("<Escape>", lambda e: dialog.destroy())
+        dialog.bind("<Return>", lambda e: dialog.destroy())
 
     def _copy_last_summary(self) -> None:
         """

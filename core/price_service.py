@@ -1,9 +1,11 @@
 # core/price_service.py
 from __future__ import annotations
 
+import json
 import logging
 import re
-from typing import Any, Optional
+from dataclasses import dataclass, field, asdict
+from typing import Any, Optional, List
 from datetime import datetime, timezone
 from core.config import Config
 from core.item_parser import ItemParser
@@ -15,6 +17,104 @@ from data_sources.pricing.poe_watch import PoeWatchAPI
 from data_sources.pricing.trade_api import TradeApiSource
 
 LOG = logging.getLogger(__name__)
+
+
+@dataclass
+class PriceExplanation:
+    """
+    Structured explanation for why a price was suggested.
+
+    This captures all the reasoning that went into a price suggestion,
+    making it easy to display "why" to users.
+    """
+    # Primary reasoning
+    summary: str = ""  # One-line summary: "Price from poe.ninja with high confidence"
+
+    # Data source details
+    source_name: str = ""  # "poe.ninja", "poe.watch", "rare_evaluator", etc.
+    source_details: str = ""  # Additional source info
+
+    # Statistical confidence
+    confidence: str = ""  # "high", "medium", "low", "none"
+    confidence_reason: str = ""  # "High sample size (50) with tight spread"
+
+    # Price calculation details
+    calculation_method: str = ""  # "trimmed_mean", "median", "mean", "evaluation"
+    sample_size: int = 0  # Number of listings/data points
+    price_spread: str = ""  # "tight", "moderate", "high"
+
+    # Statistical details (optional)
+    stats_used: dict = field(default_factory=dict)  # min, max, p25, p75, etc.
+
+    # For rare items
+    is_rare_evaluation: bool = False
+    rare_tier: str = ""  # "excellent", "good", "average", "vendor"
+    rare_score: int = 0  # Total score
+    valuable_mods: List[str] = field(default_factory=list)  # Key mods found
+    synergies: List[str] = field(default_factory=list)  # Synergies detected
+    red_flags: List[str] = field(default_factory=list)  # Anti-synergies
+
+    # Build matching
+    matches_build: bool = False
+    build_match_details: str = ""
+
+    # Adjustments made
+    adjustments: List[str] = field(default_factory=list)  # "Corrupted: -20%", etc.
+
+    def to_summary_lines(self) -> List[str]:
+        """Generate human-readable summary lines."""
+        lines = []
+
+        if self.summary:
+            lines.append(f"Summary: {self.summary}")
+
+        if self.source_name:
+            src = f"Source: {self.source_name}"
+            if self.source_details:
+                src += f" ({self.source_details})"
+            lines.append(src)
+
+        if self.confidence:
+            conf = f"Confidence: {self.confidence.upper()}"
+            if self.confidence_reason:
+                conf += f" - {self.confidence_reason}"
+            lines.append(conf)
+
+        if self.sample_size > 0:
+            lines.append(f"Based on: {self.sample_size} listings")
+
+        if self.calculation_method:
+            lines.append(f"Price method: {self.calculation_method}")
+
+        if self.is_rare_evaluation:
+            lines.append(f"Rare tier: {self.rare_tier} (score: {self.rare_score})")
+            if self.valuable_mods:
+                lines.append(f"Valuable mods: {', '.join(self.valuable_mods[:5])}")
+            if self.synergies:
+                lines.append(f"Synergies: {', '.join(self.synergies)}")
+            if self.red_flags:
+                lines.append(f"Red flags: {', '.join(self.red_flags)}")
+
+        if self.matches_build:
+            lines.append(f"Build match: {self.build_match_details}")
+
+        if self.adjustments:
+            lines.append(f"Adjustments: {', '.join(self.adjustments)}")
+
+        return lines
+
+    def to_json(self) -> str:
+        """Serialize to JSON string for storage in result row."""
+        return json.dumps(asdict(self))
+
+    @classmethod
+    def from_json(cls, json_str: str) -> "PriceExplanation":
+        """Deserialize from JSON string."""
+        try:
+            data = json.loads(json_str)
+            return cls(**data)
+        except (json.JSONDecodeError, TypeError):
+            return cls(summary="Unable to parse explanation")
 
 
 class PriceService:
@@ -76,6 +176,9 @@ class PriceService:
         if not item_text:
             return []
 
+        # Initialize explanation tracker
+        explanation = PriceExplanation()
+
         # 1) Parse item text → ParsedItem
         parsed = self.parser.parse(item_text)
 
@@ -91,10 +194,16 @@ class PriceService:
             chaos_value = 0.0
             listing_count = 0
             source_label = "no pricing sources"
+            explanation.source_name = "none"
+            explanation.summary = "No pricing sources available"
         else:
             chaos_value, listing_count, source_label, confidence = self._lookup_price_multi_source(
                 parsed
             )
+            # Extract source name from label (before any parentheses)
+            explanation.source_name = source_label.split(" (")[0] if " (" in source_label else source_label
+            explanation.sample_size = listing_count
+            explanation.confidence = confidence
 
         # 2b) For rare items: evaluate and attach evaluation for trade API filtering
         rarity = self._get_rarity(parsed)
@@ -107,6 +216,37 @@ class PriceService:
 
                 # Attach evaluation to parsed item for trade API to use
                 parsed._rare_evaluation = rare_evaluation
+
+                # Populate explanation with rare evaluation details
+                explanation.is_rare_evaluation = True
+                explanation.rare_tier = getattr(rare_evaluation, 'tier', '')
+                explanation.rare_score = getattr(rare_evaluation, 'total_score', 0)
+
+                # Extract valuable mods from matched_affixes
+                if hasattr(rare_evaluation, 'matched_affixes') and rare_evaluation.matched_affixes:
+                    for affix in rare_evaluation.matched_affixes[:5]:
+                        mod_name = affix.get('mod', '') or affix.get('name', '')
+                        tier = affix.get('tier', '')
+                        score = affix.get('score', 0)
+                        if mod_name:
+                            if tier:
+                                explanation.valuable_mods.append(f"{mod_name} ({tier}, +{score})")
+                            else:
+                                explanation.valuable_mods.append(f"{mod_name} (+{score})")
+
+                # Extract synergies
+                if hasattr(rare_evaluation, 'synergies') and rare_evaluation.synergies:
+                    explanation.synergies = [
+                        s.get('name', str(s)) if isinstance(s, dict) else str(s)
+                        for s in rare_evaluation.synergies[:5]
+                    ]
+
+                # Extract red flags
+                if hasattr(rare_evaluation, 'red_flags') and rare_evaluation.red_flags:
+                    explanation.red_flags = [
+                        rf.get('reason', str(rf)) if isinstance(rf, dict) else str(rf)
+                        for rf in rare_evaluation.red_flags[:5]
+                    ]
 
                 # Only use evaluator price if market price is missing or very low
                 if chaos_value == 0.0 or chaos_value < 5.0:
@@ -135,6 +275,13 @@ class PriceService:
                             "vendor": "low"
                         }
                         confidence = tier_confidence.get(rare_evaluation.tier, "low")
+
+                        # Update explanation for evaluator-based pricing
+                        explanation.source_name = "rare_evaluator"
+                        explanation.source_details = f"{rare_evaluation.tier}, score: {rare_evaluation.total_score}/100"
+                        explanation.confidence = confidence
+                        explanation.calculation_method = "affix_evaluation"
+                        explanation.adjustments.append(f"Market price ({old_chaos:.1f}c) overridden by evaluator ({evaluator_chaos:.1f}c)")
 
                         self.logger.info(
                             "Rare item '%s' priced by evaluator: %.1fc (was: %.1fc) "
@@ -218,10 +365,50 @@ class PriceService:
                 elif confidence != "unknown":
                     source_label = f"{source_label} ({confidence})"
 
+            # Populate explanation with stats details
+            explanation.confidence_reason = price_info.get("reason", "")
+            explanation.stats_used = {
+                "count": stats.get("count", 0),
+                "min": stats.get("min"),
+                "max": stats.get("max"),
+                "mean": stats.get("mean"),
+                "median": stats.get("median"),
+                "p25": stats.get("p25"),
+                "p75": stats.get("p75"),
+                "trimmed_mean": stats.get("trimmed_mean"),
+            }
+
+            # Determine price spread
+            p25 = stats.get("p25")
+            p75 = stats.get("p75")
+            median = stats.get("median")
+            if p25 is not None and p75 is not None and median and float(median) > 0:
+                iqr_ratio = (float(p75) - float(p25)) / float(median)
+                if iqr_ratio <= 0.35:
+                    explanation.price_spread = "tight"
+                elif iqr_ratio <= 0.6:
+                    explanation.price_spread = "moderate"
+                else:
+                    explanation.price_spread = "high"
+
+            # Determine calculation method used
+            count = stats.get("count", 0)
+            if count >= 12 and stats.get("trimmed_mean") is not None:
+                explanation.calculation_method = "trimmed_mean"
+            elif count >= 4 and stats.get("median") is not None:
+                explanation.calculation_method = "median"
+            else:
+                explanation.calculation_method = "mean"
+
         # 6) Divine conversion (if we can)
         divine_value = self._convert_chaos_to_divines(chaos_value)
 
-        # 7) Build a single-row result list.
+        # 7) Build summary for explanation
+        explanation.summary = self._build_explanation_summary(
+            explanation, chaos_value, source_label
+        )
+
+        # 8) Build a single-row result list.
         row = {
             "item_name": self._get_item_display_name(parsed),
             "variant": self._get_item_variant(parsed),
@@ -230,6 +417,8 @@ class PriceService:
             "divine_value": f"{divine_value:.2f}",
             "listing_count": str(listing_count),
             "source": source_label,
+            "upgrade": "",
+            "price_explanation": explanation.to_json(),
         }
         return [row]
 
@@ -667,6 +856,45 @@ class PriceService:
             "confidence": confidence,
             "reason": f"{reason} (center={center_used}, iqr_ratio={iqr_ratio:.2f}, cv={cv:.2f})",
         }
+
+    # ------------------------------------------------------------------ #
+    # Explanation building helpers
+    # ------------------------------------------------------------------ #
+
+    def _build_explanation_summary(
+        self,
+        explanation: PriceExplanation,
+        chaos_value: float,
+        source_label: str,
+    ) -> str:
+        """
+        Build a concise one-line summary for the price explanation.
+
+        Examples:
+            "Priced at 150c from poe.ninja with high confidence"
+            "Rare item valued at 50c (good tier, score 72/100)"
+            "No price data found - unknown item"
+        """
+        if chaos_value == 0.0:
+            return "No price data found"
+
+        parts = [f"{chaos_value:.1f}c"]
+
+        # Source info
+        if explanation.is_rare_evaluation and explanation.rare_tier:
+            parts.append(f"from rare evaluator ({explanation.rare_tier} tier)")
+        elif explanation.source_name:
+            parts.append(f"from {explanation.source_name}")
+
+        # Confidence
+        if explanation.confidence and explanation.confidence != "unknown":
+            parts.append(f"with {explanation.confidence} confidence")
+
+        # Sample size if significant
+        if explanation.sample_size >= 10:
+            parts.append(f"({explanation.sample_size} listings)")
+
+        return " ".join(parts)
 
     # ------------------------------------------------------------------ #
     # Multi-source pricing helpers
