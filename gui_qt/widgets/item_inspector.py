@@ -102,6 +102,13 @@ class ItemInspectorWidget(QWidget):
         rarity_label.setStyleSheet(f"color: {get_rarity_color(rarity)};")
         self._content_layout.addWidget(rarity_label)
 
+        # Build-effective values section - SHOW PROMINENTLY AT TOP
+        implicit_mods = getattr(item, "implicit_mods", [])
+        explicit_mods = getattr(item, "explicit_mods", []) or getattr(item, "mods", [])
+        all_mods = list(implicit_mods) + list(explicit_mods)
+        if all_mods and self._calculator:
+            self._add_effective_values_section(all_mods)
+
         # Add separator
         self._add_separator()
 
@@ -176,11 +183,6 @@ class ItemInspectorWidget(QWidget):
                     mod_label.setStyleSheet(f"color: {COLORS['text']};")
 
                 self._content_layout.addWidget(mod_label)
-
-        # Build-effective values section
-        all_mods = list(implicit_mods) + list(explicit_mods)
-        if all_mods and self._calculator:
-            self._add_effective_values_section(all_mods)
 
         # Flavor text
         flavor = getattr(item, "flavor_text", None)
