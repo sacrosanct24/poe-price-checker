@@ -36,3 +36,7 @@ scikit-learn>=1.3.0
 python-dotenv>=1.0.0
 pyperclip>=1.8.0  # Clipboard access
 keyboard>=0.13.5  # Global hotkey support (optional, Windows-focused)
+
+# Build/Distribution
+pyinstaller>=6.0.0  # For creating standalone executables
+lxml>=5.0.0  # XML parsing (PoB imports)
