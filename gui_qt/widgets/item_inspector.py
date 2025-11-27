@@ -20,6 +20,7 @@ from PyQt6.QtWidgets import (
 from gui_qt.styles import COLORS, get_rarity_color
 from core.build_stat_calculator import BuildStatCalculator, BuildStats
 from core.build_archetype import BuildArchetype
+from core.upgrade_calculator import UpgradeCalculator, UpgradeImpact
 
 
 class ItemInspectorWidget(QWidget):
@@ -37,6 +38,10 @@ class ItemInspectorWidget(QWidget):
 
         # Evaluation results from rare item evaluator
         self._evaluation: Optional[Any] = None
+
+        # Upgrade calculator and comparison
+        self._upgrade_calculator: Optional[UpgradeCalculator] = None
+        self._current_equipped_mods: Optional[List[str]] = None
 
         # Set minimum size
         self.setMinimumHeight(200)
@@ -92,8 +97,10 @@ class ItemInspectorWidget(QWidget):
         self._build_stats = stats
         if stats:
             self._calculator = BuildStatCalculator(stats)
+            self._upgrade_calculator = UpgradeCalculator(stats)
         else:
             self._calculator = None
+            self._upgrade_calculator = None
 
     def set_archetype(self, archetype: Optional[BuildArchetype]) -> None:
         """Set build archetype for weighted scoring."""
@@ -102,6 +109,26 @@ class ItemInspectorWidget(QWidget):
     def set_evaluation(self, evaluation: Optional[Any]) -> None:
         """Set evaluation results from rare item evaluator."""
         self._evaluation = evaluation
+
+    def set_current_equipped(self, item: Optional[Any]) -> None:
+        """
+        Set the current equipped item for upgrade comparison.
+
+        Args:
+            item: The currently equipped item (with mods) or None to clear
+        """
+        if item is None:
+            self._current_equipped_mods = None
+            return
+
+        # Extract mods from item
+        implicit_mods = getattr(item, "implicits", []) or getattr(item, "implicit_mods", [])
+        explicit_mods = getattr(item, "explicits", []) or getattr(item, "explicit_mods", []) or getattr(item, "mods", [])
+        self._current_equipped_mods = list(implicit_mods) + list(explicit_mods)
+
+    def clear_current_equipped(self) -> None:
+        """Clear the current equipped item comparison."""
+        self._current_equipped_mods = None
 
     def set_item(self, item: Any) -> None:
         """Display parsed item information as HTML."""
@@ -147,6 +174,12 @@ class ItemInspectorWidget(QWidget):
             archetype_html = self._build_archetype_scores_html()
             if archetype_html:
                 html_parts.append(archetype_html)
+
+        # Upgrade comparison section
+        if self._upgrade_calculator and all_mods:
+            upgrade_html = self._build_upgrade_comparison_html(all_mods)
+            if upgrade_html:
+                html_parts.append(upgrade_html)
 
         # Separator
         html_parts.append(f'<hr style="border: 1px solid {COLORS["border"]}; margin: 8px 0;">')
@@ -375,5 +408,88 @@ class ItemInspectorWidget(QWidget):
                 f'<span style="color: {COLORS["text_secondary"]};">({tier})</span>'
                 f'</p>'
             )
+
+        return "\n".join(html_parts)
+
+    def _build_upgrade_comparison_html(self, new_mods: List[str]) -> str:
+        """Build HTML for upgrade comparison section."""
+        if not self._upgrade_calculator:
+            return ""
+
+        # Calculate upgrade impact
+        comparison = self._upgrade_calculator.compare_items(
+            new_mods,
+            self._current_equipped_mods
+        )
+        impact = comparison["impact"]
+
+        html_parts = []
+
+        # Separator and header
+        html_parts.append(f'<hr style="border: 1px solid {COLORS["border"]}; margin: 8px 0;">')
+
+        # Header with status indicator
+        if comparison["is_upgrade"]:
+            status_color = COLORS.get('currency', '#ffcc00')
+            status_icon = "▲"
+            status_text = "UPGRADE"
+        elif comparison["is_downgrade"]:
+            status_color = COLORS.get('corrupted', '#ff4444')
+            status_icon = "▼"
+            status_text = "DOWNGRADE"
+        else:
+            status_color = COLORS.get('text_secondary', '#888888')
+            status_icon = "◆"
+            status_text = "SIDEGRADE"
+
+        header_text = "vs Current Equipped" if self._current_equipped_mods else "vs Empty Slot"
+        html_parts.append(
+            f'<p style="color: {status_color}; font-weight: bold; margin: 0 0 4px 0;">'
+            f'{status_icon} {status_text} {header_text}'
+            f'</p>'
+        )
+
+        # Summary line
+        summary = comparison["summary"]
+        if summary and summary != "No significant change":
+            html_parts.append(
+                f'<p style="color: {COLORS["text"]}; margin: 0 0 4px 0; font-size: 11px;">{summary}</p>'
+            )
+
+        # Improvements
+        improvements = comparison.get("improvements", [])
+        if improvements:
+            for imp in improvements[:5]:  # Limit to 5
+                html_parts.append(
+                    f'<p style="color: {COLORS.get("currency", "#ffcc00")}; margin: 2px 0 2px 8px; font-size: 10px;">+ {imp}</p>'
+                )
+
+        # Losses
+        losses = comparison.get("losses", [])
+        if losses:
+            for loss in losses[:5]:  # Limit to 5
+                html_parts.append(
+                    f'<p style="color: {COLORS.get("corrupted", "#ff4444")}; margin: 2px 0 2px 8px; font-size: 10px;">- {loss}</p>'
+                )
+
+        # Resistance gap info if relevant
+        gaps = comparison.get("gaps")
+        if gaps and gaps.has_gaps():
+            gap_parts = []
+            if gaps.fire_gap > 0:
+                gap_parts.append(f"Fire: {int(gaps.fire_gap)}%")
+            if gaps.cold_gap > 0:
+                gap_parts.append(f"Cold: {int(gaps.cold_gap)}%")
+            if gaps.lightning_gap > 0:
+                gap_parts.append(f"Light: {int(gaps.lightning_gap)}%")
+            if gaps.chaos_gap > 0:
+                gap_parts.append(f"Chaos: {int(gaps.chaos_gap)}%")
+
+            if gap_parts:
+                html_parts.append(
+                    f'<p style="color: {COLORS["text_secondary"]}; margin: 4px 0 2px 0; font-size: 10px;">'
+                    f'Res gaps remaining: {", ".join(gap_parts)}'
+                    f'</p>'
+                )
 
         return "\n".join(html_parts)
