@@ -118,8 +118,9 @@ class ItemInspectorWidget(QWidget):
         )
 
         # Build-effective values section - SHOW PROMINENTLY AT TOP
-        implicit_mods = getattr(item, "implicit_mods", [])
-        explicit_mods = getattr(item, "explicit_mods", []) or getattr(item, "mods", [])
+        # Note: ParsedItem uses 'implicits' and 'explicits' not 'implicit_mods'/'explicit_mods'
+        implicit_mods = getattr(item, "implicits", []) or getattr(item, "implicit_mods", [])
+        explicit_mods = getattr(item, "explicits", []) or getattr(item, "explicit_mods", []) or getattr(item, "mods", [])
         all_mods = list(implicit_mods) + list(explicit_mods)
         if all_mods and self._calculator:
             effective_html = self._build_effective_values_html(all_mods)
@@ -180,19 +181,19 @@ class ItemInspectorWidget(QWidget):
             )
 
         # Implicit mods
-        implicit_mods = getattr(item, "implicit_mods", [])
-        if implicit_mods:
+        implicits = getattr(item, "implicits", []) or getattr(item, "implicit_mods", [])
+        if implicits:
             html_parts.append(f'<hr style="border: 1px solid {COLORS["border"]}; margin: 8px 0;">')
-            for mod in implicit_mods:
+            for mod in implicits:
                 html_parts.append(
                     f'<p style="color: {COLORS["magic"]}; margin: 2px 0;">{mod}</p>'
                 )
 
         # Explicit mods
-        explicit_mods = getattr(item, "explicit_mods", []) or getattr(item, "mods", [])
-        if explicit_mods:
+        explicits = getattr(item, "explicits", []) or getattr(item, "explicit_mods", []) or getattr(item, "mods", [])
+        if explicits:
             html_parts.append(f'<hr style="border: 1px solid {COLORS["border"]}; margin: 8px 0;">')
-            for mod in explicit_mods:
+            for mod in explicits:
                 if "(crafted)" in mod.lower():
                     color = "#b4b4ff"
                 else:
