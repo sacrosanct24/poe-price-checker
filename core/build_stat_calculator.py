@@ -140,14 +140,15 @@ class BuildStatCalculator:
         "chaos_res": (r"\+(\d+)%? to Chaos Resistance", "chaos_res"),
         "all_res": (r"\+(\d+)%? to all Elemental Resistances", "all_ele_res"),
 
-        # Attributes
-        "strength": (r"\+(\d+) to Strength", "strength"),
-        "dexterity": (r"\+(\d+) to Dexterity", "dexterity"),
-        "intelligence": (r"\+(\d+) to Intelligence", "intelligence"),
+        # Attributes - compound patterns FIRST to match before single attributes
         "all_attributes": (r"\+(\d+) to all Attributes", "all_attributes"),
         "str_dex": (r"\+(\d+) to Strength and Dexterity", "str_dex"),
         "str_int": (r"\+(\d+) to Strength and Intelligence", "str_int"),
         "dex_int": (r"\+(\d+) to Dexterity and Intelligence", "dex_int"),
+        # Single attributes - use $ anchor to avoid matching compound mods
+        "strength": (r"\+(\d+) to Strength$", "strength"),
+        "dexterity": (r"\+(\d+) to Dexterity$", "dexterity"),
+        "intelligence": (r"\+(\d+) to Intelligence$", "intelligence"),
     }
 
     def __init__(self, build_stats: Optional[BuildStats] = None):
