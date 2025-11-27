@@ -41,7 +41,7 @@ class Database:
     """
 
     # Current schema version. Increment if schema structure changes.
-    SCHEMA_VERSION = 3
+    SCHEMA_VERSION = 4
 
     def __init__(self, db_path: Optional[Path] = None):
         """
@@ -149,7 +149,11 @@ class Database:
                     item_name TEXT NOT NULL,
                     item_base_type TEXT,
                     chaos_value REAL NOT NULL,
-                    checked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    checked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    -- v4 columns for analytics
+                    rarity TEXT,
+                    item_mods_json TEXT,
+                    build_profile TEXT
                 );
 
                 CREATE TABLE IF NOT EXISTS sales (
@@ -164,7 +168,11 @@ class Database:
                     actual_price_chaos REAL,
                     time_to_sale_hours REAL,
                     relisted BOOLEAN DEFAULT 0,
-                    notes TEXT
+                    notes TEXT,
+                    -- v4 columns for analytics
+                    league TEXT,
+                    rarity TEXT,
+                    game_version TEXT
                 );
 
                 CREATE TABLE IF NOT EXISTS price_history (
@@ -205,9 +213,22 @@ class Database:
                     stack_size INTEGER,
                     listing_id TEXT,             -- API listing id if any
                     seller_account TEXT,
-                    listed_at TIMESTAMP,         -- listing’s own timestamp if available
+                    listed_at TIMESTAMP,         -- listing's own timestamp if available
                     fetched_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
+
+                -- v4: Currency rate tracking for historical analytics
+                CREATE TABLE IF NOT EXISTS currency_rates (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    league TEXT NOT NULL,
+                    game_version TEXT NOT NULL,
+                    divine_to_chaos REAL NOT NULL,
+                    exalt_to_chaos REAL,
+                    recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_currency_rates_league_time
+                ON currency_rates (league, recorded_at DESC);
                 """
             )
 
@@ -219,6 +240,10 @@ class Database:
             - Add `source` column to `sales`.
         v2 -> v3:
             - Add `price_checks` + `price_quotes` tables for raw price data.
+        v3 -> v4:
+            - Add `league`, `rarity`, `game_version` columns to `sales`.
+            - Add `rarity`, `item_mods_json`, `build_profile` to `checked_items`.
+            - Add `currency_rates` table for divine:chaos tracking.
         """
         logger.info(f"Starting schema migration v{old} → v{new}")
 
@@ -266,6 +291,53 @@ class Database:
                         listed_at TIMESTAMP,
                         fetched_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     );
+                    """
+                )
+
+            if old < 4 <= new:
+                logger.info(
+                    "Applying v4 migration: adding analytics columns and currency_rates table."
+                )
+                # Add columns to sales table for historical analytics
+                for col, col_type in [
+                    ("league", "TEXT"),
+                    ("rarity", "TEXT"),
+                    ("game_version", "TEXT"),
+                ]:
+                    try:
+                        conn.execute(f"ALTER TABLE sales ADD COLUMN {col} {col_type};")
+                    except sqlite3.OperationalError:
+                        logger.debug(f"Column sales.{col} already exists")
+
+                # Add columns to checked_items for better analytics
+                for col, col_type in [
+                    ("rarity", "TEXT"),
+                    ("item_mods_json", "TEXT"),
+                    ("build_profile", "TEXT"),
+                ]:
+                    try:
+                        conn.execute(f"ALTER TABLE checked_items ADD COLUMN {col} {col_type};")
+                    except sqlite3.OperationalError:
+                        logger.debug(f"Column checked_items.{col} already exists")
+
+                # Create currency_rates table for divine:chaos tracking
+                conn.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS currency_rates (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        league TEXT NOT NULL,
+                        game_version TEXT NOT NULL,
+                        divine_to_chaos REAL NOT NULL,
+                        exalt_to_chaos REAL,
+                        recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    );
+                    """
+                )
+                # Create index for efficient rate lookups
+                conn.execute(
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_currency_rates_league_time
+                    ON currency_rates (league, recorded_at DESC);
                     """
                 )
 
@@ -1096,6 +1168,104 @@ class Database:
         )
         return list(cursor.fetchall())
 
+    # ----------------------------------------------------------------------
+    # Currency Rate Tracking (v4)
+    # ----------------------------------------------------------------------
+
+    def record_currency_rate(
+        self,
+        league: str,
+        game_version: str,
+        divine_to_chaos: float,
+        exalt_to_chaos: Optional[float] = None,
+    ) -> int:
+        """
+        Record a currency rate snapshot.
+
+        Args:
+            league: League name
+            game_version: "poe1" or "poe2"
+            divine_to_chaos: Divine orb value in chaos
+            exalt_to_chaos: Exalted orb value in chaos (optional)
+
+        Returns:
+            The row ID of the inserted record
+        """
+        cursor = self.conn.execute(
+            """
+            INSERT INTO currency_rates (league, game_version, divine_to_chaos, exalt_to_chaos)
+            VALUES (?, ?, ?, ?)
+            """,
+            (league, game_version, divine_to_chaos, exalt_to_chaos),
+        )
+        self.conn.commit()
+        return cursor.lastrowid or 0
+
+    def get_latest_currency_rate(
+        self, league: str, game_version: str = "poe1"
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Get the most recent currency rate for a league.
+
+        Args:
+            league: League name
+            game_version: "poe1" or "poe2"
+
+        Returns:
+            Dict with divine_to_chaos, exalt_to_chaos, recorded_at or None
+        """
+        cursor = self.conn.execute(
+            """
+            SELECT divine_to_chaos, exalt_to_chaos, recorded_at
+            FROM currency_rates
+            WHERE league = ? AND game_version = ?
+            ORDER BY recorded_at DESC
+            LIMIT 1
+            """,
+            (league, game_version),
+        )
+        row = cursor.fetchone()
+        if row:
+            return {
+                "divine_to_chaos": row["divine_to_chaos"],
+                "exalt_to_chaos": row["exalt_to_chaos"],
+                "recorded_at": self._parse_db_timestamp(row["recorded_at"]),
+            }
+        return None
+
+    def get_currency_rate_history(
+        self, league: str, days: int = 30, game_version: str = "poe1"
+    ) -> List[Dict[str, Any]]:
+        """
+        Get currency rate history for trend analysis.
+
+        Args:
+            league: League name
+            days: Number of days of history
+            game_version: "poe1" or "poe2"
+
+        Returns:
+            List of rate records ordered by time descending
+        """
+        cursor = self.conn.execute(
+            """
+            SELECT divine_to_chaos, exalt_to_chaos, recorded_at
+            FROM currency_rates
+            WHERE league = ? AND game_version = ?
+              AND recorded_at >= DATE('now', ?)
+            ORDER BY recorded_at DESC
+            """,
+            (league, game_version, f"-{days} days"),
+        )
+        return [
+            {
+                "divine_to_chaos": row["divine_to_chaos"],
+                "exalt_to_chaos": row["exalt_to_chaos"],
+                "recorded_at": self._parse_db_timestamp(row["recorded_at"]),
+            }
+            for row in cursor.fetchall()
+        ]
+
     def wipe_all_data(self) -> None:
         """
         Delete all rows from the main data tables.
@@ -1105,11 +1275,11 @@ class Database:
             - table structure
 
         Effectively resets the app's data: checked items, sales, price history,
-        price checks/quotes, plugin state.
+        price checks/quotes, plugin state, currency_rates.
         """
         logger.warning(
             "Wiping all database data (checked_items, sales, price_history, "
-            "price_checks, price_quotes, plugin_state)."
+            "price_checks, price_quotes, plugin_state, currency_rates)."
         )
 
         with self.transaction() as conn:
@@ -1119,6 +1289,10 @@ class Database:
             conn.execute("DELETE FROM price_checks")
             conn.execute("DELETE FROM price_quotes")
             conn.execute("DELETE FROM plugin_state")
+            try:
+                conn.execute("DELETE FROM currency_rates")
+            except sqlite3.OperationalError:
+                pass  # Table may not exist in older schemas
 
         # Optional: shrink file; safe but may be slow on huge DBs
         try:
