@@ -95,6 +95,9 @@ class BuildArchetype:
     # Confidence score (0-1) for how certain the detection is
     confidence: float = 0.5
 
+    # Main skill name for skill-specific affinities
+    main_skill: str = ""
+
     # Source stats used for detection (for debugging)
     source_stats: Dict[str, float] = field(default_factory=dict)
 
@@ -110,6 +113,7 @@ class BuildArchetype:
             "is_totem": self.is_totem,
             "is_trap_mine": self.is_trap_mine,
             "primary_element": self.primary_element,
+            "main_skill": self.main_skill,
             "needs_fire_res": self.needs_fire_res,
             "needs_cold_res": self.needs_cold_res,
             "needs_lightning_res": self.needs_lightning_res,
@@ -133,6 +137,7 @@ class BuildArchetype:
             is_totem=data.get("is_totem", False),
             is_trap_mine=data.get("is_trap_mine", False),
             primary_element=data.get("primary_element"),
+            main_skill=data.get("main_skill", ""),
             needs_fire_res=data.get("needs_fire_res", False),
             needs_cold_res=data.get("needs_cold_res", False),
             needs_lightning_res=data.get("needs_lightning_res", False),
@@ -185,6 +190,10 @@ class BuildArchetype:
         if self.is_trap_mine:
             parts.append("Trap/Mine")
 
+        # Main skill
+        if self.main_skill:
+            parts.append(f"({self.main_skill})")
+
         return " ".join(parts) if parts else "Unknown"
 
 
@@ -223,6 +232,7 @@ def detect_archetype(stats: Dict[str, float], main_skill: str = "") -> BuildArch
     """
     archetype = BuildArchetype()
     archetype.source_stats = dict(stats)  # Store for debugging
+    archetype.main_skill = main_skill  # Store main skill for skill-aware weights
 
     confidence_factors = []
 
@@ -569,6 +579,73 @@ def apply_archetype_weights(
         multiplier = get_weight_multiplier(archetype, affix_type)
         weighted[affix_type] = score * multiplier
     return weighted
+
+
+def get_combined_weight_multiplier(
+    archetype: BuildArchetype,
+    affix_type: str
+) -> float:
+    """
+    Get combined weight multiplier from archetype AND skill affinities.
+
+    This combines the base archetype weights with skill-specific affinities
+    based on the main skill.
+
+    Args:
+        archetype: The detected build archetype (with main_skill set)
+        affix_type: The affix type to get weight for
+
+    Returns:
+        Combined multiplier (archetype * skill affinity)
+    """
+    # Get base archetype multiplier
+    base_mult = get_weight_multiplier(archetype, affix_type)
+
+    # If no main skill, just return archetype multiplier
+    if not archetype.main_skill:
+        return base_mult
+
+    # Get skill-based multiplier
+    try:
+        from core.skill_analyzer import SkillAnalyzer
+        analyzer = SkillAnalyzer(archetype.main_skill)
+        skill_mult = analyzer.get_affix_multiplier(affix_type)
+    except Exception as e:
+        logger.debug(f"Could not get skill multiplier: {e}")
+        skill_mult = 1.0
+
+    # Combine multipliers (use average to prevent extreme values)
+    # This prevents double-counting of effects
+    if skill_mult != 1.0:
+        # Weight skill affinity at 30% influence
+        combined = base_mult * (0.7 + 0.3 * skill_mult)
+    else:
+        combined = base_mult
+
+    return combined
+
+
+def get_skill_valuable_affixes(main_skill: str) -> List[str]:
+    """
+    Get list of valuable affix types for a skill.
+
+    Args:
+        main_skill: Name of the main skill
+
+    Returns:
+        List of affix types that are valuable for this skill
+    """
+    if not main_skill:
+        return []
+
+    try:
+        from core.skill_analyzer import SkillAnalyzer
+        analyzer = SkillAnalyzer(main_skill)
+        valuable = analyzer.get_valuable_affixes()
+        return [affix for affix, _ in valuable]
+    except Exception as e:
+        logger.debug(f"Could not get skill affixes: {e}")
+        return []
 
 
 # =============================================================================
