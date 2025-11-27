@@ -49,6 +49,10 @@ class ParsedItem:
     stack_size: int = 1
     max_stack_size: int = 1
 
+    # PoE2-specific properties
+    rune_sockets: int = 0  # Number of rune sockets
+    spirit: Optional[int] = None  # Spirit value (PoE2)
+
     # Requirements
     requirements: dict = field(default_factory=dict)
 
@@ -65,6 +69,11 @@ class ParsedItem:
     is_fractured: bool = False
     is_synthesised: bool = False
     is_mirrored: bool = False
+    is_unmodifiable: bool = False  # PoE2: Cannot be modified
+    is_sanctified: bool = False  # PoE2: Sanctified item
+
+    # PoE2 mod types
+    rune_mods: List[str] = field(default_factory=list)  # Mods from socketed runes
 
     def get_display_name(self) -> str:
         """
@@ -104,6 +113,12 @@ class ParsedItem:
             "implicits": self.implicits,
             "enchants": self.enchants,
             "is_corrupted": self.is_corrupted,
+            # PoE2-specific
+            "rune_sockets": self.rune_sockets,
+            "spirit": self.spirit,
+            "is_unmodifiable": self.is_unmodifiable,
+            "is_sanctified": self.is_sanctified,
+            "rune_mods": self.rune_mods,
         }
 
 # ----------------------------------------------------------------------
@@ -294,22 +309,36 @@ class ItemParser:
                 item.item_level = int(m.group(1))
                 continue
 
+            # Spirit (PoE2)
+            if line.startswith("Spirit:"):
+                try:
+                    item.spirit = int(line.split(":", 1)[1].strip())
+                except ValueError:
+                    pass
+                continue
+
             # Quality
             if m := re.search(self.QUALITY_PATTERN, line):
                 item.quality = int(m.group(1))
                 continue
 
-            # Sockets
+            # Sockets (handles both PoE1 gem sockets and PoE2 rune sockets)
             if line.startswith("Sockets:"):
                 sockets = line.split(":", 1)[1].strip()
                 item.sockets = sockets
 
-                # Calculate links: largest connected group
-                groups = sockets.split(" ")
-                item.links = max(
-                    len(g.replace("-", ""))
-                    for g in groups
-                ) if groups else 0
+                # PoE2 rune sockets: "S S S" format (space-separated S's)
+                # Count 'S' characters for rune socket count
+                if 'S' in sockets and not any(c in sockets for c in 'RGBW'):
+                    item.rune_sockets = sockets.count('S')
+                    item.links = 0  # Rune sockets don't link
+                else:
+                    # PoE1: Calculate links from largest connected group
+                    groups = sockets.split(" ")
+                    item.links = max(
+                        len(g.replace("-", ""))
+                        for g in groups
+                    ) if groups else 0
                 continue
 
             # Gem level
@@ -376,6 +405,15 @@ class ItemParser:
                 item.is_mirrored = True
                 continue
 
+            # PoE2-specific flags
+            if "Unmodifiable" in line:
+                item.is_unmodifiable = True
+                continue
+
+            if "Sanctified" in line:
+                item.is_sanctified = True
+                continue
+
             # Influences
             found_influence = False
             for keyword in self.INFLUENCE_KEYWORDS:
@@ -409,6 +447,13 @@ class ItemParser:
                     clean = self._strip_tag(line, "implicit")
                     if clean:
                         item.implicits.append(clean)
+                    continue
+
+                # PoE2: Rune mods (added rune)
+                if "(rune)" in lower:
+                    clean = self._strip_tag(line, "rune")
+                    if clean:
+                        item.rune_mods.append(clean)
                     continue
 
                 # Otherwise it's a normal explicit mod
