@@ -62,7 +62,7 @@ But you don't actually need these! They're just convenience tools.
 
 ### Option 2: Continue (PyCharm)
 
-You're already using Continue! Here's the config:
+If you use Continue in PyCharm, here's the config:
 
 1. **Edit:** `~/.continue/config.json`
 

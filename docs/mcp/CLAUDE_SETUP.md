@@ -114,7 +114,7 @@ Try the simplest config:
 
 ## Alternative: Use Continue Instead
 
-If Claude Desktop continues to have issues, you can use Continue (which you already have in PyCharm):
+If Claude Desktop continues to have issues, you can use Continue in PyCharm:
 
 1. **Create/edit:** `~/.continue/config.json` or `C:\Users\toddb\.continue\config.json`
 

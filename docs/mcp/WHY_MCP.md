@@ -75,7 +75,7 @@ This opens a web interface - try clicking tools to test them!
 mcp install mcp_poe_server.py
 ```
 
-**For Continue (what you're using now):**
+**For Continue (PyCharm):**
 Add to `~/.continue/config.json`:
 ```json
 {

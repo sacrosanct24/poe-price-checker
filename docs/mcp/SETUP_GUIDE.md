@@ -77,9 +77,9 @@ mcp install mcp_poe_server.py
 
 3. Restart Claude Desktop
 
-## Integration with Continue (Your Current AI Assistant)
+## Integration with Continue (Alternative Client)
 
-Since you're already using Continue in PyCharm, you can connect it to your MCP server:
+Continue is another MCP-compatible client that works with PyCharm:
 
 1. Create or edit `~/.continue/config.json`:
 
@@ -105,6 +105,8 @@ Since you're already using Continue in PyCharm, you can connect it to your MCP s
 ```
 
 2. Restart PyCharm or reload Continue
+
+For more on Continue, see: https://continue.dev
 
 ## Available Tools
 
