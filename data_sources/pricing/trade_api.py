@@ -9,6 +9,7 @@ import requests
 from data_sources.base_api import BaseAPIClient
 from data_sources.pricing.trade_stat_ids import build_stat_filters
 from core.price_multi import RESULT_COLUMNS
+from core.smart_trade_filters import build_smart_filters
 
 logger = logging.getLogger(__name__)
 
@@ -325,13 +326,27 @@ class TradeApiSource:
     # Internal helpers (low-level HTTP mode)
     # ------------------------------------------------------------------ #
 
-    def _build_query(self, parsed_item: Any) -> Dict[str, Any]:
+    def _build_query(
+        self,
+        parsed_item: Any,
+        use_smart_filters: bool = False,
+        archetype: Any = None,
+        build_stats: Any = None,
+        slot: Optional[str] = None,
+    ) -> Dict[str, Any]:
         """
         Build trade API search query from ParsedItem.
 
         For uniques: specify name + type
         For rares: specify type (base) + affix filters (if evaluation available)
         For other items: basic name/type search
+
+        Args:
+            parsed_item: The item to search for
+            use_smart_filters: If True, use archetype-aware smart filters
+            archetype: BuildArchetype for smart filtering
+            build_stats: BuildStats for smart filtering
+            slot: Equipment slot for slot-specific filters
         """
         name = getattr(parsed_item, "name", None) or getattr(
             parsed_item, "display_name", None
@@ -393,19 +408,36 @@ class TradeApiSource:
             if base_str:
                 query["query"]["type"] = base_str
 
-            # Add affix filters if evaluation data is available
-            rare_evaluation = getattr(parsed_item, "_rare_evaluation", None)
-            if rare_evaluation is not None:
-                matched_affixes = getattr(rare_evaluation, "matched_affixes", None)
-                if matched_affixes:
-                    stat_filters = build_stat_filters(matched_affixes, max_filters=4)
-                    if stat_filters:
-                        query["query"]["stats"][0]["filters"] = stat_filters
-                        self.logger.info(
-                            "Built rare item query with %d affix filters for base '%s'",
-                            len(stat_filters),
-                            base_str
-                        )
+            # Try smart filters first if enabled
+            if use_smart_filters and (archetype or build_stats):
+                smart_filters, filter_result = build_smart_filters(
+                    archetype=archetype,
+                    build_stats=build_stats,
+                    slot=slot,
+                    max_filters=6,
+                )
+                if smart_filters:
+                    query["query"]["stats"][0]["filters"] = smart_filters
+                    self.logger.info(
+                        "Built rare item query with %d smart filters for base '%s': %s",
+                        len(smart_filters),
+                        base_str,
+                        filter_result.filter_reasons
+                    )
+            else:
+                # Fallback to evaluation-based filters
+                rare_evaluation = getattr(parsed_item, "_rare_evaluation", None)
+                if rare_evaluation is not None:
+                    matched_affixes = getattr(rare_evaluation, "matched_affixes", None)
+                    if matched_affixes:
+                        stat_filters = build_stat_filters(matched_affixes, max_filters=4)
+                        if stat_filters:
+                            query["query"]["stats"][0]["filters"] = stat_filters
+                            self.logger.info(
+                                "Built rare item query with %d affix filters for base '%s'",
+                                len(stat_filters),
+                                base_str
+                            )
 
         # UNIQUE/OTHER items: use name + type
         else:
