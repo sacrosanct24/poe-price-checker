@@ -20,9 +20,10 @@ import logging
 import os
 import random
 import sys
+from collections import deque
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, Deque, Dict, List, Optional, TYPE_CHECKING
 
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QThread, QObject
 from PyQt6.QtGui import QAction, QKeySequence, QShortcut, QIcon
@@ -240,7 +241,8 @@ class PriceCheckerWindow(QMainWindow):
         # State
         self._all_results: List[Dict[str, Any]] = []
         self._check_in_progress = False
-        self._history: List[Dict[str, Any]] = []
+        # Bounded history to prevent unbounded memory growth (keeps last 100 checks)
+        self._history: Deque[Dict[str, Any]] = deque(maxlen=100)
 
         # Child windows (cached references)
         self._recent_sales_window = None

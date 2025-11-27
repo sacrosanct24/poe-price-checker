@@ -956,7 +956,21 @@ class PriceService:
         else:
             self.logger.info("[MULTI-SOURCE] Skipping poe.ninja (not initialized)")
 
-        # Get poe.watch price
+        # EARLY EXIT: If poe.ninja has high-confidence data (20+ listings), skip poe.watch
+        # This avoids redundant API calls when we already have reliable pricing
+        if ninja_price is not None and ninja_count >= 20:
+            self.logger.info(
+                f"[MULTI-SOURCE] ✓ Early exit: poe.ninja has {ninja_count} listings "
+                f"(high confidence), skipping poe.watch"
+            )
+            return (
+                ninja_price,
+                ninja_count,
+                "poe.ninja (high confidence)",
+                "high"
+            )
+
+        # Get poe.watch price (only if ninja data is weak or unavailable)
         if self.poe_watch:
             self.logger.info("[MULTI-SOURCE] Querying poe.watch...")
             try:
@@ -1298,39 +1312,19 @@ class PriceService:
 
     def _lookup_currency_price(self, item_name: str) -> tuple[float, int, str]:
         """
-        Use poe.ninja's currencyoverview endpoint to price currency items
-        like Divine Orb, Exalted Orb, etc.
+        Use poe.ninja's indexed currency lookup for O(1) price queries.
         """
         if self.poe_ninja is None:
             return 0.0, 0, "no poe.ninja"
 
-        key = (item_name or "").strip().lower()
-        if not key:
-            return 0.0, 0, "not found"
+        # Use O(1) indexed lookup instead of O(n) linear scan
+        chaos_value, source = self.poe_ninja.get_currency_price(item_name)
 
-        try:
-            data = self.poe_ninja.get_currency_overview()
-        except Exception as exc:
-            self.logger.warning("poe.ninja get_currency_overview failed: %s", exc)
-            return 0.0, 0, "poe.ninja error"
+        if chaos_value > 0:
+            # poe.ninja currencyoverview doesn't have listing count
+            return chaos_value, 0, source
 
-        lines = data.get("lines", []) or []
-        for line in lines:
-            ctype = (line.get("currencyTypeName") or "").strip().lower()
-            if ctype == key:
-                chaos_raw = (
-                    line.get("chaosEquivalent")
-                    or line.get("chaosValue")
-                    or 0.0
-                )
-                try:
-                    chaos_value = float(chaos_raw)
-                except (TypeError, ValueError):
-                    chaos_value = 0.0
+        if source == "not found":
+            self.logger.info("poe.ninja currency: no price found for '%s'", item_name)
 
-                # poe.ninja currencyoverview doesn't have a clean "listing count"
-                # so we just return 0 here.
-                return chaos_value, 0, "poe.ninja currency"
-
-        self.logger.info("poe.ninja currency: no price found for '%s'", item_name)
-        return 0.0, 0, "not found"
+        return 0.0, 0, source

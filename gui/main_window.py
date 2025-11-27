@@ -20,9 +20,10 @@ import os
 import random
 import sys
 import webbrowser
+from collections import deque
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Iterable, Mapping, TYPE_CHECKING, Callable
+from typing import Any, Deque, Iterable, Mapping, TYPE_CHECKING, Callable
 
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
@@ -658,8 +659,8 @@ class PriceCheckerGUI:
         self._column_visibility_vars: dict[str, tk.BooleanVar] = {}
         self._column_visibility_window: tk.Toplevel | None = None
 
-        # Session history
-        self._history: list[dict[str, Any]] = []
+        # Session history - bounded to prevent unbounded memory growth (keeps last 100 checks)
+        self._history: Deque[dict[str, Any]] = deque(maxlen=100)
         self._history_window: tk.Toplevel | None = None
         self._history_listbox: tk.Listbox | None = None
 

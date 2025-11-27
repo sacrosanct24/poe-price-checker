@@ -93,27 +93,34 @@ class FakePoeNinja:
     """
     Fake PoeNinjaAPI for currency pricing.
 
-    Only get_currency_overview is used when rarity == "CURRENCY".
+    Implements get_currency_price for O(1) lookups.
     """
 
     def __init__(self):
         self.league = "Crucible"
         self._calls = 0
+        self._currency_data = {
+            "chaos orb": {"chaosEquivalent": 1.0},
+            "divine orb": {"chaosEquivalent": 200.0},
+        }
 
     def get_currency_overview(self):
         self._calls += 1
         return {
             "lines": [
-                {
-                    "currencyTypeName": "Chaos Orb",
-                    "chaosEquivalent": 1.0,
-                },
-                {
-                    "currencyTypeName": "Divine Orb",
-                    "chaosEquivalent": 200.0,
-                },
+                {"currencyTypeName": "Chaos Orb", "chaosEquivalent": 1.0},
+                {"currencyTypeName": "Divine Orb", "chaosEquivalent": 200.0},
             ]
         }
+
+    def get_currency_price(self, currency_name: str) -> tuple:
+        """O(1) indexed lookup for currency prices."""
+        self._calls += 1
+        key = (currency_name or "").strip().lower()
+        item = self._currency_data.get(key)
+        if item:
+            return float(item.get("chaosEquivalent", 0.0)), "poe.ninja currency"
+        return 0.0, "not found"
 
 
 # -------------------------------------------------------------------

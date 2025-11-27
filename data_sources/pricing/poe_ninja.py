@@ -59,66 +59,13 @@ class PoeNinjaAPI(BaseAPIClient):
         # 0.0 = "unknown until we ask poe.ninja"
         self.divine_chaos_rate: float = 0.0
 
+        # Indexed currency data for O(1) lookups (built on first fetch)
+        self._currency_index: Dict[str, Dict[str, Any]] = {}
+
+        # Divine rate cache with expiry (1 hour)
+        self._divine_rate_expiry: float = 0.0
+
         logger.info(f"Initialized PoeNinjaAPI for league: {league}")
-
-        def refresh_divine_rate_from_currency(self) -> float:
-            """
-            Fetch poe.ninja currencyoverview and derive chaos_per_divine from
-            the Divine Orb entry.
-
-            Sets self.divine_chaos_rate and returns it.
-            """
-            try:
-                data = self.get_currency_overview()
-            except Exception as exc:
-                logger.warning("Failed to fetch currency overview for divine rate: %s", exc)
-                self.divine_chaos_rate = 0.0
-                return 0.0
-
-            lines = (data.get("lines") or [])
-            for line in lines:
-                name = (line.get("currencyTypeName") or "").strip().lower()
-                if name == "divine orb":
-                    chaos_raw: Any = (
-                            line.get("chaosEquivalent")
-                            or line.get("chaosValue")
-                            or 0.0
-                    )
-                    try:
-                        chaos_equiv = float(chaos_raw)
-                    except (TypeError, ValueError):
-                        chaos_equiv = 0.0
-
-                    self.divine_chaos_rate = chaos_equiv
-                    logger.info(
-                        "poe.ninja divine_chaos_rate set to %.2f chaos per divine (league=%s)",
-                        self.divine_chaos_rate,
-                        self.league,
-                    )
-                    return self.divine_chaos_rate
-
-            logger.warning(
-                "Divine Orb not found in poe.ninja currencyoverview for league %s; "
-                "leaving divine_chaos_rate=0.0",
-                self.league,
-            )
-            self.divine_chaos_rate = 0.0
-            return 0.0
-
-        def ensure_divine_rate(self) -> float:
-            """
-            Return a sane chaos-per-divine rate, refreshing from poe.ninja if needed.
-            """
-            # If we already have something that looks sane, reuse it
-            try:
-                rate = float(self.divine_chaos_rate)
-            except (TypeError, ValueError):
-                rate = 0.0
-
-            if rate > 10.0:  # anything <= 10c/div is probably bogus
-                return rate
-
-            return self.refresh_divine_rate_from_currency()
 
     def refresh_divine_rate_from_currency(self) -> float:
         """
@@ -166,18 +113,30 @@ class PoeNinjaAPI(BaseAPIClient):
 
     def ensure_divine_rate(self) -> float:
         """
-        Return a sane chaos-per-divine rate, refreshing from poe.ninja if needed.
+        Return a sane chaos-per-divine rate, using cached value if valid.
+
+        Uses time-based caching (1 hour) to avoid repeated API calls.
         """
-        try:
-            rate = float(self.divine_chaos_rate)
-        except (TypeError, ValueError):
-            rate = 0.0
+        import time
 
-        # Anything <= 10c/div is probably bogus or placeholder
+        # Check if cached rate is still valid (within 1 hour)
+        now = time.time()
+        if now < self._divine_rate_expiry:
+            try:
+                rate = float(self.divine_chaos_rate)
+                if rate > 10.0:  # Anything <= 10c/div is bogus
+                    return rate
+            except (TypeError, ValueError):
+                pass
+
+        # Cache miss or invalid - refresh from API
+        rate = self.refresh_divine_rate_from_currency()
+
+        # Set expiry for 1 hour
         if rate > 10.0:
-            return rate
+            self._divine_rate_expiry = now + 3600  # 1 hour cache
 
-        return self.refresh_divine_rate_from_currency()
+        return rate
 
     def _get_cache_key(self, endpoint: str, params: Optional[Dict] = None) -> str:
         """Generate cache key from endpoint and params"""
@@ -288,14 +247,52 @@ class PoeNinjaAPI(BaseAPIClient):
             params={"league": self.league, "type": "Currency"}
         )
 
-        # Update divine/chaos conversion rate
+        # Build indexed lookup for O(1) currency price queries
+        self._currency_index.clear()
         for item in data.get("lines", []):
-            if item.get("currencyTypeName", "").lower() == "divine orb":
-                self.divine_chaos_rate = item.get("chaosEquivalent", 1.0)
-                logger.info(f"Divine Orb = {self.divine_chaos_rate:.1f} chaos")
-                break
+            name = (item.get("currencyTypeName") or "").strip().lower()
+            if name:
+                self._currency_index[name] = item
+                # Update divine/chaos conversion rate
+                if name == "divine orb":
+                    self.divine_chaos_rate = item.get("chaosEquivalent", 1.0)
+                    logger.info(f"Divine Orb = {self.divine_chaos_rate:.1f} chaos")
 
+        logger.debug(f"Built currency index with {len(self._currency_index)} entries")
         return data
+
+    def get_currency_price(self, currency_name: str) -> tuple[float, str]:
+        """
+        Get price for a currency item using O(1) indexed lookup.
+
+        Args:
+            currency_name: Name of currency (e.g., "Divine Orb", "Exalted Orb")
+
+        Returns:
+            Tuple of (chaos_value, source_info) or (0.0, "not found")
+        """
+        key = (currency_name or "").strip().lower()
+        if not key:
+            return 0.0, "empty name"
+
+        # Ensure index is populated
+        if not self._currency_index:
+            try:
+                self.get_currency_overview()
+            except Exception as exc:
+                logger.warning("Failed to fetch currency overview: %s", exc)
+                return 0.0, "fetch error"
+
+        # O(1) lookup
+        item = self._currency_index.get(key)
+        if item:
+            chaos_raw = item.get("chaosEquivalent") or item.get("chaosValue") or 0.0
+            try:
+                return float(chaos_raw), "poe.ninja currency"
+            except (TypeError, ValueError):
+                return 0.0, "parse error"
+
+        return 0.0, "not found"
 
     def _get_item_overview(self, item_type: str) -> dict | None:
         """
