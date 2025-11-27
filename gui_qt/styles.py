@@ -26,6 +26,7 @@ COLORS = {
     "background": "#1a1a1e",      # Dark background with slight blue tint
     "surface": "#2a2a30",         # Slightly lighter surface
     "surface_alt": "#252530",     # Alternative surface (panels)
+    "surface_hover": "#3a3a42",   # Surface hover state
     "border": "#3a3a45",          # Border color
     "text": "#e8e8ec",            # Primary text
     "text_secondary": "#9898a8",  # Secondary text
@@ -349,3 +350,56 @@ def get_value_color(chaos_value: float) -> str:
         return COLORS["medium_value"]
     else:
         return COLORS["low_value"]
+
+
+def get_app_icon():
+    """Get the application icon as a QIcon.
+
+    Returns:
+        QIcon if icon found, else None
+    """
+    from pathlib import Path
+    from PyQt6.QtGui import QIcon
+
+    # Try PNG first, then ICO
+    base = Path(__file__).parent.parent / "assets"
+    for name in ("icon.png", "icon.ico"):
+        path = base / name
+        if path.exists():
+            return QIcon(str(path))
+    return None
+
+
+def get_app_banner_pixmap(size: int = 180):
+    """Get the application banner as a scaled QPixmap.
+
+    Args:
+        size: Maximum size (width or height) for scaling
+
+    Returns:
+        QPixmap if banner found, else None
+    """
+    from pathlib import Path
+    from PyQt6.QtGui import QPixmap
+    from PyQt6.QtCore import Qt
+
+    path = Path(__file__).parent.parent / "assets" / "banner.png"
+    if path.exists():
+        pixmap = QPixmap(str(path))
+        return pixmap.scaled(
+            size, size,
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation
+        )
+    return None
+
+
+def apply_window_icon(window):
+    """Apply the application icon to a window or dialog.
+
+    Args:
+        window: QWidget (QMainWindow, QDialog, etc.) to apply icon to
+    """
+    icon = get_app_icon()
+    if icon:
+        window.setWindowIcon(icon)

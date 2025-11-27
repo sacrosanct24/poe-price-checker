@@ -106,6 +106,7 @@ class CharacterProfile:
     notes: str = ""
     categories: List[str] = field(default_factory=list)  # List of BuildCategory values
     is_upgrade_target: bool = False  # Mark as the build to check upgrades against
+    priorities: Optional[Any] = None  # BuildPriorities for BiS search (lazy import to avoid circular)
 
     def get_item_for_slot(self, slot: str) -> Optional[PoBItem]:
         """Get the item equipped in a specific slot."""
@@ -540,7 +541,7 @@ class CharacterManager:
 
     def _serialize_profile(self, profile: CharacterProfile) -> dict:
         """Serialize a profile to dict for JSON storage."""
-        return {
+        result = {
             "name": profile.name,
             "pob_code": profile.pob_code,
             "created_at": profile.created_at,
@@ -570,6 +571,10 @@ class CharacterManager:
                 },
             },
         }
+        # Add priorities if they exist
+        if profile.priorities is not None:
+            result["priorities"] = profile.priorities.to_dict()
+        return result
 
     def _deserialize_profile(self, data: dict) -> CharacterProfile:
         """Deserialize a profile from dict."""
@@ -595,6 +600,15 @@ class CharacterManager:
                 explicit_mods=item_data.get("explicit_mods", []),
             )
 
+        # Load priorities if they exist
+        priorities = None
+        if "priorities" in data:
+            try:
+                from core.build_priorities import BuildPriorities
+                priorities = BuildPriorities.from_dict(data["priorities"])
+            except Exception as e:
+                logger.warning(f"Failed to load priorities: {e}")
+
         return CharacterProfile(
             name=data.get("name", ""),
             build=build,
@@ -604,6 +618,7 @@ class CharacterManager:
             notes=data.get("notes", ""),
             categories=data.get("categories", []),
             is_upgrade_target=data.get("is_upgrade_target", False),
+            priorities=priorities,
         )
 
     def add_from_pob_code(self, name: str, pob_code: str, notes: str = "") -> CharacterProfile:
@@ -762,6 +777,35 @@ class CharacterManager:
                 return profile
         # Fall back to active profile
         return self.get_active_profile()
+
+    def set_priorities(self, name: str, priorities: Any) -> bool:
+        """
+        Set build priorities for a profile.
+
+        Args:
+            name: Profile name
+            priorities: BuildPriorities object
+
+        Returns:
+            True if successful
+        """
+        if name not in self._profiles:
+            return False
+
+        self._profiles[name].priorities = priorities
+        self._save_profiles()
+        logger.info(f"Updated priorities for: {name}")
+        return True
+
+    def get_priorities(self, name: str) -> Optional[Any]:
+        """
+        Get build priorities for a profile.
+
+        Returns BuildPriorities or None if not set.
+        """
+        if name not in self._profiles:
+            return None
+        return self._profiles[name].priorities
 
     def get_builds_by_category(self, category: str) -> List[CharacterProfile]:
         """Get all builds with a specific category."""

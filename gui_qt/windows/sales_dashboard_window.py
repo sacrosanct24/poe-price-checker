@@ -97,8 +97,9 @@ class SalesDashboardWindow(QDialog):
         self.ctx = ctx
 
         self.setWindowTitle("Sales Dashboard")
-        self.setMinimumSize(600, 500)
+        self.setMinimumSize(450, 400)
         self.resize(650, 550)
+        self.setSizeGripEnabled(True)
 
         self._create_widgets()
         self._load_data()

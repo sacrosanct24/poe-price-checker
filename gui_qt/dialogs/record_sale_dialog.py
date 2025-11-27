@@ -33,8 +33,10 @@ class RecordSaleDialog(QDialog):
         super().__init__(parent)
 
         self.setWindowTitle("Record Sale")
-        self.setMinimumWidth(350)
-        self.setModal(True)
+        self.setMinimumWidth(300)
+        self.setMinimumHeight(180)
+        self.resize(400, 250)  # Good default size
+        self.setSizeGripEnabled(True)  # Show resize grip
 
         self._item_name = item_name
         self._suggested_price = suggested_price

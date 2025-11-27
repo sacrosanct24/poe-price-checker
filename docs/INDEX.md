@@ -27,6 +27,12 @@
 - [GUI Integration Guide](features/GUI_INTEGRATION_GUIDE.md) - How evaluation integrates with GUI
 - [Integration Guide](features/INTEGRATION_GUIDE.md) - Meta integration and build archetypes
 
+### BiS Search & Build Priorities
+- **[BiS Search Guide](features/BIS_SEARCH_GUIDE.md)** ⭐ - Find optimal gear upgrades
+  - Build priority system (Critical/Important/Nice-to-have)
+  - Affix tier calculator with ilvl requirements
+  - Guide gear extraction from reference builds
+
 ---
 
 ## 🛠️ Development

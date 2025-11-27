@@ -30,7 +30,7 @@ from PyQt6.QtWidgets import (
     QMessageBox,
 )
 
-from gui_qt.styles import COLORS
+from gui_qt.styles import COLORS, apply_window_icon
 
 if TYPE_CHECKING:
     from core.app_context import AppContext
@@ -351,8 +351,9 @@ class PriceRankingsWindow(QDialog):
         self._rankings: Dict[str, Any] = {}
 
         self.setWindowTitle("Price Rankings - Top 20")
-        self.setMinimumSize(900, 700)
+        self.setMinimumSize(700, 500)
         self.resize(1000, 800)
+        apply_window_icon(self)
 
         self._setup_ui()
         self._load_initial_data()

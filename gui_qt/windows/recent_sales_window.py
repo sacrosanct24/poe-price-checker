@@ -112,8 +112,9 @@ class RecentSalesWindow(QDialog):
         self.ctx = ctx
 
         self.setWindowTitle("Recent Sales")
-        self.setMinimumSize(700, 500)
+        self.setMinimumSize(500, 400)
         self.resize(800, 550)
+        self.setSizeGripEnabled(True)
 
         self._all_sales: List[Dict[str, Any]] = []
 

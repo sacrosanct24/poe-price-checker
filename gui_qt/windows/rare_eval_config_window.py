@@ -136,7 +136,7 @@ class RareEvalConfigWindow(QDialog):
         self.config_path = data_dir / "rare_eval_config.json"
 
         self.setWindowTitle("Rare Item Evaluation Settings")
-        self.setMinimumSize(500, 600)
+        self.setMinimumSize(400, 450)
         self.resize(550, 650)
 
         self._sliders: Dict[str, QSlider] = {}

@@ -248,6 +248,8 @@ class PriceCheckerWindow(QMainWindow):
         self._pob_character_window = None
         self._rare_eval_config_window = None
         self._price_rankings_window = None
+        self._build_comparison_dialog = None
+        self._bis_search_dialog = None
 
         # PoB integration
         self._character_manager = None
@@ -389,41 +391,58 @@ class PriceCheckerWindow(QMainWindow):
         exit_action.triggered.connect(self.close)
         file_menu.addAction(exit_action)
 
-        # View menu
+        # Build menu (PoB and build-related features)
+        build_menu = menubar.addMenu("&Build")
+
+        pob_action = QAction("&PoB Characters", self)
+        pob_action.setShortcut(QKeySequence("Ctrl+B"))
+        pob_action.triggered.connect(self._show_pob_characters)
+        build_menu.addAction(pob_action)
+
+        compare_build_action = QAction("&Compare Build Trees...", self)
+        compare_build_action.triggered.connect(self._show_build_comparison)
+        build_menu.addAction(compare_build_action)
+
+        bis_search_action = QAction("Find &BiS Item...", self)
+        bis_search_action.setShortcut(QKeySequence("Ctrl+I"))
+        bis_search_action.triggered.connect(self._show_bis_search)
+        build_menu.addAction(bis_search_action)
+
+        build_menu.addSeparator()
+
+        rare_eval_action = QAction("Rare Item &Settings...", self)
+        rare_eval_action.triggered.connect(self._show_rare_eval_config)
+        build_menu.addAction(rare_eval_action)
+
+        # Prices menu (price and sales related)
+        prices_menu = menubar.addMenu("&Prices")
+
+        price_rankings_action = QAction("&Top 20 Rankings", self)
+        price_rankings_action.triggered.connect(self._show_price_rankings)
+        prices_menu.addAction(price_rankings_action)
+
+        prices_menu.addSeparator()
+
+        recent_sales_action = QAction("&Recent Sales", self)
+        recent_sales_action.triggered.connect(self._show_recent_sales)
+        prices_menu.addAction(recent_sales_action)
+
+        dashboard_action = QAction("Sales &Dashboard", self)
+        dashboard_action.triggered.connect(self._show_sales_dashboard)
+        prices_menu.addAction(dashboard_action)
+
+        prices_menu.addSeparator()
+
+        sources_action = QAction("Data &Sources Info", self)
+        sources_action.triggered.connect(self._show_data_sources)
+        prices_menu.addAction(sources_action)
+
+        # View menu (display options)
         view_menu = menubar.addMenu("&View")
 
         history_action = QAction("Session &History", self)
         history_action.triggered.connect(self._show_history)
         view_menu.addAction(history_action)
-
-        sources_action = QAction("Data &Sources", self)
-        sources_action.triggered.connect(self._show_data_sources)
-        view_menu.addAction(sources_action)
-
-        view_menu.addSeparator()
-
-        recent_sales_action = QAction("&Recent Sales", self)
-        recent_sales_action.triggered.connect(self._show_recent_sales)
-        view_menu.addAction(recent_sales_action)
-
-        dashboard_action = QAction("Sales &Dashboard", self)
-        dashboard_action.triggered.connect(self._show_sales_dashboard)
-        view_menu.addAction(dashboard_action)
-
-        view_menu.addSeparator()
-
-        pob_action = QAction("&PoB Characters", self)
-        pob_action.setShortcut(QKeySequence("Ctrl+B"))
-        pob_action.triggered.connect(self._show_pob_characters)
-        view_menu.addAction(pob_action)
-
-        rare_eval_action = QAction("Rare Item &Settings", self)
-        rare_eval_action.triggered.connect(self._show_rare_eval_config)
-        view_menu.addAction(rare_eval_action)
-
-        price_rankings_action = QAction("Price &Rankings (Top 20)", self)
-        price_rankings_action.triggered.connect(self._show_price_rankings)
-        view_menu.addAction(price_rankings_action)
 
         view_menu.addSeparator()
 
@@ -438,6 +457,10 @@ class PriceCheckerWindow(QMainWindow):
             action.triggered.connect(lambda checked, c=col: self._toggle_column(c, checked))
             columns_menu.addAction(action)
             self._column_actions[col] = action
+
+        # Resources menu
+        resources_menu = menubar.addMenu("&Resources")
+        self._create_resources_menu(resources_menu)
 
         # Dev menu
         dev_menu = menubar.addMenu("&Dev")
@@ -470,6 +493,157 @@ class PriceCheckerWindow(QMainWindow):
         about_action = QAction("&About", self)
         about_action.triggered.connect(self._show_about)
         help_menu.addAction(about_action)
+
+    def _create_resources_menu(self, menu: QMenu) -> None:
+        """Create the Resources menu with PoE1/PoE2 submenus."""
+        import webbrowser
+
+        def open_url(url: str):
+            """Open URL in default browser."""
+            def handler():
+                webbrowser.open(url)
+            return handler
+
+        # PoE1 submenu
+        poe1_menu = menu.addMenu("Path of Exile &1")
+
+        # PoE1 - Official
+        poe1_official = poe1_menu.addMenu("Official")
+        action = QAction("Official Website", self)
+        action.triggered.connect(open_url("https://www.pathofexile.com/"))
+        poe1_official.addAction(action)
+        action = QAction("Official Trade", self)
+        action.triggered.connect(open_url("https://www.pathofexile.com/trade/search/Keepers"))
+        poe1_official.addAction(action)
+        action = QAction("Passive Skill Tree", self)
+        action.triggered.connect(open_url("https://www.pathofexile.com/passive-skill-tree"))
+        poe1_official.addAction(action)
+
+        # PoE1 - Wiki & Database
+        poe1_wiki = poe1_menu.addMenu("Wiki && Database")
+        action = QAction("Community Wiki", self)
+        action.triggered.connect(open_url("https://www.poewiki.net/wiki/Path_of_Exile_Wiki"))
+        poe1_wiki.addAction(action)
+        action = QAction("PoE DB", self)
+        action.triggered.connect(open_url("https://poedb.tw/us/"))
+        poe1_wiki.addAction(action)
+
+        # PoE1 - Build Planning
+        poe1_planning = poe1_menu.addMenu("Build Planning")
+        action = QAction("Path of Building (Desktop)", self)
+        action.triggered.connect(open_url("https://pathofbuilding.community/"))
+        poe1_planning.addAction(action)
+        action = QAction("Path of Building (Web)", self)
+        action.triggered.connect(open_url("https://pob.cool/"))
+        poe1_planning.addAction(action)
+        action = QAction("PoE Planner", self)
+        action.triggered.connect(open_url("https://poeplanner.com/"))
+        poe1_planning.addAction(action)
+        action = QAction("Path of Pathing (Atlas)", self)
+        action.triggered.connect(open_url("https://www.pathofpathing.com/"))
+        poe1_planning.addAction(action)
+
+        # PoE1 - Build Guides
+        poe1_guides = poe1_menu.addMenu("Build Guides")
+        action = QAction("Maxroll", self)
+        action.triggered.connect(open_url("https://maxroll.gg/poe"))
+        poe1_guides.addAction(action)
+        action = QAction("Mobalytics", self)
+        action.triggered.connect(open_url("https://mobalytics.gg/poe"))
+        poe1_guides.addAction(action)
+        action = QAction("PoE Builds", self)
+        action.triggered.connect(open_url("https://www.poebuilds.cc/"))
+        poe1_guides.addAction(action)
+        action = QAction("Pohx (Righteous Fire)", self)
+        action.triggered.connect(open_url("https://pohx.net/"))
+        poe1_guides.addAction(action)
+
+        # PoE1 - Economy & Trading
+        poe1_economy = poe1_menu.addMenu("Economy && Trading")
+        action = QAction("Wealthy Exile", self)
+        action.triggered.connect(open_url("https://wealthyexile.com/"))
+        poe1_economy.addAction(action)
+        action = QAction("Map Trade", self)
+        action.triggered.connect(open_url("https://poemap.trade/"))
+        poe1_economy.addAction(action)
+        action = QAction("poe.how Economy Guide", self)
+        action.triggered.connect(open_url("https://poe.how/economy"))
+        poe1_economy.addAction(action)
+
+        # PoE1 - Tools
+        poe1_tools = poe1_menu.addMenu("Tools")
+        action = QAction("FilterBlade (Loot Filters)", self)
+        action.triggered.connect(open_url("https://www.filterblade.xyz/?game=Poe1"))
+        poe1_tools.addAction(action)
+
+        # PoE1 - Community
+        poe1_menu.addSeparator()
+        action = QAction("Reddit", self)
+        action.triggered.connect(open_url("https://www.reddit.com/r/pathofexile/"))
+        poe1_menu.addAction(action)
+
+        # PoE2 submenu
+        poe2_menu = menu.addMenu("Path of Exile &2")
+
+        # PoE2 - Official
+        poe2_official = poe2_menu.addMenu("Official")
+        action = QAction("Official Website", self)
+        action.triggered.connect(open_url("https://pathofexile2.com/"))
+        poe2_official.addAction(action)
+        action = QAction("Official Trade", self)
+        action.triggered.connect(open_url("https://www.pathofexile.com/trade2/search/poe2/Rise%20of%20the%20Abyssal"))
+        poe2_official.addAction(action)
+
+        # PoE2 - Wiki & Database
+        poe2_wiki = poe2_menu.addMenu("Wiki && Database")
+        action = QAction("Community Wiki", self)
+        action.triggered.connect(open_url("https://www.poe2wiki.net/wiki/Path_of_Exile_2_Wiki"))
+        poe2_wiki.addAction(action)
+        action = QAction("PoE2 DB", self)
+        action.triggered.connect(open_url("https://poe2db.tw/"))
+        poe2_wiki.addAction(action)
+
+        # PoE2 - Build Planning
+        poe2_planning = poe2_menu.addMenu("Build Planning")
+        action = QAction("Path of Building PoE2 (GitHub)", self)
+        action.triggered.connect(open_url("https://github.com/PathOfBuildingCommunity/PathOfBuilding-PoE2"))
+        poe2_planning.addAction(action)
+
+        # PoE2 - Build Guides
+        poe2_guides = poe2_menu.addMenu("Build Guides")
+        action = QAction("Maxroll", self)
+        action.triggered.connect(open_url("https://maxroll.gg/poe2"))
+        poe2_guides.addAction(action)
+        action = QAction("Mobalytics", self)
+        action.triggered.connect(open_url("https://mobalytics.gg/poe-2"))
+        poe2_guides.addAction(action)
+
+        # PoE2 - Tools
+        poe2_tools = poe2_menu.addMenu("Tools")
+        action = QAction("FilterBlade (Loot Filters)", self)
+        action.triggered.connect(open_url("https://www.filterblade.xyz/?game=Poe2"))
+        poe2_tools.addAction(action)
+
+        # PoE2 - Community
+        poe2_menu.addSeparator()
+        action = QAction("Reddit", self)
+        action.triggered.connect(open_url("https://www.reddit.com/r/PathOfExile2/"))
+        poe2_menu.addAction(action)
+        action = QAction("Reddit Builds", self)
+        action.triggered.connect(open_url("https://www.reddit.com/r/pathofexile2builds/"))
+        poe2_menu.addAction(action)
+
+        # Separator before shared resources
+        menu.addSeparator()
+
+        # Shared resources (both games)
+        action = QAction("poe.ninja (Economy)", self)
+        action.triggered.connect(open_url("https://poe.ninja/"))
+        menu.addAction(action)
+
+        action = QAction("PoB Archives (Meta Builds)", self)
+        action.triggered.connect(open_url("https://pobarchives.com/"))
+        menu.addAction(action)
 
     # -------------------------------------------------------------------------
     # Central Widget
@@ -1176,6 +1350,32 @@ class PriceCheckerWindow(QMainWindow):
         self._price_rankings_window.show()
         self._price_rankings_window.raise_()
 
+    def _show_build_comparison(self) -> None:
+        """Show build comparison dialog."""
+        from gui_qt.dialogs.build_comparison_dialog import BuildComparisonDialog
+
+        if self._build_comparison_dialog is None or not self._build_comparison_dialog.isVisible():
+            self._build_comparison_dialog = BuildComparisonDialog(
+                self,
+                character_manager=self._character_manager,
+            )
+
+        self._build_comparison_dialog.show()
+        self._build_comparison_dialog.raise_()
+
+    def _show_bis_search(self) -> None:
+        """Show BiS item search dialog."""
+        from gui_qt.dialogs.bis_search_dialog import BiSSearchDialog
+
+        if self._bis_search_dialog is None or not self._bis_search_dialog.isVisible():
+            self._bis_search_dialog = BiSSearchDialog(
+                self,
+                character_manager=self._character_manager,
+            )
+
+        self._bis_search_dialog.show()
+        self._bis_search_dialog.raise_()
+
     def _paste_sample(self, item_type: str) -> None:
         """Paste a sample item of the given type."""
         samples = SAMPLE_ITEMS.get(item_type, [])
@@ -1207,6 +1407,8 @@ class PriceCheckerWindow(QMainWindow):
 
 Ctrl+Enter - Check price
 Ctrl+Shift+V - Paste and check
+Ctrl+B - Open PoB Characters
+Ctrl+I - Find BiS Item
 Ctrl+E - Export results
 Ctrl+Shift+C - Copy all as TSV
 Escape - Clear input
@@ -1233,16 +1435,59 @@ Alt+F4 - Exit
         QMessageBox.information(self, "Usage Tips", text)
 
     def _show_about(self) -> None:
-        """Show about dialog."""
-        text = """PoE Price Checker
+        """Show about dialog with logo."""
+        from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QPushButton
+        from PyQt6.QtCore import Qt
+        from gui_qt.styles import get_app_banner_pixmap, apply_window_icon
 
-A tool for checking Path of Exile item prices.
+        dialog = QDialog(self)
+        dialog.setWindowTitle("About PoE Price Checker")
+        dialog.setFixedSize(400, 400)
+        apply_window_icon(dialog)
 
-Uses data from poe.ninja and other sources.
+        layout = QVBoxLayout(dialog)
+        layout.setSpacing(16)
 
-Built with PyQt6.
-"""
-        QMessageBox.about(self, "About", text)
+        # Logo
+        banner = get_app_banner_pixmap(180)
+        if banner:
+            logo_label = QLabel()
+            logo_label.setPixmap(banner)
+            logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            layout.addWidget(logo_label)
+
+        # Title
+        title_label = QLabel("<h2 style='color: #3498db;'>PoE Price Checker</h2>")
+        title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(title_label)
+
+        # Version
+        version_label = QLabel("Version 1.0")
+        version_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        version_label.setStyleSheet(f"color: {COLORS['text_secondary']};")
+        layout.addWidget(version_label)
+
+        # Description
+        desc_label = QLabel(
+            "A tool for checking Path of Exile item prices.\n\n"
+            "Features:\n"
+            "• Multi-source pricing (poe.ninja, poe.watch, Trade API)\n"
+            "• PoB build integration for upgrade checking\n"
+            "• BiS item search with affix tier analysis\n"
+            "• Rare item evaluation system"
+        )
+        desc_label.setWordWrap(True)
+        desc_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(desc_label)
+
+        layout.addStretch()
+
+        # Close button
+        close_btn = QPushButton("Close")
+        close_btn.clicked.connect(dialog.accept)
+        layout.addWidget(close_btn)
+
+        dialog.exec()
 
 
 def run(ctx: "AppContext") -> None:

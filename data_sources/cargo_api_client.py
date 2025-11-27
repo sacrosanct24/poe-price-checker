@@ -24,17 +24,30 @@ class CargoAPIClient:
     - Item base types and properties
     - Skill information
     - Area data
+
+    Supports both PoE1 and PoE2 wikis:
+    - PoE1: https://www.poewiki.net (default)
+    - PoE2: https://www.poe2wiki.net
     """
 
-    BASE_URL = "https://www.poewiki.net/w/api.php"
+    # Wiki base URLs
+    POE1_WIKI_URL = "https://www.poewiki.net/w/api.php"
+    POE2_WIKI_URL = "https://www.poe2wiki.net/w/api.php"
 
-    def __init__(self, rate_limit: float = 1.0):
+    def __init__(self, rate_limit: float = 1.0, wiki: str = "poe1"):
         """
         Initialize the Cargo API client.
 
         Args:
             rate_limit: Minimum seconds between requests (default: 1.0)
+            wiki: Which wiki to query - "poe1" or "poe2" (default: "poe1")
         """
+        self.wiki = wiki.lower()
+        if self.wiki == "poe2":
+            self.base_url = self.POE2_WIKI_URL
+        else:
+            self.base_url = self.POE1_WIKI_URL
+
         self.session = requests.Session()
         self.session.headers.update({
             'User-Agent': 'PoE-Price-Checker/1.0 (Rare Item Pricing Tool)'
@@ -107,7 +120,7 @@ class CargoAPIClient:
 
         try:
             logger.debug(f"Cargo API query: tables={tables}, limit={limit}, offset={offset}")
-            response = self.session.get(self.BASE_URL, params=params, timeout=30)
+            response = self.session.get(self.base_url, params=params, timeout=30)
             response.raise_for_status()
 
             data = response.json()

@@ -32,7 +32,7 @@ from PyQt6.QtWidgets import (
     QHeaderView,
 )
 
-from gui_qt.styles import COLORS, get_rarity_color
+from gui_qt.styles import COLORS, get_rarity_color, apply_window_icon
 
 # Try to import BuildCategory
 try:
@@ -65,8 +65,9 @@ class PoBCharacterWindow(QDialog):
         self._profiles_cache: Dict[str, Dict[str, Any]] = {}
 
         self.setWindowTitle("PoB Character Manager")
-        self.setMinimumSize(850, 550)
+        self.setMinimumSize(700, 450)
         self.resize(900, 600)
+        apply_window_icon(self)
 
         self._create_widgets()
         self._load_profiles()
@@ -452,7 +453,10 @@ class ItemDetailsDialog(QDialog):
         self.on_price_check = on_price_check
 
         self.setWindowTitle(f"Item Details: {slot}")
-        self.setMinimumWidth(350)
+        self.setMinimumWidth(300)
+        self.setMinimumHeight(200)
+        self.resize(400, 350)
+        self.setSizeGripEnabled(True)
 
         layout = QVBoxLayout(self)
         layout.setSpacing(8)
@@ -587,7 +591,10 @@ class ManageCategoriesDialog(QDialog):
         self.profile_name = profile_name
 
         self.setWindowTitle(f"Categories: {profile_name}")
-        self.setMinimumWidth(300)
+        self.setMinimumWidth(280)
+        self.setMinimumHeight(200)
+        self.resize(350, 350)
+        self.setSizeGripEnabled(True)
 
         # Get current categories
         profile = character_manager.get_profile(profile_name)
@@ -649,7 +656,9 @@ class ImportPoBDialog(QDialog):
         self.character_manager = character_manager
 
         self.setWindowTitle("Import PoB Character")
-        self.setMinimumSize(450, 500)
+        self.setMinimumSize(400, 400)
+        self.resize(500, 550)
+        self.setSizeGripEnabled(True)
 
         layout = QVBoxLayout(self)
         layout.setSpacing(12)

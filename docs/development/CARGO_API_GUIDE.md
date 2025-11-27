@@ -2,7 +2,18 @@
 
 ## Overview
 
-This guide explains how to populate the mod database using the PoE Wiki Cargo API once it's available.
+This guide explains how to populate the mod database using the PoE Wiki Cargo API.
+
+## Supported Wikis
+
+Both Path of Exile wikis use the MediaWiki Cargo extension for structured data queries:
+
+| Wiki | Base URL | Cargo Tables |
+|------|----------|--------------|
+| PoE1 | https://www.poewiki.net | https://www.poewiki.net/wiki/Special:CargoTables |
+| PoE2 | https://www.poe2wiki.net | https://www.poe2wiki.net/wiki/Special:CargoTables |
+
+The `CargoAPIClient` supports both wikis - just specify the base URL when initializing.
 
 ## Quick Start
 
@@ -28,6 +39,23 @@ db = ensure_mod_database_updated(league="Settlers", force_update=True)
 # Check stats
 print(f"Mods loaded: {db.get_mod_count()}")
 print(f"Last update: {db.get_last_update_time()}")
+```
+
+## Using PoE2 Wiki
+
+```python
+from data_sources.cargo_api_client import CargoAPIClient
+
+# Query PoE2 wiki
+poe2_client = CargoAPIClient(wiki="poe2")
+results = poe2_client.query(
+    tables="mods",
+    fields="mods.id,mods.name",
+    limit=10
+)
+
+# Query PoE1 wiki (default)
+poe1_client = CargoAPIClient(wiki="poe1")
 ```
 
 ## Query Examples
@@ -257,5 +285,6 @@ except Exception as e:
 
 ## References
 
-- [PoE Wiki Cargo API Docs](https://www.poewiki.net/wiki/Path_of_Exile_Wiki:Data_query_API)
+- [PoE1 Wiki Cargo API Docs](https://www.poewiki.net/wiki/Path_of_Exile_Wiki:Data_query_API)
+- [PoE2 Wiki Cargo API Docs](https://www.poe2wiki.net/wiki/Path_of_Exile_2_Wiki:Data_query_API)
 - [Cargo Query Format](https://www.mediawiki.org/wiki/Extension:Cargo/Querying_data)
