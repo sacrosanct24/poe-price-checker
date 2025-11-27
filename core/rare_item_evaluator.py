@@ -13,10 +13,10 @@ import json
 import re
 from pathlib import Path
 from typing import List, Dict, Optional, Tuple, Any
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from core.item_parser import ParsedItem
 from core.build_archetype import (
-    BuildArchetype, get_default_archetype, get_weight_multiplier
+    BuildArchetype, get_weight_multiplier
 )
 
 

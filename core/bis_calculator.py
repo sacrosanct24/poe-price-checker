@@ -8,10 +8,10 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 from core.build_stat_calculator import BuildStats
-from core.build_priorities import BuildPriorities, PriorityTier, AVAILABLE_STATS
+from core.build_priorities import BuildPriorities, AVAILABLE_STATS
 from data_sources.pricing.trade_stat_ids import AFFIX_TO_STAT_ID
 
 logger = logging.getLogger(__name__)

@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import re
 import logging
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from dataclasses import dataclass
+from typing import Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -315,7 +315,7 @@ class BuildStatCalculator:
             return raw_value * 2, 2.0, explanation
 
         # Default: no scaling
-        return raw_value, 1.0, f"{mod} (no scaling applied)"
+        return raw_value, 1.0, f"{mod_type} (no scaling applied)"
 
     def get_build_summary(self) -> str:
         """Get a formatted summary of build stats."""

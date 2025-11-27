@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, List, Optional, TYPE_CHECKING
 
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QAbstractTableModel, QModelIndex
 from PyQt6.QtGui import QColor
@@ -35,17 +35,14 @@ from PyQt6.QtWidgets import (
     QTableView,
     QAbstractItemView,
     QProgressBar,
-    QGroupBox,
     QFormLayout,
     QMessageBox,
-    QHeaderView,
 )
 
 from gui_qt.styles import COLORS
 from core.stash_valuator import (
     StashValuator,
     ValuationResult,
-    PricedTab,
     PricedItem,
     PriceSource,
 )

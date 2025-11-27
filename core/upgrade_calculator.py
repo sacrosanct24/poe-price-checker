@@ -12,7 +12,7 @@ from __future__ import annotations
 import re
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 from core.build_stat_calculator import BuildStats, BuildStatCalculator
 

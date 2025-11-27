@@ -13,12 +13,10 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 from data_sources.poe_ninja_client import (
-    PoeNinjaClient,
     NinjaPriceDatabase,
-    NinjaPrice,
     get_ninja_client,
 )
 from data_sources.poe_stash_api import (
