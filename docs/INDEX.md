@@ -33,6 +33,14 @@
   - Affix tier calculator with ilvl requirements
   - Guide gear extraction from reference builds
 
+### PoE2 Support
+- Rune socket parsing and rune data (28+ runes across tiers)
+- Charm modifier data with tier progression
+- PoE2 Trade API stat ID mappings
+- Pseudo stat aggregation (resistances, life, attributes)
+- Goodness score calculations for mod roll quality
+- New item types: Focus, Crossbow, Flail, Spear, Warstaff, Charm, Soulcore
+
 ---
 
 ## 🛠️ Development
