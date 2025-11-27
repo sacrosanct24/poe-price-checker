@@ -138,7 +138,7 @@ class PoBCharacterWindow(QDialog):
         # Info grid
         info_form = QFormLayout()
         self.info_labels: Dict[str, QLabel] = {}
-        for field in ["Name", "Class", "Level", "Items", "Categories", "Status"]:
+        for field in ["Name", "Class", "Level", "Archetype", "Items", "Categories", "Status"]:
             label = QLabel("-")
             self.info_labels[field] = label
             info_form.addRow(f"{field}:", label)
@@ -240,6 +240,16 @@ class PoBCharacterWindow(QDialog):
 
     def _build_profile_cache(self, profile: Any) -> Dict[str, Any]:
         """Build cache dict for a profile."""
+        # Get archetype summary if available
+        archetype_summary = None
+        try:
+            if hasattr(profile, 'get_archetype'):
+                archetype = profile.get_archetype()
+                if archetype and hasattr(archetype, 'get_summary'):
+                    archetype_summary = archetype.get_summary()
+        except Exception:
+            pass  # Archetype not available
+
         return {
             "name": profile.name,
             "build_info": {
@@ -259,6 +269,7 @@ class PoBCharacterWindow(QDialog):
             },
             "categories": getattr(profile, 'categories', []) or [],
             "is_upgrade_target": getattr(profile, 'is_upgrade_target', False),
+            "archetype_summary": archetype_summary,
         }
 
     def _on_filter_changed(self) -> None:
@@ -292,6 +303,15 @@ class PoBCharacterWindow(QDialog):
         self.info_labels["Class"].setText(class_name)
 
         self.info_labels["Level"].setText(str(build_info.get("level", "-")))
+
+        # Archetype
+        archetype_summary = profile.get("archetype_summary")
+        if archetype_summary:
+            self.info_labels["Archetype"].setText(archetype_summary)
+            self.info_labels["Archetype"].setStyleSheet(f"color: {COLORS['accent']};")
+        else:
+            self.info_labels["Archetype"].setText("Not detected")
+            self.info_labels["Archetype"].setStyleSheet("")
 
         items = profile.get("items", {})
         self.info_labels["Items"].setText(f"{len(items)} equipped")

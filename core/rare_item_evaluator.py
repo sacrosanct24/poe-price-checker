@@ -12,9 +12,12 @@ This module evaluates rare items by:
 import json
 import re
 from pathlib import Path
-from typing import List, Dict, Optional, Tuple
-from dataclasses import dataclass
+from typing import List, Dict, Optional, Tuple, Any
+from dataclasses import dataclass, field
 from core.item_parser import ParsedItem
+from core.build_archetype import (
+    BuildArchetype, get_default_archetype, get_weight_multiplier
+)
 
 
 @dataclass
@@ -75,6 +78,11 @@ class RareItemEvaluation:
     build_name: Optional[str] = None
     matching_requirements: List[str] = None
 
+    # Build archetype context (Phase 2 - PoB integration)
+    build_archetype: Optional[BuildArchetype] = None
+    archetype_weighted_score: int = 0  # Score adjusted by archetype weights
+    archetype_affix_details: List[Dict[str, Any]] = None  # Per-affix weight details
+
     def __post_init__(self):
         if self.synergies_found is None:
             self.synergies_found = []
@@ -84,6 +92,8 @@ class RareItemEvaluation:
             self.slot_bonus_reasons = []
         if self.matched_archetypes is None:
             self.matched_archetypes = []
+        if self.archetype_affix_details is None:
+            self.archetype_affix_details = []
 
 
 class RareItemEvaluator:
@@ -266,6 +276,82 @@ class RareItemEvaluator:
             tier=tier,
             estimated_value=estimated_value
         )
+
+    def evaluate_with_archetype(
+        self,
+        item: ParsedItem,
+        archetype: BuildArchetype
+    ) -> RareItemEvaluation:
+        """
+        Evaluate a rare item with build archetype context.
+
+        This applies archetype-based weight multipliers to affix scores,
+        making the evaluation build-aware.
+
+        Args:
+            item: Parsed item to evaluate
+            archetype: Build archetype for weight adjustments
+
+        Returns:
+            RareItemEvaluation with archetype-weighted scores
+        """
+        # First do standard evaluation
+        evaluation = self.evaluate(item)
+
+        if evaluation.tier == "not_rare":
+            return evaluation
+
+        # Apply archetype weights to matched affixes
+        weighted_total = 0.0
+        affix_details = []
+
+        for match in evaluation.matched_affixes:
+            base_weight = match.weight
+            multiplier = get_weight_multiplier(archetype, match.affix_type)
+            weighted_weight = base_weight * multiplier
+
+            affix_details.append({
+                "affix_type": match.affix_type,
+                "mod_text": match.mod_text,
+                "base_weight": base_weight,
+                "multiplier": round(multiplier, 2),
+                "weighted_weight": round(weighted_weight, 2),
+                "tier": match.tier,
+            })
+
+            weighted_total += weighted_weight
+
+        # Calculate archetype-weighted score (similar to _calculate_affix_score logic)
+        num_matches = len(evaluation.matched_affixes)
+        if num_matches >= 3 and weighted_total >= 25:
+            archetype_affix_score = min(100, int(60 + weighted_total))
+        elif num_matches >= 2 and weighted_total >= 16:
+            archetype_affix_score = min(100, int(40 + weighted_total * 2))
+        elif num_matches >= 1:
+            archetype_affix_score = min(100, int(20 + weighted_total * 3))
+        else:
+            archetype_affix_score = 0
+
+        # Recalculate total with archetype-weighted affix score
+        archetype_total = self._calculate_total_score(
+            evaluation.base_score,
+            archetype_affix_score,
+            evaluation.has_high_ilvl,
+            evaluation.synergy_bonus,
+            evaluation.red_flag_penalty,
+            evaluation.slot_bonus,
+            evaluation.crafting_bonus,
+            evaluation.fractured_bonus,
+            evaluation.archetype_bonus,
+            evaluation.meta_bonus
+        )
+
+        # Update evaluation with archetype info
+        evaluation.build_archetype = archetype
+        evaluation.archetype_weighted_score = archetype_total
+        evaluation.archetype_affix_details = affix_details
+
+        return evaluation
 
     def _evaluate_base(self, item: ParsedItem) -> Tuple[bool, int]:
         """

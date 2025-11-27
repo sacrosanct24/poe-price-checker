@@ -20,9 +20,12 @@ import zlib
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
 
 import requests
+
+if TYPE_CHECKING:
+    from core.build_archetype import BuildArchetype
 
 logger = logging.getLogger(__name__)
 
@@ -107,6 +110,7 @@ class CharacterProfile:
     categories: List[str] = field(default_factory=list)  # List of BuildCategory values
     is_upgrade_target: bool = False  # Mark as the build to check upgrades against
     priorities: Optional[Any] = None  # BuildPriorities for BiS search (lazy import to avoid circular)
+    _archetype: Optional["BuildArchetype"] = field(default=None, repr=False)  # Cached archetype
 
     def get_item_for_slot(self, slot: str) -> Optional[PoBItem]:
         """Get the item equipped in a specific slot."""
@@ -125,6 +129,30 @@ class CharacterProfile:
         """Remove a category from the profile."""
         if category.value in self.categories:
             self.categories.remove(category.value)
+
+    def get_archetype(self) -> "BuildArchetype":
+        """
+        Get the build archetype, auto-detecting from PoB stats if needed.
+
+        Returns:
+            BuildArchetype detected from build stats
+        """
+        if self._archetype is None:
+            self._archetype = self._detect_archetype()
+        return self._archetype
+
+    def _detect_archetype(self) -> "BuildArchetype":
+        """Detect archetype from build's PoB stats."""
+        from core.build_archetype import detect_archetype, get_default_archetype
+
+        if not self.build.stats:
+            return get_default_archetype()
+
+        return detect_archetype(self.build.stats, self.build.main_skill)
+
+    def clear_archetype_cache(self) -> None:
+        """Clear cached archetype (call after build stats change)."""
+        self._archetype = None
 
 
 class PoBDecoder:
@@ -574,6 +602,9 @@ class CharacterManager:
         # Add priorities if they exist
         if profile.priorities is not None:
             result["priorities"] = profile.priorities.to_dict()
+        # Add cached archetype if computed
+        if profile._archetype is not None:
+            result["archetype"] = profile._archetype.to_dict()
         return result
 
     def _deserialize_profile(self, data: dict) -> CharacterProfile:
@@ -609,6 +640,15 @@ class CharacterManager:
             except Exception as e:
                 logger.warning(f"Failed to load priorities: {e}")
 
+        # Load cached archetype if it exists
+        archetype = None
+        if "archetype" in data:
+            try:
+                from core.build_archetype import BuildArchetype
+                archetype = BuildArchetype.from_dict(data["archetype"])
+            except Exception as e:
+                logger.warning(f"Failed to load archetype: {e}")
+
         return CharacterProfile(
             name=data.get("name", ""),
             build=build,
@@ -619,6 +659,7 @@ class CharacterManager:
             categories=data.get("categories", []),
             is_upgrade_target=data.get("is_upgrade_target", False),
             priorities=priorities,
+            _archetype=archetype,
         )
 
     def add_from_pob_code(self, name: str, pob_code: str, notes: str = "") -> CharacterProfile:

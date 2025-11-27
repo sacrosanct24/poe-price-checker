@@ -19,6 +19,7 @@ from PyQt6.QtWidgets import (
 
 from gui_qt.styles import COLORS, get_rarity_color
 from core.build_stat_calculator import BuildStatCalculator, BuildStats
+from core.build_archetype import BuildArchetype
 
 
 class ItemInspectorWidget(QWidget):
@@ -30,6 +31,12 @@ class ItemInspectorWidget(QWidget):
         # Build stats for calculating effective values
         self._build_stats: Optional[BuildStats] = None
         self._calculator: Optional[BuildStatCalculator] = None
+
+        # Build archetype for weighted scoring
+        self._archetype: Optional[BuildArchetype] = None
+
+        # Evaluation results from rare item evaluator
+        self._evaluation: Optional[Any] = None
 
         # Set minimum size
         self.setMinimumHeight(200)
@@ -88,6 +95,14 @@ class ItemInspectorWidget(QWidget):
         else:
             self._calculator = None
 
+    def set_archetype(self, archetype: Optional[BuildArchetype]) -> None:
+        """Set build archetype for weighted scoring."""
+        self._archetype = archetype
+
+    def set_evaluation(self, evaluation: Optional[Any]) -> None:
+        """Set evaluation results from rare item evaluator."""
+        self._evaluation = evaluation
+
     def set_item(self, item: Any) -> None:
         """Display parsed item information as HTML."""
         if item is None:
@@ -126,6 +141,12 @@ class ItemInspectorWidget(QWidget):
             effective_html = self._build_effective_values_html(all_mods)
             if effective_html:
                 html_parts.append(effective_html)
+
+        # Archetype-weighted scores section
+        if self._evaluation and hasattr(self._evaluation, 'archetype_affix_details'):
+            archetype_html = self._build_archetype_scores_html()
+            if archetype_html:
+                html_parts.append(archetype_html)
 
         # Separator
         html_parts.append(f'<hr style="border: 1px solid {COLORS["border"]}; margin: 8px 0;">')
@@ -279,5 +300,80 @@ class ItemInspectorWidget(QWidget):
                 html_parts.append(
                     f'<p style="color: {color}; margin: 2px 0 2px 8px; font-size: 11px;">• {text}</p>'
                 )
+
+        return "\n".join(html_parts)
+
+    def _build_archetype_scores_html(self) -> str:
+        """Build HTML for archetype-weighted scores section."""
+        if not self._evaluation:
+            return ""
+
+        affix_details = getattr(self._evaluation, 'archetype_affix_details', None)
+        if not affix_details:
+            return ""
+
+        html_parts = []
+
+        # Separator and header
+        html_parts.append(f'<hr style="border: 1px solid {COLORS["border"]}; margin: 8px 0;">')
+        html_parts.append(
+            f'<p style="color: {COLORS["accent"]}; font-weight: bold; margin: 0 0 4px 0;">Archetype-Weighted Scores</p>'
+        )
+
+        # Show archetype summary if available
+        archetype = getattr(self._evaluation, 'build_archetype', None)
+        if archetype and hasattr(archetype, 'get_summary'):
+            summary = archetype.get_summary()
+            html_parts.append(
+                f'<p style="color: {COLORS["text_secondary"]}; font-size: 10px; margin: 0 0 4px 0;">{summary}</p>'
+            )
+
+        # Show total scores
+        base_score = getattr(self._evaluation, 'total_score', 0)
+        weighted_score = getattr(self._evaluation, 'archetype_weighted_score', 0)
+        if weighted_score and weighted_score != base_score:
+            delta = weighted_score - base_score
+            delta_str = f"+{delta}" if delta > 0 else str(delta)
+            delta_color = COLORS.get('currency', '#ffcc00') if delta > 0 else COLORS.get('corrupted', '#ff4444')
+            html_parts.append(
+                f'<p style="margin: 2px 0; font-size: 11px;">'
+                f'<span style="color: {COLORS["text_secondary"]};">Score:</span> '
+                f'<span style="color: {COLORS["text"]};">{base_score}</span> → '
+                f'<span style="color: {delta_color}; font-weight: bold;">{weighted_score}</span> '
+                f'<span style="color: {delta_color};">({delta_str})</span>'
+                f'</p>'
+            )
+
+        # Show individual affix weights
+        for detail in affix_details:
+            affix_type = detail.get('affix_type', '')
+            multiplier = detail.get('multiplier', 1.0)
+            base_weight = detail.get('base_weight', 0)
+            weighted_weight = detail.get('weighted_weight', 0)
+            tier = detail.get('tier', '')
+
+            # Skip if no meaningful change
+            if abs(multiplier - 1.0) < 0.01:
+                continue
+
+            # Color based on multiplier
+            if multiplier > 1.0:
+                mult_color = COLORS.get('currency', '#ffcc00')
+                arrow = "↑"
+            else:
+                mult_color = COLORS.get('corrupted', '#ff4444')
+                arrow = "↓"
+
+            # Format affix type for display
+            display_type = affix_type.replace('_', ' ').title()
+
+            html_parts.append(
+                f'<p style="margin: 2px 0 2px 8px; font-size: 10px;">'
+                f'<span style="color: {COLORS["text_secondary"]};">•</span> '
+                f'<span style="color: {COLORS["text"]};">{display_type}</span> '
+                f'<span style="color: {mult_color};">{arrow} {multiplier:.1f}x</span> '
+                f'<span style="color: {COLORS["text_secondary"]};">({tier})</span>'
+                f'</p>'
+            )
 
         return "\n".join(html_parts)
