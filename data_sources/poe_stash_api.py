@@ -74,8 +74,8 @@ class PoEStashClient:
     CHARACTERS_URL = "/character-window/get-characters"
     ITEMS_URL = "/character-window/get-items"
 
-    # Rate limiting
-    REQUEST_DELAY = 0.5  # seconds between requests (be nice to GGG servers)
+    # Rate limiting - GGG rate limits are strict, need 1.5s+ between requests
+    REQUEST_DELAY = 1.5  # seconds between requests (be nice to GGG servers)
 
     def __init__(self, poesessid: str, user_agent: str = "PoEPriceChecker/1.0"):
         """
@@ -266,18 +266,29 @@ class PoEStashClient:
         return snapshot
 
 
-def get_available_leagues() -> List[str]:
+def get_available_leagues(include_standard: bool = False) -> List[str]:
     """
     Get list of active leagues.
 
-    Returns common league names - actual availability depends on season.
+    Args:
+        include_standard: If True, include Standard/Hardcore leagues
+
+    Returns:
+        List of league names, current league first
     """
-    return [
-        "Standard",
-        "Hardcore",
-        "Phrecia",  # Current league (update as needed)
-        "Hardcore Phrecia",
+    # Current league first
+    leagues = [
+        "Keepers",  # Current league (update as needed)
+        "Hardcore Keepers",
     ]
+
+    if include_standard:
+        leagues.extend([
+            "Standard",
+            "Hardcore",
+        ])
+
+    return leagues
 
 
 # Testing

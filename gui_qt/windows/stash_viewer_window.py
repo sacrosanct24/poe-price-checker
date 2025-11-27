@@ -29,6 +29,7 @@ from PyQt6.QtWidgets import (
     QComboBox,
     QSpinBox,
     QPushButton,
+    QCheckBox,
     QListWidget,
     QListWidgetItem,
     QTableView,
@@ -265,10 +266,15 @@ class StashViewerWindow(QDialog):
         # League selector
         toolbar.addWidget(QLabel("League:"))
         self.league_combo = QComboBox()
-        self.league_combo.setMinimumWidth(120)
-        for league in get_available_leagues():
-            self.league_combo.addItem(league)
+        self.league_combo.setMinimumWidth(140)
+        self._update_league_combo()
         toolbar.addWidget(self.league_combo)
+
+        # Include Standard checkbox
+        self.include_standard_cb = QCheckBox("Include Standard")
+        self.include_standard_cb.setChecked(False)
+        self.include_standard_cb.stateChanged.connect(self._on_include_standard_changed)
+        toolbar.addWidget(self.include_standard_cb)
 
         toolbar.addSpacing(20)
 
@@ -404,16 +410,32 @@ class StashViewerWindow(QDialog):
         if self.ctx.config.account_name:
             self.account_label.setText(self.ctx.config.account_name)
 
-        # Set league from config
-        league = self.ctx.config.league
-        idx = self.league_combo.findText(league)
-        if idx >= 0:
-            self.league_combo.setCurrentIndex(idx)
-
         # Show last fetch time
         last_fetch = self.ctx.config.stash_last_fetch
         if last_fetch:
             self.last_fetch_label.setText(f"Last fetched: {last_fetch}")
+
+    def _update_league_combo(self) -> None:
+        """Update league combo based on include_standard checkbox."""
+        current = self.league_combo.currentText()
+        include_standard = (
+            hasattr(self, 'include_standard_cb') and
+            self.include_standard_cb.isChecked()
+        )
+
+        self.league_combo.clear()
+        for league in get_available_leagues(include_standard=include_standard):
+            self.league_combo.addItem(league)
+
+        # Try to restore previous selection
+        if current:
+            idx = self.league_combo.findText(current)
+            if idx >= 0:
+                self.league_combo.setCurrentIndex(idx)
+
+    def _on_include_standard_changed(self, state: int) -> None:
+        """Handle include standard checkbox change."""
+        self._update_league_combo()
 
     def _show_settings(self) -> None:
         """Show settings dialog for POESESSID."""

@@ -337,20 +337,28 @@ class TestPoEStashClient:
 class TestGetAvailableLeagues:
     """Tests for league list function."""
 
-    def test_returns_leagues(self):
-        """Test that leagues are returned."""
+    def test_returns_current_leagues(self):
+        """Test that current leagues are returned by default."""
         leagues = get_available_leagues()
 
         assert len(leagues) >= 2
+        assert "Keepers" in leagues  # Current league
+        # Standard not included by default
+        assert "Standard" not in leagues
+
+    def test_includes_standard_when_requested(self):
+        """Test Standard included when requested."""
+        leagues = get_available_leagues(include_standard=True)
+
+        assert "Keepers" in leagues
         assert "Standard" in leagues
         assert "Hardcore" in leagues
 
-    def test_includes_current_league(self):
-        """Test current league is included."""
+    def test_current_league_first(self):
+        """Test current league is first in list."""
         leagues = get_available_leagues()
 
-        # Phrecia is the current league
-        assert "Phrecia" in leagues
+        assert leagues[0] == "Keepers"
 
 
 class TestHTTPErrors:
