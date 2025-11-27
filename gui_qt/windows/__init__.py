@@ -7,6 +7,7 @@ from gui_qt.windows.sales_dashboard_window import SalesDashboardWindow
 from gui_qt.windows.pob_character_window import PoBCharacterWindow
 from gui_qt.windows.rare_eval_config_window import RareEvalConfigWindow
 from gui_qt.windows.price_rankings_window import PriceRankingsWindow
+from gui_qt.windows.stash_viewer_window import StashViewerWindow
 
 __all__ = [
     "RecentSalesWindow",
@@ -14,4 +15,5 @@ __all__ = [
     "PoBCharacterWindow",
     "RareEvalConfigWindow",
     "PriceRankingsWindow",
+    "StashViewerWindow",
 ]

@@ -56,6 +56,11 @@ class Config:
         "plugins": {
             "enabled": [],
         },
+        "stash": {
+            "poesessid": "",  # Session cookie for stash access
+            "account_name": "",  # PoE account name
+            "last_fetch": None,  # Last stash fetch timestamp
+        },
     }
 
     def __init__(self, config_file: Optional[Path] = None) -> None:
@@ -308,6 +313,53 @@ class Config:
         if plugin_name in enabled:
             enabled.remove(plugin_name)
             self.save()
+
+    # ------------------------------------------------------------------
+    # Stash Settings
+    # ------------------------------------------------------------------
+
+    @property
+    def poesessid(self) -> str:
+        """Get POESESSID for stash API access."""
+        return self.data.get("stash", {}).get("poesessid", "")
+
+    @poesessid.setter
+    def poesessid(self, value: str) -> None:
+        """Set POESESSID and persist."""
+        if "stash" not in self.data:
+            self.data["stash"] = {}
+        self.data["stash"]["poesessid"] = value
+        self.save()
+
+    @property
+    def account_name(self) -> str:
+        """Get PoE account name for stash access."""
+        return self.data.get("stash", {}).get("account_name", "")
+
+    @account_name.setter
+    def account_name(self, value: str) -> None:
+        """Set account name and persist."""
+        if "stash" not in self.data:
+            self.data["stash"] = {}
+        self.data["stash"]["account_name"] = value
+        self.save()
+
+    @property
+    def stash_last_fetch(self) -> Optional[str]:
+        """Get last stash fetch timestamp."""
+        return self.data.get("stash", {}).get("last_fetch")
+
+    @stash_last_fetch.setter
+    def stash_last_fetch(self, value: Optional[str]) -> None:
+        """Set last stash fetch timestamp and persist."""
+        if "stash" not in self.data:
+            self.data["stash"] = {}
+        self.data["stash"]["last_fetch"] = value
+        self.save()
+
+    def has_stash_credentials(self) -> bool:
+        """Check if stash credentials are configured."""
+        return bool(self.poesessid and self.account_name)
 
     # ------------------------------------------------------------------
     # Utility

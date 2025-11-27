@@ -245,6 +245,7 @@ class PriceCheckerWindow(QMainWindow):
         # Child windows (cached references)
         self._recent_sales_window = None
         self._sales_dashboard_window = None
+        self._stash_viewer_window = None
         self._pob_character_window = None
         self._rare_eval_config_window = None
         self._price_rankings_window = None
@@ -443,6 +444,10 @@ class PriceCheckerWindow(QMainWindow):
         history_action = QAction("Session &History", self)
         history_action.triggered.connect(self._show_history)
         view_menu.addAction(history_action)
+
+        stash_action = QAction("&Stash Viewer", self)
+        stash_action.triggered.connect(self._show_stash_viewer)
+        view_menu.addAction(stash_action)
 
         view_menu.addSeparator()
 
@@ -1226,6 +1231,16 @@ class PriceCheckerWindow(QMainWindow):
 
         self._sales_dashboard_window.show()
         self._sales_dashboard_window.raise_()
+
+    def _show_stash_viewer(self) -> None:
+        """Show stash viewer window."""
+        from gui_qt.windows.stash_viewer_window import StashViewerWindow
+
+        if self._stash_viewer_window is None or not self._stash_viewer_window.isVisible():
+            self._stash_viewer_window = StashViewerWindow(self.ctx, self)
+
+        self._stash_viewer_window.show()
+        self._stash_viewer_window.raise_()
 
     def _show_pob_characters(self) -> None:
         """Show PoB character manager window."""
