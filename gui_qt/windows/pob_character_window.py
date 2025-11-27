@@ -477,6 +477,7 @@ class ItemDetailsDialog(QDialog):
         self.setMinimumHeight(200)
         self.resize(400, 350)
         self.setSizeGripEnabled(True)
+        apply_window_icon(self)
 
         layout = QVBoxLayout(self)
         layout.setSpacing(8)
@@ -527,7 +528,7 @@ class ItemDetailsDialog(QDialog):
             for mod in explicit_mods:
                 mod_label = QLabel(f"  {mod}")
                 if "(crafted)" in mod.lower():
-                    mod_label.setStyleSheet("color: #b4b4ff;")
+                    mod_label.setStyleSheet(f"color: {COLORS['crafted']};")
                 layout.addWidget(mod_label)
 
         # Buttons
@@ -615,6 +616,7 @@ class ManageCategoriesDialog(QDialog):
         self.setMinimumHeight(200)
         self.resize(350, 350)
         self.setSizeGripEnabled(True)
+        apply_window_icon(self)
 
         # Get current categories
         profile = character_manager.get_profile(profile_name)
@@ -679,6 +681,7 @@ class ImportPoBDialog(QDialog):
         self.setMinimumSize(400, 400)
         self.resize(500, 550)
         self.setSizeGripEnabled(True)
+        apply_window_icon(self)
 
         layout = QVBoxLayout(self)
         layout.setSpacing(12)

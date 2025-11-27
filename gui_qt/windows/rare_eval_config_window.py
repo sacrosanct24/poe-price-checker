@@ -28,7 +28,7 @@ from PyQt6.QtWidgets import (
     QFrame,
 )
 
-from gui_qt.styles import COLORS
+from gui_qt.styles import COLORS, apply_window_icon
 
 
 # Preset configurations
@@ -138,6 +138,8 @@ class RareEvalConfigWindow(QDialog):
         self.setWindowTitle("Rare Item Evaluation Settings")
         self.setMinimumSize(400, 450)
         self.resize(550, 650)
+        self.setSizeGripEnabled(True)
+        apply_window_icon(self)
 
         self._sliders: Dict[str, QSlider] = {}
         self._spin_boxes: Dict[str, QSpinBox] = {}

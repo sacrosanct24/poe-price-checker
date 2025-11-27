@@ -27,7 +27,7 @@ from PyQt6.QtWidgets import (
     QLineEdit,
 )
 
-from gui_qt.styles import COLORS
+from gui_qt.styles import COLORS, apply_window_icon
 from core.build_priorities import (
     BuildPriorities,
     StatPriority,
@@ -62,6 +62,7 @@ class PrioritiesEditorDialog(QDialog):
         self.setMinimumHeight(650)
         self.resize(550, 750)  # Good default size for vertical layout
         self.setSizeGripEnabled(True)  # Show resize grip
+        apply_window_icon(self)
 
         self._create_widgets()
         self._load_profile()

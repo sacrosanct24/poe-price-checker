@@ -20,6 +20,8 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from gui_qt.styles import apply_window_icon
+
 
 class RecordSaleDialog(QDialog):
     """Dialog for recording an item sale."""
@@ -37,6 +39,7 @@ class RecordSaleDialog(QDialog):
         self.setMinimumHeight(180)
         self.resize(400, 250)  # Good default size
         self.setSizeGripEnabled(True)  # Show resize grip
+        apply_window_icon(self)
 
         self._item_name = item_name
         self._suggested_price = suggested_price

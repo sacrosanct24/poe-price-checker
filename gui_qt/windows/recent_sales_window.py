@@ -24,6 +24,8 @@ from PyQt6.QtWidgets import (
     QAbstractItemView,
 )
 
+from gui_qt.styles import apply_window_icon
+
 if TYPE_CHECKING:
     from core.app_context import AppContext
 
@@ -115,6 +117,7 @@ class RecentSalesWindow(QDialog):
         self.setMinimumSize(500, 400)
         self.resize(800, 550)
         self.setSizeGripEnabled(True)
+        apply_window_icon(self)
 
         self._all_sales: List[Dict[str, Any]] = []
 

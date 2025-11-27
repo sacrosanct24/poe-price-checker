@@ -44,6 +44,7 @@ COLORS = {
     "fractured": "#a29162",       # Fractured items
     "synthesised": "#6a1b9a",     # Synthesised items
     "corrupted": "#d20000",       # Corrupted items
+    "crafted": "#b4b4ff",         # Crafted mods (light blue)
 }
 
 

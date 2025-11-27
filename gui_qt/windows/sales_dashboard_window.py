@@ -24,6 +24,8 @@ from PyQt6.QtWidgets import (
     QFormLayout,
 )
 
+from gui_qt.styles import apply_window_icon
+
 if TYPE_CHECKING:
     from core.app_context import AppContext
 
@@ -100,6 +102,7 @@ class SalesDashboardWindow(QDialog):
         self.setMinimumSize(450, 400)
         self.resize(650, 550)
         self.setSizeGripEnabled(True)
+        apply_window_icon(self)
 
         self._create_widgets()
         self._load_data()

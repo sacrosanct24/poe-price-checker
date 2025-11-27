@@ -37,9 +37,11 @@ from PyQt6.QtWidgets import (
     QProgressBar,
     QFormLayout,
     QMessageBox,
+    QTextBrowser,
+    QApplication,
 )
 
-from gui_qt.styles import COLORS
+from gui_qt.styles import COLORS, apply_window_icon, get_rarity_color
 from core.stash_valuator import (
     StashValuator,
     ValuationResult,
@@ -135,6 +137,7 @@ class ItemTableModel(QAbstractTableModel):
         super().__init__(parent)
         self._items: List[PricedItem] = []
         self._min_value: float = 0.0
+        self._search_text: str = ""
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
         return len(self._filtered_items())
@@ -143,8 +146,12 @@ class ItemTableModel(QAbstractTableModel):
         return len(self.COLUMNS)
 
     def _filtered_items(self) -> List[PricedItem]:
-        """Get items filtered by minimum value."""
-        return [i for i in self._items if i.total_price >= self._min_value]
+        """Get items filtered by minimum value and search text."""
+        items = [i for i in self._items if i.total_price >= self._min_value]
+        if self._search_text:
+            search_lower = self._search_text.lower()
+            items = [i for i in items if search_lower in i.display_name.lower()]
+        return items
 
     def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
         items = self._filtered_items()
@@ -226,12 +233,135 @@ class ItemTableModel(QAbstractTableModel):
         self._min_value = min_value
         self.endResetModel()
 
+    def set_search_text(self, text: str) -> None:
+        """Set search text filter."""
+        self.beginResetModel()
+        self._search_text = text.strip()
+        self.endResetModel()
+
     def get_item(self, row: int) -> Optional[PricedItem]:
         """Get item at row."""
         items = self._filtered_items()
         if 0 <= row < len(items):
             return items[row]
         return None
+
+
+class StashItemDetailsDialog(QDialog):
+    """Dialog showing stash item details with copy functionality."""
+
+    def __init__(self, item: PricedItem, parent: Optional[QWidget] = None):
+        super().__init__(parent)
+
+        self.item = item
+
+        self.setWindowTitle("Item Details")
+        self.setMinimumWidth(400)
+        self.setMinimumHeight(300)
+        self.resize(450, 400)
+        self.setSizeGripEnabled(True)
+        apply_window_icon(self)
+
+        self._create_widgets()
+
+    def _create_widgets(self) -> None:
+        """Create dialog widgets."""
+        layout = QVBoxLayout(self)
+        layout.setSpacing(12)
+
+        # Item header
+        name_color = get_rarity_color(self.item.rarity.lower())
+        header_html = f'''
+        <div style="text-align: center;">
+            <p style="font-size: 16px; font-weight: bold; color: {name_color}; margin: 4px;">
+                {self.item.display_name}
+            </p>
+            <p style="color: {COLORS["text_secondary"]}; margin: 2px;">
+                {self.item.rarity} • {self.item.item_class}
+            </p>
+        </div>
+        '''
+
+        header_browser = QTextBrowser()
+        header_browser.setMaximumHeight(80)
+        header_browser.setHtml(header_html)
+        header_browser.setStyleSheet(f"""
+            QTextBrowser {{
+                background-color: {COLORS["surface"]};
+                border: 1px solid {COLORS["border"]};
+                border-radius: 4px;
+            }}
+        """)
+        layout.addWidget(header_browser)
+
+        # Price info
+        price_html = f'''
+        <table style="width: 100%;">
+            <tr>
+                <td style="color: {COLORS["text_secondary"]};">Stack Size:</td>
+                <td style="text-align: right;">{self.item.stack_size}</td>
+            </tr>
+            <tr>
+                <td style="color: {COLORS["text_secondary"]};">Unit Price:</td>
+                <td style="text-align: right; color: {COLORS["currency"]};">
+                    {self.item.unit_price:.2f}c
+                </td>
+            </tr>
+            <tr>
+                <td style="color: {COLORS["text_secondary"]};">Total Value:</td>
+                <td style="text-align: right; font-weight: bold; color: {COLORS["high_value"]};">
+                    {self.item.display_price}
+                </td>
+            </tr>
+            <tr>
+                <td style="color: {COLORS["text_secondary"]};">Price Source:</td>
+                <td style="text-align: right;">
+                    {"poe.ninja" if self.item.price_source == PriceSource.POE_NINJA else "poeprices" if self.item.price_source == PriceSource.POE_PRICES else "unknown"}
+                </td>
+            </tr>
+        </table>
+        '''
+
+        price_browser = QTextBrowser()
+        price_browser.setMaximumHeight(120)
+        price_browser.setHtml(price_html)
+        price_browser.setStyleSheet(f"""
+            QTextBrowser {{
+                background-color: {COLORS["surface"]};
+                border: 1px solid {COLORS["border"]};
+                border-radius: 4px;
+                padding: 8px;
+            }}
+        """)
+        layout.addWidget(price_browser)
+
+        # Tab info
+        if self.item.tab_name:
+            tab_label = QLabel(f"Found in: {self.item.tab_name}")
+            tab_label.setStyleSheet(f"color: {COLORS['text_secondary']};")
+            layout.addWidget(tab_label)
+
+        layout.addStretch()
+
+        # Buttons
+        btn_row = QHBoxLayout()
+
+        copy_name_btn = QPushButton("Copy Name")
+        copy_name_btn.clicked.connect(self._copy_name)
+        btn_row.addWidget(copy_name_btn)
+
+        btn_row.addStretch()
+
+        close_btn = QPushButton("Close")
+        close_btn.clicked.connect(self.accept)
+        btn_row.addWidget(close_btn)
+
+        layout.addLayout(btn_row)
+
+    def _copy_name(self) -> None:
+        """Copy item name to clipboard."""
+        QApplication.clipboard().setText(self.item.display_name)
+        QMessageBox.information(self, "Copied", "Item name copied to clipboard.")
 
 
 class StashViewerWindow(QDialog):
@@ -248,6 +378,7 @@ class StashViewerWindow(QDialog):
         self.setMinimumSize(900, 600)
         self.resize(1100, 700)
         self.setSizeGripEnabled(True)
+        apply_window_icon(self)
 
         self._create_widgets()
         self._load_settings()
@@ -631,8 +762,8 @@ class StashViewerWindow(QDialog):
 
     def _on_search_changed(self, text: str) -> None:
         """Handle search filter change."""
-        # TODO: Implement search filtering
-        pass
+        self._item_model.set_search_text(text)
+        self._update_item_count()
 
     def _update_item_count(self) -> None:
         """Update item count label."""
@@ -640,11 +771,11 @@ class StashViewerWindow(QDialog):
         self.item_count_label.setText(f"{count} items")
 
     def _on_item_double_click(self, index: QModelIndex) -> None:
-        """Handle item double-click."""
+        """Handle item double-click - show item details dialog."""
         item = self._item_model.get_item(index.row())
         if item:
-            # TODO: Show item details or copy trade whisper
-            logger.info(f"Double-clicked: {item.display_name}")
+            dialog = StashItemDetailsDialog(item, self)
+            dialog.exec()
 
     def closeEvent(self, event) -> None:
         """Handle window close."""
