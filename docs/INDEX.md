@@ -53,7 +53,12 @@
 
 ### Data Integration
 - **[Cargo API Guide](development/CARGO_API_GUIDE.md)** - PoE Wiki Cargo API for mod/item data
+- **[Data Sources Guide](development/DATA_SOURCES_GUIDE.md)** - Authoritative data source reference
 - [Continuation Guide](development/CONTINUATION.md) - Session continuation notes
+
+### Roadmaps
+- **[PoB Build-Aware Integration](roadmap_pob_integration.md)** - 6-phase integration plan
+- [Next Session Plan](NEXT_SESSION_PLAN.md) - Immediate next steps
 
 ### Plugin System
 - [Plugin Specification](development/PLUGIN_SPEC.md) - How to create plugins
