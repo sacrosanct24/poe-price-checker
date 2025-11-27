@@ -18,9 +18,12 @@ Supports:
 
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass, field
 from typing import Optional, List
+
+logger = logging.getLogger(__name__)
 
 LEVEL_RE = re.compile(r"^Level:\s*(\d+)")
 QUALITY_RE = re.compile(r"^Quality:\s*\+?(-?\d+)%")
@@ -181,8 +184,9 @@ class ItemParser:
         try:
             lines = self._parse_header(lines, item)
             self._parse_body(lines, item)
-        except Exception:
+        except Exception as e:
             # Fail closed - better to return None than misparse
+            logger.debug(f"Item parse failed: {e}")
             return None
 
         # Final validation check: ensure useful minimum structure

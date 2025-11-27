@@ -7,12 +7,90 @@ https://www.poewiki.net/wiki/Path_of_Exile_Wiki:Data_query_API
 from __future__ import annotations
 
 import logging
+import re
 import time
 from typing import Any, Dict, List, Optional
 
 import requests
 
 logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# Input Sanitization for Cargo API Queries
+# =============================================================================
+
+# Valid item classes in PoE (whitelist for query safety)
+VALID_ITEM_CLASSES = frozenset([
+    # Armour
+    "Helmet", "Body Armour", "Gloves", "Boots", "Shield",
+    # Weapons
+    "Bow", "Claw", "Dagger", "One Hand Axe", "One Hand Mace",
+    "One Hand Sword", "Sceptre", "Staff", "Two Hand Axe",
+    "Two Hand Mace", "Two Hand Sword", "Wand", "Warstaff",
+    "Rune Dagger", "Fishing Rod",
+    # Accessories
+    "Amulet", "Belt", "Ring", "Quiver",
+    # Jewels
+    "Jewel", "Abyss Jewel", "Cluster Jewel",
+    # Flasks
+    "Life Flask", "Mana Flask", "Hybrid Flask", "Utility Flask",
+    # Other
+    "Map", "Currency", "Divination Card", "Gem", "Skill Gem",
+    "Support Gem", "Unique",
+])
+
+
+def _sanitize_cargo_string(value: str, max_length: int = 500) -> str:
+    """
+    Sanitize a string value for use in Cargo API queries.
+
+    Prevents SQL injection by:
+    1. Removing/escaping dangerous characters
+    2. Limiting string length
+    3. Allowing only safe characters
+
+    Args:
+        value: The string to sanitize
+        max_length: Maximum allowed length (default: 500)
+
+    Returns:
+        Sanitized string safe for Cargo queries
+    """
+    if not value:
+        return ""
+
+    # Truncate to max length
+    value = value[:max_length]
+
+    # Escape single quotes (double them for SQL)
+    value = value.replace("'", "''")
+
+    # Remove other dangerous SQL characters
+    # Keep: alphanumeric, spaces, common punctuation, % for LIKE patterns
+    value = re.sub(r'[;\-\-\/*\\`]', '', value)
+
+    return value
+
+
+def _validate_item_class(item_class: str) -> str:
+    """
+    Validate item class against whitelist.
+
+    Args:
+        item_class: Item class to validate
+
+    Returns:
+        Validated item class
+
+    Raises:
+        ValueError: If item class is not in whitelist
+    """
+    if item_class not in VALID_ITEM_CLASSES:
+        # Log attempt but don't expose internal details
+        logger.warning(f"Invalid item class requested: {item_class[:50]}")
+        raise ValueError(f"Invalid item class: {item_class}")
+    return item_class
 
 
 class CargoAPIClient:
@@ -179,10 +257,19 @@ class CargoAPIClient:
             "mods.tags"
         )
 
+        # Sanitize user input to prevent SQL injection
+        safe_pattern = _sanitize_cargo_string(stat_text_pattern)
+
+        # Validate integer parameters
+        if not isinstance(generation_type, int) or generation_type not in (1, 2):
+            raise ValueError("generation_type must be 1 (prefix) or 2 (suffix)")
+        if not isinstance(domain, int) or domain < 0:
+            raise ValueError("domain must be a non-negative integer")
+
         where_clauses = [
-            f"mods.stat_text LIKE '{stat_text_pattern}'",
-            f"mods.generation_type={generation_type}",
-            f"mods.domain={domain}",
+            f"mods.stat_text LIKE '{safe_pattern}'",
+            f"mods.generation_type={int(generation_type)}",
+            f"mods.domain={int(domain)}",
         ]
 
         return self.query(
@@ -338,6 +425,9 @@ class CargoAPIClient:
         Returns:
             List of item dictionaries
         """
+        # Validate item class against whitelist to prevent injection
+        validated_class = _validate_item_class(item_class)
+
         all_items = []
         offset = 0
 
@@ -354,7 +444,7 @@ class CargoAPIClient:
             batch = self.query(
                 tables="items",
                 fields=fields,
-                where=f'items.class="{item_class}"',
+                where=f'items.class="{validated_class}"',
                 limit=batch_size,
                 offset=offset,
             )
@@ -416,14 +506,21 @@ class CargoAPIClient:
         )
 
         for item_class in item_classes:
+            # Validate item class against whitelist to prevent injection
+            try:
+                validated_class = _validate_item_class(item_class)
+            except ValueError:
+                logger.warning(f"Skipping invalid item class: {item_class[:50]}")
+                continue
+
             offset = 0
             class_items = []
 
             # Handle "Unique" as a rarity filter instead of class
-            if item_class == "Unique":
+            if validated_class == "Unique":
                 where_clause = 'items.rarity="Unique"'
             else:
-                where_clause = f'items.class="{item_class}"'
+                where_clause = f'items.class="{validated_class}"'
 
             while offset < max_total:
                 batch = self.query(

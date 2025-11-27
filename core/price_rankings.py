@@ -24,6 +24,9 @@ logger = logging.getLogger(__name__)
 # Cache expiry in days
 CACHE_EXPIRY_DAYS = 5
 
+# Time constants
+SECONDS_PER_DAY = 86400
+
 
 @dataclass
 class RankedItem:
@@ -286,7 +289,7 @@ class PriceRankingCache:
         try:
             updated_dt = datetime.fromisoformat(updated_at.replace('Z', '+00:00'))
             age = datetime.now(timezone.utc) - updated_dt
-            return age.total_seconds() / 86400  # Convert to days
+            return age.total_seconds() / SECONDS_PER_DAY
         except (ValueError, AttributeError):
             return None
 
@@ -1057,6 +1060,14 @@ class PriceRankingHistory:
         """Close database connection."""
         self.conn.close()
 
+    def __enter__(self) -> "PriceRankingHistory":
+        """Context manager entry."""
+        return self
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        """Context manager exit - ensures connection is closed."""
+        self.close()
+
 
 # =============================================================================
 # CLI Interface
@@ -1170,21 +1181,19 @@ Examples:
 
     # Handle item history
     if args.history:
-        history_db = PriceRankingHistory()
-        history = history_db.get_item_history(args.history, league, days=args.days, category=args.category)
+        with PriceRankingHistory() as history_db:
+            history = history_db.get_item_history(args.history, league, days=args.days, category=args.category)
 
-        print(f"\n{'='*60}")
-        print(f" Price History: {args.history}")
-        print(f"{'='*60}")
+            print(f"\n{'='*60}")
+            print(f" Price History: {args.history}")
+            print(f"{'='*60}")
 
-        if not history:
-            print("  No history found. Run with --save to store snapshots.")
-        else:
-            for entry in history:
-                divine_str = f" ({entry['divine_value']:.2f} div)" if entry.get('divine_value') else ""
-                print(f"  {entry['snapshot_date']}: #{entry['rank']} - {entry['chaos_value']:,.0f}c{divine_str}")
-
-        history_db.close()
+            if not history:
+                print("  No history found. Run with --save to store snapshots.")
+            else:
+                for entry in history:
+                    divine_str = f" ({entry['divine_value']:.2f} div)" if entry.get('divine_value') else ""
+                    print(f"  {entry['snapshot_date']}: #{entry['rank']} - {entry['chaos_value']:,.0f}c{divine_str}")
         return
 
     # Handle trending
@@ -1192,20 +1201,17 @@ Examples:
         # Need to refresh first to ensure we have current data
         rankings = calculator.refresh_all(force=args.refresh)
 
-        history_db = PriceRankingHistory()
+        with PriceRankingHistory() as history_db:
+            # Save current snapshot
+            if args.save or True:  # Always save for trending
+                history_db.save_all_snapshots(rankings, league)
 
-        # Save current snapshot
-        if args.save or True:  # Always save for trending
-            history_db.save_all_snapshots(rankings, league)
+            categories_to_check = [args.category] if args.category else list(PriceRankingCache.CATEGORIES.keys())
 
-        categories_to_check = [args.category] if args.category else list(PriceRankingCache.CATEGORIES.keys())
-
-        for cat in categories_to_check:
-            trending = history_db.get_trending_items(league, cat, days=args.days)
-            if trending:
-                print_trending(trending, PriceRankingCache.CATEGORIES.get(cat, cat))
-
-        history_db.close()
+            for cat in categories_to_check:
+                trending = history_db.get_trending_items(league, cat, days=args.days)
+                if trending:
+                    print_trending(trending, PriceRankingCache.CATEGORIES.get(cat, cat))
         return
 
     # Fetch rankings
@@ -1215,9 +1221,8 @@ Examples:
         if ranking:
             print_ranking(ranking, limit=args.limit)
             if args.save:
-                history_db = PriceRankingHistory()
-                history_db.save_snapshot(ranking, league)
-                history_db.close()
+                with PriceRankingHistory() as history_db:
+                    history_db.save_snapshot(ranking, league)
                 print("\nSnapshot saved to database.")
     elif args.slots:
         # All equipment slots
@@ -1225,36 +1230,32 @@ Examples:
         for ranking in rankings.values():
             print_ranking(ranking, limit=args.limit)
         if args.save:
-            history_db = PriceRankingHistory()
-            history_db.save_all_snapshots(rankings, league)
-            history_db.close()
+            with PriceRankingHistory() as history_db:
+                history_db.save_all_snapshots(rankings, league)
             print("\nSnapshots saved to database.")
     elif args.category:
         ranking = calculator.refresh_category(args.category, force=args.refresh)
         if ranking:
             print_ranking(ranking, limit=args.limit)
             if args.save:
-                history_db = PriceRankingHistory()
-                history_db.save_snapshot(ranking, league)
-                history_db.close()
+                with PriceRankingHistory() as history_db:
+                    history_db.save_snapshot(ranking, league)
                 print("\nSnapshot saved to database.")
     elif args.group:
         rankings = get_rankings_by_group(args.group, league=league, force_refresh=args.refresh)
         for ranking in rankings.values():
             print_ranking(ranking, limit=args.limit)
         if args.save:
-            history_db = PriceRankingHistory()
-            history_db.save_all_snapshots(rankings, league)
-            history_db.close()
+            with PriceRankingHistory() as history_db:
+                history_db.save_all_snapshots(rankings, league)
             print("\nSnapshots saved to database.")
     else:
         rankings = calculator.refresh_all(force=args.refresh)
         for ranking in rankings.values():
             print_ranking(ranking, limit=args.limit)
         if args.save:
-            history_db = PriceRankingHistory()
-            history_db.save_all_snapshots(rankings, league)
-            history_db.close()
+            with PriceRankingHistory() as history_db:
+                history_db.save_all_snapshots(rankings, league)
             print("\nSnapshots saved to database.")
 
     # Show cache status

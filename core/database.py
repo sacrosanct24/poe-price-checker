@@ -9,12 +9,17 @@ Responsibilities:
 - Plugin state (enabled/config)
 - Aggregate statistics
 - Schema initialization + versioning
+
+Thread Safety:
+- Uses a threading.Lock for all database operations
+- Safe to use from multiple threads (GUI, background workers, etc.)
 """
 from __future__ import annotations
 
 import logging
 import sqlite3
 import statistics
+import threading
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -55,6 +60,9 @@ class Database:
 
         self.db_path = db_path
 
+        # Thread safety lock for all database operations
+        self._lock = threading.RLock()
+
         # Ensure parent directory exists
         db_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -75,20 +83,58 @@ class Database:
     @contextmanager
     def transaction(self) -> Iterator[sqlite3.Connection]:
         """
-        Provide a transaction scope:
+        Provide a transaction scope with thread safety:
 
             with db.transaction() as conn:
                 conn.execute(...)
 
         Commits on success, rolls back on error.
+        Thread-safe: acquires lock for entire transaction.
         """
-        try:
-            yield self.conn
-            self.conn.commit()
-        except Exception as exc:
-            self.conn.rollback()
-            logger.error(f"Transaction failed: {exc}")
-            raise
+        with self._lock:
+            try:
+                yield self.conn
+                self.conn.commit()
+            except Exception as exc:
+                self.conn.rollback()
+                logger.error(f"Transaction failed: {exc}")
+                raise
+
+    def _execute(
+        self, sql: str, params: tuple = (), commit: bool = True
+    ) -> sqlite3.Cursor:
+        """
+        Thread-safe execute helper for single operations.
+
+        Args:
+            sql: SQL statement to execute
+            params: Parameters for the SQL statement
+            commit: Whether to commit after execution (default True)
+
+        Returns:
+            The cursor from the execute call
+        """
+        with self._lock:
+            cursor = self.conn.execute(sql, params)
+            if commit:
+                self.conn.commit()
+            return cursor
+
+    def _execute_fetchone(
+        self, sql: str, params: tuple = ()
+    ) -> Optional[sqlite3.Row]:
+        """Thread-safe fetchone helper."""
+        with self._lock:
+            cursor = self.conn.execute(sql, params)
+            return cursor.fetchone()
+
+    def _execute_fetchall(
+        self, sql: str, params: tuple = ()
+    ) -> List[sqlite3.Row]:
+        """Thread-safe fetchall helper."""
+        with self._lock:
+            cursor = self.conn.execute(sql, params)
+            return cursor.fetchall()
 
     # ----------------------------------------------------------------------
     # Schema Management
@@ -298,13 +344,27 @@ class Database:
                 logger.info(
                     "Applying v4 migration: adding analytics columns and currency_rates table."
                 )
+                # Whitelist of allowed column names and types for security
+                # (prevents any possibility of SQL injection in migrations)
+                ALLOWED_COLUMNS = {
+                    "league": "TEXT",
+                    "rarity": "TEXT",
+                    "game_version": "TEXT",
+                    "item_mods_json": "TEXT",
+                    "build_profile": "TEXT",
+                }
+
                 # Add columns to sales table for historical analytics
                 for col, col_type in [
                     ("league", "TEXT"),
                     ("rarity", "TEXT"),
                     ("game_version", "TEXT"),
                 ]:
+                    if col not in ALLOWED_COLUMNS or ALLOWED_COLUMNS[col] != col_type:
+                        logger.error(f"Invalid column in migration: {col}")
+                        continue
                     try:
+                        # Column names validated against whitelist above
                         conn.execute(f"ALTER TABLE sales ADD COLUMN {col} {col_type};")
                     except sqlite3.OperationalError:
                         logger.debug(f"Column sales.{col} already exists")
@@ -315,7 +375,11 @@ class Database:
                     ("item_mods_json", "TEXT"),
                     ("build_profile", "TEXT"),
                 ]:
+                    if col not in ALLOWED_COLUMNS or ALLOWED_COLUMNS[col] != col_type:
+                        logger.error(f"Invalid column in migration: {col}")
+                        continue
                     try:
+                        # Column names validated against whitelist above
                         conn.execute(f"ALTER TABLE checked_items ADD COLUMN {col} {col_type};")
                     except sqlite3.OperationalError:
                         logger.debug(f"Column checked_items.{col} already exists")
@@ -392,8 +456,8 @@ class Database:
         chaos_value: float,
         item_base_type: Optional[str] = None,
     ) -> int:
-        """Insert a checked item and return its ID."""
-        cursor = self.conn.execute(
+        """Insert a checked item and return its ID. Thread-safe."""
+        cursor = self._execute(
             """
             INSERT INTO checked_items
                 (game_version, league, item_name, item_base_type, chaos_value)
@@ -401,7 +465,6 @@ class Database:
             """,
             (game_version.value, league, item_name, item_base_type, chaos_value),
         )
-        self.conn.commit()
         return cursor.lastrowid
 
     def get_checked_items(
@@ -411,7 +474,7 @@ class Database:
         limit: int = 100,
     ) -> List[Dict[str, Any]]:
         """
-        Return recent checked items.
+        Return recent checked items. Thread-safe.
 
         Results are ordered newest-first by:
         1. checked_at DESC
@@ -431,8 +494,8 @@ class Database:
         query += " ORDER BY checked_at DESC, id DESC LIMIT ?"
         params.append(limit)
 
-        cursor = self.conn.execute(query, params)
-        return [dict(row) for row in cursor.fetchall()]
+        rows = self._execute_fetchall(query, tuple(params))
+        return [dict(row) for row in rows]
 
     # ----------------------------------------------------------------------
     # Sales

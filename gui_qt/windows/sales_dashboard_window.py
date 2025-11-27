@@ -6,8 +6,11 @@ PyQt6 window for sales analytics dashboard.
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
+
+logger = logging.getLogger(__name__)
 
 from PyQt6.QtCore import Qt, QAbstractTableModel, QModelIndex
 from PyQt6.QtWidgets import (
@@ -238,7 +241,8 @@ class SalesDashboardWindow(QDialog):
 
             self._model.set_data(daily_list)
 
-        except Exception:
+        except Exception as e:
+            logger.warning(f"Failed to load sales data: {e}")
             self.total_sales_label.setText("Error")
             self.total_chaos_label.setText("-")
             self.avg_chaos_label.setText("-")

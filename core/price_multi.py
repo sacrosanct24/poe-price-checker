@@ -1,6 +1,9 @@
+import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from typing import Any, Iterable, Protocol, runtime_checkable, Mapping
+
+logger = logging.getLogger(__name__)
 
 RESULT_COLUMNS: tuple[str, ...] = (
     "item_name",
@@ -123,8 +126,11 @@ class MultiSourcePriceService:
                 source = future_to_source[future]
                 try:
                     rows = future.result()
-                except Exception:
-                    # In a real app you'd log this; for now we just skip on error.
+                except Exception as e:
+                    logger.warning(
+                        f"Price source '{source.name}' failed: {e}",
+                        exc_info=True
+                    )
                     continue
 
                 for row in rows:

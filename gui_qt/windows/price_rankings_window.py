@@ -128,8 +128,8 @@ class IconCache:
                 for cb in callbacks:
                     try:
                         cb(pixmap)
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug(f"Icon callback failed: {e}")
         else:
             logger.debug(f"Failed to download icon: {url} - {reply.errorString()}")
 

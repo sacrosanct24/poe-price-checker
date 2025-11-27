@@ -7,7 +7,10 @@ Shows characters and equipment in a compact sidebar format.
 
 from __future__ import annotations
 
+import logging
 from typing import Any, Dict, List, Optional
+
+logger = logging.getLogger(__name__)
 
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor
@@ -125,8 +128,8 @@ class PoBPanel(QWidget):
                     profile = self.character_manager.get_profile(name)
                     if profile:
                         self._profiles_cache[name] = profile
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"Failed to load profile '{name}': {e}")
 
             # Get active profile (returns CharacterProfile object, not dict)
             active = self.character_manager.get_active_profile()

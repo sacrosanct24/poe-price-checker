@@ -195,8 +195,11 @@ class AffixDataProvider:
             return f"JSON Fallback: {affix_count} affix types from {self.json_path}"
 
 
-# Singleton instance for easy access
+# Thread-safe singleton instance for easy access
+import threading
+
 _provider: Optional[AffixDataProvider] = None
+_provider_lock = threading.Lock()
 
 
 def get_affix_provider(
@@ -204,7 +207,7 @@ def get_affix_provider(
     force_reload: bool = False,
 ) -> AffixDataProvider:
     """
-    Get the global AffixDataProvider instance.
+    Get the global AffixDataProvider instance. Thread-safe.
 
     Args:
         mod_database: Optional ModDatabase instance to use
@@ -216,7 +219,10 @@ def get_affix_provider(
     global _provider
 
     if _provider is None or force_reload:
-        _provider = AffixDataProvider(mod_database=mod_database)
-        logger.info(f"Initialized affix provider: {_provider.get_source_info()}")
+        with _provider_lock:
+            # Double-check locking pattern
+            if _provider is None or force_reload:
+                _provider = AffixDataProvider(mod_database=mod_database)
+                logger.info(f"Initialized affix provider: {_provider.get_source_info()}")
 
     return _provider

@@ -11,6 +11,7 @@ from typing import Optional, Dict, Any
 from datetime import datetime
 
 from core.game_version import GameVersion, GameConfig
+from core.secure_storage import encrypt_credential, decrypt_credential
 
 logger = logging.getLogger(__name__)
 
@@ -320,15 +321,19 @@ class Config:
 
     @property
     def poesessid(self) -> str:
-        """Get POESESSID for stash API access."""
-        return self.data.get("stash", {}).get("poesessid", "")
+        """Get POESESSID for stash API access (decrypted)."""
+        encrypted = self.data.get("stash", {}).get("poesessid", "")
+        if not encrypted:
+            return ""
+        return decrypt_credential(encrypted)
 
     @poesessid.setter
     def poesessid(self, value: str) -> None:
-        """Set POESESSID and persist."""
+        """Set POESESSID (encrypted) and persist."""
         if "stash" not in self.data:
             self.data["stash"] = {}
-        self.data["stash"]["poesessid"] = value
+        # Encrypt before storing
+        self.data["stash"]["poesessid"] = encrypt_credential(value) if value else ""
         self.save()
 
     @property

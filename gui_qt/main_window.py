@@ -1327,8 +1327,10 @@ class PriceCheckerWindow(QMainWindow):
             # SW_RESTORE = 9, brings window to foreground
             ctypes.windll.user32.ShowWindow(hwnd, 9)
             ctypes.windll.user32.SetForegroundWindow(hwnd)
-        except Exception:
-            pass  # Not on Windows or failed
+        except (AttributeError, OSError) as e:
+            # AttributeError: ctypes.windll not available on non-Windows
+            # OSError: Windows API call failed
+            self.logger.debug(f"Windows API bring_to_front failed (expected on non-Windows): {e}")
 
         # Restore maximized state if needed
         if old_state & Qt.WindowState.WindowMaximized:
@@ -1503,6 +1505,34 @@ Alt+F4 - Exit
         layout.addWidget(close_btn)
 
         dialog.exec()
+
+    def closeEvent(self, event) -> None:
+        """Handle window close - clean up application resources."""
+        self.logger.info("Closing application...")
+
+        # Stop any running background workers
+        if self._rankings_worker and self._rankings_worker.isRunning():
+            self._rankings_worker.quit()
+            self._rankings_worker.wait(2000)
+
+        # Close child windows
+        for win in [
+            self._recent_sales_window,
+            self._sales_dashboard_window,
+            self._stash_viewer_window,
+            self._pob_character_window,
+            self._rare_eval_config_window,
+            self._price_rankings_window,
+        ]:
+            if win:
+                win.close()
+
+        # Clean up AppContext resources (database, API sessions)
+        if self.ctx:
+            self.ctx.close()
+
+        self.logger.info("Application closed")
+        super().closeEvent(event)
 
 
 def run(ctx: "AppContext") -> None:

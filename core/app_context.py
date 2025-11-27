@@ -34,6 +34,8 @@ class AppContext:
     - price_service: high-level *multi-source* item pricing façade for GUI/CLI
       (currently wraps the existing single PriceService, but can host multiple
        PriceSource implementations going forward).
+
+    Call close() when the application exits to release resources.
     """
     config: Config
     parser: ItemParser
@@ -41,6 +43,42 @@ class AppContext:
     poe_ninja: PoeNinjaAPI | None  # None when current game is PoE2 (until PoE2 support exists)
     poe_watch: PoeWatchAPI | None  # None when disabled or PoE2
     price_service: MultiSourcePriceService
+
+    def close(self) -> None:
+        """
+        Clean up all resources held by the application context.
+
+        Call this when the application exits to properly close:
+        - Database connections
+        - HTTP sessions (API clients)
+        """
+        logger = logging.getLogger(__name__)
+        logger.info("Closing AppContext resources...")
+
+        # Close database connection
+        if self.db:
+            try:
+                self.db.close()
+                logger.debug("Database closed")
+            except Exception as e:
+                logger.error(f"Error closing database: {e}")
+
+        # Close API client sessions
+        if self.poe_ninja:
+            try:
+                self.poe_ninja.close()
+                logger.debug("poe.ninja API closed")
+            except Exception as e:
+                logger.error(f"Error closing poe.ninja API: {e}")
+
+        if self.poe_watch:
+            try:
+                self.poe_watch.close()
+                logger.debug("poe.watch API closed")
+            except Exception as e:
+                logger.error(f"Error closing poe.watch API: {e}")
+
+        logger.info("AppContext resources closed")
 
 
 def create_app_context() -> AppContext:

@@ -210,7 +210,8 @@ class PoeOAuthClient:
         auth_url = f"{self.AUTH_URL}?{urlencode(params)}"
 
         self.logger.info("Opening browser for authentication")
-        self.logger.info("URL: %s", auth_url)
+        # Redact sensitive parameters (state, code_challenge) from logs
+        self.logger.info("URL: %s?... (params redacted)", self.AUTH_URL)
 
         # Open browser
         webbrowser.open(auth_url)

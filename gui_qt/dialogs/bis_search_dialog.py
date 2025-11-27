@@ -710,8 +710,8 @@ class BiSSearchDialog(QDialog):
                 is_es_build=is_es,
                 is_armour_build=not is_es,
             )
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Failed to get base item recommendation: {e}")
 
         # Header with RePoE indicator
         repoe_badge = ""
@@ -797,8 +797,8 @@ class BiSSearchDialog(QDialog):
                 detected = api.detect_current_league()
                 if detected:
                     league = detected
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"Failed to detect current league: {e}")
 
             import urllib.parse
             base_url = f"https://www.pathofexile.com/trade/search/{urllib.parse.quote(league)}"
@@ -837,8 +837,8 @@ class BiSSearchDialog(QDialog):
                 detected = api.detect_current_league()
                 if detected:
                     league = detected
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"Failed to detect current league for in-app search: {e}")
 
             self.progress_bar.setVisible(True)
             self.progress_bar.setRange(0, 0)

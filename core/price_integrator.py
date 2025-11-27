@@ -249,8 +249,8 @@ class PriceIntegrator:
                     source="poe.ninja",
                     notes=[f"API lookup: {chaos:.0f}c"]
                 )
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"poe.ninja lookup failed for unique '{item.name}': {e}")
 
         return None
 

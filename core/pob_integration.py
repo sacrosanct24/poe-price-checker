@@ -15,7 +15,6 @@ import base64
 import json
 import logging
 import re
-import xml.etree.ElementTree as ET
 import zlib
 from dataclasses import dataclass, field
 from enum import Enum
@@ -23,6 +22,20 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
 
 import requests
+
+# Use defusedxml to prevent XXE (XML External Entity) attacks
+# PoB codes from untrusted sources could contain malicious XML
+try:
+    import defusedxml.ElementTree as ET
+    _USING_DEFUSEDXML = True
+except ImportError:
+    import xml.etree.ElementTree as ET
+    _USING_DEFUSEDXML = False
+    # Log warning once at module load
+    logging.getLogger(__name__).warning(
+        "defusedxml not installed - XML parsing may be vulnerable to XXE attacks. "
+        "Install with: pip install defusedxml"
+    )
 
 if TYPE_CHECKING:
     from core.build_archetype import BuildArchetype
@@ -186,6 +199,10 @@ class PoBDecoder:
         "Flask 5": "Flask 5",
     }
 
+    # Maximum sizes to prevent denial-of-service attacks
+    MAX_CODE_SIZE = 500_000  # 500KB encoded (most PoB codes are < 50KB)
+    MAX_XML_SIZE = 10_000_000  # 10MB decompressed (prevents zip bombs)
+
     @staticmethod
     def decode_pob_code(code: str) -> str:
         """
@@ -196,9 +213,16 @@ class PoBDecoder:
 
         Returns:
             Decoded XML string
+
+        Raises:
+            ValueError: If code is invalid, too large, or decompresses to excessive size
         """
         # Remove any whitespace/newlines
         code = code.strip().replace("\n", "").replace("\r", "")
+
+        # Security: Reject excessively large inputs
+        if len(code) > PoBDecoder.MAX_CODE_SIZE:
+            raise ValueError(f"PoB code too large ({len(code)} bytes, max {PoBDecoder.MAX_CODE_SIZE})")
 
         # Handle pastebin URLs
         if "pastebin.com" in code:
@@ -219,11 +243,22 @@ class PoBDecoder:
             # Decode base64
             decoded = base64.b64decode(code)
 
-            # Decompress zlib
-            xml_data = zlib.decompress(decoded)
+            # Decompress zlib with size limit to prevent zip bombs
+            # Use decompressobj to control decompression size
+            decompressor = zlib.decompressobj()
+            xml_data = decompressor.decompress(decoded, PoBDecoder.MAX_XML_SIZE)
+
+            # Check if there's more data (would indicate zip bomb)
+            if decompressor.unconsumed_tail:
+                raise ValueError(
+                    f"Decompressed data exceeds maximum size ({PoBDecoder.MAX_XML_SIZE} bytes)"
+                )
 
             return xml_data.decode("utf-8")
 
+        except zlib.error as e:
+            logger.error(f"Failed to decompress PoB code: {e}")
+            raise ValueError(f"Invalid PoB code (decompression failed): {e}")
         except Exception as e:
             logger.error(f"Failed to decode PoB code: {e}")
             raise ValueError(f"Invalid PoB code: {e}")
@@ -257,8 +292,9 @@ class PoBDecoder:
             response = requests.get(raw_url, timeout=10)
             response.raise_for_status()
             return response.text.strip()
-        except Exception:
+        except Exception as e:
             # Fallback: try the API endpoint
+            logger.debug(f"pobb.in raw endpoint failed, trying API: {e}")
             api_url = f"https://pobb.in/api/v1/paste/{paste_id}"
             try:
                 response = requests.get(api_url, timeout=10)
@@ -531,7 +567,7 @@ class CharacterManager:
         self._active_profile_name: Optional[str] = None
         self._load_profiles()
 
-    def _load_profiles(self):
+    def _load_profiles(self) -> None:
         """Load profiles from storage file."""
         if self.storage_path.exists():
             try:
@@ -549,7 +585,7 @@ class CharacterManager:
             except Exception as e:
                 logger.error(f"Failed to load profiles: {e}")
 
-    def _save_profiles(self):
+    def _save_profiles(self) -> None:
         """Save profiles to storage file."""
         try:
             self.storage_path.parent.mkdir(parents=True, exist_ok=True)

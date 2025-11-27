@@ -10,6 +10,7 @@ This module evaluates rare items by:
 """
 
 import json
+import logging
 import re
 from pathlib import Path
 from typing import List, Dict, Optional, Tuple, Any
@@ -18,6 +19,8 @@ from core.item_parser import ParsedItem
 from core.build_archetype import (
     BuildArchetype, get_weight_multiplier
 )
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -165,8 +168,8 @@ class RareItemEvaluator:
                 with open(meta_file) as f:
                     data = json.load(f)
                     return data.get("affixes", {})
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"Failed to load meta_affixes.json: {e}")
 
         # Fallback to build_archetypes.json meta section
         archetype_file = self.data_dir / "build_archetypes.json"
@@ -175,8 +178,8 @@ class RareItemEvaluator:
                 with open(archetype_file) as f:
                     data = json.load(f)
                     return data.get("_meta_weights", {}).get("popularity_boosts", {})
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"Failed to load build_archetypes.json: {e}")
 
         return {}
 

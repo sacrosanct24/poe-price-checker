@@ -37,6 +37,10 @@ python-dotenv>=1.0.0
 pyperclip>=1.8.0  # Clipboard access
 keyboard>=0.13.5  # Global hotkey support (optional, Windows-focused)
 
+# Security
+cryptography>=41.0.0  # For secure credential storage
+defusedxml>=0.7.0  # XXE-safe XML parsing for PoB imports
+
 # Build/Distribution
 pyinstaller>=6.0.0  # For creating standalone executables
 lxml>=5.0.0  # XML parsing (PoB imports)

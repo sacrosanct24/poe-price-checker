@@ -1182,9 +1182,9 @@ class PriceService:
                     rate = _normalize_rate(game_cfg.get("divine_chaos_rate"))
                     if rate > 0:
                         return chaos_value / rate
-        except Exception:
+        except Exception as e:
             # Config structure weird? Just skip to poe.ninja fallback.
-            pass
+            logger.debug(f"Config divine rate lookup failed: {e}")
 
         # 3) poe.ninja divine/chaos rate
         if self.poe_ninja is not None:

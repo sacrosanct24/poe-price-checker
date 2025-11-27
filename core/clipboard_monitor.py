@@ -110,6 +110,9 @@ class ClipboardMonitor:
 
         return ""
 
+    # Maximum clipboard size to process (100KB should be more than enough for any PoE item)
+    MAX_CLIPBOARD_SIZE = 100_000
+
     def _is_poe_item(self, text: str) -> bool:
         """
         Check if text looks like PoE item clipboard data.
@@ -121,6 +124,11 @@ class ClipboardMonitor:
             True if text appears to be PoE item data
         """
         if not text or len(text) < 20:
+            return False
+
+        # Security: Reject suspiciously large clipboard content
+        if len(text) > self.MAX_CLIPBOARD_SIZE:
+            logger.warning(f"Clipboard content too large ({len(text)} bytes), ignoring")
             return False
 
         # Count matching indicators
@@ -248,8 +256,8 @@ class ClipboardMonitor:
         for config in self._hotkeys:
             try:
                 keyboard.remove_hotkey(config.hotkey)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"Failed to remove hotkey '{config.hotkey}': {e}")
         self._hotkeys.clear()
         logger.info("Unregistered all hotkeys")
 

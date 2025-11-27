@@ -366,22 +366,29 @@ class PoeNinjaClient(BaseAPIClient):
         return 1.0  # Fallback
 
 
-# Convenience functions
+# Thread-safe singleton pattern for convenience functions
+import threading
+
 _client: Optional[PoeNinjaClient] = None
 _price_db: Optional[NinjaPriceDatabase] = None
+_client_lock = threading.Lock()
+_price_db_lock = threading.Lock()
 
 
 def get_ninja_client() -> PoeNinjaClient:
-    """Get or create singleton client."""
+    """Get or create singleton client. Thread-safe."""
     global _client
     if _client is None:
-        _client = PoeNinjaClient()
+        with _client_lock:
+            # Double-check locking pattern
+            if _client is None:
+                _client = PoeNinjaClient()
     return _client
 
 
 def get_ninja_price(name: str, league: str = "Phrecia") -> Optional[NinjaPrice]:
     """
-    Quick lookup for an item price.
+    Quick lookup for an item price. Thread-safe.
 
     Args:
         name: Item name
@@ -393,10 +400,10 @@ def get_ninja_price(name: str, league: str = "Phrecia") -> Optional[NinjaPrice]:
     global _price_db
     client = get_ninja_client()
 
-    if _price_db is None or _price_db.league != league:
-        _price_db = client.build_price_database(league)
-
-    return _price_db.get_price(name)
+    with _price_db_lock:
+        if _price_db is None or _price_db.league != league:
+            _price_db = client.build_price_database(league)
+        return _price_db.get_price(name)
 
 
 if __name__ == "__main__":

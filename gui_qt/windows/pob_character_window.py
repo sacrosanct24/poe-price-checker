@@ -6,7 +6,10 @@ PyQt6 window for managing Path of Building character imports.
 
 from __future__ import annotations
 
+import logging
 from typing import Any, Callable, Dict, Optional
+
+logger = logging.getLogger(__name__)
 
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QFont
@@ -247,8 +250,8 @@ class PoBCharacterWindow(QDialog):
                 archetype = profile.get_archetype()
                 if archetype and hasattr(archetype, 'get_summary'):
                     archetype_summary = archetype.get_summary()
-        except Exception:
-            pass  # Archetype not available
+        except Exception as e:
+            logger.debug(f"Archetype not available: {e}")
 
         return {
             "name": profile.name,
