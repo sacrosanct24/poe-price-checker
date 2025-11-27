@@ -75,7 +75,7 @@ def test_multi_source_both_agree(
     mock_poe_ninja,
     mock_poe_watch
 ):
-    """Test when both sources agree on price."""
+    """Test when both sources agree on price (ninja count < 20 so watch is consulted)."""
     service = PriceService(
         config=mock_config,
         parser=mock_parser,
@@ -83,39 +83,87 @@ def test_multi_source_both_agree(
         poe_ninja=mock_poe_ninja,
         poe_watch=mock_poe_watch
     )
-    
+
     # Create mock parsed item
     parsed = Mock()
     parsed.display_name = "Divine Orb"
     parsed.name = "Divine Orb"
-    parsed.rarity = "CURRENCY"
-    parsed.base_type = None
+    parsed.rarity = "UNIQUE"  # Not currency, so uses find_item_price
+    parsed.base_type = "Orb"
     parsed.gem_level = None
     parsed.gem_quality = None
     parsed.corrupted = None
     parsed.links = 0
-    
-    # Mock poe.ninja response (100 chaos)
-    mock_poe_ninja.get_currency_overview = Mock(return_value={
-        'lines': [{
-            'currencyTypeName': 'Divine Orb',
-            'chaosEquivalent': 100.0
-        }]
+
+    # Mock poe.ninja response (100 chaos, count=15 to NOT trigger early exit)
+    mock_poe_ninja.find_item_price = Mock(return_value={
+        'chaosValue': 100.0,
+        'count': 15  # Below 20 threshold, so watch will be consulted
     })
-    
+
     # Mock poe.watch response (105 chaos - within 20%)
     mock_poe_watch.find_item_price = Mock(return_value={
         'mean': 105.0,
         'daily': 50,
         'lowConfidence': False
     })
-    
+
     chaos, count, source, confidence = service._lookup_price_multi_source(parsed)
-    
-    # Should use ninja price (faster updates) with high confidence
+
+    # Should use ninja price (faster updates) with high confidence when validated
     assert chaos == 100.0
     assert "validated" in source.lower()
     assert confidence == "high"
+
+
+def test_multi_source_high_confidence_early_exit(
+    mock_config,
+    mock_parser,
+    mock_database,
+    mock_poe_ninja,
+    mock_poe_watch
+):
+    """Test early exit when ninja has 20+ listings (high confidence)."""
+    service = PriceService(
+        config=mock_config,
+        parser=mock_parser,
+        db=mock_database,
+        poe_ninja=mock_poe_ninja,
+        poe_watch=mock_poe_watch
+    )
+
+    parsed = Mock()
+    parsed.display_name = "Common Unique"
+    parsed.name = "Common Unique"
+    parsed.rarity = "UNIQUE"
+    parsed.base_type = "Ring"
+    parsed.gem_level = None
+    parsed.gem_quality = None
+    parsed.corrupted = None
+    parsed.links = 0
+
+    # Mock poe.ninja response with HIGH count (triggers early exit)
+    mock_poe_ninja.find_item_price = Mock(return_value={
+        'chaosValue': 50.0,
+        'count': 25  # >= 20 triggers early exit
+    })
+
+    # Mock poe.watch - should NOT be called due to early exit
+    mock_poe_watch.find_item_price = Mock(return_value={
+        'mean': 100.0,  # Different price to verify it's not used
+        'daily': 50,
+        'lowConfidence': False
+    })
+
+    chaos, count, source, confidence = service._lookup_price_multi_source(parsed)
+
+    # Should use ninja price with high confidence, NOT consult poe.watch
+    assert chaos == 50.0
+    assert count == 25
+    assert "high confidence" in source.lower()
+    assert confidence == "high"
+    # Verify poe.watch was NOT called
+    mock_poe_watch.find_item_price.assert_not_called()
 
 
 def test_multi_source_divergence(
@@ -172,7 +220,7 @@ def test_multi_source_watch_low_confidence(
     mock_poe_ninja,
     mock_poe_watch
 ):
-    """Test when poe.watch flags low confidence."""
+    """Test when poe.watch flags low confidence (ninja count < 20 so watch is consulted)."""
     service = PriceService(
         config=mock_config,
         parser=mock_parser,
@@ -180,7 +228,7 @@ def test_multi_source_watch_low_confidence(
         poe_ninja=mock_poe_ninja,
         poe_watch=mock_poe_watch
     )
-    
+
     parsed = Mock()
     parsed.display_name = "Rare Item"
     parsed.name = "Rare Item"
@@ -190,22 +238,22 @@ def test_multi_source_watch_low_confidence(
     parsed.gem_quality = None
     parsed.corrupted = None
     parsed.links = 0
-    
-    # Mock ninja: 50 chaos
+
+    # Mock ninja: 50 chaos with count < 20 (so watch is consulted)
     mock_poe_ninja.find_item_price = Mock(return_value={
         'chaosValue': 50.0,
-        'count': 20
+        'count': 15  # Below 20 so watch is consulted
     })
-    
+
     # Mock watch: 100 chaos but LOW CONFIDENCE
     mock_poe_watch.find_item_price = Mock(return_value={
         'mean': 100.0,
         'daily': 2,
         'lowConfidence': True  # Flagged as unreliable
     })
-    
+
     chaos, count, source, confidence = service._lookup_price_multi_source(parsed)
-    
+
     # Should prefer ninja when watch has low confidence
     assert chaos == 50.0
     assert "ninja" in source.lower()
