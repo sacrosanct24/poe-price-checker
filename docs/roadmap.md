@@ -8,381 +8,287 @@ review_frequency: monthly
 
 # PoE Price Checker – Development Roadmap
 
-**Project Vision:** Over-engineered, portfolio-worthy PoE economy tool supporting both PoE1 & PoE2
+**Project Vision:** The ultimate PoE character item management tool - an over-engineered, portfolio-worthy economy analysis platform supporting PoE1 & PoE2 with desktop and web interfaces.
 
 ---
 
-## 🎯 PROJECT GOALS
+## Current State (v1.1.0)
 
-### Primary Objectives
-
-1. **Learning Experience:** Deep dive into Python architecture, APIs, databases, plugins
-2. **Portfolio Piece:** Demonstrate professional development practices
-3. **Practical Tool:** Actually useful for PoE trading and economy analysis
-4. **Expandability:** Plugin system for community contributions
-
-### Success Criteria
-
-* [ ] Supports both PoE1 and PoE2 seamlessly
-* [ ] 5+ data sources integrated
-* [ ] Plugin system with 3+ example plugins
-* [ ] Sales tracking with price learning
-* [ ] Web API + documentation
-* [ ] 80%+ test coverage
-* [ ] Clean, documented code reviewable by other LLMs
+**Completed Features:**
+- Multi-source pricing (poe.ninja, poe.watch, Trade API)
+- PyQt6 GUI with item inspector, stash scanner, sales tracking
+- PoB integration with build decoding and stat analysis
+- BiS search system with affix tier calculations
+- OAuth stash tab scanning
+- MCP integration for AI assistants
+- 1226 tests passing, ~60% coverage
+- Security hardening (encrypted tokens, CSRF protection)
 
 ---
 
-## 📊 FEATURE BREAKDOWN
+## Phase A: UX/UI Enhancements (Next Priority)
 
-### ✅ Phase 1: Foundation, GUI Refactor & Pricing Integration (CURRENT)
+### A.1 Visual Polish & Theming
+- [ ] **Dark/Light theme toggle** with system preference detection
+- [ ] **Accent color customization** (match PoE currency colors)
+- [ ] **Compact mode** for smaller screens / overlay use
+- [ ] **Font scaling** for accessibility
+- [ ] **High-DPI support** improvements
 
-#### Week 1–2: Infrastructure
+### A.2 Results Table Improvements
+- [ ] **Inline item preview** - hover shows item tooltip with mods
+- [ ] **Profit column** - show margin vs purchase price
+- [ ] **Trend indicators** - up/down arrows for price movement
+- [ ] **Bulk selection** - multi-select for batch operations
+- [ ] **Custom column ordering** - drag-and-drop
+- [ ] **Saved column presets** - "Currency mode", "Gear mode", "Crafting mode"
 
-* [x] PyCharm setup
-* [x] Initial working GUI
-* [ ] Git initialization
-* [ ] GitHub repository creation
-* [ ] Project structure refactoring
-* [ ] CONTEXT.md (this file)
-* [ ] requirements.txt
-* [ ] .gitignore setup
+### A.3 Item Inspector Enhancements
+- [ ] **Side-by-side comparison** - compare 2-3 items simultaneously
+- [ ] **DPS/EHP calculator** - show theoretical impact on build
+- [ ] **Mod tier highlighting** - color-code T1/T2/T3+ affixes
+- [ ] **Craft potential indicator** - "can become X with Y craft"
+- [ ] **Similar items search** - one-click Trade search for comparable
 
-#### Week 2–3: Core Architecture
+### A.4 Navigation & Workflow
+- [ ] **Keyboard shortcuts** - configurable hotkeys for all actions
+- [ ] **Command palette** (Ctrl+Shift+P) - quick access to any feature
+- [ ] **Recent items history** - quick re-check previous items
+- [ ] **Pinned items** - keep important items visible
+- [ ] **Session tabs** - multiple price-checking sessions
 
-* [x] `game_version.py` – PoE1/PoE2 enum
-* [x] `config.py` – Config object with per-game settings and league info
-* [x] `item_parser.py` – Parser wired into the app (basic PoE1 support)
-* [x] `database.py` – SQLite wrapper (initial version) used by app context
-* [ ] `database.py` – Migrations, helpers & query utilities polished
-* [ ] `config.py` – Enhanced validation, error reporting
-* [ ] `item_parser.py` – Refined parsing rules + full unit test suite
+### A.5 Stash Visualization
+- [ ] **Stash grid preview** - visual representation of tab contents
+- [ ] **Heatmap overlay** - color by value (red=high, blue=low)
+- [ ] **Quick-filter** - show only items matching criteria
+- [ ] **Tab comparison** - diff between snapshots over time
 
-#### Week 3–4: Data Sources – Pricing (PoE1 focus)
-
-* [x] `data_sources/base_api.py` – Abstract API client with:
-
-  * [x] Base request logic
-  * [x] Simple rate limiting
-  * [x] Caching via in-memory store
-  * [x] Request logging + User-Agent
-* [x] `data_sources/pricing/poe_ninja.py` – PoE1 pricing
-
-  * [x] Leagues detection (`get_current_leagues`, `detect_current_league`)
-  * [x] `get_currency_overview()` with divine/chaos rate
-  * [x] `load_all_prices()` cache (currency + uniques + misc)
-  * [x] `find_item_price()` for:
-
-    * Gems (`SkillGem` overview)
-    * Uniques (weapons, armour, accessories, flasks, jewels)
-    * Divination cards
-    * Fragments
-    * Unique maps (+ fallback to Map)
-    * Essences, fossils, scarabs, oils, incubators, vials via name heuristics
-* [ ] `poe2_scout.py` – PoE2 pricing integration
-
-  * [ ] Swagger/OpenAPI client
-  * [ ] PoE2-specific error handling & fallbacks
-* [ ] `poe_watch.py` – Historical pricing
-
-  * [ ] Time-series data storage
-  * [ ] Trend helpers
-
-#### Phase 1.5: App Context, GUI Wiring & Live Pricing (COMPLETED THIS WEEK)
-
-* [x] `core/app_context.py`
-
-  * [x] Central `AppContext` dataclass with:
-
-    * `config`, `parser`, `db`, `poe_ninja`, `price_service`
-  * [x] `create_app_context()`:
-
-    * Builds config
-    * Initializes DB
-    * Initializes `PoeNinjaAPI` with league detection
-    * Injects `PriceService`
-
-* [x] `core/price_service.py`
-
-  * [x] `PriceService.check_item(item_text: str) -> list[dict]`
-  * [x] Uses `ItemParser` → parsed item
-  * [x] Uses `PoeNinjaAPI`:
-
-    * Currency via `get_currency_overview()` (e.g., Divine Orb)
-    * Items via `find_item_price(...)`
-  * [x] Chaos → Divine conversion using:
-
-    * `Config.divine_rate` (if set) OR
-    * `PoeNinjaAPI.divine_chaos_rate`
-  * [x] Graceful fallbacks for unsupported/unknown items (`source="not found"`)
-
-* [x] GUI entrypoint & logging
-
-  * [x] `main.py` using `create_app_context()` and `gui.main_window.run(ctx)`
-  * [x] Unified logging via `core.logging_setup` (app + GUI + API + DB)
-  * [x] Status bar & log messages wired (Ready / Checking / Complete / Error)
-
-#### GUI Refactor & Results Table (UPDATED)
-
-* [x] `gui/main_window.py` refactor:
-
-  * [x] Split `_create_layout()` into:
-
-    * `_create_input_area()`
-    * `_create_results_area()`
-    * `_create_status_bar()`
-  * [x] MainWindow uses an injected `AppContext` with `price_service`
-  * [x] Status bar integrated with live league/status messages
-  * [x] Robust logging on price check, clear, errors
-
-* [x] `ResultsTable` abstraction (inside `gui/main_window.py` for now):
-
-  * [x] Encapsulates `ttk.Treeview` for results
-  * [x] Column configuration + tags
-  * [x] Autosize columns helper
-  * [x] `insert_results(rows)` normalizing:
-
-    * `item_name`, `variant`, `links`, `chaos_value`, `divine_value`, `listing_count`, `source`
-  * [x] Row highlighting hooks (e.g. high-value, fractured, craft bases – ready to extend)
-  * [x] `copy_row_as_tsv()` / `_copy_row_tsv()` helper
-  * [x] `export_tsv(...)` implementation (hooked to “Export TSV…” menu)
-  * [x] Column visibility support (backend ready; UI toggle gear planned)
-
-* [x] GUI Quality-of-Life:
-
-  * [x] Auto-paste detection (<<Paste>> triggers auto-check)
-  * [x] Menus:
-
-    * File (Clear, Export TSV, Open Log, Open Config Folder)
-    * Help / Links (GGG, PoEDB, Maxroll, etc.)
-    * About dialog
-  * [x] Results table supports Ctrl+C copy of selected row as TSV
-  * [x] Cleaned Tk callback signatures (no bogus `event` warnings)
-  * [x] Removed unstable dark mode; planned redesigned theming later
-
-#### Testing (Phase 1 scope)
-
-* [x] All existing tests green after refactor:
-
-  * [x] `tests/test_gui_copy_row.py`
-
-    * Headless Tk fixture (`tk_root`)
-    * `_make_fake_gui(...)` constructing a fake `PriceCheckerGUI` + tree
-    * `_get_selected_row()` returns all columns
-    * `_copy_row_tsv()` verified TSV string content
-  * [x] GUI tests now resilient to missing physical display (`TclError`→skip)
-* [ ] Expanded tests for:
-
-  * [ ] `PriceService.check_item` (with mocks for `PoeNinjaAPI`)
-  * [ ] `PoeNinjaAPI.find_item_price` edge cases
-  * [ ] AppContext creation for PoE1 vs PoE2
-
-**Phase 1 Deliverable (updated):**
-Working PoE1-focused price checker with:
-
-* Live poe.ninja integration
-* Functional GUI with clean architecture
-* Logging, basic exports, copy-to-clipboard, and a refactored ResultsTable
+### A.6 Notifications & Feedback
+- [ ] **Toast notifications** - non-blocking status updates
+- [ ] **Sound alerts** - configurable audio for price thresholds
+- [ ] **System tray** - minimize to tray with price alerts
+- [ ] **Progress indicators** - better feedback for long operations
 
 ---
 
-### 🔌 Phase 2: Plugin System (Weeks 5–7) *(unchanged, not started yet)*
+## Phase B: Intelligence & Analytics
 
-**Core Plugin Infrastructure**
+### B.1 Price Intelligence
+- [ ] **Price trend analysis** - 24h/7d/30d trend graphs
+- [ ] **Volatility warnings** - flag items with unstable prices
+- [ ] **Confidence scoring** - weighted average across sources
+- [ ] **Outlier detection** - identify price manipulation
+- [ ] **Historical price lookup** - "what was X worth last league?"
 
-* [ ] `base_plugin.py` – Plugin interface:
+### B.2 Build-Aware Recommendations
+- [ ] **Upgrade finder** - "best upgrades for your build under X budget"
+- [ ] **Stat gap analysis** - "you need 30 more cold res, here are options"
+- [ ] **DPS optimization** - "swap X for Y = +15% DPS for 50c"
+- [ ] **Build archetype detection** - auto-classify from PoB
+- [ ] **Meta awareness** - weight stats by current meta popularity
 
-  ```python
-  class PluginBase(ABC):
-      def initialize(app_context)
-      def on_item_checked(item_data)
-      def on_price_update(price_data)
-      def on_sale_recorded(sale_data)
-      def get_config_schema()
-      def shutdown()
-  ```
-* [ ] `plugin_manager.py` – Discovery & lifecycle:
+### B.3 Crafting Intelligence
+- [ ] **Craft profit calculator** - expected value of crafting operations
+- [ ] **Recombinator simulator** - model outcomes with probabilities
+- [ ] **Essence/Fossil recommendations** - "best method to hit X mod"
+- [ ] **Awakener orb planner** - predict influence mod combinations
+- [ ] **Harvest craft tracker** - log available crafts, suggest uses
 
-  * Auto-discover plugins in `/plugins`
-  * Dependency resolution
-  * Enable/disable via GUI
-  * Config UI generation from schema
-  * Sandbox/safety checks
-* [ ] Plugin DB table for plugin state
+### B.4 Market Analysis
+- [ ] **Snipe detection** - alert when items listed below market
+- [ ] **Flip finder** - identify arbitrage opportunities
+- [ ] **League economy tracker** - currency ratios over time
+- [ ] **Demand prediction** - anticipate price changes from patch notes
+- [ ] **Build popularity correlation** - link item prices to build trends
 
-**Example Plugins**
-
-1. **Price Alert Plugin**
-2. **Export Plugin**
-3. **Statistics Plugin**
-
-**Deliverable:** Plugin system with 3 working plugins, GUI management.
-
----
-
-### 📈 Phase 3: Sales Tracking & Price Learning (Weeks 8–10)
-
-*(Same high-level plan as before – not started yet, but Phase 1 groundwork supports it.)*
+### B.5 Personal Analytics
+- [ ] **Profit/loss tracking** - running total of trading gains
+- [ ] **Time-value analysis** - chaos per hour from different activities
+- [ ] **Portfolio value** - total wealth across all tabs
+- [ ] **Achievement tracking** - "first 100 div", "most profitable flip"
 
 ---
 
-### 🎮 Phase 4: Meta Analysis from PoB (Weeks 11–13)
+## Phase C: Character & Build Management
 
-*(Same as before.)*
+### C.1 Character Dashboard
+- [ ] **Multi-character overview** - all characters at a glance
+- [ ] **Gear score** - aggregate item quality metric
+- [ ] **Resistance summary** - instant res overcap view
+- [ ] **Attribute requirements** - highlight unmet requirements
+- [ ] **Socket/link status** - visual gem setup display
 
----
+### C.2 Gear Progression Planning
+- [ ] **Upgrade roadmap** - prioritized gear improvements
+- [ ] **Budget planner** - "reach T16 maps for under 1 div"
+- [ ] **Leveling gear presets** - saved gear sets for alts
+- [ ] **Goal tracking** - "save for Headhunter: 45/120 div"
 
-### 🌐 Phase 5: Official Trade API Integration (Weeks 14–16)
+### C.3 Build Library
+- [ ] **Build profiles** - save/load complete character setups
+- [ ] **Build comparison** - diff two builds side-by-side
+- [ ] **Build sharing** - export/import build configurations
+- [ ] **Guide integration** - link builds to Maxroll/poe.ninja guides
+- [ ] **SSF mode** - filter recommendations for self-found
 
-*(Same as before; `PriceService` and `AppContext` are now good injection points for Trade API pricing.)*
-
----
-
-### 🔧 Debugging Task: Chaos Orb / Currency Normalization
-
-**Status:** Partially addressed, still worth a future normalization pass
-**Category:** Parser / Name Matching
-**Severity:** Low (Chaos Orb = 1c by definition; Divine & other currency now work well)
-
-**Current State**
-
-* Currency now uses `PoeNinjaAPI.get_currency_overview()`:
-
-  * `Divine Orb` verified working (`138.7c`, `1.00 div`, `source = poe.ninja currency`)
-* Chaos Orb currently handled via:
-
-  * Normalized matching logic
-  * (Optionally) special-case fallback = 1c
-
-**Long-Term Fix Plan (keep):**
-
-1. Debug tracing for unmatched currency keys
-2. Shared `normalize(name: str) -> str` helper
-3. Improved multi-step currency matching (strict → normalized → fuzzy)
-4. Unit tests for Chaos Orb & common currencies
-5. Retire hard-coded fallback once matching is robust
+### C.4 Passive Tree Integration
+- [ ] **Tree visualization** - display allocated passives
+- [ ] **Cluster jewel planner** - optimize notable placement
+- [ ] **Respec cost calculator** - plan passive changes
+- [ ] **Mastery optimizer** - suggest best mastery choices
 
 ---
 
-### 🖼️ Phase 6: Computer Vision (Weeks 17–19)
+## Phase D: Web Implementation
 
-*(Same as before.)*
+### D.1 Architecture
+- [ ] **FastAPI backend** - RESTful API with OpenAPI docs
+- [ ] **WebSocket support** - real-time price updates
+- [ ] **React/Vue frontend** - modern SPA with responsive design
+- [ ] **PostgreSQL** - production database with proper scaling
+- [ ] **Redis caching** - fast price lookups
 
----
+### D.2 Core Web Features
+- [ ] **User authentication** - OAuth with PoE account linking
+- [ ] **Cloud sync** - preferences, builds, history across devices
+- [ ] **Public API** - documented endpoints for third-party tools
+- [ ] **Rate limiting** - protect against abuse
+- [ ] **Webhook integrations** - Discord, Telegram notifications
 
-### 🌍 Phase 7: Web Dashboard & API (Weeks 20–23)
+### D.3 Web-Specific UI
+- [ ] **Mobile-responsive design** - usable on phones/tablets
+- [ ] **PWA support** - installable web app
+- [ ] **Offline mode** - cached data for basic functionality
+- [ ] **Browser extension** - quick price lookup on any page
+- [ ] **Overlay mode** - transparent overlay for in-game use
 
-*(Same as before.)*
-
----
-
-### 📊 Phase 8: Market Trend Analysis (Weeks 24–26)
-
-*(Same as before.)*
-
----
-
-### 🔔 Phase 9: Real-Time Alerts & Webhooks (Weeks 27–28)
-
-*(Same as before.)*
-
----
-
-### 🧪 Phase 10: Testing & Documentation (Weeks 29–30)
-
-*(Same as before, but Phase 1 is already nudging coverage up.)*
-
----
-
-## 🛠️ TECH STACK (UNCHANGED)
-
-*(Keep your existing section; still valid.)*
+### D.4 Social Features
+- [ ] **Price alerts sharing** - community-curated alert configs
+- [ ] **Build showcase** - public build profiles with gear
+- [ ] **Trade reputation** - optional trader ratings
+- [ ] **Guild features** - shared wishlists, group analytics
+- [ ] **Leaderboards** - wealth tracking (opt-in)
 
 ---
 
-## 📁 FINAL PROJECT STRUCTURE (UNCHANGED, BUT NOW PARTIALLY REAL)
+## Phase E: Advanced Integrations
 
-Note: `core/app_context.py`, `core/price_service.py`, `data_sources/pricing/poe_ninja.py`, and `gui/main_window.py` are now aligned with this layout.
+### E.1 External Tool Integration
+- [ ] **Path of Building sync** - two-way build updates
+- [ ] **Awakened PoE Trade** - complement, not replace
+- [ ] **Exilence Next** - portfolio data sharing
+- [ ] **Craft of Exile** - link craft simulations
+- [ ] **PoE Overlay** - hotkey coordination
 
----
+### E.2 Data Source Expansion
+- [ ] **Official Trade API v2** - full listing support
+- [ ] **TFT bulk pricing** - mirror tier item values
+- [ ] **poe.ninja build data** - skill gem popularity
+- [ ] **PoE-Racing** - league start economy patterns
+- [ ] **Reddit sentiment** - gauge community reactions
 
-## 🎓 LEARNING OBJECTIVES / DEVOPS / TIMELINE
-
-*(Keep as-is; roadmap still holds.)*
-
----
-
-## 🎯 NEAR-TERM NEXT STEPS (NEXT 1–2 SESSIONS)
-
-When you open a fresh chat tomorrow, this is the “start here” list:
-
-1. **Threading for Price Checks**
-
-   * Move `PriceService.check_item` calls onto a worker thread
-   * Keep GUI responsive for long-running lookups
-   * Add a “spinner” or subtle status indicator
-
-2. **ResultsTable & Export Polish**
-
-   * Add CSV/Excel export option alongside TSV
-   * Make “Export TSV…” respect current column visibility
-   * Add keyboard shortcuts (Ctrl+L clear, Ctrl+E export, Ctrl+R re-check)
-
-3. **Column Visibility UI**
-
-   * Add a small gear icon / menu to toggle columns
-   * Persist column visibility in config
-
-4. **Unit Tests**
-
-   * Add tests for `PriceService.check_item` (mock `PoeNinjaAPI`)
-   * Add tests for `_lookup_currency_price` (Divine, Exalt, Chaos, etc.)
-   * Add tests for `PoeNinjaAPI.find_item_price` with fake responses
-
-5. **Prep for PoE2**
-
-   * Add a stub `Poe2PricingService` + `Poe2API` interface
-   * Make `AppContext` choose price service based on `GameVersion`
+### E.3 Automation (Ethical)
+- [ ] **Auto-pricing suggestions** - "price this stack at X"
+- [ ] **Bulk listing helper** - batch create forum posts
+- [ ] **Inventory snapshots** - scheduled stash scans
+- [ ] **Watchlist alerts** - notify when items appear
+- [ ] **Smart filters** - learn from your pricing patterns
 
 ---
 
-## 🧭 END-OF-SESSION SUMMARY (2025-11-21)
+## Phase F: Machine Learning & AI
 
-**Focus:** Live Pricing Integration & Coverage
+### F.1 Price Prediction
+- [ ] **ML price model** - predict rare item values
+- [ ] **Affix value weights** - learned from market data
+- [ ] **Roll quality scoring** - tier + roll% = value
+- [ ] **Seasonal adjustments** - league lifecycle patterns
 
-**Work Completed**
+### F.2 Natural Language
+- [ ] **Chat interface** - "find me a 500 pdps axe under 1 div"
+- [ ] **Voice commands** - "check this item" via microphone
+- [ ] **Item description generation** - auto-create trade listings
+- [ ] **Query translation** - natural language to Trade API filters
 
-* Created and wired `PriceService` into `AppContext` and GUI
-* Integrated `PoeNinjaAPI` with:
-
-  * Currency (`get_currency_overview`)
-  * Uniques, div cards, fragments, etc. (`find_item_price`)
-* Implemented `PriceService.check_item` → GUI-friendly rows
-* Implemented currency pricing (e.g., Divine Orb) with chaos/divine conversion
-* Extended poe.ninja coverage to:
-
-  * Unique maps
-  * Fragments, essences, fossils, scarabs, oils, incubators, vials (heuristic-based)
-* Verified GUI behavior:
-
-  * Status updates for ready/checking/complete/error
-  * Logs show correct wiring and no unhandled exceptions
-  * All existing tests green, including GUI copy-row tests
-
-**Blockers / To Watch**
-
-* Rare items (like rare cluster jewels) still “not found” – require Trade API or live search
-* No threading yet → heavy operations still synchronous
-* Chaos/currency normalization could use a proper normalization layer + tests
-
-**Next Session – Recommended First Tasks**
-
-1. Add background worker for price checks (no GUI freeze)
-2. Add CSV/Excel export option to ResultsTable
-3. Wire up column visibility UI + persistence
-4. Start adding unit tests around `PriceService` and `PoeNinjaAPI`
+### F.3 Computer Vision
+- [ ] **Screenshot parsing** - paste image, get item data
+- [ ] **In-game overlay OCR** - read items without clipboard
+- [ ] **Stash tab OCR** - visual inventory without API
 
 ---
 
-Sleep brain now, ship brain tomorrow. 🧠💤
-When you spin up the new chat, just say “load the latest PoE roadmap” and we can jump straight into the next steps.
+## Implementation Priority
+
+### Immediate (Next 2-4 weeks)
+1. **Dark/Light theme toggle** - quick UX win
+2. **Keyboard shortcuts** - power user essential
+3. **Price trend indicators** - add value to existing data
+4. **Side-by-side item comparison** - highly requested
+5. **DPS impact calculator** - build-aware intelligence
+
+### Short-term (1-2 months)
+1. **Upgrade finder** - killer feature for build management
+2. **Stash grid visualization** - visual inventory
+3. **FastAPI backend skeleton** - web foundation
+4. **Build profiles/library** - character management core
+
+### Medium-term (3-6 months)
+1. **Full web implementation** - React frontend
+2. **ML price prediction** - rare item valuation
+3. **Craft profit calculator** - crafting intelligence
+4. **Mobile-responsive web** - cross-platform access
+
+### Long-term (6-12 months)
+1. **Browser extension** - ubiquitous access
+2. **Guild features** - social layer
+3. **Voice/chat interface** - AI interaction
+4. **Computer vision** - image-based lookup
+
+---
+
+## Tech Stack Evolution
+
+### Current (Desktop)
+- Python 3.12, PyQt6, SQLite
+- pytest, requests, beautifulsoup4
+
+### Web Addition
+- **Backend:** FastAPI, SQLAlchemy, PostgreSQL, Redis, Celery
+- **Frontend:** React/Vue 3, TypeScript, TailwindCSS
+- **Infrastructure:** Docker, nginx, GitHub Actions
+- **Monitoring:** Prometheus, Grafana, Sentry
+
+---
+
+## Success Metrics
+
+### User Experience
+- [ ] < 100ms item lookup response time
+- [ ] < 3 clicks to any feature
+- [ ] 90%+ user satisfaction on core workflows
+
+### Technical
+- [ ] 80%+ test coverage
+- [ ] < 1% error rate on API calls
+- [ ] 99.9% uptime for web service
+
+### Adoption
+- [ ] 1000+ desktop downloads
+- [ ] 500+ registered web users
+- [ ] 10+ community plugin contributions
+
+---
+
+## What Makes This "Ultimate"
+
+1. **Unified Experience** - Desktop, web, mobile, overlay all sync
+2. **Build-Aware** - Every feature considers your character's needs
+3. **Intelligence Layer** - Not just data, but actionable insights
+4. **Community-Powered** - Plugins, shared configs, guild features
+5. **Future-Proof** - ML models that improve with more data
+6. **Professional Quality** - Production-grade code, documentation, tests
+
+---
+
+*Last updated: 2025-11-28*
+*Next review: 2025-12-28*
