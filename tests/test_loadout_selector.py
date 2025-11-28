@@ -198,8 +198,12 @@ class TestLoadoutSelectorDialogIntegration:
         """Create dialog instance for testing."""
         pytest.importorskip("PyQt6")
 
-        # Only import if PyQt6 is available
-        from PyQt6.QtWidgets import QApplication
+        # Only import if PyQt6 is available and display backend works
+        try:
+            from PyQt6.QtWidgets import QApplication
+        except ImportError as e:
+            pytest.skip(f"PyQt6 display backend not available: {e}")
+
         import sys
 
         # Create QApplication if not exists
