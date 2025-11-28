@@ -28,7 +28,7 @@ def test_results_table_model_columns(qapp):
     model = ResultsTableModel()
     expected_columns = [
         "item_name", "variant", "links", "chaos_value", "divine_value",
-        "listing_count", "source", "upgrade", "price_explanation"
+        "trend_7d", "listing_count", "source", "upgrade", "price_explanation"
     ]
 
     assert model.columns == expected_columns
@@ -48,7 +48,7 @@ def test_results_table_model_set_data(qapp):
     model.set_data(data)
 
     assert model.rowCount() == 2
-    assert model.columnCount() == 9
+    assert model.columnCount() == 10
 
 
 def test_results_table_model_get_row(qapp):
@@ -82,7 +82,7 @@ def test_results_table_widget_creation(qapp):
     widget = ResultsTableWidget()
 
     assert widget is not None
-    assert len(widget.columns) == 9
+    assert len(widget.columns) == 10
 
 
 def test_results_table_widget_set_data(qapp):

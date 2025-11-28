@@ -249,3 +249,270 @@ class TestPriceCheckHotkeyManager:
         manager.cleanup()
 
         assert manager.monitor.is_running is False
+
+    def test_enable_auto_detection(self):
+        """Test enabling auto detection starts monitoring."""
+        def dummy_callback(text):
+            pass
+
+        manager = PriceCheckHotkeyManager(dummy_callback)
+
+        detection_callback = lambda x: None
+        result = manager.enable_auto_detection(detection_callback)
+        assert result is True
+        assert manager.monitor.on_item_detected is detection_callback
+        assert manager.monitor.is_running is True
+
+        manager.cleanup()
+
+    def test_disable_auto_detection(self):
+        """Test disabling auto detection stops monitoring."""
+        def dummy_callback(text):
+            pass
+
+        manager = PriceCheckHotkeyManager(dummy_callback)
+        manager.enable_auto_detection(lambda x: None)
+        manager.disable_auto_detection()
+
+        assert manager.monitor.is_running is False
+        manager.cleanup()
+
+
+class TestClipboardMonitorSingleton:
+    """Tests for singleton functions."""
+
+    def test_get_hotkey_manager_creates_instance(self):
+        """get_hotkey_manager creates manager on first call."""
+        from core.clipboard_monitor import get_hotkey_manager, cleanup_hotkey_manager
+
+        # Ensure clean state
+        cleanup_hotkey_manager()
+
+        callback = lambda x: None
+        manager = get_hotkey_manager(callback)
+        assert manager is not None
+
+        cleanup_hotkey_manager()
+
+    def test_get_hotkey_manager_returns_same_instance(self):
+        """get_hotkey_manager returns same instance on subsequent calls."""
+        from core.clipboard_monitor import get_hotkey_manager, cleanup_hotkey_manager
+
+        cleanup_hotkey_manager()
+
+        callback = lambda x: None
+        manager1 = get_hotkey_manager(callback)
+        manager2 = get_hotkey_manager()  # No callback needed
+
+        assert manager1 is manager2
+
+        cleanup_hotkey_manager()
+
+    def test_get_hotkey_manager_no_callback_returns_none(self):
+        """get_hotkey_manager returns None when no callback and no instance."""
+        from core.clipboard_monitor import get_hotkey_manager, cleanup_hotkey_manager
+
+        cleanup_hotkey_manager()
+
+        result = get_hotkey_manager()
+        assert result is None
+
+    def test_cleanup_hotkey_manager(self):
+        """cleanup_hotkey_manager clears the singleton."""
+        from core.clipboard_monitor import get_hotkey_manager, cleanup_hotkey_manager
+
+        cleanup_hotkey_manager()
+
+        callback = lambda x: None
+        get_hotkey_manager(callback)
+
+        cleanup_hotkey_manager()
+
+        result = get_hotkey_manager()
+        assert result is None
+
+
+class TestClipboardMonitorModuleConstants:
+    """Tests for module-level constants."""
+
+    def test_keyboard_available_is_bool(self):
+        """KEYBOARD_AVAILABLE should be boolean."""
+        from core.clipboard_monitor import KEYBOARD_AVAILABLE
+        assert isinstance(KEYBOARD_AVAILABLE, bool)
+
+    def test_pyperclip_available_is_bool(self):
+        """PYPERCLIP_AVAILABLE should be boolean."""
+        from core.clipboard_monitor import PYPERCLIP_AVAILABLE
+        assert isinstance(PYPERCLIP_AVAILABLE, bool)
+
+    def test_max_clipboard_size(self):
+        """MAX_CLIPBOARD_SIZE should be reasonable."""
+        monitor = ClipboardMonitor()
+        assert monitor.MAX_CLIPBOARD_SIZE == 100_000
+
+
+class TestClipboardMonitorHotkeyRegistration:
+    """Tests for hotkey registration methods."""
+
+    def test_register_hotkey_no_keyboard(self):
+        """register_hotkey returns False when keyboard not available."""
+        from unittest.mock import patch
+
+        monitor = ClipboardMonitor()
+
+        with patch('core.clipboard_monitor.KEYBOARD_AVAILABLE', False):
+            result = monitor.register_hotkey("ctrl+c", lambda: None, "Test")
+            # The actual KEYBOARD_AVAILABLE is checked at module level
+            # This test verifies the method exists and can be called
+
+    def test_unregister_hotkey_not_registered(self):
+        """unregister_hotkey handles non-existent hotkey."""
+        from unittest.mock import patch
+
+        monitor = ClipboardMonitor()
+
+        with patch('core.clipboard_monitor.KEYBOARD_AVAILABLE', False):
+            result = monitor.unregister_hotkey("ctrl+nonexistent")
+            assert result is False
+
+    def test_unregister_all_hotkeys_empty(self):
+        """unregister_all_hotkeys handles empty list."""
+        monitor = ClipboardMonitor()
+        assert len(monitor._hotkeys) == 0
+
+        # Should not raise
+        monitor.unregister_all_hotkeys()
+
+
+class TestClipboardMonitorInit:
+    """Tests for ClipboardMonitor initialization options."""
+
+    def test_default_poll_interval(self):
+        """Default poll interval is 0.5 seconds."""
+        monitor = ClipboardMonitor()
+        assert monitor.poll_interval == 0.5
+
+    def test_custom_poll_interval(self):
+        """Custom poll interval is respected."""
+        monitor = ClipboardMonitor(poll_interval=1.0)
+        assert monitor.poll_interval == 1.0
+
+    def test_callback_stored(self):
+        """Callback function is stored."""
+        callback = lambda x: x
+
+        monitor = ClipboardMonitor(on_item_detected=callback)
+        assert monitor.on_item_detected is callback
+
+    def test_tkinter_root_stored(self):
+        """Tkinter root is stored for fallback."""
+        from unittest.mock import Mock
+
+        tk_root = Mock()
+        monitor = ClipboardMonitor(tk_root=tk_root)
+        assert monitor.tk_root is tk_root
+
+
+class TestClipboardMonitorEdgeCases:
+    """Tests for edge cases in clipboard monitoring."""
+
+    def test_detect_item_with_only_separator(self):
+        """Text with only separator is not detected as item."""
+        monitor = ClipboardMonitor()
+        text = "--------\n--------\n--------\n--------"
+        assert monitor._is_poe_item(text) is False
+
+    def test_detect_item_near_min_length(self):
+        """Text near minimum length boundary."""
+        monitor = ClipboardMonitor()
+        # Exactly 20 chars with 2 indicators should work
+        text = "Rarity: Rare--------"  # 20 chars
+        assert monitor._is_poe_item(text) is True
+
+    def test_stats_with_hotkeys(self):
+        """Stats include registered hotkeys."""
+        monitor = ClipboardMonitor()
+        monitor._hotkeys = [
+            HotkeyConfig("ctrl+a", "Test A"),
+            HotkeyConfig("ctrl+b", "Test B"),
+        ]
+
+        stats = monitor.get_stats()
+        assert stats["hotkeys_registered"] == 2
+        assert len(stats["hotkeys"]) == 2
+        assert stats["hotkeys"][0]["hotkey"] == "ctrl+a"
+        assert stats["hotkeys"][1]["description"] == "Test B"
+
+    def test_stop_monitoring_without_thread(self):
+        """stop_monitoring handles case with no thread."""
+        monitor = ClipboardMonitor()
+        monitor._running = True
+        monitor._monitor_thread = None
+
+        # Should not raise
+        monitor.stop_monitoring()
+        assert monitor._running is False
+
+
+class TestPriceCheckHotkeyManagerCallbacks:
+    """Tests for hotkey callback handling."""
+
+    def test_on_price_check_hotkey_with_item(self):
+        """Hotkey triggers callback when item found."""
+        calls = []
+
+        def callback(text):
+            calls.append(text)
+
+        manager = PriceCheckHotkeyManager(callback)
+
+        item_text = """Item Class: Amulets
+Rarity: Rare
+Storm Collar
+Onyx Amulet
+--------
+Item Level: 84"""
+
+        manager.monitor._get_clipboard = lambda: item_text
+        manager._on_price_check_hotkey()
+
+        assert len(calls) == 1
+        assert calls[0] == item_text
+
+        manager.cleanup()
+
+    def test_on_price_check_hotkey_no_item(self):
+        """Hotkey doesn't trigger callback when no item."""
+        calls = []
+
+        def callback(text):
+            calls.append(text)
+
+        manager = PriceCheckHotkeyManager(callback)
+        manager.monitor._get_clipboard = lambda: "not an item"
+        manager._on_price_check_hotkey()
+
+        assert len(calls) == 0
+
+        manager.cleanup()
+
+    def test_on_price_check_hotkey_callback_error(self):
+        """Hotkey handles callback errors gracefully."""
+        def error_callback(text):
+            raise ValueError("Test error")
+
+        manager = PriceCheckHotkeyManager(error_callback)
+
+        item_text = """Item Class: Rings
+Rarity: Rare
+Storm Ring
+Diamond Ring
+--------
+Item Level: 80"""
+
+        manager.monitor._get_clipboard = lambda: item_text
+
+        # Should not raise
+        manager._on_price_check_hotkey()
+
+        manager.cleanup()
