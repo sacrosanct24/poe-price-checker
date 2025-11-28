@@ -6,6 +6,7 @@ PyQt6 table widget for displaying price check results.
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -19,6 +20,15 @@ from PyQt6.QtWidgets import (
 
 from gui_qt.styles import COLORS
 
+logger = logging.getLogger(__name__)
+
+# Trend colors (colorblind-safe)
+TREND_COLORS = {
+    "up": "#4CAF50",  # Green
+    "down": "#F44336",  # Red
+    "stable": "#9E9E9E",  # Gray
+}
+
 
 class ResultsTableModel(QAbstractTableModel):
     """Table model for price check results."""
@@ -30,6 +40,7 @@ class ResultsTableModel(QAbstractTableModel):
         ("links", "Links", 60),
         ("chaos_value", "Chaos", 80),
         ("divine_value", "Divine", 80),
+        ("trend_7d", "7d Trend", 75),
         ("listing_count", "Listings", 70),
         ("source", "Source", 100),
         ("upgrade", "Upgrade", 70),
@@ -40,6 +51,8 @@ class ResultsTableModel(QAbstractTableModel):
         super().__init__(parent)
         self._data: List[Dict[str, Any]] = []
         self._hidden_columns: set[str] = {"price_explanation"}
+        self._trend_calculator = None
+        self._league = "Standard"
 
     @property
     def columns(self) -> List[str]:
@@ -51,6 +64,22 @@ class ResultsTableModel(QAbstractTableModel):
 
     def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
         return len(self.COLUMNS)
+
+    @property
+    def trend_calculator(self):
+        """Lazy-load trend calculator."""
+        if self._trend_calculator is None:
+            try:
+                from core.price_trend_calculator import get_trend_calculator
+
+                self._trend_calculator = get_trend_calculator()
+            except Exception as e:
+                logger.warning(f"Failed to load trend calculator: {e}")
+        return self._trend_calculator
+
+    def set_league(self, league: str) -> None:
+        """Set the current league for trend calculations."""
+        self._league = league
 
     def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
         if not index.isValid() or not (0 <= index.row() < len(self._data)):
@@ -67,9 +96,24 @@ class ResultsTableModel(QAbstractTableModel):
                     return f"{float(value):.1f}" if value else ""
                 except (ValueError, TypeError):
                     return str(value) if value else ""
+
+            # Trend column
+            if col_key == "trend_7d":
+                trend = row_data.get("_trend")
+                if trend:
+                    return trend.display_text
+                return ""
+
             return str(value) if value else ""
 
         elif role == Qt.ItemDataRole.ForegroundRole:
+            # Trend column coloring
+            if col_key == "trend_7d":
+                trend = row_data.get("_trend")
+                if trend:
+                    color = TREND_COLORS.get(trend.trend, TREND_COLORS["stable"])
+                    return QBrush(QColor(color))
+
             # Color based on value
             chaos_val = row_data.get("chaos_value", 0)
             try:
@@ -92,8 +136,16 @@ class ResultsTableModel(QAbstractTableModel):
                 return QBrush(QColor("#2a3a2a"))  # Dark green tint
 
         elif role == Qt.ItemDataRole.TextAlignmentRole:
-            if col_key in ("chaos_value", "divine_value", "listing_count", "links"):
+            if col_key in ("chaos_value", "divine_value", "listing_count", "links", "trend_7d"):
                 return Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+
+        elif role == Qt.ItemDataRole.ToolTipRole:
+            # Trend tooltip
+            if col_key == "trend_7d":
+                trend = row_data.get("_trend")
+                if trend:
+                    return trend.tooltip
+                return "No trend data available"
 
         elif role == Qt.ItemDataRole.UserRole:
             # Return full row data for selection handling
@@ -114,10 +166,29 @@ class ResultsTableModel(QAbstractTableModel):
                 return str(section + 1)
         return None
 
-    def set_data(self, data: List[Dict[str, Any]]) -> None:
-        """Set the table data."""
+    def set_data(self, data: List[Dict[str, Any]], calculate_trends: bool = True) -> None:
+        """Set the table data.
+
+        Args:
+            data: List of row dictionaries
+            calculate_trends: Whether to calculate price trends (default True)
+        """
         self.beginResetModel()
         self._data = data
+
+        # Calculate trends for each item
+        if calculate_trends and self.trend_calculator:
+            for row in self._data:
+                item_name = row.get("item_name", "")
+                if item_name:
+                    try:
+                        trend = self.trend_calculator.get_trend(
+                            item_name, self._league, days=7
+                        )
+                        row["_trend"] = trend
+                    except Exception as e:
+                        logger.debug(f"Failed to get trend for {item_name}: {e}")
+
         self.endResetModel()
 
     def get_row(self, row: int) -> Optional[Dict[str, Any]]:
@@ -187,9 +258,13 @@ class ResultsTableWidget(QTableView):
         """Return list of column keys."""
         return self._model.columns
 
-    def set_data(self, data: List[Dict[str, Any]]) -> None:
+    def set_league(self, league: str) -> None:
+        """Set the current league for trend calculations."""
+        self._model.set_league(league)
+
+    def set_data(self, data: List[Dict[str, Any]], calculate_trends: bool = True) -> None:
         """Set the table data."""
-        self._model.set_data(data)
+        self._model.set_data(data, calculate_trends=calculate_trends)
 
     def get_selected_row(self) -> Optional[Dict[str, Any]]:
         """Get the currently selected row data."""

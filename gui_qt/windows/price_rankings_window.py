@@ -148,6 +148,14 @@ def get_icon_cache() -> IconCache:
     return _icon_cache
 
 
+# Trend colors (colorblind-safe)
+TREND_COLORS = {
+    "up": "#4CAF50",  # Green
+    "down": "#F44336",  # Red
+    "stable": "#9E9E9E",  # Gray
+}
+
+
 class RankingsTableModel(QAbstractTableModel):
     """Table model for price rankings with icon support."""
 
@@ -158,6 +166,7 @@ class RankingsTableModel(QAbstractTableModel):
         ("base_type", "Base Type", 140),
         ("chaos_value", "Chaos", 75),
         ("divine_value", "Divine", 70),
+        ("trend_7d", "7d Trend", 75),
     ]
 
     ICON_SIZE = 32  # Icon size in pixels
@@ -166,6 +175,25 @@ class RankingsTableModel(QAbstractTableModel):
         super().__init__(parent)
         self._data: List[Dict[str, Any]] = []
         self._icon_cache = get_icon_cache()
+        self._trend_calculator = None
+        self._league = "Standard"
+        self._category = ""
+
+    @property
+    def trend_calculator(self):
+        """Lazy-load trend calculator."""
+        if self._trend_calculator is None:
+            try:
+                from core.price_trend_calculator import get_trend_calculator
+                self._trend_calculator = get_trend_calculator()
+            except Exception as e:
+                logger.warning(f"Failed to load trend calculator: {e}")
+        return self._trend_calculator
+
+    def set_context(self, league: str, category: str) -> None:
+        """Set the league and category for trend calculations."""
+        self._league = league
+        self._category = category
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
         return len(self._data)
@@ -196,6 +224,11 @@ class RankingsTableModel(QAbstractTableModel):
                     return ""
             elif col_key == "base_type":
                 return str(value) if value else ""
+            elif col_key == "trend_7d":
+                trend = row_data.get("_trend")
+                if trend:
+                    return trend.display_text
+                return ""
             return str(value) if value else ""
 
         elif role == Qt.ItemDataRole.DecorationRole:
@@ -218,12 +251,19 @@ class RankingsTableModel(QAbstractTableModel):
                 return None
 
         elif role == Qt.ItemDataRole.TextAlignmentRole:
-            if col_key in ("chaos_value", "divine_value", "rank"):
+            if col_key in ("chaos_value", "divine_value", "rank", "trend_7d"):
                 return Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
             elif col_key == "icon":
                 return Qt.AlignmentFlag.AlignCenter
 
         elif role == Qt.ItemDataRole.ForegroundRole:
+            # Trend column coloring
+            if col_key == "trend_7d":
+                trend = row_data.get("_trend")
+                if trend:
+                    color = TREND_COLORS.get(trend.trend, TREND_COLORS["stable"])
+                    return QBrush(QColor(color))
+
             # Color high-value items
             chaos = row_data.get("chaos_value", 0) or 0
             if chaos >= 10000:
@@ -232,6 +272,13 @@ class RankingsTableModel(QAbstractTableModel):
                 return QBrush(QColor(COLORS["rare"]))
             elif chaos >= 100:
                 return QBrush(QColor(COLORS["magic"]))
+
+        elif role == Qt.ItemDataRole.ToolTipRole:
+            if col_key == "trend_7d":
+                trend = row_data.get("_trend")
+                if trend:
+                    return trend.tooltip
+                return "No trend data available"
 
         elif role == Qt.ItemDataRole.SizeHintRole:
             if col_key == "icon":
@@ -257,19 +304,39 @@ class RankingsTableModel(QAbstractTableModel):
                 return self.COLUMNS[section][1]
         return None
 
-    def set_data(self, items: List[Any]) -> None:
-        """Set the table data from RankedItem list."""
+    def set_data(self, items: List[Any], calculate_trends: bool = True) -> None:
+        """Set the table data from RankedItem list.
+
+        Args:
+            items: List of RankedItem objects
+            calculate_trends: Whether to calculate price trends (default True)
+        """
         self.beginResetModel()
         self._data = []
         for item in items:
-            self._data.append({
+            row = {
                 "icon": item.icon or "",
                 "rank": item.rank,
                 "name": item.name,
                 "base_type": item.base_type or "",
                 "chaos_value": item.chaos_value,
                 "divine_value": item.divine_value,
-            })
+            }
+
+            # Calculate trend if enabled
+            if calculate_trends and self.trend_calculator and item.name:
+                try:
+                    trend = self.trend_calculator.get_trend(
+                        item.name,
+                        self._league,
+                        days=7,
+                        category=self._category or None
+                    )
+                    row["_trend"] = trend
+                except Exception as e:
+                    logger.debug(f"Failed to get trend for {item.name}: {e}")
+
+            self._data.append(row)
         self.endResetModel()
 
 

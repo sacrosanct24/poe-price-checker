@@ -48,6 +48,7 @@ class Config:
             "show_vendor_items": True,
             "window_width": 1200,
             "window_height": 800,
+            "theme": "dark",  # dark, light, or system
         },
         "api": {
             "auto_detect_league": True,
@@ -276,6 +277,19 @@ class Config:
         width, height = value
         self.data["ui"]["window_width"] = width
         self.data["ui"]["window_height"] = height
+        self.save()
+
+    @property
+    def theme(self) -> str:
+        """Get the UI theme (dark, light, or system)."""
+        return self.data["ui"].get("theme", "dark")
+
+    @theme.setter
+    def theme(self, value: str) -> None:
+        """Set the UI theme and persist."""
+        if value not in ("dark", "light", "system"):
+            value = "dark"
+        self.data["ui"]["theme"] = value
         self.save()
 
     # ------------------------------------------------------------------
