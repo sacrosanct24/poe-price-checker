@@ -437,5 +437,280 @@ class TestGetValuator:
         assert valuator1 is valuator2
 
 
+class TestStashValuatorEdgeCases:
+    """Additional edge case tests for StashValuator."""
+
+    def test_classify_oil(self):
+        """Test classifying oil items."""
+        valuator = StashValuator()
+        item = {"frameType": 0, "typeLine": "Golden Oil", "icon": ""}
+        assert valuator._classify_item(item) == "oil"
+
+    def test_classify_oiled_not_oil(self):
+        """Test that 'oiled' items are not classified as oil."""
+        valuator = StashValuator()
+        item = {"frameType": 0, "typeLine": "Oiled Map", "icon": ""}
+        # Should not be classified as oil
+        assert valuator._classify_item(item) != "oil"
+
+    def test_classify_fossil(self):
+        """Test classifying fossil items."""
+        valuator = StashValuator()
+        item = {"frameType": 0, "typeLine": "Pristine Fossil", "icon": ""}
+        assert valuator._classify_item(item) == "fossil"
+
+    def test_classify_resonator(self):
+        """Test classifying resonator items."""
+        valuator = StashValuator()
+        item = {"frameType": 0, "typeLine": "Primitive Chaotic Resonator", "icon": ""}
+        assert valuator._classify_item(item) == "resonator"
+
+    def test_classify_fragment(self):
+        """Test classifying fragment items."""
+        valuator = StashValuator()
+        item = {"frameType": 0, "typeLine": "Fragment of the Chimera", "icon": ""}
+        assert valuator._classify_item(item) == "fragment"
+
+    def test_classify_splinter(self):
+        """Test classifying splinter as fragment."""
+        valuator = StashValuator()
+        item = {"frameType": 0, "typeLine": "Splinter of Xoph", "icon": ""}
+        assert valuator._classify_item(item) == "fragment"
+
+    def test_classify_map(self):
+        """Test classifying map items."""
+        valuator = StashValuator()
+        item = {
+            "frameType": 0,
+            "typeLine": "Strand Map",
+            "icon": "https://example.com/map.png",
+            "properties": [{"name": "Map Tier", "values": [["16", 0]]}],
+        }
+        assert valuator._classify_item(item) == "map"
+
+    def test_classify_normal(self):
+        """Test classifying normal items."""
+        valuator = StashValuator()
+        item = {"frameType": 0, "typeLine": "Iron Ring", "icon": ""}
+        assert valuator._classify_item(item) == "normal"
+
+    def test_classify_essence_of(self):
+        """Test classifying 'Essence of' items."""
+        valuator = StashValuator()
+        item = {"frameType": 0, "typeLine": "Essence of Greed", "icon": ""}
+        assert valuator._classify_item(item) == "essence"
+
+    def test_display_name_same_name_type(self):
+        """Test display name when name equals type_line."""
+        item = PricedItem(
+            name="Chaos Orb",
+            type_line="Chaos Orb",
+            base_type="Chaos Orb",
+            item_class="currency",
+        )
+        assert item.display_name == "Chaos Orb"
+
+    def test_priced_tab_display_value_tiny(self):
+        """Test display value for very low value tabs."""
+        tab = PricedTab(
+            id="abc",
+            name="Test",
+            index=0,
+            tab_type="NormalStash",
+            total_value=0.25,
+        )
+        assert tab.display_value == "0.25c"
+
+    def test_priced_item_is_valuable_exactly_one(self):
+        """Test is_valuable is True for exactly 1c."""
+        item = PricedItem(
+            name="Test",
+            type_line="Test",
+            base_type="Test",
+            item_class="currency",
+            total_price=1.0,
+        )
+        assert item.is_valuable is True
+
+    def test_load_prices_caches(self):
+        """Test load_prices caches by league."""
+        valuator = StashValuator()
+
+        with patch.object(valuator.ninja_client, 'build_price_database') as mock_build:
+            mock_db = NinjaPriceDatabase(league="TestLeague")
+            mock_build.return_value = mock_db
+
+            valuator.load_prices("TestLeague")
+            assert valuator._current_league == "TestLeague"
+            assert valuator.price_db is mock_db
+
+            # Second call should use cache
+            valuator.load_prices("TestLeague")
+            mock_build.assert_called_once()
+
+    def test_load_prices_different_league(self):
+        """Test load_prices reloads for different league."""
+        valuator = StashValuator()
+
+        with patch.object(valuator.ninja_client, 'build_price_database') as mock_build:
+            mock_db1 = NinjaPriceDatabase(league="League1")
+            mock_db2 = NinjaPriceDatabase(league="League2")
+            mock_build.side_effect = [mock_db1, mock_db2]
+
+            valuator.load_prices("League1")
+            valuator.load_prices("League2")
+
+            assert mock_build.call_count == 2
+
+    def test_valuate_tab_empty(self):
+        """Test valuating empty tab."""
+        valuator = StashValuator()
+        valuator.price_db = NinjaPriceDatabase(league="Test")
+
+        tab = StashTab(
+            id="t1",
+            name="Empty",
+            index=0,
+            type="NormalStash",
+            items=[]
+        )
+
+        priced_tab = valuator.valuate_tab(tab)
+        assert len(priced_tab.items) == 0
+        assert priced_tab.total_value == 0.0
+        assert priced_tab.valuable_count == 0
+
+    def test_valuate_snapshot_with_children(self):
+        """Test valuating snapshot with nested tabs."""
+        valuator = StashValuator()
+        valuator.price_db = NinjaPriceDatabase(league="Phrecia")
+        valuator.price_db.currency["chaos orb"] = NinjaPrice(name="Chaos Orb", chaos_value=1.0)
+        valuator._current_league = "Phrecia"
+
+        child_tab = StashTab(
+            id="child1",
+            name="Child Tab",
+            index=10,
+            type="NormalStash",
+            items=[{"name": "", "typeLine": "Chaos Orb", "frameType": 5, "stackSize": 25, "icon": ""}]
+        )
+
+        parent_tab = StashTab(
+            id="t1",
+            name="Folder",
+            index=0,
+            type="Folder",
+            items=[],
+            children=[child_tab]
+        )
+
+        snapshot = StashSnapshot(
+            account_name="Test",
+            league="Phrecia",
+            tabs=[parent_tab],
+            total_items=1,
+        )
+
+        result = valuator.valuate_snapshot(snapshot)
+
+        # Should include child tab
+        assert len(result.tabs) >= 1
+        # Total value should include child items
+        assert result.total_value >= 25.0
+
+    def test_valuate_snapshot_with_progress(self):
+        """Test valuating with progress callback."""
+        valuator = StashValuator()
+        valuator.price_db = NinjaPriceDatabase(league="Phrecia")
+        valuator._current_league = "Phrecia"
+
+        progress_calls = []
+        def progress_cb(cur, total, name):
+            progress_calls.append((cur, total, name))
+
+        snapshot = StashSnapshot(
+            account_name="Test",
+            league="Phrecia",
+            tabs=[
+                StashTab(id="t1", name="Tab1", index=0, type="NormalStash", items=[]),
+                StashTab(id="t2", name="Tab2", index=1, type="NormalStash", items=[]),
+            ],
+            total_items=0,
+        )
+
+        valuator.valuate_snapshot(snapshot, progress_callback=progress_cb)
+
+        # Should have been called for each tab
+        assert len(progress_calls) == 2
+        assert progress_calls[0][0] == 1  # First tab
+        assert progress_calls[1][0] == 2  # Second tab
+
+    def test_price_item_div_card(self):
+        """Test pricing a divination card."""
+        valuator = StashValuator()
+        valuator.price_db = NinjaPriceDatabase(league="Phrecia")
+        valuator.price_db.div_cards["the doctor"] = NinjaPrice(name="The Doctor", chaos_value=2500.0)
+        valuator._current_league = "Phrecia"
+
+        item = {
+            "name": "",
+            "typeLine": "The Doctor",
+            "frameType": 6,
+            "stackSize": 1,
+            "icon": "",
+        }
+
+        tab = StashTab(id="t1", name="Cards", index=0, type="DivinationCardStash")
+        priced = valuator._price_item(item, tab)
+
+        assert priced.rarity == "Divination"
+        assert priced.item_class == "divination card"
+        assert priced.unit_price == 2500.0
+
+    def test_price_item_with_sockets(self):
+        """Test pricing item and building socket string."""
+        valuator = StashValuator()
+        valuator.price_db = NinjaPriceDatabase(league="Test")
+        valuator._current_league = "Test"
+
+        item = {
+            "name": "Test Item",
+            "typeLine": "Vaal Regalia",
+            "baseType": "Vaal Regalia",
+            "frameType": 2,
+            "icon": "",
+            "sockets": [
+                {"group": 0, "sColour": "R"},
+                {"group": 0, "sColour": "G"},
+                {"group": 0, "sColour": "B"},
+                {"group": 1, "sColour": "W"},
+            ],
+        }
+
+        tab = StashTab(id="t1", name="Items", index=0, type="NormalStash")
+        priced = valuator._price_item(item, tab)
+
+        assert priced.links == 3
+        assert "RGB" in priced.sockets or "R" in priced.sockets
+
+    def test_ninja_categories_constant(self):
+        """Test NINJA_CATEGORIES has expected entries."""
+        assert "currency" in StashValuator.NINJA_CATEGORIES
+        assert "divinationcards" in StashValuator.NINJA_CATEGORIES
+        assert "unique" in StashValuator.NINJA_CATEGORIES
+        assert "gem" in StashValuator.NINJA_CATEGORIES
+        assert "scarab" in StashValuator.NINJA_CATEGORIES
+
+    def test_valuation_result_errors_list(self):
+        """Test ValuationResult errors list."""
+        result = ValuationResult(
+            league="Test",
+            account_name="Test",
+            errors=["Error 1", "Error 2"],
+        )
+        assert len(result.errors) == 2
+        assert "Error 1" in result.errors
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
