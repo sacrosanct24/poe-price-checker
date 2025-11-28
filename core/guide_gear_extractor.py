@@ -11,7 +11,12 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Set
 
 from core.pob_integration import PoBBuild, PoBItem, CharacterManager, PoBDecoder
-from core.build_comparison import GuideBuildParser
+
+# Use defusedxml to prevent XXE attacks
+try:
+    import defusedxml.ElementTree as ET
+except ImportError:
+    import xml.etree.ElementTree as ET
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +52,21 @@ class GuideGearRecommendation:
 
 
 @dataclass
+class ItemSetInfo:
+    """Information about an item set (loadout) in a PoB build."""
+    id: str
+    title: str
+    slot_count: int
+    is_active: bool = False
+
+    @property
+    def display_name(self) -> str:
+        """Display name with active marker."""
+        marker = " (Active)" if self.is_active else ""
+        return f"{self.title}{marker}"
+
+
+@dataclass
 class GuideGearSummary:
     """Summary of all gear recommendations from a guide."""
     profile_name: str
@@ -54,6 +74,7 @@ class GuideGearSummary:
     recommendations: Dict[str, GuideGearRecommendation] = field(default_factory=dict)
     uniques_needed: List[str] = field(default_factory=list)
     rare_slots: List[str] = field(default_factory=list)
+    item_set_name: str = ""  # Name of the item set this was extracted from
 
     def get_recommendation(self, slot: str) -> Optional[GuideGearRecommendation]:
         """Get recommendation for a specific slot."""
@@ -288,6 +309,302 @@ class GuideGearExtractor:
             lines.append("")
 
         return "\n".join(lines)
+
+    def get_item_sets_from_profile(self, profile_name: str) -> List[ItemSetInfo]:
+        """
+        Get list of item sets (loadouts) from a profile's PoB code.
+
+        Args:
+            profile_name: Name of the profile
+
+        Returns:
+            List of ItemSetInfo objects
+        """
+        if not self.character_manager:
+            return []
+
+        profile = self.character_manager.get_profile(profile_name)
+        if not profile or not profile.pob_code:
+            return []
+
+        try:
+            xml_str = self._decoder.decode_pob_code(profile.pob_code)
+            return self._parse_item_sets(xml_str)
+        except Exception as e:
+            logger.warning(f"Failed to parse item sets from profile: {e}")
+            return []
+
+    def get_item_sets_from_pob_code(self, pob_code: str) -> List[ItemSetInfo]:
+        """
+        Get list of item sets (loadouts) from a PoB code.
+
+        Args:
+            pob_code: Path of Building share code
+
+        Returns:
+            List of ItemSetInfo objects
+        """
+        try:
+            xml_str = self._decoder.decode_pob_code(pob_code)
+            return self._parse_item_sets(xml_str)
+        except Exception as e:
+            logger.warning(f"Failed to parse item sets from PoB code: {e}")
+            return []
+
+    def _parse_item_sets(self, xml_string: str) -> List[ItemSetInfo]:
+        """Parse item sets from PoB XML."""
+        try:
+            root = ET.fromstring(xml_string)
+            items_elem = root.find("Items")
+            if items_elem is None:
+                return []
+
+            item_sets = []
+            active_set = items_elem.get("activeItemSet", "1")
+
+            for item_set in items_elem.findall("ItemSet"):
+                set_id = item_set.get("id", "?")
+                raw_title = item_set.get("title", "Unnamed")
+                # Clean PoB color codes like ^xFFFFFF
+                import re
+                title = re.sub(r"\^x[0-9A-Fa-f]{6}", "", raw_title).strip()
+                if not title:
+                    title = f"Item Set {set_id}"
+                slots = len(item_set.findall("Slot"))
+
+                item_sets.append(ItemSetInfo(
+                    id=set_id,
+                    title=title,
+                    slot_count=slots,
+                    is_active=(set_id == active_set),
+                ))
+
+            return item_sets
+
+        except Exception as e:
+            logger.warning(f"Failed to parse item sets: {e}")
+            return []
+
+    def extract_from_profile_with_item_set(
+        self,
+        profile_name: str,
+        item_set_id: str
+    ) -> Optional[GuideGearSummary]:
+        """
+        Extract gear from a specific item set in a profile.
+
+        Args:
+            profile_name: Name of the profile
+            item_set_id: ID of the item set to extract from
+
+        Returns:
+            GuideGearSummary for the specified item set
+        """
+        if not self.character_manager:
+            return None
+
+        profile = self.character_manager.get_profile(profile_name)
+        if not profile or not profile.pob_code:
+            return None
+
+        try:
+            xml_str = self._decoder.decode_pob_code(profile.pob_code)
+            return self._extract_from_item_set(xml_str, profile_name, item_set_id)
+        except Exception as e:
+            logger.exception(f"Failed to extract from item set: {e}")
+            return None
+
+    def extract_from_pob_code_with_item_set(
+        self,
+        pob_code: str,
+        guide_name: str,
+        item_set_id: str
+    ) -> Optional[GuideGearSummary]:
+        """
+        Extract gear from a specific item set in a PoB code.
+
+        Args:
+            pob_code: Path of Building share code
+            guide_name: Name to use for this guide
+            item_set_id: ID of the item set to extract from
+
+        Returns:
+            GuideGearSummary for the specified item set
+        """
+        try:
+            xml_str = self._decoder.decode_pob_code(pob_code)
+            return self._extract_from_item_set(xml_str, guide_name, item_set_id)
+        except Exception as e:
+            logger.exception(f"Failed to extract from item set: {e}")
+            return None
+
+    def _extract_from_item_set(
+        self,
+        xml_string: str,
+        guide_name: str,
+        item_set_id: str
+    ) -> Optional[GuideGearSummary]:
+        """Extract items from a specific item set in PoB XML."""
+        try:
+            root = ET.fromstring(xml_string)
+
+            # Get build info
+            build_elem = root.find("Build")
+            class_name = build_elem.get("className", "") if build_elem is not None else ""
+
+            items_elem = root.find("Items")
+            if items_elem is None:
+                return None
+
+            # Find the target item set
+            target_item_set = None
+            item_set_title = ""
+            for item_set in items_elem.findall("ItemSet"):
+                if item_set.get("id") == item_set_id:
+                    target_item_set = item_set
+                    raw_title = item_set.get("title", "Unnamed")
+                    import re
+                    item_set_title = re.sub(r"\^x[0-9A-Fa-f]{6}", "", raw_title).strip()
+                    break
+
+            if target_item_set is None:
+                logger.warning(f"Item set {item_set_id} not found")
+                return None
+
+            # Parse all items by ID
+            items_by_id: Dict[str, PoBItem] = {}
+            for item_elem in items_elem.findall("Item"):
+                item = self._parse_item_element(item_elem)
+                if item:
+                    item_id = item_elem.get("id", "")
+                    items_by_id[item_id] = item
+
+            # Map slots to items from this specific item set
+            slot_items: Dict[str, PoBItem] = {}
+            for slot_elem in target_item_set.findall("Slot"):
+                slot_name = slot_elem.get("name", "")
+                item_id = slot_elem.get("itemId", "")
+
+                # Skip special slots
+                if "Abyssal" in slot_name or "Graft" in slot_name:
+                    continue
+                if not item_id or item_id == "0":
+                    continue
+
+                if item_id in items_by_id:
+                    slot_items[slot_name] = items_by_id[item_id]
+
+            # Build summary
+            summary = GuideGearSummary(
+                profile_name=guide_name,
+                guide_name=class_name or guide_name,
+                item_set_name=item_set_title,
+            )
+
+            for slot in EQUIPMENT_SLOTS:
+                item = slot_items.get(slot)
+                if item:
+                    recommendation = self._item_to_recommendation(item, slot)
+                    summary.recommendations[slot] = recommendation
+
+                    if recommendation.is_unique:
+                        summary.uniques_needed.append(recommendation.item_name)
+                    else:
+                        summary.rare_slots.append(slot)
+
+            return summary
+
+        except Exception as e:
+            logger.exception(f"Failed to extract from item set: {e}")
+            return None
+
+    def _parse_item_element(self, item_elem) -> Optional[PoBItem]:
+        """Parse a single item element from PoB XML."""
+        raw_text = item_elem.text or ""
+        if not raw_text.strip():
+            return None
+
+        lines = [line.strip() for line in raw_text.strip().split("\n") if line.strip()]
+        if len(lines) < 2:
+            return None
+
+        item = PoBItem(
+            slot="",
+            rarity="RARE",
+            name="",
+            base_type="",
+            raw_text=raw_text,
+        )
+
+        # Metadata fields to skip
+        METADATA_PREFIXES = (
+            "Rarity:", "Unique ID:", "Item Level:", "Quality:", "Sockets:",
+            "LevelReq:", "Implicits:", "Elder Item", "Shaper Item", "Crusader Item",
+            "Hunter Item", "Redeemer Item", "Warlord Item", "Synthesised Item",
+            "Fractured Item", "Corrupted", "Mirrored", "Split", "Unidentified",
+            "Radius:", "Limited to:", "Has Alt Variant", "Selected Variant:",
+            "Catalyst:", "Talisman Tier:", "Requires ", "League:",
+        )
+
+        implicit_count = 0
+        implicits_remaining = 0
+        import re
+
+        for i, line in enumerate(lines):
+            if not line:
+                continue
+
+            # Rarity
+            if line.startswith("Rarity:"):
+                item.rarity = line.replace("Rarity:", "").strip().upper()
+                continue
+
+            # Item name (line after Rarity)
+            if i == 1:
+                item.name = line
+                continue
+
+            # Base type (line after name)
+            if i == 2:
+                item.base_type = line
+                continue
+
+            # Skip metadata lines but extract values
+            if any(line.startswith(prefix) for prefix in METADATA_PREFIXES):
+                if line.startswith("Item Level:"):
+                    try:
+                        item.item_level = int(line.replace("Item Level:", "").strip())
+                    except ValueError:
+                        pass
+                elif line.startswith("Quality:"):
+                    qual = re.search(r"\+?(\d+)%?", line)
+                    if qual:
+                        item.quality = int(qual.group(1))
+                elif line.startswith("Sockets:"):
+                    item.sockets = line.replace("Sockets:", "").strip()
+                elif line.startswith("Implicits:"):
+                    try:
+                        implicit_count = int(line.replace("Implicits:", "").strip())
+                        implicits_remaining = implicit_count
+                    except ValueError:
+                        pass
+                continue
+
+            # Implicit mods
+            if implicits_remaining > 0:
+                mod = re.sub(r"\{[^}]+\}", "", line).strip()
+                if mod:
+                    item.implicit_mods.append(mod)
+                implicits_remaining -= 1
+                continue
+
+            # Explicit mods
+            if implicit_count >= 0:
+                mod = re.sub(r"\{[^}]+\}", "", line).strip()
+                if mod:
+                    item.explicit_mods.append(mod)
+
+        return item
 
 
 # Testing

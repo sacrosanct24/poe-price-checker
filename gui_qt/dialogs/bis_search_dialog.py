@@ -38,7 +38,7 @@ from core.build_stat_calculator import BuildStats
 from core.pob_integration import CharacterManager
 from core.build_priorities import BuildPriorities
 from core.affix_tier_calculator import AffixTierCalculator
-from core.guide_gear_extractor import GuideGearExtractor, GuideGearSummary
+from core.guide_gear_extractor import GuideGearExtractor, GuideGearSummary, ItemSetInfo
 
 logger = logging.getLogger(__name__)
 
@@ -335,6 +335,23 @@ class BiSSearchDialog(QDialog):
         ref_row.addWidget(self.ref_profile_combo, stretch=1)
         layout.addLayout(ref_row)
 
+        # Item set (loadout) selector row - initially hidden
+        self.item_set_row = QWidget()
+        item_set_layout = QHBoxLayout(self.item_set_row)
+        item_set_layout.setContentsMargins(0, 0, 0, 0)
+        item_set_layout.addWidget(QLabel("Item Set (Loadout):"))
+        self.item_set_combo = QComboBox()
+        self.item_set_combo.currentIndexChanged.connect(self._on_item_set_changed)
+        item_set_layout.addWidget(self.item_set_combo, stretch=1)
+        self.item_set_row.setVisible(False)
+        layout.addWidget(self.item_set_row)
+
+        # Item set info label
+        self.item_set_info_label = QLabel("")
+        self.item_set_info_label.setStyleSheet(f"color: {COLORS['text_secondary']}; font-style: italic;")
+        self.item_set_info_label.setVisible(False)
+        layout.addWidget(self.item_set_info_label)
+
         # Guide gear display
         self.guide_gear_browser = QTextBrowser()
         self.guide_gear_browser.setStyleSheet(f"""
@@ -611,6 +628,11 @@ class BiSSearchDialog(QDialog):
 
     def _on_ref_profile_changed(self, profile_name: str) -> None:
         """Handle reference profile selection change."""
+        # Hide item set controls initially
+        self.item_set_row.setVisible(False)
+        self.item_set_info_label.setVisible(False)
+        self._current_item_sets: List[ItemSetInfo] = []
+
         if not profile_name or profile_name in ("No profiles available", "No profiles saved"):
             self.guide_gear_browser.setHtml(
                 f'<p style="color: {COLORS["text_secondary"]};">Select a reference build.</p>'
@@ -618,15 +640,41 @@ class BiSSearchDialog(QDialog):
             return
 
         try:
-            summary = self._gear_extractor.extract_from_profile(profile_name)
-            if not summary:
-                self.guide_gear_browser.setHtml(
-                    f'<p style="color: {COLORS["corrupted"]};">Could not extract gear from profile.</p>'
-                )
-                return
+            # Check for item sets (loadouts)
+            item_sets = self._gear_extractor.get_item_sets_from_profile(profile_name)
 
-            self._guide_gear = summary
-            self._show_guide_gear(summary)
+            if len(item_sets) > 1:
+                # Multiple item sets found - show selector
+                self._current_item_sets = item_sets
+                self.item_set_combo.blockSignals(True)
+                self.item_set_combo.clear()
+                for item_set in item_sets:
+                    display = item_set.display_name
+                    self.item_set_combo.addItem(display, item_set.id)
+                    # Select active item set
+                    if item_set.is_active:
+                        self.item_set_combo.setCurrentIndex(self.item_set_combo.count() - 1)
+                self.item_set_combo.blockSignals(False)
+
+                self.item_set_row.setVisible(True)
+                self.item_set_info_label.setText(
+                    f"This build has {len(item_sets)} item sets. Select one to view its gear."
+                )
+                self.item_set_info_label.setVisible(True)
+
+                # Load gear from selected item set
+                self._load_gear_from_item_set(profile_name)
+            else:
+                # Single or no item sets - use default extraction
+                summary = self._gear_extractor.extract_from_profile(profile_name)
+                if not summary:
+                    self.guide_gear_browser.setHtml(
+                        f'<p style="color: {COLORS["corrupted"]};">Could not extract gear from profile.</p>'
+                    )
+                    return
+
+                self._guide_gear = summary
+                self._show_guide_gear(summary)
 
         except Exception as e:
             logger.exception("Failed to extract guide gear")
@@ -634,9 +682,43 @@ class BiSSearchDialog(QDialog):
                 f'<p style="color: {COLORS["corrupted"]};">Error: {str(e)}</p>'
             )
 
+    def _on_item_set_changed(self, index: int) -> None:
+        """Handle item set selection change."""
+        profile_name = self.ref_profile_combo.currentText()
+        if profile_name:
+            self._load_gear_from_item_set(profile_name)
+
+    def _load_gear_from_item_set(self, profile_name: str) -> None:
+        """Load gear from the currently selected item set."""
+        item_set_id = self.item_set_combo.currentData()
+        if not item_set_id:
+            return
+
+        try:
+            summary = self._gear_extractor.extract_from_profile_with_item_set(
+                profile_name, item_set_id
+            )
+            if not summary:
+                self.guide_gear_browser.setHtml(
+                    f'<p style="color: {COLORS["corrupted"]};">Could not extract gear from item set.</p>'
+                )
+                return
+
+            self._guide_gear = summary
+            self._show_guide_gear(summary)
+
+        except Exception as e:
+            logger.exception("Failed to extract gear from item set")
+            self.guide_gear_browser.setHtml(
+                f'<p style="color: {COLORS["corrupted"]};">Error: {str(e)}</p>'
+            )
+
     def _show_guide_gear(self, summary: GuideGearSummary) -> None:
         """Show guide gear in the browser."""
-        html = f'<h3 style="color: {COLORS["accent"]};">Gear from: {summary.guide_name}</h3>'
+        title = summary.guide_name
+        if summary.item_set_name:
+            title += f" - {summary.item_set_name}"
+        html = f'<h3 style="color: {COLORS["accent"]};">Gear from: {title}</h3>'
 
         # Uniques
         uniques = summary.get_unique_recommendations()
