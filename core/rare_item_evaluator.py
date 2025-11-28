@@ -1014,13 +1014,9 @@ class RareItemEvaluator:
                 f"Valuable Affixes ({len(evaluation.matched_affixes)}):")
             for match in evaluation.matched_affixes:
                 value_str = f" [{match.value}]" if match.value else ""
-                tier_str = f" ({
-                    match.tier})" if not match.is_influence_mod else " (influence)"
+                tier_str = f" ({match.tier})" if not match.is_influence_mod else " (influence)"
                 weight_str = f" weight:{match.weight}"
-                lines.append(
-                    f"  [OK] {
-                        match.affix_type}: {
-                        match.mod_text}{value_str}{tier_str}{weight_str}")
+                lines.append(f"  [OK] {match.affix_type}: {match.mod_text}{value_str}{tier_str}{weight_str}")
         else:
             lines.append("No valuable affixes found")
 
