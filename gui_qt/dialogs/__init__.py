@@ -8,6 +8,7 @@ from gui_qt.dialogs.bis_search_dialog import BiSSearchDialog
 from gui_qt.dialogs.priorities_editor_dialog import PrioritiesEditorDialog
 from gui_qt.dialogs.loadout_selector_dialog import LoadoutSelectorDialog
 from gui_qt.dialogs.clear_builds_dialog import ClearBuildsDialog
+from gui_qt.dialogs.find_builds_dialog import FindBuildsDialog
 
 __all__ = [
     "RecordSaleDialog",
@@ -16,4 +17,5 @@ __all__ = [
     "PrioritiesEditorDialog",
     "LoadoutSelectorDialog",
     "ClearBuildsDialog",
+    "FindBuildsDialog",
 ]

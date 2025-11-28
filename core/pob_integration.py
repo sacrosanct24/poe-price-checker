@@ -231,6 +231,9 @@ class PoBDecoder:
             code = PoBDecoder._fetch_pastebin(code)
         elif "pobb.in" in code:
             code = PoBDecoder._fetch_pobbin(code)
+        elif PoBDecoder._looks_like_url(code):
+            # Detect URLs from sites that don't have PoB codes directly
+            PoBDecoder._raise_url_error(code)
 
         # PoB uses URL-safe base64 with some modifications
         # Replace - with + and _ with /
@@ -307,6 +310,72 @@ class PoBDecoder:
             except Exception as e:
                 logger.error(f"Failed to fetch pobb.in: {e}")
                 raise ValueError(f"Could not fetch pobb.in: {e}")
+
+    @staticmethod
+    def _looks_like_url(text: str) -> bool:
+        """Check if text looks like a URL rather than a PoB code."""
+        text_lower = text.lower()
+        # Check for URL patterns
+        if text_lower.startswith(("http://", "https://", "www.")):
+            return True
+        # Check for common build site domains
+        url_indicators = [
+            "maxroll.gg",
+            "mobalytics.gg",
+            "poe.ninja",
+            "pathofexile.com",
+            "poewiki.net",
+            "poebuilds.cc",
+            "pobarchives.com",
+        ]
+        return any(indicator in text_lower for indicator in url_indicators)
+
+    @staticmethod
+    def _raise_url_error(url: str) -> None:
+        """Raise a helpful error message for URLs that can't be auto-imported."""
+        url_lower = url.lower()
+
+        # Site-specific messages
+        if "maxroll.gg" in url_lower:
+            raise ValueError(
+                "Maxroll.gg URLs cannot be imported directly.\n\n"
+                "To import this build:\n"
+                "1. Open the URL in your browser\n"
+                "2. Look for the 'Export to PoB' or 'Copy PoB Code' button\n"
+                "3. Copy the PoB code and paste it here"
+            )
+        elif "mobalytics.gg" in url_lower:
+            raise ValueError(
+                "Mobalytics URLs cannot be imported directly.\n\n"
+                "To import this build:\n"
+                "1. Open the URL in your browser\n"
+                "2. Find the 'Path of Building' section\n"
+                "3. Copy the PoB code and paste it here"
+            )
+        elif "poe.ninja" in url_lower:
+            raise ValueError(
+                "poe.ninja URLs cannot be imported directly.\n\n"
+                "To import this build:\n"
+                "1. Open the URL in your browser\n"
+                "2. Click 'Export to Path of Building'\n"
+                "3. Copy the PoB code and paste it here"
+            )
+        elif "pobarchives.com" in url_lower:
+            raise ValueError(
+                "PoB Archives URLs cannot be imported directly.\n\n"
+                "To import this build:\n"
+                "1. Open the URL in your browser\n"
+                "2. Click the pobb.in link on the build page\n"
+                "3. Copy the pobb.in URL and paste it here"
+            )
+        else:
+            raise ValueError(
+                f"URL detected but cannot be imported directly: {url}\n\n"
+                "To import a build:\n"
+                "- Paste a PoB code (base64 encoded string)\n"
+                "- Or paste a pastebin.com URL\n"
+                "- Or paste a pobb.in URL"
+            )
 
     @staticmethod
     def parse_build(xml_string: str) -> PoBBuild:

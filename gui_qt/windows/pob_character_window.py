@@ -38,6 +38,7 @@ from PyQt6.QtWidgets import (
 from gui_qt.styles import COLORS, get_rarity_color, apply_window_icon
 from gui_qt.widgets.build_filter_widget import BuildFilterWidget
 from gui_qt.dialogs.clear_builds_dialog import ClearBuildsDialog
+from gui_qt.dialogs.find_builds_dialog import FindBuildsDialog
 
 # Try to import BuildCategory
 try:
@@ -143,6 +144,10 @@ class PoBCharacterWindow(QDialog):
         self.clear_builds_btn = QPushButton("Clear Builds...")
         self.clear_builds_btn.clicked.connect(self._on_clear_builds)
         btn_row2.addWidget(self.clear_builds_btn)
+
+        self.find_builds_btn = QPushButton("Find Builds...")
+        self.find_builds_btn.clicked.connect(self._on_find_builds)
+        btn_row2.addWidget(self.find_builds_btn)
 
         btn_row2.addStretch()
         left_layout.addLayout(btn_row2)
@@ -486,6 +491,11 @@ class PoBCharacterWindow(QDialog):
         dialog = ClearBuildsDialog(self, self.character_manager)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             self._load_profiles()
+
+    def _on_find_builds(self) -> None:
+        """Open find builds dialog."""
+        dialog = FindBuildsDialog(self)
+        dialog.exec()
 
 
 class ItemDetailsDialog(QDialog):

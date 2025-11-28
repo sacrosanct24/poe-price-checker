@@ -263,8 +263,8 @@ class PobbinScraper:
         """
         self._wait_for_rate_limit()
 
-        # pobb.in has a raw endpoint
-        url = f"{self.BASE_URL}/raw/{pobb_id}"
+        # pobb.in API: /{id}/raw returns raw PoB code
+        url = f"{self.BASE_URL}/{pobb_id}/raw"
 
         try:
             logger.info(f"Fetching PoB code from pobb.in: {pobb_id}")
@@ -303,6 +303,301 @@ class PobbinScraper:
         else:
             logger.error(f"Invalid pobb.in URL: {url}")
             return None
+
+
+class PoBArchivesScraper:
+    """
+    Scrape builds from pobarchives.com.
+
+    Features:
+    - Popular builds with pobb.in links
+    - Filter by category (League Starter, SSF, Hardcore, etc.)
+    - YouTube/Reddit popularity metrics
+    """
+
+    BASE_URL = "https://pobarchives.com"
+
+    # Supported build categories/tags
+    CATEGORIES = {
+        "league_starter": "League Starter",
+        "ssf": "SSF",
+        "hardcore": "Hardcore",
+        "mapping": "Mapping",
+        "bossing": "Bossing",
+        "budget": "Budget",
+        "endgame": "Endgame",
+    }
+
+    # League/tree version options
+    LEAGUES = {
+        # PoE1
+        "poe1_current": "3.27",  # Keepers of the Flame
+        "poe1_3.27": "3.27",
+        "poe1_3.26": "3.26",  # Phrecia
+        "poe1_3.25": "3.25",  # Settlers of Kalguur
+        # PoE2
+        "poe2_current": "poe2-0.2.0",  # Third Edict
+        "poe2_dawn": "poe2-0.1.1",  # Dawn of the Hunt
+        "poe2_ea": "poe2-0.1.0",  # Early Access
+    }
+
+    def __init__(self, rate_limit: float = 2.0):
+        """
+        Initialize pobarchives.com scraper.
+
+        Args:
+            rate_limit: Seconds between requests (default: 2.0)
+        """
+        self.rate_limit = rate_limit
+        self.session = requests.Session()
+        self.session.headers.update({
+            'User-Agent': 'PoE-Price-Checker/1.0 (Build Analysis Tool)',
+            'Accept': 'application/json, text/html',
+        })
+        self.last_request = 0.0
+        self._pobbin_scraper = PobbinScraper(rate_limit=rate_limit)
+
+    def _wait_for_rate_limit(self) -> None:
+        """Respect rate limiting."""
+        elapsed = time.time() - self.last_request
+        if elapsed < self.rate_limit:
+            time.sleep(self.rate_limit - elapsed)
+        self.last_request = time.time()
+
+    def scrape_builds_by_category(
+        self,
+        category: str,
+        limit: int = 20,
+        league: str = "poe1_current",
+        fetch_pob_codes: bool = False,
+    ) -> List[ScrapedBuild]:
+        """
+        Scrape builds from pobarchives.com by category.
+
+        Args:
+            category: Category key (e.g., "league_starter", "ssf", "hardcore")
+            limit: Maximum number of builds to fetch (default: 20)
+            league: League key from LEAGUES dict, or raw version string (default: "poe1_current")
+            fetch_pob_codes: If True, also fetch PoB codes from pobb.in (slower)
+
+        Returns:
+            List of ScrapedBuild objects
+        """
+        if category not in self.CATEGORIES:
+            logger.warning(f"Unknown category '{category}', using as raw tag")
+            tag = category
+        else:
+            tag = self.CATEGORIES[category]
+
+        # Resolve league to tree version
+        tree_version = self.LEAGUES.get(league, league)
+
+        self._wait_for_rate_limit()
+
+        # Build URL with filters
+        # pobarchives uses JSON-encoded tags in URL
+        import json
+        tags_param = json.dumps([tag])
+        url = f"{self.BASE_URL}/builds/poe"
+        params = {
+            'tags': tags_param,
+            'tree': tree_version,
+            'sort': 'popularity',
+        }
+
+        try:
+            logger.info(f"Fetching {category} builds from pobarchives.com")
+            response = self.session.get(url, params=params, timeout=15)
+            response.raise_for_status()
+
+            # Parse HTML to find build data
+            soup = BeautifulSoup(response.text, 'html.parser')
+            builds = self._parse_build_listings(soup, limit, category)
+
+            # Optionally fetch pobb.in URLs and PoB codes
+            if fetch_pob_codes:
+                for build in builds:
+                    if build.url and 'pobarchives.com' in build.url:
+                        # First get pobb.in URL from build page
+                        pobb_url = self._fetch_pobb_url_from_build_page(build.url)
+                        if pobb_url:
+                            build.url = pobb_url  # Replace internal URL with pobb.in
+                            # Then fetch actual PoB code
+                            pob_code = self._pobbin_scraper.get_pob_from_url(pobb_url)
+                            if pob_code:
+                                build.pob_code = pob_code
+
+            logger.info(f"Scraped {len(builds)} {category} builds from pobarchives.com")
+            return builds
+
+        except requests.RequestException as e:
+            logger.error(f"Failed to scrape pobarchives.com: {e}")
+            return []
+        except Exception as e:
+            logger.error(f"Unexpected error scraping pobarchives.com: {e}")
+            return []
+
+    def _parse_build_listings(
+        self,
+        soup: BeautifulSoup,
+        limit: int,
+        category: str,
+    ) -> List[ScrapedBuild]:
+        """
+        Parse build listings from pobarchives.com HTML.
+
+        Args:
+            soup: BeautifulSoup parsed HTML
+            limit: Maximum builds to return
+            category: Category being scraped (for metadata)
+
+        Returns:
+            List of ScrapedBuild objects
+        """
+        builds = []
+
+        # pobarchives.com uses internal build IDs, not direct pobb.in links
+        # Structure: <article class="listing-style1">
+        #   <a href="/build/mciA7nQh">
+        #     <h6 class="list-title">Build Name</h6>
+        #   </a>
+        #   <img alt="Ascendancy" />
+        # </article>
+
+        # Find internal build links
+        build_links = soup.find_all('a', href=re.compile(r'^/build/[A-Za-z0-9_-]+$'))
+
+        # Common ascendancies for detection
+        ascendancies = [
+            "Slayer", "Gladiator", "Champion",  # Duelist
+            "Assassin", "Saboteur", "Trickster",  # Shadow
+            "Juggernaut", "Berserker", "Chieftain",  # Marauder
+            "Necromancer", "Elementalist", "Occultist",  # Witch
+            "Deadeye", "Raider", "Pathfinder",  # Ranger
+            "Inquisitor", "Hierophant", "Guardian",  # Templar
+            "Ascendant",  # Scion
+        ]
+
+        seen_ids = set()
+        for link in build_links:
+            if len(builds) >= limit:
+                break
+
+            href = link.get('href', '')
+            build_id = href.replace('/build/', '')
+
+            # Skip duplicates
+            if build_id in seen_ids:
+                continue
+            seen_ids.add(build_id)
+
+            # Get build name from title element
+            build_name = "Unknown Build"
+            title_elem = link.find(['h6', 'h5', 'h4', 'h3'])
+            if title_elem:
+                build_name = title_elem.get_text(strip=True)
+            elif link.get_text(strip=True):
+                build_name = link.get_text(strip=True)
+
+            # Try to extract ascendancy from alt text or nearby elements
+            ascendancy = None
+            parent = link.find_parent(['article', 'div'])
+            if parent:
+                # Look for ascendancy icon alt text
+                img = parent.find('img', alt=True)
+                if img and img['alt'] in ascendancies:
+                    ascendancy = img['alt']
+                else:
+                    # Check title text for ascendancy
+                    for asc in ascendancies:
+                        if asc.lower() in build_name.lower():
+                            ascendancy = asc
+                            break
+
+            # Store internal URL - will need separate fetch to get pobb.in link
+            internal_url = f"https://pobarchives.com{href}"
+
+            build = ScrapedBuild(
+                source='pobarchives.com',
+                build_name=build_name,
+                pob_code=None,  # Fetched later if requested
+                char_class=None,
+                ascendancy=ascendancy,
+                main_skill=None,
+                url=internal_url,  # Internal URL, not pobb.in yet
+            )
+            builds.append(build)
+            logger.debug(f"Found build: {build_name} ({ascendancy}) -> {internal_url}")
+
+        return builds
+
+    def _fetch_pobb_url_from_build_page(self, internal_url: str) -> Optional[str]:
+        """
+        Fetch pobb.in URL from individual build page.
+
+        Args:
+            internal_url: pobarchives.com internal build URL
+
+        Returns:
+            First pobb.in URL found, or None
+        """
+        self._wait_for_rate_limit()
+
+        try:
+            response = self.session.get(internal_url, timeout=15)
+            response.raise_for_status()
+
+            soup = BeautifulSoup(response.text, 'html.parser')
+
+            # Find pobb.in links
+            pobb_links = soup.find_all('a', href=re.compile(r'pobb\.in/[A-Za-z0-9_-]+'))
+            if pobb_links:
+                pobb_url = pobb_links[0].get('href', '')
+                if not pobb_url.startswith('http'):
+                    pobb_url = 'https://' + pobb_url.lstrip('/')
+                return pobb_url
+
+            return None
+
+        except Exception as e:
+            logger.error(f"Failed to fetch pobb.in URL from {internal_url}: {e}")
+            return None
+
+    def scrape_all_categories(
+        self,
+        categories: Optional[List[str]] = None,
+        limit_per_category: int = 20,
+        league: str = "poe1_current",
+        fetch_pob_codes: bool = False,
+    ) -> dict:
+        """
+        Scrape builds from multiple categories.
+
+        Args:
+            categories: List of category keys, or None for all
+            limit_per_category: Max builds per category (default: 20)
+            league: League key from LEAGUES dict (default: "poe1_current")
+            fetch_pob_codes: If True, also fetch PoB codes
+
+        Returns:
+            Dict mapping category -> List[ScrapedBuild]
+        """
+        if categories is None:
+            categories = list(self.CATEGORIES.keys())
+
+        results = {}
+        for category in categories:
+            builds = self.scrape_builds_by_category(
+                category=category,
+                limit=limit_per_category,
+                league=league,
+                fetch_pob_codes=fetch_pob_codes,
+            )
+            results[category] = builds
+
+        total = sum(len(b) for b in results.values())
+        logger.info(f"Scraped {total} builds across {len(categories)} categories")
+        return results
 
 
 class PastebinScraper:
@@ -360,6 +655,89 @@ class PastebinScraper:
             return None
 
 
+class BuildSourceProvider:
+    """
+    Provides URLs to external build sources for browsing.
+
+    These sites use JavaScript rendering making direct scraping difficult,
+    but we can provide direct links for users to browse.
+    """
+
+    # Build source URLs with filtering support
+    SOURCES = {
+        "pobarchives": {
+            "name": "PoB Archives",
+            "base_url": "https://pobarchives.com/builds/poe",
+            "description": "Community builds with pobb.in links",
+            "has_filtering": True,
+        },
+        "mobalytics": {
+            "name": "Mobalytics",
+            "base_url": "https://mobalytics.gg/poe/starter-builds",
+            "description": "Curated starter builds with guides",
+            "has_filtering": False,
+        },
+        "poeninja": {
+            "name": "poe.ninja Builds",
+            "base_url": "https://poe.ninja/builds",
+            "description": "Ladder character builds",
+            "has_filtering": True,
+        },
+        "maxroll": {
+            "name": "Maxroll.gg",
+            "base_url": "https://maxroll.gg/poe/build-guides",
+            "description": "In-depth build guides",
+            "has_filtering": True,
+        },
+    }
+
+    @classmethod
+    def get_source_url(
+        cls,
+        source: str,
+        category: Optional[str] = None,
+        league: str = "3.27",
+    ) -> Optional[str]:
+        """
+        Get URL for a build source with optional filtering.
+
+        Args:
+            source: Source key (pobarchives, mobalytics, etc.)
+            category: Category filter (league_starter, ssf, etc.)
+            league: League/tree version
+
+        Returns:
+            URL string or None if source not found
+        """
+        if source not in cls.SOURCES:
+            return None
+
+        source_info = cls.SOURCES[source]
+        url = source_info["base_url"]
+
+        # Add filters for supported sources
+        if source == "pobarchives" and category:
+            import json
+            import urllib.parse
+            category_map = {
+                "league_starter": "League Starter",
+                "ssf": "SSF",
+                "hardcore": "Hardcore",
+                "mapping": "Mapping",
+                "bossing": "Bossing",
+            }
+            tag = category_map.get(category, category)
+            tags_param = urllib.parse.quote(json.dumps([tag]))
+            url = f"{url}?tags={tags_param}&tree={league}&sort=popularity"
+
+        return url
+
+    @classmethod
+    def get_all_sources(cls) -> dict:
+        """Get info about all available build sources."""
+        return cls.SOURCES.copy()
+
+
 def extract_pob_link(text: str) -> Optional[str]:
     """
     Extract PoB link from text (forum posts, reddit, etc.).
@@ -397,23 +775,42 @@ if __name__ == "__main__":
     print("Testing Build Scrapers")
     print("=" * 80)
 
-    # Test poe.ninja
-    print("\n1. Testing poe.ninja scraper...")
-    ninja_scraper = PoeNinjaBuildScraper(league="Ancestor")
-    builds = ninja_scraper.scrape_top_builds(limit=5, sort_by="dps")
+    # Test pobarchives.com scraper
+    print("\n1. Testing pobarchives.com scraper...")
+    archives_scraper = PoBArchivesScraper()
 
-    if builds:
-        print(f"Found {len(builds)} builds:")
-        for i, build in enumerate(builds, 1):
-            print(f"  {i}. {build.build_name} - {build.main_skill}")
-            print(f"     Class: {build.char_class}/{build.ascendancy}")
-            print(f"     DPS: {build.dps}, Life: {build.life}, ES: {build.es}")
+    print("  Available categories:", list(archives_scraper.CATEGORIES.keys()))
+
+    # Test single category
+    print("\n  Fetching League Starter builds...")
+    starter_builds = archives_scraper.scrape_builds_by_category(
+        category="league_starter",
+        limit=5,
+        fetch_pob_codes=False,  # Don't fetch codes for quick test
+    )
+
+    if starter_builds:
+        print(f"  Found {len(starter_builds)} League Starter builds:")
+        for i, build in enumerate(starter_builds, 1):
+            print(f"    {i}. {build.build_name}")
+            print(f"       Ascendancy: {build.ascendancy or 'Unknown'}")
+            print(f"       URL: {build.url}")
     else:
-        print("  No builds found (API may have changed)")
+        print("  No builds found (site structure may have changed)")
 
-    # Test pobb.in (need a valid ID to test)
+    # Test pobb.in scraper
     print("\n2. Testing pobb.in scraper...")
-    print("  (Skipped - need valid pobb.in ID)")
+    if starter_builds and starter_builds[0].url:
+        pobbin = PobbinScraper()
+        print(f"  Testing with URL: {starter_builds[0].url}")
+        pob_code = pobbin.get_pob_from_url(starter_builds[0].url)
+        if pob_code:
+            print(f"  Successfully fetched PoB code ({len(pob_code)} chars)")
+            print(f"  First 50 chars: {pob_code[:50]}...")
+        else:
+            print("  Failed to fetch PoB code")
+    else:
+        print("  (Skipped - no build URL available)")
 
     # Test link extraction
     print("\n3. Testing link extraction...")
