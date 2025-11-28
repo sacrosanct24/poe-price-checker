@@ -45,6 +45,7 @@ logger = logging.getLogger(__name__)
 
 class BuildCategory(str, Enum):
     """Categories for organizing builds."""
+    MY_BUILDS = "my_builds"  # User's own builds - protected from bulk delete
     LEAGUE_STARTER = "league_starter"
     ENDGAME = "endgame"
     BOSS_KILLER = "boss_killer"
@@ -53,6 +54,7 @@ class BuildCategory(str, Enum):
     META = "meta"
     EXPERIMENTAL = "experimental"
     REFERENCE = "reference"  # For reference builds you're comparing against
+    IMPORTED = "imported"  # Imported from build sites - can be bulk deleted
 
 
 @dataclass

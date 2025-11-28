@@ -63,6 +63,7 @@ oauth_config.json
 
 # User data files
 data/characters.json
+data/repoe_cache/
 
 # Dev test files
 test_pob_workflow.py

@@ -36,6 +36,8 @@ from PyQt6.QtWidgets import (
 )
 
 from gui_qt.styles import COLORS, get_rarity_color, apply_window_icon
+from gui_qt.widgets.build_filter_widget import BuildFilterWidget
+from gui_qt.dialogs.clear_builds_dialog import ClearBuildsDialog
 
 # Try to import BuildCategory
 try:
@@ -87,9 +89,9 @@ class PoBCharacterWindow(QDialog):
         left_panel = QGroupBox("Characters")
         left_layout = QVBoxLayout(left_panel)
 
-        # Filter row
+        # Category filter row
         filter_row = QHBoxLayout()
-        filter_row.addWidget(QLabel("Filter:"))
+        filter_row.addWidget(QLabel("Category:"))
         self.filter_combo = QComboBox()
         self.filter_combo.addItem("All")
         self.filter_combo.addItem("---")
@@ -98,6 +100,15 @@ class PoBCharacterWindow(QDialog):
         self.filter_combo.currentTextChanged.connect(self._on_filter_changed)
         filter_row.addWidget(self.filter_combo)
         left_layout.addLayout(filter_row)
+
+        # Game/Class/Ascendancy filter
+        self.build_filter = BuildFilterWidget(
+            show_labels=True,
+            horizontal=True,
+            include_all_option=True,
+        )
+        self.build_filter.filter_changed.connect(self._on_filter_changed)
+        left_layout.addWidget(self.build_filter)
 
         # Profile list
         self.profile_list = QListWidget()
@@ -128,6 +139,10 @@ class PoBCharacterWindow(QDialog):
         self.categories_btn = QPushButton("Categories...")
         self.categories_btn.clicked.connect(self._on_manage_categories)
         btn_row2.addWidget(self.categories_btn)
+
+        self.clear_builds_btn = QPushButton("Clear Builds...")
+        self.clear_builds_btn.clicked.connect(self._on_clear_builds)
+        btn_row2.addWidget(self.clear_builds_btn)
 
         btn_row2.addStretch()
         left_layout.addLayout(btn_row2)
@@ -202,8 +217,15 @@ class PoBCharacterWindow(QDialog):
             # Get categories
             categories = getattr(profile, 'categories', []) or []
 
-            # Apply filter
+            # Apply category filter
             if filter_category and filter_category not in categories:
+                continue
+
+            # Apply game/class/ascendancy filter
+            build_info = self._profiles_cache[name].get("build_info", {})
+            build_class = build_info.get("class_name", "")
+            build_asc = build_info.get("ascendancy", "")
+            if not self.build_filter.matches_build(build_class, build_asc):
                 continue
 
             # Build display text
@@ -456,6 +478,12 @@ class PoBCharacterWindow(QDialog):
             self.character_manager,
             self._selected_profile,
         )
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            self._load_profiles()
+
+    def _on_clear_builds(self) -> None:
+        """Open clear builds dialog."""
+        dialog = ClearBuildsDialog(self, self.character_manager)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             self._load_profiles()
 
