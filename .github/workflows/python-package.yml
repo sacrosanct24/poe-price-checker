@@ -49,7 +49,6 @@ jobs:
 
     - name: Test with pytest
       id: pytest
-      continue-on-error: true
       run: |
         pytest tests/ --ignore=tests/integration --ignore=tests/unit/gui_qt \
           --cov=core --cov-report=term-missing \
