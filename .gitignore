@@ -70,3 +70,5 @@ test_pob_workflow.py
 # Generated acceptance test reports
 tests/acceptance/latest_report.md
 tests/acceptance/latest_report.json
+nul
+assets/temp/
