@@ -33,11 +33,8 @@ class StashItem:
     confidence: str = "unknown"
 
     def __str__(self) -> str:
-        return f"{
-            self.name or self.type_line} @ Tab '{
-            self.stash_tab_name}' ({
-            self.position_x}, {
-                self.position_y})"
+        name = self.name or self.type_line
+        return f"{name} @ Tab '{self.stash_tab_name}' ({self.position_x}, {self.position_y})"
 
 
 @dataclass

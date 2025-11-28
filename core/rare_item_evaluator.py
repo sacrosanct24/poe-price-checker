@@ -982,10 +982,7 @@ class RareItemEvaluator:
         lines.append(f"Base: {evaluation.item.base_type}")
         lines.append(f"iLvl: {evaluation.item.item_level or 'Unknown'}")
         if evaluation.item.influences:
-            lines.append(
-                f"Influences: {
-                    ', '.join(
-                        evaluation.item.influences)}")
+            lines.append(f"Influences: {', '.join(evaluation.item.influences)}")
         if evaluation.is_fractured:
             lines.append("Fractured: Yes")
         lines.append("")

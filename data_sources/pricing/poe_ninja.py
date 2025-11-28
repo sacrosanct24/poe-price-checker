@@ -275,6 +275,11 @@ class PoeNinjaAPI(BaseAPIClient):
         if not key:
             return 0.0, "empty name"
 
+        # Chaos Orb is the reference currency - always 1.0c
+        # poe.ninja doesn't list it since everything is priced relative to chaos
+        if key == "chaos orb":
+            return 1.0, "poe.ninja currency (reference)"
+
         # Ensure index is populated
         if not self._currency_index:
             try:

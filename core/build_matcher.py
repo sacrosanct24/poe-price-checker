@@ -301,16 +301,10 @@ class BuildMatcher:
                         lines.append(f"  - {res.title()}: {value}%")
 
                 if build.desired_affixes:
-                    lines.append(
-                        f"Desired Affixes: {
-                            ', '.join(
-                                build.desired_affixes)}")
+                    lines.append(f"Desired Affixes: {', '.join(build.desired_affixes)}")
 
                 if build.key_uniques:
-                    lines.append(
-                        f"Key Uniques: {
-                            ', '.join(
-                                build.key_uniques)}")
+                    lines.append(f"Key Uniques: {', '.join(build.key_uniques)}")
 
                 if build.main_skills:
                     lines.append(
