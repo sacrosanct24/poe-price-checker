@@ -253,6 +253,7 @@ class PriceCheckerWindow(QMainWindow):
         self._price_rankings_window = None
         self._build_comparison_dialog = None
         self._bis_search_dialog = None
+        self._loadout_selector_dialog = None
 
         # PoB integration
         self._character_manager = None
@@ -405,6 +406,10 @@ class PriceCheckerWindow(QMainWindow):
         compare_build_action = QAction("&Compare Build Trees...", self)
         compare_build_action.triggered.connect(self._show_build_comparison)
         build_menu.addAction(compare_build_action)
+
+        loadout_action = QAction("Browse &Loadouts...", self)
+        loadout_action.triggered.connect(self._show_loadout_selector)
+        build_menu.addAction(loadout_action)
 
         bis_search_action = QAction("Find &BiS Item...", self)
         bis_search_action.setShortcut(QKeySequence("Ctrl+I"))
@@ -1381,6 +1386,35 @@ class PriceCheckerWindow(QMainWindow):
 
         self._build_comparison_dialog.show()
         self._build_comparison_dialog.raise_()
+
+    def _show_loadout_selector(self) -> None:
+        """Show loadout selector dialog for browsing PoB loadouts."""
+        from gui_qt.dialogs.loadout_selector_dialog import LoadoutSelectorDialog
+
+        if self._loadout_selector_dialog is None or not self._loadout_selector_dialog.isVisible():
+            self._loadout_selector_dialog = LoadoutSelectorDialog(self)
+            self._loadout_selector_dialog.loadout_selected.connect(self._on_loadout_selected)
+
+        self._loadout_selector_dialog.show()
+        self._loadout_selector_dialog.raise_()
+
+    def _on_loadout_selected(self, config: dict) -> None:
+        """Handle loadout selection from the selector dialog."""
+        # Could be used to apply selected tree spec, skill set, or item set
+        tree_spec = config.get("tree_spec")
+        skill_set = config.get("skill_set")
+        item_set = config.get("item_set")
+
+        parts = []
+        if tree_spec:
+            parts.append(f"Tree: {tree_spec.get('title', 'Unknown')}")
+        if skill_set:
+            parts.append(f"Skills: {skill_set.get('title', 'Unknown')}")
+        if item_set:
+            parts.append(f"Items: {item_set.get('title', 'Unknown')}")
+
+        if parts:
+            self._set_status(f"Selected loadout: {', '.join(parts)}")
 
     def _show_bis_search(self) -> None:
         """Show BiS item search dialog."""

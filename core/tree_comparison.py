@@ -160,12 +160,42 @@ class TreeComparisonService:
             target_name=target_profile_name,
         )
 
+    def compare_xml_with_specs(
+        self,
+        your_xml: str,
+        target_xml: str,
+        your_name: str,
+        target_name: str,
+        your_spec_idx: int = 0,
+        target_spec_idx: int = 0,
+    ) -> TreeComparisonResult:
+        """
+        Compare two builds from their decoded XML with specific tree spec indices.
+
+        Args:
+            your_xml: Your decoded PoB XML
+            target_xml: Target decoded PoB XML
+            your_name: Display name for your build
+            target_name: Display name for target build
+            your_spec_idx: Index of tree spec to use from your build
+            target_spec_idx: Index of tree spec to use from target build
+
+        Returns:
+            TreeComparisonResult with comparison data
+        """
+        return self._compare_xml(
+            your_xml, target_xml, your_name, target_name,
+            your_spec_idx, target_spec_idx
+        )
+
     def _compare_xml(
         self,
         your_xml: str,
         target_xml: str,
         your_name: str,
         target_name: str,
+        your_spec_idx: int = 0,
+        target_spec_idx: int = 0,
     ) -> TreeComparisonResult:
         """
         Compare two builds from their decoded XML.
@@ -175,6 +205,8 @@ class TreeComparisonService:
             target_xml: Target decoded PoB XML
             your_name: Display name for your build
             target_name: Display name for target build
+            your_spec_idx: Index of tree spec to use from your build (default: 0)
+            target_spec_idx: Index of tree spec to use from target build (default: 0)
 
         Returns:
             TreeComparisonResult with comparison data
@@ -188,9 +220,11 @@ class TreeComparisonService:
         if not target_specs:
             raise ValueError("Could not parse tree from target build")
 
-        # Use the first/active spec from each build
-        your_spec = your_specs[0]
-        target_spec = target_specs[0]
+        # Use the specified spec index, falling back to 0 if out of range
+        your_spec_idx = min(your_spec_idx, len(your_specs) - 1)
+        target_spec_idx = min(target_spec_idx, len(target_specs) - 1)
+        your_spec = your_specs[your_spec_idx]
+        target_spec = target_specs[target_spec_idx]
 
         # Compare the trees
         delta = self.comparator.compare_trees(

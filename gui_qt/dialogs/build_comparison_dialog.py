@@ -30,7 +30,8 @@ from PyQt6.QtWidgets import (
 
 from gui_qt.styles import COLORS, apply_window_icon
 from core.tree_comparison import TreeComparisonService, TreeComparisonResult
-from core.pob_integration import CharacterManager
+from core.pob_integration import CharacterManager, PoBDecoder
+from core.build_comparison import GuideBuildParser
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +49,12 @@ class BuildComparisonDialog(QDialog):
         self.character_manager = character_manager
         self.comparison_service = TreeComparisonService(character_manager)
         self._last_result: Optional[TreeComparisonResult] = None
+
+        # Store parsed tree specs for loadout selection
+        self._your_tree_specs: List[dict] = []
+        self._target_tree_specs: List[dict] = []
+        self._your_pob_xml: Optional[str] = None
+        self._target_pob_xml: Optional[str] = None
 
         self.setWindowTitle("Compare Build Trees")
         self.setMinimumWidth(500)
@@ -91,6 +98,20 @@ class BuildComparisonDialog(QDialog):
         self.your_pob_input.setPlaceholderText("Paste your PoB share code here...")
         self.your_pob_input.setMaximumHeight(60)
         your_pob_layout.addWidget(self.your_pob_input)
+
+        # Tree spec selector row
+        your_spec_row = QHBoxLayout()
+        self.your_load_btn = QPushButton("Load")
+        self.your_load_btn.setFixedWidth(60)
+        self.your_load_btn.clicked.connect(self._on_load_your_build)
+        your_spec_row.addWidget(self.your_load_btn)
+
+        self.your_spec_combo = QComboBox()
+        self.your_spec_combo.setPlaceholderText("Tree Spec (click Load first)")
+        self.your_spec_combo.setEnabled(False)
+        your_spec_row.addWidget(self.your_spec_combo, 1)
+        your_pob_layout.addLayout(your_spec_row)
+
         self.your_input_stack.addWidget(your_pob_widget)
 
         # Profile selector
@@ -137,6 +158,20 @@ class BuildComparisonDialog(QDialog):
         self.target_pob_input.setPlaceholderText("Paste target PoB share code here...")
         self.target_pob_input.setMaximumHeight(60)
         target_pob_layout.addWidget(self.target_pob_input)
+
+        # Tree spec selector row
+        target_spec_row = QHBoxLayout()
+        self.target_load_btn = QPushButton("Load")
+        self.target_load_btn.setFixedWidth(60)
+        self.target_load_btn.clicked.connect(self._on_load_target_build)
+        target_spec_row.addWidget(self.target_load_btn)
+
+        self.target_spec_combo = QComboBox()
+        self.target_spec_combo.setPlaceholderText("Tree Spec (click Load first)")
+        self.target_spec_combo.setEnabled(False)
+        target_spec_row.addWidget(self.target_spec_combo, 1)
+        target_pob_layout.addLayout(target_spec_row)
+
         self.target_input_stack.addWidget(target_pob_widget)
 
         # Profile selector
@@ -317,8 +352,15 @@ class BuildComparisonDialog(QDialog):
                 if not your_code:
                     self._show_error("Please paste your PoB code")
                     return
-                your_name = "Your Build"
                 your_from_code = True
+
+                # Get selected tree spec name
+                your_spec_idx = self.your_spec_combo.currentIndex()
+                if your_spec_idx >= 0 and your_spec_idx < len(self._your_tree_specs):
+                    spec = self._your_tree_specs[your_spec_idx]
+                    your_name = spec.get("title", "Your Build")
+                else:
+                    your_name = "Your Build"
             else:
                 your_name = self.your_profile_combo.currentText()
                 if not your_name or your_name in ("No profiles available", "No profiles saved"):
@@ -332,8 +374,15 @@ class BuildComparisonDialog(QDialog):
                 if not target_code:
                     self._show_error("Please paste target PoB code")
                     return
-                target_name = "Target Build"
                 target_from_code = True
+
+                # Get selected tree spec name
+                target_spec_idx = self.target_spec_combo.currentIndex()
+                if target_spec_idx >= 0 and target_spec_idx < len(self._target_tree_specs):
+                    spec = self._target_tree_specs[target_spec_idx]
+                    target_name = spec.get("title", "Target Build")
+                else:
+                    target_name = "Target Build"
             else:
                 target_name = self.target_profile_combo.currentText()
                 if not target_name or target_name in ("No profiles available", "No profiles saved"):
@@ -343,8 +392,13 @@ class BuildComparisonDialog(QDialog):
 
             # Perform comparison
             if your_from_code and target_from_code:
-                result = self.comparison_service.compare_pob_codes(
-                    your_code, target_code, your_name, target_name
+                # Use selected tree specs if available
+                your_spec_idx = max(0, self.your_spec_combo.currentIndex())
+                target_spec_idx = max(0, self.target_spec_combo.currentIndex())
+
+                result = self._compare_with_specs(
+                    your_code, target_code, your_name, target_name,
+                    your_spec_idx, target_spec_idx
                 )
             elif your_from_code and not target_from_code:
                 # Compare pasted code to saved profile - need to get profile's code
@@ -352,12 +406,22 @@ class BuildComparisonDialog(QDialog):
                 if not profile or not profile.pob_code:
                     self._show_error(f"Profile '{target_name}' has no PoB code")
                     return
-                result = self.comparison_service.compare_pob_codes(
-                    your_code, profile.pob_code, your_name, target_name
+
+                your_spec_idx = max(0, self.your_spec_combo.currentIndex())
+                result = self._compare_with_specs(
+                    your_code, profile.pob_code, your_name, target_name,
+                    your_spec_idx, 0  # Use default spec for saved profile
                 )
             elif not your_from_code and target_from_code:
-                result = self.comparison_service.compare_profile_to_code(
-                    your_name, target_code, target_name
+                profile = self.character_manager.get_profile(your_name)
+                if not profile or not profile.pob_code:
+                    self._show_error(f"Profile '{your_name}' has no PoB code")
+                    return
+
+                target_spec_idx = max(0, self.target_spec_combo.currentIndex())
+                result = self._compare_with_specs(
+                    profile.pob_code, target_code, your_name, target_name,
+                    0, target_spec_idx  # Use default spec for saved profile
                 )
             else:
                 result = self.comparison_service.compare_profiles(your_name, target_name)
@@ -368,6 +432,28 @@ class BuildComparisonDialog(QDialog):
         except Exception as e:
             logger.exception("Error comparing builds")
             self._show_error(f"Error: {str(e)}")
+
+    def _compare_with_specs(
+        self,
+        your_code: str,
+        target_code: str,
+        your_name: str,
+        target_name: str,
+        your_spec_idx: int,
+        target_spec_idx: int,
+    ) -> TreeComparisonResult:
+        """Compare builds using specific tree spec indices."""
+        # Decode both builds
+        decoder = PoBDecoder()
+
+        your_xml = decoder.decode(your_code)
+        target_xml = decoder.decode(target_code)
+
+        # Use the comparison service's spec-aware comparison
+        return self.comparison_service.compare_xml_with_specs(
+            your_xml, target_xml, your_name, target_name,
+            your_spec_idx, target_spec_idx
+        )
 
     def _display_result(self, result: TreeComparisonResult) -> None:
         """Display comparison result."""
@@ -440,3 +526,101 @@ class BuildComparisonDialog(QDialog):
         self.results_browser.setHtml(
             f'<p style="color: {COLORS["corrupted"]};">{message}</p>'
         )
+
+    def _on_load_your_build(self) -> None:
+        """Load and parse the your build PoB code to extract tree specs."""
+        code = self.your_pob_input.toPlainText().strip()
+        if not code:
+            self._show_error("Please paste a PoB code first")
+            return
+
+        try:
+            # Decode PoB code
+            decoder = PoBDecoder()
+            xml_str = decoder.decode(code)
+            self._your_pob_xml = xml_str
+
+            # Parse tree specs
+            parser = GuideBuildParser(xml_str)
+            self._your_tree_specs = parser.parse_tree_specs()
+
+            # Populate combo box
+            self.your_spec_combo.clear()
+            if len(self._your_tree_specs) <= 1:
+                self.your_spec_combo.addItem("Default Tree")
+                self.your_spec_combo.setEnabled(False)
+            else:
+                for i, spec in enumerate(self._your_tree_specs):
+                    title = spec.get("title", f"Tree {i+1}")
+                    level = spec.get("level")
+                    if level:
+                        title = f"{title} (Lvl {level})"
+                    self.your_spec_combo.addItem(title)
+                self.your_spec_combo.setEnabled(True)
+
+            self.your_spec_combo.setCurrentIndex(len(self._your_tree_specs) - 1)
+            self.results_browser.setHtml(
+                f'<p style="color: {COLORS["high_value"]};">Loaded {len(self._your_tree_specs)} tree spec(s)</p>'
+            )
+
+        except Exception as e:
+            logger.exception("Error loading your build")
+            self._show_error(f"Failed to load: {str(e)}")
+
+    def _on_load_target_build(self) -> None:
+        """Load and parse the target build PoB code to extract tree specs."""
+        code = self.target_pob_input.toPlainText().strip()
+        if not code:
+            self._show_error("Please paste a PoB code first")
+            return
+
+        try:
+            # Decode PoB code
+            decoder = PoBDecoder()
+            xml_str = decoder.decode(code)
+            self._target_pob_xml = xml_str
+
+            # Parse tree specs
+            parser = GuideBuildParser(xml_str)
+            self._target_tree_specs = parser.parse_tree_specs()
+
+            # Populate combo box
+            self.target_spec_combo.clear()
+            if len(self._target_tree_specs) <= 1:
+                self.target_spec_combo.addItem("Default Tree")
+                self.target_spec_combo.setEnabled(False)
+            else:
+                for i, spec in enumerate(self._target_tree_specs):
+                    title = spec.get("title", f"Tree {i+1}")
+                    level = spec.get("level")
+                    if level:
+                        title = f"{title} (Lvl {level})"
+                    self.target_spec_combo.addItem(title)
+                self.target_spec_combo.setEnabled(True)
+
+            self.target_spec_combo.setCurrentIndex(len(self._target_tree_specs) - 1)
+            self.results_browser.setHtml(
+                f'<p style="color: {COLORS["high_value"]};">Loaded {len(self._target_tree_specs)} tree spec(s)</p>'
+            )
+
+        except Exception as e:
+            logger.exception("Error loading target build")
+            self._show_error(f"Failed to load: {str(e)}")
+
+    def _get_tree_url_for_spec(self, xml_str: str, spec_index: int) -> Optional[str]:
+        """Extract tree URL for a specific tree spec index."""
+        try:
+            import xml.etree.ElementTree as ET
+            root = ET.fromstring(xml_str)
+            tree_elem = root.find(".//Tree")
+            if tree_elem is None:
+                return None
+
+            specs = tree_elem.findall("Spec")
+            if spec_index < len(specs):
+                url = specs[spec_index].find("URL")
+                if url is not None and url.text:
+                    return url.text.strip()
+            return None
+        except Exception:
+            return None
