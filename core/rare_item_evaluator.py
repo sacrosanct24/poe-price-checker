@@ -1078,11 +1078,10 @@ class RareItemEvaluator:
                     lines.append(f"      {desc}")
 
         lines.append("")
-        lines.append(
-            f"Valuable Base: {
-                'Yes' if evaluation.is_valuable_base else 'No'}")
-        lines.append(
-            f"High iLvl (84+): {'Yes' if evaluation.has_high_ilvl else 'No'}")
+        valuable_base = 'Yes' if evaluation.is_valuable_base else 'No'
+        lines.append(f"Valuable Base: {valuable_base}")
+        high_ilvl = 'Yes' if evaluation.has_high_ilvl else 'No'
+        lines.append(f"High iLvl (84+): {high_ilvl}")
 
         return "\n".join(lines)
 
