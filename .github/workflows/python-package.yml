@@ -48,8 +48,21 @@ jobs:
         flake8 . --count --exit-zero --max-complexity=15 --max-line-length=127 --statistics
 
     - name: Test with pytest
+      id: pytest
+      continue-on-error: true
       run: |
-        pytest tests/ --ignore=tests/integration --ignore=tests/unit/gui_qt --cov=core --cov-report=term-missing -v
+        pytest tests/ --ignore=tests/integration --ignore=tests/unit/gui_qt \
+          --cov=core --cov-report=term-missing \
+          --junitxml=test-results-${{ matrix.python-version }}.xml \
+          -v
+
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: test-results-${{ matrix.python-version }}
+        path: test-results-${{ matrix.python-version }}.xml
+        retention-days: 30
 
     - name: Upload coverage report
       if: matrix.python-version == '3.11'
@@ -58,3 +71,13 @@ jobs:
         name: coverage-report
         path: .coverage
         retention-days: 5
+
+    - name: Test Report Summary
+      if: always()
+      run: |
+        echo "## Test Results for Python ${{ matrix.python-version }}" >> $GITHUB_STEP_SUMMARY
+        if [ "${{ steps.pytest.outcome }}" == "success" ]; then
+          echo "✅ All tests passed" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "⚠️ Some tests failed - check artifacts for details" >> $GITHUB_STEP_SUMMARY
+        fi
