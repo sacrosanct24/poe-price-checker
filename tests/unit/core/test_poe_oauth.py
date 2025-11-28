@@ -144,7 +144,7 @@ class TestTokenPersistence:
     """Test saving and loading tokens from disk."""
 
     def test_saves_token_to_file(self, tmp_path):
-        """Token should be saved to JSON file."""
+        """Token should be saved to JSON file with encryption."""
         token_file = tmp_path / "token.json"
         client = PoeOAuthClient(
             client_id="test_client",
@@ -160,13 +160,18 @@ class TestTokenPersistence:
 
         assert token_file.exists()
 
-        # Verify contents
+        # Verify contents - tokens should be encrypted
         with open(token_file) as f:
             data = json.load(f)
 
-        assert data['access_token'] == "test_access_token"
-        assert data['refresh_token'] == "test_refresh_token"
+        # Tokens should be encrypted (start with enc:v1: or obf:)
+        assert data['access_token'].startswith(('enc:v1:', 'obf:'))
+        assert data['refresh_token'].startswith(('enc:v1:', 'obf:'))
         assert data['expires_at'] == "2025-12-31T23:59:59"
+
+        # Verify client still has plaintext tokens in memory
+        assert client.access_token == "test_access_token"
+        assert client.refresh_token == "test_refresh_token"
 
     def test_loads_token_from_file(self, tmp_path):
         """Client should load existing token from file."""
@@ -424,11 +429,14 @@ class TestTokenExchange:
 
         client._exchange_code_for_token("auth_code")
 
-        # Verify token was saved
+        # Verify token was saved (encrypted)
         assert token_file.exists()
         with open(token_file) as f:
             data = json.load(f)
-        assert data['access_token'] == 'new_token'
+        # Token should be encrypted in file
+        assert data['access_token'].startswith(('enc:v1:', 'obf:'))
+        # But client should have plaintext in memory
+        assert client.access_token == 'new_token'
 
 
 # -------------------------
@@ -543,11 +551,14 @@ class TestTokenRefresh:
 
         client.refresh_access_token()
 
-        # Verify saved
+        # Verify saved (encrypted)
         assert token_file.exists()
         with open(token_file) as f:
             data = json.load(f)
-        assert data['access_token'] == 'refreshed_token'
+        # Token should be encrypted in file
+        assert data['access_token'].startswith(('enc:v1:', 'obf:'))
+        # But client should have plaintext in memory
+        assert client.access_token == 'refreshed_token'
 
 
 # -------------------------

@@ -13,7 +13,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.12+-3776ab?logo=python&logoColor=white" alt="Python">
-  <img src="https://img.shields.io/badge/Tests-671%20passing-brightgreen?logo=pytest" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-1200%2B%20passing-brightgreen?logo=pytest" alt="Tests">
   <img src="https://img.shields.io/badge/GUI-PyQt6-41cd52?logo=qt" alt="PyQt6">
   <img src="https://img.shields.io/github/license/sacrosanct24/poe-price-checker" alt="License">
 </p>
@@ -128,7 +128,7 @@ poe-price-checker/
 ├── gui_qt/         # PyQt6 interface (default)
 ├── data_sources/   # PoE Ninja, poe.watch, and more
 ├── plugins/        # Custom pricing sources
-├── tests/          # 671+ unit & integration tests
+├── tests/          # 1200+ unit & integration tests
 └── docs/           # Documentation
 ```
 

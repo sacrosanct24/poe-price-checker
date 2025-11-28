@@ -76,13 +76,43 @@ class SecureStorage:
         try:
             self._salt_file.parent.mkdir(parents=True, exist_ok=True)
             self._salt_file.write_bytes(salt)
-            # Make salt file readable only by owner on Unix
-            if platform.system() != "Windows":
-                os.chmod(self._salt_file, 0o600)
+            # Make salt file readable only by owner
+            self._restrict_file_permissions(self._salt_file)
         except Exception as e:
             logger.warning(f"Failed to save salt file: {e}")
 
         return salt
+
+    def _restrict_file_permissions(self, file_path: Path) -> None:
+        """
+        Restrict file permissions to owner-only access.
+
+        On Unix: chmod 600
+        On Windows: Use icacls to remove inheritance and set owner-only access
+        """
+        try:
+            if platform.system() == "Windows":
+                import subprocess
+                # Remove inherited permissions and grant only current user full control
+                # /inheritance:r = remove inherited ACLs
+                # /grant:r = replace existing permissions
+                username = os.getenv("USERNAME", "")
+                if username:
+                    subprocess.run(
+                        [
+                            "icacls", str(file_path),
+                            "/inheritance:r",
+                            "/grant:r", f"{username}:(F)"
+                        ],
+                        capture_output=True,
+                        check=True
+                    )
+                    logger.debug(f"Set Windows file permissions for {file_path}")
+            else:
+                os.chmod(file_path, 0o600)
+                logger.debug(f"Set Unix file permissions for {file_path}")
+        except Exception as e:
+            logger.warning(f"Failed to set file permissions for {file_path}: {e}")
 
     def _get_machine_identifier(self) -> bytes:
         """

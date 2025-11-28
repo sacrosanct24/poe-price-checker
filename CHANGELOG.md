@@ -18,6 +18,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.1.0] - 2025-11-28
+
+### Security
+
+This release addresses multiple security improvements identified during a comprehensive security audit.
+
+#### Token Storage (HIGH)
+- OAuth tokens are now encrypted at rest using Fernet encryption with PBKDF2 key derivation
+- Token files have restricted permissions (owner-only access on Windows via `icacls`, 0600 on Unix)
+
+#### OAuth Flow (MEDIUM)
+- Added state parameter validation to prevent CSRF attacks during OAuth authentication
+- State mismatch now properly logs and rejects the authentication attempt
+
+#### API Security (HIGH)
+- Fixed regex pattern in Cargo API client to properly sanitize input values
+- Added exponential backoff for rate-limited requests (429 responses) in PoE Stash API
+
+#### Input Validation (MEDIUM)
+- PoB integration now uses `urlparse` for safer URL handling instead of string manipulation
+- Item Inspector uses `html.escape()` to prevent XSS in displayed item names
+
+### Changed
+- Upgraded test suite from 671 to 1200+ tests with improved security coverage
+- OAuth tests updated to verify encrypted token storage
+
+### Technical Details
+- `core/secure_storage.py`: Added `_restrict_file_permissions()` method for cross-platform file security
+- `core/poe_oauth.py`: Integrated SecureStorage for token encryption/decryption
+- `data_sources/cargo_api_client.py`: Improved regex character class for input sanitization
+- `data_sources/poe_stash_api.py`: Added retry logic with exponential backoff (2s, 4s, 8s)
+- `core/pob_integration.py`: Safe URL parsing with `urlparse`
+- `gui_qt/widgets/item_inspector.py`: HTML escaping for user-visible content
+
+---
+
 ## [1.0.0] - 2025-11-27
 
 ### Added
@@ -89,5 +125,6 @@ This is the initial public release (v1.0.0). The project was developed privately
 
 ---
 
-[Unreleased]: https://github.com/sacrosanct24/exilePriceCheck/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/sacrosanct24/exilePriceCheck/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/sacrosanct24/exilePriceCheck/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/sacrosanct24/exilePriceCheck/releases/tag/v1.0.0

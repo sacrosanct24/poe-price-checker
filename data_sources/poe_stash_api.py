@@ -100,25 +100,60 @@ class PoEStashClient:
             time.sleep(self.REQUEST_DELAY - elapsed)
         self._last_request_time = time.time()
 
-    def _get(self, endpoint: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """Make a GET request to the API."""
+    def _get(
+        self,
+        endpoint: str,
+        params: Optional[Dict[str, Any]] = None,
+        max_retries: int = 3,
+    ) -> Dict[str, Any]:
+        """
+        Make a GET request to the API with exponential backoff on rate limits.
+
+        Args:
+            endpoint: API endpoint path
+            params: Query parameters
+            max_retries: Maximum retry attempts for 429 errors
+
+        Returns:
+            Response JSON data
+        """
         self._rate_limit()
 
         url = f"{self.BASE_URL}{endpoint}"
 
-        try:
-            response = self.session.get(url, params=params, timeout=30)
-            response.raise_for_status()
-            return response.json()
-        except requests.exceptions.HTTPError as e:
-            if response.status_code == 403:
-                logger.error("Access denied - POESESSID may be invalid or expired")
-            elif response.status_code == 429:
-                logger.error("Rate limited - too many requests")
-            raise
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Request failed: {e}")
-            raise
+        for attempt in range(max_retries + 1):
+            try:
+                response = self.session.get(url, params=params, timeout=30)
+                response.raise_for_status()
+                return response.json()
+            except requests.exceptions.HTTPError as e:
+                if response.status_code == 403:
+                    logger.error("Access denied - POESESSID may be invalid or expired")
+                    raise
+                elif response.status_code == 429:
+                    if attempt < max_retries:
+                        # Exponential backoff: 2, 4, 8 seconds
+                        wait_time = 2 ** (attempt + 1)
+                        logger.warning(
+                            f"Rate limited (429). Retrying in {wait_time}s "
+                            f"(attempt {attempt + 1}/{max_retries})"
+                        )
+                        time.sleep(wait_time)
+                        continue
+                    else:
+                        logger.error(
+                            "Rate limited - max retries exceeded. "
+                            "Consider increasing REQUEST_DELAY."
+                        )
+                        raise
+                else:
+                    raise
+            except requests.exceptions.RequestException as e:
+                logger.error(f"Request failed: {e}")
+                raise
+
+        # Should not reach here, but just in case
+        raise requests.exceptions.RequestException("Max retries exceeded")
 
     def verify_session(self) -> bool:
         """

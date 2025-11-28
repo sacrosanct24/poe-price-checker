@@ -8,6 +8,7 @@ Uses QTextBrowser for native scrolling and copy/paste support.
 
 from __future__ import annotations
 
+import html
 from typing import Any, List, Optional
 
 from PyQt6.QtCore import Qt
@@ -138,20 +139,22 @@ class ItemInspectorWidget(QWidget):
 
         html_parts = []
 
-        # Item name with rarity color
+        # Item name with rarity color (escape for XSS protection)
         name = getattr(item, "name", "") or getattr(item, "base_type", "Unknown Item")
+        safe_name = html.escape(str(name))
         rarity = getattr(item, "rarity", "Normal")
         rarity_color = get_rarity_color(rarity)
 
         html_parts.append(
-            f'<p style="color: {rarity_color}; font-size: 14px; font-weight: bold; margin: 0 0 4px 0;">{name}</p>'
+            f'<p style="color: {rarity_color}; font-size: 14px; font-weight: bold; margin: 0 0 4px 0;">{safe_name}</p>'
         )
 
         # Base type (if different from name)
         base_type = getattr(item, "base_type", "")
         if base_type and base_type != name:
+            safe_base_type = html.escape(str(base_type))
             html_parts.append(
-                f'<p style="color: {COLORS["text_secondary"]}; margin: 0 0 4px 0;">{base_type}</p>'
+                f'<p style="color: {COLORS["text_secondary"]}; margin: 0 0 4px 0;">{safe_base_type}</p>'
             )
 
         # Rarity

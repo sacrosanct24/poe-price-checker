@@ -18,17 +18,25 @@ import json
 from pathlib import Path
 from datetime import datetime, timedelta
 
+from core.secure_storage import get_secure_storage
+
 
 class OAuthCallbackHandler(BaseHTTPRequestHandler):
     """HTTP handler for OAuth callback."""
 
     authorization_code: Optional[str] = None
+    expected_state: Optional[str] = None  # Set before handling request
+    received_state: Optional[str] = None
 
     def do_GET(self) -> None:
         """Handle GET request from OAuth redirect."""
         # Parse the callback URL
         parsed = urlparse(self.path)
         params = parse_qs(parsed.query)
+
+        # Validate state parameter for CSRF protection
+        received_state = params.get('state', [None])[0]
+        OAuthCallbackHandler.received_state = received_state
 
         if 'code' in params:
             # Success - got authorization code
@@ -133,8 +141,13 @@ class PoeOAuthClient:
             with open(self.token_file, 'r') as f:
                 data = json.load(f)
 
-            self.access_token = data.get('access_token')
-            self.refresh_token = data.get('refresh_token')
+            # Decrypt tokens using SecureStorage
+            storage = get_secure_storage()
+            encrypted_access = data.get('access_token', '')
+            encrypted_refresh = data.get('refresh_token', '')
+
+            self.access_token = storage.decrypt(encrypted_access) if encrypted_access else None
+            self.refresh_token = storage.decrypt(encrypted_refresh) if encrypted_refresh else None
 
             expires_at_str = data.get('expires_at')
             if expires_at_str:
@@ -149,13 +162,16 @@ class PoeOAuthClient:
             self.logger.warning("Failed to load token: %s", e)
 
     def _save_token(self) -> None:
-        """Save current token to file."""
+        """Save current token to file with encryption."""
         if not self.access_token:
             return
 
+        # Encrypt tokens using SecureStorage
+        storage = get_secure_storage()
+
         data = {
-            'access_token': self.access_token,
-            'refresh_token': self.refresh_token,
+            'access_token': storage.encrypt(self.access_token),
+            'refresh_token': storage.encrypt(self.refresh_token) if self.refresh_token else None,
             'expires_at': self.expires_at.isoformat() if self.expires_at else None,
         }
 
@@ -164,6 +180,9 @@ class PoeOAuthClient:
 
         with open(self.token_file, 'w') as f:
             json.dump(data, f, indent=2)
+
+        # Restrict file permissions to owner-only
+        storage._restrict_file_permissions(self.token_file)
 
         self.logger.info("Saved OAuth token to %s", self.token_file)
 
@@ -223,12 +242,25 @@ class PoeOAuthClient:
 
         # Wait for one request (the callback)
         OAuthCallbackHandler.authorization_code = None
+        OAuthCallbackHandler.expected_state = state  # Set expected state for validation
+        OAuthCallbackHandler.received_state = None
         server.handle_request()
 
         code = OAuthCallbackHandler.authorization_code
+        received_state = OAuthCallbackHandler.received_state
 
         if not code:
             self.logger.error("Failed to get authorization code")
+            return False
+
+        # Validate state to prevent CSRF attacks
+        if received_state != state:
+            self.logger.error(
+                "OAuth state mismatch - possible CSRF attack. "
+                "Expected: %s..., Received: %s...",
+                state[:10] if state else "None",
+                received_state[:10] if received_state else "None"
+            )
             return False
 
         self.logger.info("Got authorization code: %s...", code[:10])

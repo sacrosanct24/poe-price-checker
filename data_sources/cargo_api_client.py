@@ -66,9 +66,14 @@ def _sanitize_cargo_string(value: str, max_length: int = 500) -> str:
     # Escape single quotes (double them for SQL)
     value = value.replace("'", "''")
 
-    # Remove other dangerous SQL characters
+    # Remove dangerous SQL characters
+    # - Semicolons: prevent statement termination
+    # - Hyphens: prevent SQL comments (--)
+    # - Slashes/asterisks: prevent block comments (/*, */)
+    # - Backslashes: prevent escape sequences
+    # - Backticks: prevent identifier escaping
     # Keep: alphanumeric, spaces, common punctuation, % for LIKE patterns
-    value = re.sub(r'[;\-\-\/*\\`]', '', value)
+    value = re.sub(r'[;/*\\`-]', '', value)
 
     return value
 

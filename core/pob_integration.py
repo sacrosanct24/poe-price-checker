@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
+from urllib.parse import urlparse
 
 import requests
 
@@ -271,9 +272,14 @@ class PoBDecoder:
     @staticmethod
     def _fetch_pastebin(url: str) -> str:
         """Fetch raw content from a pastebin URL."""
-        # Convert to raw URL
-        if "/raw/" not in url:
-            paste_id = url.split("/")[-1]
+        # Convert to raw URL using urlparse for security
+        parsed = urlparse(url)
+        if "/raw/" not in parsed.path:
+            # Extract paste ID from path (last segment)
+            path_parts = parsed.path.rstrip("/").split("/")
+            paste_id = path_parts[-1] if path_parts else ""
+            if not paste_id:
+                raise ValueError("Invalid pastebin URL: no paste ID found")
             url = f"https://pastebin.com/raw/{paste_id}"
 
         try:
@@ -288,7 +294,12 @@ class PoBDecoder:
     def _fetch_pobbin(url: str) -> str:
         """Fetch raw PoB code from a pobb.in URL."""
         # pobb.in uses /u/{id}/raw or we can fetch from API
-        paste_id = url.rstrip("/").split("/")[-1]
+        # Use urlparse for secure URL parsing
+        parsed = urlparse(url)
+        path_parts = parsed.path.rstrip("/").split("/")
+        paste_id = path_parts[-1] if path_parts else ""
+        if not paste_id:
+            raise ValueError("Invalid pobb.in URL: no paste ID found")
 
         # Try the raw endpoint first
         raw_url = f"https://pobb.in/{paste_id}/raw"
