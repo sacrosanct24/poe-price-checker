@@ -1,8 +1,16 @@
+---
+title: Test Suite Guide
+status: current
+stability: stable
+last_reviewed: 2025-11-28
+review_frequency: quarterly
+---
+
 # Test Suite Guide - PoE Price Checker
 
-**Status:** ✅ 163 tests passing (98% pass rate)  
-**Coverage:** ~60% overall  
-**Runtime:** ~3 seconds
+**Status:** ✅ 1226 tests passing (100% pass rate)
+**Coverage:** ~60% overall
+**Runtime:** ~30 seconds
 
 ---
 

@@ -1,3 +1,11 @@
+---
+title: Claude Desktop Configuration Fix
+status: current
+stability: stable
+last_reviewed: 2025-11-28
+review_frequency: as-needed
+---
+
 # Claude Desktop Configuration Fix
 
 ## Issue

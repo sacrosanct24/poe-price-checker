@@ -1,3 +1,13 @@
+---
+title: MCP Setup Guide
+status: current
+stability: stable
+last_reviewed: 2025-11-28
+review_frequency: quarterly
+related_code:
+  - mcp_poe_server.py
+---
+
 # MCP Setup Guide for PoE Price Checker
 
 ## What is MCP?

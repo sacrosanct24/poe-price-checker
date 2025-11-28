@@ -1,9 +1,15 @@
-Here’s a merged **`docs/TESTING_GUIDE.md`** you can drop in and then remove `TESTING.md`, `TESTING_SUMMARY.md`, and `tests/README_test.md`.
+---
+title: Testing Guide
+status: current
+stability: stable
+last_reviewed: 2025-11-28
+review_frequency: quarterly
+related_code:
+  - tests/
+  - conftest.py
+---
 
-````md
 # PoE Price Checker – Testing Guide
-
-_Last updated: 2025-11-22_
 
 This guide explains:
 

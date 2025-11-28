@@ -1,10 +1,15 @@
-Here’s a concrete, repo-ready **Plugin Interface Specification** that fits your current architecture (AppContext, MultiSourcePriceService, plugin_state table, etc.). You can drop this into `docs/PLUGIN_SPEC.md` or append to `DEVELOPMENT_GUIDE.md`.
-
+---
+title: Plugin Interface Specification
+status: current
+stability: stable
+last_reviewed: 2025-11-28
+review_frequency: quarterly
+related_code:
+  - plugins/
+  - core/plugin_loader.py
 ---
 
 # PoE Price Checker – Plugin Interface Specification
-
-*Last updated: 2025-11-22*
 
 ## 1. Goals
 

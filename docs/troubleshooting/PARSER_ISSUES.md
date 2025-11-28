@@ -1,3 +1,14 @@
+---
+title: Parser Troubleshooting Guide
+status: current
+stability: stable
+last_reviewed: 2025-11-28
+review_frequency: as-needed
+related_code:
+  - core/item_parser.py
+  - debug_clipboard.py
+---
+
 # Parser Troubleshooting Guide
 
 **Problem:** Items showing as "Unknown Item" with 0 chaos value

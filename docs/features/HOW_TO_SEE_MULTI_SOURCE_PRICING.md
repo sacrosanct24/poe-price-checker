@@ -1,3 +1,11 @@
+---
+title: How to See Multi-Source Pricing
+status: current
+stability: stable
+last_reviewed: 2025-11-28
+review_frequency: quarterly
+---
+
 # How to See Multi-Source Pricing in Action
 
 Your PoE Price Checker now uses **two pricing sources** (poe.ninja + poe.watch) to validate prices and provide confidence levels!

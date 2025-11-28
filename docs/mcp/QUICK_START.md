@@ -1,3 +1,13 @@
+---
+title: MCP Quick Start
+status: current
+stability: stable
+last_reviewed: 2025-11-28
+review_frequency: quarterly
+related_code:
+  - mcp_poe_server.py
+---
+
 # MCP Quick Start - PoE Price Checker
 
 ## 30-Second Install

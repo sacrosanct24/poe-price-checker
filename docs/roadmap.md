@@ -1,10 +1,12 @@
-Here’s an updated **Roadmap v2 – 2025-11-21** you can drop straight into `ROADMAP.md` and call it a night. 😴
-
-I’ve **kept your original structure**, but updated Phase 1 to reflect what we’ve actually done (GUI refactor + live poe.ninja pricing), and added a new **“Near-Term Next Steps”** block so tomorrow’s session has a clean landing zone.
-
+---
+title: Development Roadmap
+status: current
+stability: volatile
+last_reviewed: 2025-11-28
+review_frequency: monthly
 ---
 
-# PoE Price Checker – Development Roadmap (Updated 2025-11-21)
+# PoE Price Checker – Development Roadmap
 
 **Project Vision:** Over-engineered, portfolio-worthy PoE economy tool supporting both PoE1 & PoE2
 

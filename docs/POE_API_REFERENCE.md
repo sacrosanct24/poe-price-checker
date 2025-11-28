@@ -1,6 +1,14 @@
+---
+title: Path of Exile Official API Reference
+status: current
+stability: stable
+last_reviewed: 2025-11-28
+review_frequency: quarterly
+---
+
 # Path of Exile Official API Reference
 
-**Last Updated:** January 2025  
+**Last Updated:** January 2025
 **Official Source:** https://www.pathofexile.com/developer/docs/reference
 
 > This is a reference copy for offline use. Always check official docs for updates.

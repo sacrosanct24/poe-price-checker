@@ -1,3 +1,14 @@
+---
+title: PoB Build-Aware Integration Roadmap
+status: current
+stability: volatile
+last_reviewed: 2025-11-28
+review_frequency: monthly
+related_code:
+  - core/pob_integration.py
+  - core/build_matcher.py
+---
+
 # PoB Build-Aware Integration Roadmap
 
 ## Overview

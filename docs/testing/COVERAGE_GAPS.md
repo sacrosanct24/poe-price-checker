@@ -1,7 +1,20 @@
-﻿# Suggested Additional Tests - PoE Price Checker
+---
+title: Coverage Gaps Analysis
+status: current
+stability: volatile
+last_reviewed: 2025-11-28
+review_frequency: per-release
+---
+
+# Suggested Additional Tests - PoE Price Checker
 
 ## Coverage Analysis Summary
-Current overall coverage: 57%
+
+> **Last Updated**: 2025-11-28
+> **Test Count**: 1226 tests
+> **Pass Rate**: 100%
+
+Current overall coverage: ~60% (improved from 57%)
 
 ### High Priority Gaps
 

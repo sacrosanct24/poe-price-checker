@@ -1,3 +1,14 @@
+---
+title: Maxroll Build Integration Guide
+status: current
+stability: stable
+last_reviewed: 2025-11-28
+review_frequency: quarterly
+related_code:
+  - data_sources/maxroll_client.py
+  - core/pob_integration.py
+---
+
 # Maxroll Build Integration Guide
 
 This document describes how to fetch, decode, and work with Path of Building (PoB) data from Maxroll.gg build guides.

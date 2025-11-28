@@ -1,6 +1,14 @@
+---
+title: Rare Item Valuation Guide
+status: current
+stability: stable
+last_reviewed: 2025-11-28
+review_frequency: quarterly
+---
+
 # Path of Exile Rare Item Valuation Guide
-**Purpose:** LLM Context Document for Understanding Rare Item Economy  
-**Version:** 1.0 | **Last Updated:** 2025-11-24  
+**Purpose:** LLM Context Document for Understanding Rare Item Economy
+**Version:** 1.0 | **Last Updated:** 2025-11-28
 **Scope:** Path of Exile 1 (PoE2 has different systems)
 
 ---

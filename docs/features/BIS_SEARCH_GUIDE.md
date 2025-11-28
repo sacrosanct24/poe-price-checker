@@ -1,7 +1,19 @@
+---
+title: BiS Search System Guide
+status: current
+stability: volatile
+last_reviewed: 2025-11-28
+review_frequency: monthly
+related_code:
+  - core/bis_calculator.py
+  - core/build_priorities.py
+  - core/affix_tier_calculator.py
+  - gui_qt/dialogs/bis_search_dialog.py
+---
+
 # BiS (Best-in-Slot) Search System
 
 **Purpose:** Find optimal gear upgrades based on your build's needs
-**Version:** 1.0 | **Last Updated:** 2025-11-26
 
 ---
 

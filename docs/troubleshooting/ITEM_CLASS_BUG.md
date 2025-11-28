@@ -1,7 +1,15 @@
+---
+title: Bug Fix - Item Class Line Handling
+status: archived
+stability: archived
+last_reviewed: 2025-11-28
+review_frequency: as-needed
+---
+
 # Bug Fix: "Item Class:" Line Handling
 
-**Date:** 2025-01-23  
-**Status:** ✅ FIXED  
+**Date:** 2025-01-23
+**Status:** FIXED
 **Tests Added:** 6 new tests
 
 ---

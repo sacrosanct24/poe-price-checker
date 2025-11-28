@@ -1,3 +1,13 @@
+---
+title: Cargo API Integration Guide
+status: current
+stability: stable
+last_reviewed: 2025-11-28
+review_frequency: quarterly
+related_code:
+  - data_sources/cargo_api_client.py
+---
+
 # Cargo API Integration Guide
 
 ## Overview

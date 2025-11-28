@@ -1,7 +1,18 @@
+---
+title: MCP Integration Guide
+status: current
+stability: stable
+last_reviewed: 2025-11-28
+review_frequency: quarterly
+related_code:
+  - mcp_poe_server.py
+  - tests/unit/test_mcp_server.py
+---
+
 # MCP Integration Guide
 
-**Status:** ✅ Ready to use  
-**Test Coverage:** 8 tests (skip if MCP not installed)  
+**Status:** Ready to use
+**Test Coverage:** 8 tests (skip if MCP not installed)
 **Setup Time:** 5 minutes
 
 ---

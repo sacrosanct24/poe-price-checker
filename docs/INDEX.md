@@ -1,4 +1,12 @@
-﻿# PoE Price Checker Documentation
+---
+title: Documentation Index
+status: current
+stability: stable
+last_reviewed: 2025-11-28
+review_frequency: quarterly
+---
+
+# PoE Price Checker Documentation
 
 **Quick Navigation** - All essential documentation for development and usage.
 
@@ -88,6 +96,12 @@
 
 ---
 
+## 🔗 External Integrations
+
+- **[Maxroll Build Integration](integration/MAXROLL_INTEGRATION.md)** - Import and compare builds from Maxroll.gg
+
+---
+
 ## 🔧 Troubleshooting
 
 - [Parser Issues](troubleshooting/PARSER_ISSUES.md) - "Unknown Item" problems
@@ -96,20 +110,28 @@
 
 ---
 
+## 📋 Documentation Management
+
+- **[Documentation Manifest](DOCS_MANIFEST.md)** - Registry of all docs with status tracking
+
+---
+
 ## 📂 Documentation Structure
 
 ```
 docs/
 ├── INDEX.md (this file)
+├── DOCS_MANIFEST.md (documentation registry)
 ├── RARE_ITEM_VALUATION.md ⭐⭐⭐ (Essential reference)
 ├── POE_API_REFERENCE.md
 ├── POEWATCH_API_REFERENCE.md
 ├── roadmap.md
 │
-├── features/          # User guides
 ├── development/       # Dev guides & architecture
-├── testing/          # Test documentation
+├── features/          # User guides
+├── integration/       # External service integrations
 ├── mcp/              # AI assistant integration
+├── testing/          # Test documentation
 └── troubleshooting/  # Problem solving
 ```
 

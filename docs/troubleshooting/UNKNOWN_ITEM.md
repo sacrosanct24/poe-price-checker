@@ -1,3 +1,13 @@
+---
+title: Troubleshooting Unknown Item Issues
+status: current
+stability: stable
+last_reviewed: 2025-11-28
+review_frequency: as-needed
+related_code:
+  - core/item_parser.py
+---
+
 # Troubleshooting "Unknown Item" Issues
 
 ## Problem

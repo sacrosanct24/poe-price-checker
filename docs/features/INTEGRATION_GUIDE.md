@@ -1,3 +1,15 @@
+---
+title: Meta-Based Dynamic Affix Weighting Integration Guide
+status: current
+stability: volatile
+last_reviewed: 2025-11-28
+review_frequency: monthly
+related_code:
+  - data_sources/build_scrapers.py
+  - core/meta_analyzer.py
+  - core/build_matcher.py
+---
+
 # Meta-Based Dynamic Affix Weighting - Integration Guide
 
 ## Overview

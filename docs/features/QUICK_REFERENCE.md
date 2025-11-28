@@ -1,6 +1,14 @@
+---
+title: Quick Reference - Multi-Source Pricing
+status: current
+stability: stable
+last_reviewed: 2025-11-28
+review_frequency: quarterly
+---
+
 # Quick Reference: Multi-Source Pricing
 
-## ✅ Status: VERIFIED WORKING
+## Status: VERIFIED WORKING
 
 Your PoE Price Checker now uses **two pricing sources** with validation!
 

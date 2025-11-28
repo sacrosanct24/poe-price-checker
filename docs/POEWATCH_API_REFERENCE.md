@@ -1,7 +1,15 @@
+---
+title: poe.watch API Reference
+status: current
+stability: stable
+last_reviewed: 2025-11-28
+review_frequency: quarterly
+---
+
 # poe.watch API Reference
 
-**Last Updated:** January 2025  
-**Official Documentation:** https://docs.poe.watch  
+**Last Updated:** January 2025
+**Official Documentation:** https://docs.poe.watch
 **Website:** https://poe.watch
 
 > Third-party price tracking service for Path of Exile with historical data, enchantments, and corruption pricing.

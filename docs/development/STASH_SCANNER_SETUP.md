@@ -1,4 +1,13 @@
-
+---
+title: Stash Scanner Setup Guide
+status: current
+stability: stable
+last_reviewed: 2025-11-28
+review_frequency: quarterly
+related_code:
+  - data_sources/poe_stash_api.py
+  - data_sources/oauth_manager.py
+---
 
 # Stash Scanner Setup Guide
 

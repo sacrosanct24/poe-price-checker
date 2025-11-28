@@ -1,3 +1,14 @@
+---
+title: Rare Item Evaluator Quick Start
+status: current
+stability: stable
+last_reviewed: 2025-11-28
+review_frequency: quarterly
+related_code:
+  - core/rare_item_evaluator.py
+  - test_rare_evaluator.py
+---
+
 # Rare Item Evaluator - Quick Start
 
 ## Test It Now

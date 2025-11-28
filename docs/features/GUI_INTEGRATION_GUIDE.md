@@ -1,10 +1,27 @@
+---
+title: GUI Integration Guide - Rare Item Evaluator
+status: outdated
+stability: volatile
+last_reviewed: 2025-11-28
+review_frequency: per-release
+related_code:
+  - gui_qt/widgets/item_inspector.py
+  - core/rare_item_evaluator.py
+---
+
 # GUI Integration Guide - Rare Item Evaluator
+
+> **Note**: This guide references the legacy `gui/` (tkinter) folder. The application now uses
+> `gui_qt/` (PyQt6). The rare item evaluation is now integrated into the Item Inspector widget
+> at `gui_qt/widgets/item_inspector.py`. See that file for current implementation.
 
 ## Overview
 
 This guide shows how to integrate the rare item evaluator into your GUI.
 
-I've created a ready-to-use panel widget: `gui/rare_evaluation_panel.py`
+**Current Implementation**: `gui_qt/widgets/item_inspector.py`
+
+Legacy reference: `gui/rare_evaluation_panel.py` (tkinter, deprecated)
 
 ---
 

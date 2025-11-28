@@ -1,3 +1,13 @@
+---
+title: MCP Server Without Node.js
+status: current
+stability: stable
+last_reviewed: 2025-11-28
+review_frequency: quarterly
+related_code:
+  - mcp_poe_server.py
+---
+
 # MCP Server Without Node.js
 
 **Good News:** You can run the MCP server without installing Node.js!

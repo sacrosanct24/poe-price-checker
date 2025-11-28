@@ -1,10 +1,18 @@
-Here’s a development doc you can drop into `docs/` or the repo root as something like `DEVELOPMENT_GUIDE.md`. It’s based on the current snapshot in `exilePriceCheck.zip` (not generic guesses).
-
+---
+title: Development Guide
+status: current
+stability: stable
+last_reviewed: 2025-11-28
+review_frequency: quarterly
+related_code:
+  - core/
+  - gui_qt/
+  - data_sources/
 ---
 
 # PoE Price Checker – Development Guide
 
-*Last updated: 2025-11-26*
+*Last updated: 2025-11-28*
 
 ## 1. Project Goals & Non-Functional Requirements
 

@@ -1,3 +1,13 @@
+---
+title: Data Sources Guide
+status: current
+stability: stable
+last_reviewed: 2025-11-28
+review_frequency: quarterly
+related_code:
+  - data_sources/
+---
+
 # Data Sources Guide
 
 Authoritative reference for all data sources used in PoE Price Checker.

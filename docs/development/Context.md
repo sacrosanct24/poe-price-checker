@@ -1,5 +1,13 @@
+---
+title: LLM Context Document
+status: current
+stability: volatile
+last_reviewed: 2025-11-28
+review_frequency: monthly
+---
+
 # PoE Price Checker - LLM Context Document
-**Version:** 2.5 Enhanced | **Last Updated:** 2025-11-15 | **Python:** 3.12
+**Version:** 2.5 Enhanced | **Last Updated:** 2025-11-28 | **Python:** 3.12
 
 ## CRITICAL GOTCHAS & LESSONS LEARNED
 

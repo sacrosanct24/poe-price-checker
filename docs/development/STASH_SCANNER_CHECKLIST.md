@@ -1,6 +1,17 @@
+---
+title: Stash Scanner Quick Start Checklist
+status: current
+stability: stable
+last_reviewed: 2025-11-28
+review_frequency: quarterly
+related_code:
+  - data_sources/poe_stash_api.py
+  - gui_qt/windows/stash_scanner_window.py
+---
+
 # Stash Scanner - Quick Start Checklist
 
-## ✅ Your Action Items
+## Your Action Items
 
 ### Step 1: Register OAuth App (5 minutes)
 - [ ] Go to https://www.pathofexile.com/developer/docs

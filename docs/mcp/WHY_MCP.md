@@ -1,6 +1,14 @@
+---
+title: Why Use Python MCP
+status: current
+stability: stable
+last_reviewed: 2025-11-28
+review_frequency: quarterly
+---
+
 # Should You Use Python MCP? - Final Recommendation
 
-## TL;DR: **YES** ✅
+## TL;DR: YES
 
 **Use Python MCP, but with the custom server approach I've built for you.**
 

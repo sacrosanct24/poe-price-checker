@@ -1,7 +1,14 @@
+---
+title: Code Review Report
+status: archived
+stability: archived
+last_reviewed: 2025-11-28
+review_frequency: as-needed
+---
 
 # PoE Price Checker - Code Review Report
-**Date:** 2025-11-16  
-**Version:** 0.2.0-dev  
+**Date:** 2025-11-16
+**Version:** 0.2.0-dev
 **Reviewer:** Code Analysis
 
 ---
