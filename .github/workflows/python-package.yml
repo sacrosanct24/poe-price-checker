@@ -38,8 +38,9 @@ jobs:
           libxcb-render-util0 \
           libxcb-xinerama0 \
           libxcb-xfixes0 \
+          libxcb-cursor0 \
           libegl1 \
-          libgl1-mesa-glx
+          libgl1
 
     - name: Cache pip dependencies
       uses: actions/cache@v4
