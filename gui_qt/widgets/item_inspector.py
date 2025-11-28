@@ -22,6 +22,7 @@ from gui_qt.styles import COLORS, get_rarity_color
 from core.build_stat_calculator import BuildStatCalculator, BuildStats
 from core.build_archetype import BuildArchetype
 from core.upgrade_calculator import UpgradeCalculator, UpgradeImpact
+from core.dps_impact_calculator import DPSImpactCalculator, DPSStats
 
 
 class ItemInspectorWidget(QWidget):
@@ -43,6 +44,10 @@ class ItemInspectorWidget(QWidget):
         # Upgrade calculator and comparison
         self._upgrade_calculator: Optional[UpgradeCalculator] = None
         self._current_equipped_mods: Optional[List[str]] = None
+
+        # DPS impact calculator
+        self._dps_calculator: Optional[DPSImpactCalculator] = None
+        self._dps_stats: Optional[DPSStats] = None
 
         # Set minimum size
         self.setMinimumHeight(200)
@@ -106,6 +111,14 @@ class ItemInspectorWidget(QWidget):
     def set_archetype(self, archetype: Optional[BuildArchetype]) -> None:
         """Set build archetype for weighted scoring."""
         self._archetype = archetype
+
+    def set_dps_stats(self, stats: Optional[DPSStats]) -> None:
+        """Set DPS stats for calculating damage impact."""
+        self._dps_stats = stats
+        if stats:
+            self._dps_calculator = DPSImpactCalculator(stats)
+        else:
+            self._dps_calculator = None
 
     def set_evaluation(self, evaluation: Optional[Any]) -> None:
         """Set evaluation results from rare item evaluator."""
@@ -183,6 +196,12 @@ class ItemInspectorWidget(QWidget):
             upgrade_html = self._build_upgrade_comparison_html(all_mods)
             if upgrade_html:
                 html_parts.append(upgrade_html)
+
+        # DPS impact section
+        if self._dps_calculator and all_mods:
+            dps_html = self._build_dps_impact_html(all_mods)
+            if dps_html:
+                html_parts.append(dps_html)
 
         # Separator
         html_parts.append(f'<hr style="border: 1px solid {COLORS["border"]}; margin: 8px 0;">')
@@ -496,3 +515,92 @@ class ItemInspectorWidget(QWidget):
                 )
 
         return "\n".join(html_parts)
+
+    def _build_dps_impact_html(self, mods: List[str]) -> str:
+        """Build HTML for DPS impact section."""
+        if not self._dps_calculator:
+            return ""
+
+        # Calculate DPS impact
+        result = self._dps_calculator.calculate_impact(mods)
+
+        # Only show if there are offensive mods detected
+        if not result.mod_impacts:
+            return ""
+
+        html_parts = []
+
+        # Separator and header
+        html_parts.append(f'<hr style="border: 1px solid {COLORS["border"]}; margin: 8px 0;">')
+
+        # Header with DPS summary
+        if result.total_dps_percent > 0:
+            header_color = COLORS.get('currency', '#ffcc00')
+            arrow = "▲"
+        elif result.total_dps_percent < 0:
+            header_color = COLORS.get('corrupted', '#ff4444')
+            arrow = "▼"
+        else:
+            header_color = COLORS.get('text_secondary', '#888888')
+            arrow = "◆"
+
+        html_parts.append(
+            f'<p style="color: {header_color}; font-weight: bold; margin: 0 0 4px 0;">'
+            f'{arrow} DPS Impact (Estimated)'
+            f'</p>'
+        )
+
+        # Build info
+        if result.build_info:
+            html_parts.append(
+                f'<p style="color: {COLORS["text_secondary"]}; font-size: 10px; margin: 0 0 4px 0;">'
+                f'{result.build_info}'
+                f'</p>'
+            )
+
+        # Summary
+        if result.summary:
+            # Color the summary based on impact
+            if "Significant" in result.summary:
+                summary_color = COLORS.get('currency', '#ffcc00')
+            elif "Moderate" in result.summary:
+                summary_color = COLORS.get('text', '#ffffff')
+            else:
+                summary_color = COLORS.get('text_secondary', '#888888')
+
+            html_parts.append(
+                f'<p style="color: {summary_color}; margin: 0 0 4px 0; font-size: 11px;">'
+                f'{result.summary}'
+                f'</p>'
+            )
+
+        # Show individual mod impacts (high relevance first)
+        high_impacts = [m for m in result.mod_impacts if m.relevance == "high"]
+        medium_impacts = [m for m in result.mod_impacts if m.relevance == "medium"]
+
+        for impact in high_impacts[:4]:
+            dps_str = self._format_dps_change(impact.estimated_dps_change)
+            html_parts.append(
+                f'<p style="color: {COLORS.get("currency", "#ffcc00")}; margin: 2px 0 2px 8px; font-size: 10px;">'
+                f'• {dps_str} ({impact.estimated_dps_percent:+.1f}%)'
+                f'</p>'
+            )
+
+        for impact in medium_impacts[:2]:
+            dps_str = self._format_dps_change(impact.estimated_dps_change)
+            html_parts.append(
+                f'<p style="color: {COLORS.get("text_secondary", "#888888")}; margin: 2px 0 2px 8px; font-size: 10px;">'
+                f'• {dps_str} ({impact.estimated_dps_percent:+.1f}%)'
+                f'</p>'
+            )
+
+        return "\n".join(html_parts)
+
+    def _format_dps_change(self, dps: float) -> str:
+        """Format DPS change value for display."""
+        if abs(dps) >= 1_000_000:
+            return f"{dps/1_000_000:+.2f}M DPS"
+        elif abs(dps) >= 1_000:
+            return f"{dps/1_000:+.1f}K DPS"
+        else:
+            return f"{dps:+.0f} DPS"

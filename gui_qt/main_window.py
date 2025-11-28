@@ -47,7 +47,11 @@ from PyQt6.QtWidgets import (
     QDialog,
 )
 
-from gui_qt.styles import APP_STYLESHEET, COLORS
+from gui_qt.styles import (
+    APP_STYLESHEET, COLORS, Theme, get_theme_manager, get_app_stylesheet,
+    THEME_CATEGORIES, THEME_DISPLAY_NAMES
+)
+from gui_qt.shortcuts import get_shortcut_manager, get_shortcuts_help_text
 from gui_qt.widgets.results_table import ResultsTableWidget
 from gui_qt.widgets.item_inspector import ItemInspectorWidget
 from gui_qt.widgets.rare_evaluation_panel import RareEvaluationPanelWidget
@@ -254,6 +258,7 @@ class PriceCheckerWindow(QMainWindow):
         self._build_comparison_dialog = None
         self._bis_search_dialog = None
         self._loadout_selector_dialog = None
+        self._item_comparison_dialog = None
 
         # PoB integration
         self._character_manager = None
@@ -279,8 +284,8 @@ class PriceCheckerWindow(QMainWindow):
         self._create_status_bar()
         self._setup_shortcuts()
 
-        # Apply stylesheet
-        self.setStyleSheet(APP_STYLESHEET)
+        # Initialize theme from config and apply stylesheet
+        self._init_theme()
 
         self._set_status("Ready")
 
@@ -336,6 +341,8 @@ class PriceCheckerWindow(QMainWindow):
 
     def _update_build_stats_for_inspector(self) -> None:
         """Update the item inspector with build stats from the active PoB profile."""
+        from core.dps_impact_calculator import DPSStats
+
         self.logger.info("Updating build stats for item inspector")
         if not self._character_manager:
             self.logger.info("No character manager available")
@@ -351,9 +358,19 @@ class PriceCheckerWindow(QMainWindow):
                 self.logger.info(
                     f"Set build stats: life={build_stats.total_life}, life_inc={build_stats.life_inc}%"
                 )
+
+                # Also set DPS stats for damage impact calculations
+                dps_stats = DPSStats.from_pob_stats(profile.build.stats)
+                self.item_inspector.set_dps_stats(dps_stats)
+                if dps_stats.combined_dps > 0:
+                    self.logger.info(
+                        f"Set DPS stats: {dps_stats.combined_dps:.0f} DPS, "
+                        f"type={dps_stats.primary_damage_type.value}"
+                    )
             else:
                 self.logger.info(f"No build stats available")
                 self.item_inspector.set_build_stats(None)
+                self.item_inspector.set_dps_stats(None)
         except Exception as e:
             self.logger.warning(f"Failed to update build stats: {e}")
 
@@ -416,6 +433,11 @@ class PriceCheckerWindow(QMainWindow):
         bis_search_action.triggered.connect(self._show_bis_search)
         build_menu.addAction(bis_search_action)
 
+        item_compare_action = QAction("Compare &Items...", self)
+        item_compare_action.setShortcut(QKeySequence("Ctrl+Shift+I"))
+        item_compare_action.triggered.connect(self._show_item_comparison)
+        build_menu.addAction(item_compare_action)
+
         build_menu.addSeparator()
 
         rare_eval_action = QAction("Rare Item &Settings...", self)
@@ -455,6 +477,34 @@ class PriceCheckerWindow(QMainWindow):
         stash_action = QAction("&Stash Viewer", self)
         stash_action.triggered.connect(self._show_stash_viewer)
         view_menu.addAction(stash_action)
+
+        view_menu.addSeparator()
+
+        # Theme submenu with categories
+        self._theme_menu = view_menu.addMenu("&Theme")
+        self._theme_actions: Dict[Theme, QAction] = {}
+
+        for category, themes in THEME_CATEGORIES.items():
+            if category != "Standard":
+                self._theme_menu.addSeparator()
+                label_action = QAction(f"[ {category} ]", self)
+                label_action.setEnabled(False)
+                self._theme_menu.addAction(label_action)
+
+            for theme in themes:
+                display_name = THEME_DISPLAY_NAMES.get(theme, theme.value)
+                action = QAction(display_name, self)
+                action.setCheckable(True)
+                action.triggered.connect(lambda checked, t=theme: self._set_theme(t))
+                self._theme_menu.addAction(action)
+                self._theme_actions[theme] = action
+
+        # Quick toggle shortcut
+        view_menu.addSeparator()
+        toggle_theme_action = QAction("&Quick Toggle Dark/Light", self)
+        toggle_theme_action.setShortcut(QKeySequence("Ctrl+T"))
+        toggle_theme_action.triggered.connect(self._toggle_theme)
+        view_menu.addAction(toggle_theme_action)
 
         view_menu.addSeparator()
 
@@ -819,18 +869,110 @@ class PriceCheckerWindow(QMainWindow):
     # -------------------------------------------------------------------------
 
     def _setup_shortcuts(self) -> None:
-        """Setup keyboard shortcuts."""
-        # Ctrl+Enter to check price
-        check_shortcut = QShortcut(QKeySequence("Ctrl+Return"), self)
-        check_shortcut.activated.connect(self._on_check_price)
+        """Setup keyboard shortcuts using the ShortcutManager."""
+        manager = get_shortcut_manager()
+        manager.set_window(self)
 
-        # Escape to clear input
-        clear_shortcut = QShortcut(QKeySequence("Escape"), self)
-        clear_shortcut.activated.connect(self._clear_input)
+        # Register all action callbacks
+        # General
+        manager.register("show_shortcuts", self._show_shortcuts)
+        manager.register("show_command_palette", self._show_command_palette)
+        manager.register("show_tips", self._show_tips)
+        manager.register("exit", self.close)
 
-        # Ctrl+V to paste and check
-        paste_check_shortcut = QShortcut(QKeySequence("Ctrl+Shift+V"), self)
-        paste_check_shortcut.activated.connect(self._paste_and_check)
+        # Price Checking
+        manager.register("check_price", self._on_check_price)
+        manager.register("paste_and_check", self._paste_and_check)
+        manager.register("clear_input", self._clear_input)
+        manager.register("focus_input", self._focus_input)
+        manager.register("focus_filter", self._focus_filter)
+
+        # Build & PoB
+        manager.register("show_pob_characters", self._show_pob_characters)
+        manager.register("show_bis_search", self._show_bis_search)
+        manager.register("show_build_comparison", self._show_build_comparison)
+        manager.register("show_item_comparison", self._show_item_comparison)
+        manager.register("show_rare_eval_config", self._show_rare_eval_config)
+
+        # Navigation
+        manager.register("show_history", self._show_history)
+        manager.register("show_stash_viewer", self._show_stash_viewer)
+        manager.register("show_recent_sales", self._show_recent_sales)
+        manager.register("show_sales_dashboard", self._show_sales_dashboard)
+        manager.register("show_price_rankings", self._show_price_rankings)
+
+        # View & Theme
+        manager.register("toggle_theme", self._toggle_theme)
+        manager.register("cycle_theme", self._cycle_theme)
+        manager.register("toggle_rare_panel", self._toggle_rare_panel)
+
+        # Data & Export
+        manager.register("export_results", self._export_results)
+        manager.register("copy_all_tsv", self._copy_all_as_tsv)
+        manager.register("open_log_file", self._open_log_file)
+        manager.register("open_config_folder", self._open_config_folder)
+        manager.register("show_data_sources", self._show_data_sources)
+
+        # Register all shortcuts with Qt
+        manager.register_all()
+
+    def _focus_input(self) -> None:
+        """Focus the item input text area."""
+        self.input_text.setFocus()
+
+    def _focus_filter(self) -> None:
+        """Focus the results filter input."""
+        self.filter_input.setFocus()
+        self.filter_input.selectAll()
+
+    def _toggle_rare_panel(self) -> None:
+        """Toggle the rare evaluation panel visibility."""
+        self.rare_eval_panel.setVisible(not self.rare_eval_panel.isVisible())
+
+    def _cycle_theme(self) -> None:
+        """Cycle through all available themes."""
+        from gui_qt.styles import Theme
+
+        theme_manager = get_theme_manager()
+        current = theme_manager.current_theme
+
+        # Get all themes in order
+        all_themes = list(Theme)
+        try:
+            current_idx = all_themes.index(current)
+            next_idx = (current_idx + 1) % len(all_themes)
+            next_theme = all_themes[next_idx]
+        except ValueError:
+            next_theme = Theme.DARK
+
+        self._set_theme(next_theme)
+
+    def _show_command_palette(self) -> None:
+        """Show the command palette for quick access to all actions."""
+        from gui_qt.dialogs.command_palette import CommandPaletteDialog
+
+        manager = get_shortcut_manager()
+        actions = manager.get_action_for_palette()
+
+        dialog = CommandPaletteDialog(
+            actions=actions,
+            on_action=self._execute_palette_action,
+            parent=self,
+        )
+
+        # Center dialog over main window
+        dialog.move(
+            self.x() + (self.width() - dialog.width()) // 2,
+            self.y() + 100,
+        )
+
+        dialog.exec()
+
+    def _execute_palette_action(self, action_id: str) -> None:
+        """Execute an action from the command palette."""
+        manager = get_shortcut_manager()
+        if not manager.trigger(action_id):
+            self._set_status(f"Action not available: {action_id}")
 
     # -------------------------------------------------------------------------
     # Price Checking
@@ -1156,6 +1298,91 @@ class PriceCheckerWindow(QMainWindow):
         self.results_table.set_column_visible(column, visible)
 
     # -------------------------------------------------------------------------
+    # Theme Management
+    # -------------------------------------------------------------------------
+
+    def _init_theme(self) -> None:
+        """Initialize theme from config and apply stylesheet."""
+        theme_manager = get_theme_manager()
+
+        # Load theme from config
+        saved_theme = self.ctx.config.theme if hasattr(self.ctx, 'config') else "dark"
+        try:
+            theme = Theme(saved_theme)
+        except ValueError:
+            theme = Theme.DARK
+
+        # Set theme (this also updates colors)
+        theme_manager.set_theme(theme)
+
+        # Apply stylesheet
+        self.setStyleSheet(theme_manager.get_stylesheet())
+
+        # Update menu checkmarks
+        self._update_theme_menu_checks(theme)
+
+        # Register callback for future theme changes
+        theme_manager.register_callback(self._on_theme_changed)
+
+    def _set_theme(self, theme: Theme) -> None:
+        """Set the application theme."""
+        theme_manager = get_theme_manager()
+        theme_manager.set_theme(theme)
+
+        # Save to config
+        if hasattr(self.ctx, 'config'):
+            self.ctx.config.theme = theme.value
+
+        # Apply stylesheet
+        app = QApplication.instance()
+        if app:
+            app.setStyleSheet(theme_manager.get_stylesheet())
+        self.setStyleSheet(theme_manager.get_stylesheet())
+
+        # Update menu checkmarks
+        self._update_theme_menu_checks(theme)
+
+        display_name = THEME_DISPLAY_NAMES.get(theme, theme.value)
+        self._set_status(f"Theme changed to: {display_name}")
+
+    def _toggle_theme(self) -> None:
+        """Toggle between dark and light themes."""
+        theme_manager = get_theme_manager()
+        new_theme = theme_manager.toggle_theme()
+
+        # Save to config
+        if hasattr(self.ctx, 'config'):
+            self.ctx.config.theme = new_theme.value
+
+        # Apply stylesheet
+        app = QApplication.instance()
+        if app:
+            app.setStyleSheet(theme_manager.get_stylesheet())
+        self.setStyleSheet(theme_manager.get_stylesheet())
+
+        # Update menu checkmarks
+        self._update_theme_menu_checks(new_theme)
+
+        display_name = THEME_DISPLAY_NAMES.get(new_theme, new_theme.value)
+        self._set_status(f"Theme toggled to: {display_name}")
+
+    def _update_theme_menu_checks(self, current_theme: Theme) -> None:
+        """Update the checkmarks in the theme menu."""
+        for theme, action in self._theme_actions.items():
+            action.setChecked(theme == current_theme)
+
+    def _on_theme_changed(self, theme: Theme) -> None:
+        """Handle theme change callback from ThemeManager."""
+        # Update stylesheet
+        app = QApplication.instance()
+        if app:
+            app.setStyleSheet(get_theme_manager().get_stylesheet())
+        self.setStyleSheet(get_theme_manager().get_stylesheet())
+
+        # Update menu checkmarks
+        self._update_theme_menu_checks(theme)
+
+    # -------------------------------------------------------------------------
     # Menu Actions
     # -------------------------------------------------------------------------
 
@@ -1429,6 +1656,16 @@ class PriceCheckerWindow(QMainWindow):
         self._bis_search_dialog.show()
         self._bis_search_dialog.raise_()
 
+    def _show_item_comparison(self) -> None:
+        """Show item comparison dialog."""
+        from gui_qt.dialogs.item_comparison_dialog import ItemComparisonDialog
+
+        if self._item_comparison_dialog is None or not self._item_comparison_dialog.isVisible():
+            self._item_comparison_dialog = ItemComparisonDialog(self, self.ctx)
+
+        self._item_comparison_dialog.show()
+        self._item_comparison_dialog.raise_()
+
     def _paste_sample(self, item_type: str) -> None:
         """Paste a sample item of the given type."""
         samples = SAMPLE_ITEMS.get(item_type, [])
@@ -1455,19 +1692,39 @@ class PriceCheckerWindow(QMainWindow):
                 QMessageBox.critical(self, "Error", f"Failed to wipe database: {e}")
 
     def _show_shortcuts(self) -> None:
-        """Show keyboard shortcuts."""
-        text = """Keyboard Shortcuts:
+        """Show keyboard shortcuts in a scrollable dialog."""
+        text = get_shortcuts_help_text()
 
-Ctrl+Enter - Check price
-Ctrl+Shift+V - Paste and check
-Ctrl+B - Open PoB Characters
-Ctrl+I - Find BiS Item
-Ctrl+E - Export results
-Ctrl+Shift+C - Copy all as TSV
-Escape - Clear input
-Alt+F4 - Exit
-"""
-        QMessageBox.information(self, "Keyboard Shortcuts", text)
+        # Use a larger dialog for the full shortcuts list
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Keyboard Shortcuts")
+        dialog.setMinimumSize(450, 500)
+
+        layout = QVBoxLayout(dialog)
+
+        from PyQt6.QtWidgets import QTextEdit
+        text_widget = QTextEdit()
+        text_widget.setReadOnly(True)
+        text_widget.setPlainText(text)
+        text_widget.setStyleSheet(
+            f"background-color: {COLORS['background']}; "
+            f"color: {COLORS['text']}; "
+            f"font-family: monospace; "
+            f"font-size: 12px;"
+        )
+        layout.addWidget(text_widget)
+
+        # Hint about command palette
+        hint_label = QLabel("Tip: Press Ctrl+Shift+P to open Command Palette for quick access to all actions")
+        hint_label.setStyleSheet(f"color: {COLORS['accent']}; font-size: 11px; padding: 8px;")
+        hint_label.setWordWrap(True)
+        layout.addWidget(hint_label)
+
+        close_btn = QPushButton("Close")
+        close_btn.clicked.connect(dialog.accept)
+        layout.addWidget(close_btn)
+
+        dialog.exec()
 
     def _show_tips(self) -> None:
         """Show usage tips."""

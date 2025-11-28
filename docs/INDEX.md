@@ -41,6 +41,18 @@ review_frequency: quarterly
   - Affix tier calculator with ilvl requirements
   - Guide gear extraction from reference builds
 
+### Item Comparison & DPS Impact
+- **[Item Comparison Guide](features/ITEM_COMPARISON_GUIDE.md)** ⭐ - Side-by-side item comparison
+  - Compare two items to see stat differences
+  - DPS impact estimation based on your PoB build
+  - Upgrade/downgrade/sidegrade verdicts
+
+### Keyboard Shortcuts
+- **[Keyboard Shortcuts](features/KEYBOARD_SHORTCUTS.md)** - All available shortcuts
+  - F1 for shortcuts reference
+  - Ctrl+K for command palette
+  - Category-organized shortcuts (General, Price Check, Build, Navigation, View)
+
 ### PoE2 Support
 - Rune socket parsing and rune data (28+ runes across tiers)
 - Charm modifier data with tier progression
