@@ -6,6 +6,8 @@ All API clients (poe.ninja, official trade, etc.) inherit from this.
 from abc import ABC, abstractmethod
 from typing import Optional, Dict, Any, Callable
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 import time
 import logging
 from datetime import datetime, timedelta
@@ -143,6 +145,13 @@ class BaseAPIClient(ABC):
     Provides rate limiting, caching, error handling, and retry logic.
     """
 
+    # Connection pool settings (shared across instances)
+    POOL_CONNECTIONS = 10  # Number of connection pools to cache
+    POOL_MAXSIZE = 20      # Max connections per pool
+    MAX_RETRIES = 3        # Retries for connection errors
+    BACKOFF_FACTOR = 0.5   # Exponential backoff multiplier
+    RETRY_STATUS_CODES = frozenset({500, 502, 503, 504})  # Server errors to retry
+
     def __init__(
             self,
             base_url: str,
@@ -173,7 +182,23 @@ class BaseAPIClient(ABC):
             'Accept': 'application/json'
         })
 
-        logger.info(f"Initialized {self.__class__.__name__} - Rate: {rate_limit} req/s, Cache TTL: {cache_ttl}s")
+        # Configure connection pooling with retry logic
+        retry_strategy = Retry(
+            total=self.MAX_RETRIES,
+            backoff_factor=self.BACKOFF_FACTOR,
+            status_forcelist=self.RETRY_STATUS_CODES,
+            allowed_methods=["GET", "POST"],  # Retry these methods
+            raise_on_status=False  # Don't raise, let us handle status codes
+        )
+        adapter = HTTPAdapter(
+            pool_connections=self.POOL_CONNECTIONS,
+            pool_maxsize=self.POOL_MAXSIZE,
+            max_retries=retry_strategy
+        )
+        self.session.mount('https://', adapter)
+        self.session.mount('http://', adapter)
+
+        logger.info(f"Initialized {self.__class__.__name__} - Rate: {rate_limit} req/s, Cache TTL: {cache_ttl}s, Pool: {self.POOL_MAXSIZE}")
 
     @abstractmethod
     def _get_cache_key(self, endpoint: str, params: Optional[Dict] = None) -> str:

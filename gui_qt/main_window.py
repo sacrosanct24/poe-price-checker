@@ -51,6 +51,9 @@ from gui_qt.styles import (
     APP_STYLESHEET, COLORS, Theme, get_theme_manager, get_app_stylesheet,
     THEME_CATEGORIES, THEME_DISPLAY_NAMES, POE_CURRENCY_COLORS
 )
+from gui_qt.menus.menu_builder import (
+    MenuBuilder, MenuConfig, MenuItem, MenuSection, SubMenu, create_resources_menu
+)
 from gui_qt.shortcuts import get_shortcut_manager, get_shortcuts_help_text
 from gui_qt.widgets.results_table import ResultsTableWidget
 from gui_qt.widgets.item_inspector import ItemInspectorWidget
@@ -465,95 +468,75 @@ class PriceCheckerWindow(QMainWindow):
     # -------------------------------------------------------------------------
 
     def _create_menu_bar(self) -> None:
-        """Create the application menu bar."""
+        """Create the application menu bar using declarative MenuBuilder."""
         menubar = self.menuBar()
+        builder = MenuBuilder(self)
 
-        # File menu
-        file_menu = menubar.addMenu("&File")
+        # Define static menus declaratively
+        static_menus = [
+            MenuConfig("&File", [
+                MenuItem("Open &Log File", handler=self._open_log_file),
+                MenuItem("Open &Config Folder", handler=self._open_config_folder),
+                MenuSection([
+                    MenuItem("&Export Results (TSV)...", handler=self._export_results,
+                             shortcut="Ctrl+E"),
+                    MenuItem("Copy &All as TSV", handler=self._copy_all_as_tsv,
+                             shortcut="Ctrl+Shift+C"),
+                ]),
+                MenuSection([
+                    MenuItem("E&xit", handler=self.close, shortcut="Alt+F4"),
+                ]),
+            ]),
+            MenuConfig("&Build", [
+                MenuItem("&PoB Characters", handler=self._show_pob_characters,
+                         shortcut="Ctrl+B"),
+                MenuItem("&Compare Build Trees...", handler=self._show_build_comparison),
+                MenuItem("Browse &Loadouts...", handler=self._show_loadout_selector),
+                MenuItem("Find &BiS Item...", handler=self._show_bis_search,
+                         shortcut="Ctrl+I"),
+                MenuItem("Compare &Items...", handler=self._show_item_comparison,
+                         shortcut="Ctrl+Shift+I"),
+                MenuSection([
+                    MenuItem("Rare Item &Settings...", handler=self._show_rare_eval_config),
+                ]),
+            ]),
+            MenuConfig("&Prices", [
+                MenuItem("&Top 20 Rankings", handler=self._show_price_rankings),
+                MenuSection([
+                    MenuItem("&Recent Sales", handler=self._show_recent_sales),
+                    MenuItem("Sales &Dashboard", handler=self._show_sales_dashboard),
+                ]),
+                MenuSection([
+                    MenuItem("Data &Sources Info", handler=self._show_data_sources),
+                ]),
+            ]),
+        ]
+        builder.build(menubar, static_menus)
 
-        open_log_action = QAction("Open &Log File", self)
-        open_log_action.triggered.connect(self._open_log_file)
-        file_menu.addAction(open_log_action)
+        # View menu - dynamic content (themes, accents, columns)
+        self._create_view_menu(menubar)
 
-        open_config_action = QAction("Open &Config Folder", self)
-        open_config_action.triggered.connect(self._open_config_folder)
-        file_menu.addAction(open_config_action)
+        # Resources menu - use declarative config
+        resources_menu = menubar.addMenu("&Resources")
+        builder._populate_menu(resources_menu, create_resources_menu())
 
-        file_menu.addSeparator()
+        # Dev menu - dynamic content (sample items)
+        self._create_dev_menu(menubar)
 
-        export_action = QAction("&Export Results (TSV)...", self)
-        export_action.setShortcut(QKeySequence("Ctrl+E"))
-        export_action.triggered.connect(self._export_results)
-        file_menu.addAction(export_action)
+        # Help menu - static
+        help_config = [
+            MenuConfig("&Help", [
+                MenuItem("&Keyboard Shortcuts", handler=self._show_shortcuts),
+                MenuItem("Usage &Tips", handler=self._show_tips),
+                MenuSection([
+                    MenuItem("&About", handler=self._show_about),
+                ]),
+            ])
+        ]
+        builder.build(menubar, help_config)
 
-        copy_all_action = QAction("Copy &All as TSV", self)
-        copy_all_action.setShortcut(QKeySequence("Ctrl+Shift+C"))
-        copy_all_action.triggered.connect(self._copy_all_as_tsv)
-        file_menu.addAction(copy_all_action)
-
-        file_menu.addSeparator()
-
-        exit_action = QAction("E&xit", self)
-        exit_action.setShortcut(QKeySequence("Alt+F4"))
-        exit_action.triggered.connect(self.close)
-        file_menu.addAction(exit_action)
-
-        # Build menu (PoB and build-related features)
-        build_menu = menubar.addMenu("&Build")
-
-        pob_action = QAction("&PoB Characters", self)
-        pob_action.setShortcut(QKeySequence("Ctrl+B"))
-        pob_action.triggered.connect(self._show_pob_characters)
-        build_menu.addAction(pob_action)
-
-        compare_build_action = QAction("&Compare Build Trees...", self)
-        compare_build_action.triggered.connect(self._show_build_comparison)
-        build_menu.addAction(compare_build_action)
-
-        loadout_action = QAction("Browse &Loadouts...", self)
-        loadout_action.triggered.connect(self._show_loadout_selector)
-        build_menu.addAction(loadout_action)
-
-        bis_search_action = QAction("Find &BiS Item...", self)
-        bis_search_action.setShortcut(QKeySequence("Ctrl+I"))
-        bis_search_action.triggered.connect(self._show_bis_search)
-        build_menu.addAction(bis_search_action)
-
-        item_compare_action = QAction("Compare &Items...", self)
-        item_compare_action.setShortcut(QKeySequence("Ctrl+Shift+I"))
-        item_compare_action.triggered.connect(self._show_item_comparison)
-        build_menu.addAction(item_compare_action)
-
-        build_menu.addSeparator()
-
-        rare_eval_action = QAction("Rare Item &Settings...", self)
-        rare_eval_action.triggered.connect(self._show_rare_eval_config)
-        build_menu.addAction(rare_eval_action)
-
-        # Prices menu (price and sales related)
-        prices_menu = menubar.addMenu("&Prices")
-
-        price_rankings_action = QAction("&Top 20 Rankings", self)
-        price_rankings_action.triggered.connect(self._show_price_rankings)
-        prices_menu.addAction(price_rankings_action)
-
-        prices_menu.addSeparator()
-
-        recent_sales_action = QAction("&Recent Sales", self)
-        recent_sales_action.triggered.connect(self._show_recent_sales)
-        prices_menu.addAction(recent_sales_action)
-
-        dashboard_action = QAction("Sales &Dashboard", self)
-        dashboard_action.triggered.connect(self._show_sales_dashboard)
-        prices_menu.addAction(dashboard_action)
-
-        prices_menu.addSeparator()
-
-        sources_action = QAction("Data &Sources Info", self)
-        sources_action.triggered.connect(self._show_data_sources)
-        prices_menu.addAction(sources_action)
-
-        # View menu (display options)
+    def _create_view_menu(self, menubar: QMenuBar) -> None:
+        """Create View menu with dynamic theme/accent/column submenus."""
         view_menu = menubar.addMenu("&View")
 
         history_action = QAction("Session &History", self)
@@ -585,18 +568,16 @@ class PriceCheckerWindow(QMainWindow):
                 self._theme_menu.addAction(action)
                 self._theme_actions[theme] = action
 
-        # Quick toggle shortcut
         view_menu.addSeparator()
         toggle_theme_action = QAction("&Quick Toggle Dark/Light", self)
         toggle_theme_action.setShortcut(QKeySequence("Ctrl+T"))
         toggle_theme_action.triggered.connect(self._toggle_theme)
         view_menu.addAction(toggle_theme_action)
 
-        # Accent Color submenu (PoE currency colors)
+        # Accent Color submenu
         self._accent_menu = view_menu.addMenu("&Accent Color")
         self._accent_actions: Dict[Optional[str], QAction] = {}
 
-        # Default (theme's accent)
         default_action = QAction("Theme Default", self)
         default_action.setCheckable(True)
         default_action.triggered.connect(lambda: self._set_accent_color(None))
@@ -605,7 +586,6 @@ class PriceCheckerWindow(QMainWindow):
 
         self._accent_menu.addSeparator()
 
-        # Currency-based accent colors
         for key, data in POE_CURRENCY_COLORS.items():
             action = QAction(data["name"], self)
             action.setCheckable(True)
@@ -627,11 +607,8 @@ class PriceCheckerWindow(QMainWindow):
             columns_menu.addAction(action)
             self._column_actions[col] = action
 
-        # Resources menu
-        resources_menu = menubar.addMenu("&Resources")
-        self._create_resources_menu(resources_menu)
-
-        # Dev menu
+    def _create_dev_menu(self, menubar: QMenuBar) -> None:
+        """Create Dev menu with dynamic sample items."""
         dev_menu = menubar.addMenu("&Dev")
 
         paste_menu = dev_menu.addMenu("Paste &Sample")
@@ -645,174 +622,6 @@ class PriceCheckerWindow(QMainWindow):
         clear_db_action = QAction("&Wipe Database...", self)
         clear_db_action.triggered.connect(self._wipe_database)
         dev_menu.addAction(clear_db_action)
-
-        # Help menu
-        help_menu = menubar.addMenu("&Help")
-
-        shortcuts_action = QAction("&Keyboard Shortcuts", self)
-        shortcuts_action.triggered.connect(self._show_shortcuts)
-        help_menu.addAction(shortcuts_action)
-
-        tips_action = QAction("Usage &Tips", self)
-        tips_action.triggered.connect(self._show_tips)
-        help_menu.addAction(tips_action)
-
-        help_menu.addSeparator()
-
-        about_action = QAction("&About", self)
-        about_action.triggered.connect(self._show_about)
-        help_menu.addAction(about_action)
-
-    def _create_resources_menu(self, menu: QMenu) -> None:
-        """Create the Resources menu with PoE1/PoE2 submenus."""
-        import webbrowser
-
-        def open_url(url: str):
-            """Open URL in default browser."""
-            def handler():
-                webbrowser.open(url)
-            return handler
-
-        # PoE1 submenu
-        poe1_menu = menu.addMenu("Path of Exile &1")
-
-        # PoE1 - Official
-        poe1_official = poe1_menu.addMenu("Official")
-        action = QAction("Official Website", self)
-        action.triggered.connect(open_url("https://www.pathofexile.com/"))
-        poe1_official.addAction(action)
-        action = QAction("Official Trade", self)
-        action.triggered.connect(open_url("https://www.pathofexile.com/trade/search/Keepers"))
-        poe1_official.addAction(action)
-        action = QAction("Passive Skill Tree", self)
-        action.triggered.connect(open_url("https://www.pathofexile.com/passive-skill-tree"))
-        poe1_official.addAction(action)
-
-        # PoE1 - Wiki & Database
-        poe1_wiki = poe1_menu.addMenu("Wiki && Database")
-        action = QAction("Community Wiki", self)
-        action.triggered.connect(open_url("https://www.poewiki.net/wiki/Path_of_Exile_Wiki"))
-        poe1_wiki.addAction(action)
-        action = QAction("PoE DB", self)
-        action.triggered.connect(open_url("https://poedb.tw/us/"))
-        poe1_wiki.addAction(action)
-
-        # PoE1 - Build Planning
-        poe1_planning = poe1_menu.addMenu("Build Planning")
-        action = QAction("Path of Building (Desktop)", self)
-        action.triggered.connect(open_url("https://pathofbuilding.community/"))
-        poe1_planning.addAction(action)
-        action = QAction("Path of Building (Web)", self)
-        action.triggered.connect(open_url("https://pob.cool/"))
-        poe1_planning.addAction(action)
-        action = QAction("PoE Planner", self)
-        action.triggered.connect(open_url("https://poeplanner.com/"))
-        poe1_planning.addAction(action)
-        action = QAction("Path of Pathing (Atlas)", self)
-        action.triggered.connect(open_url("https://www.pathofpathing.com/"))
-        poe1_planning.addAction(action)
-
-        # PoE1 - Build Guides
-        poe1_guides = poe1_menu.addMenu("Build Guides")
-        action = QAction("Maxroll", self)
-        action.triggered.connect(open_url("https://maxroll.gg/poe"))
-        poe1_guides.addAction(action)
-        action = QAction("Mobalytics", self)
-        action.triggered.connect(open_url("https://mobalytics.gg/poe"))
-        poe1_guides.addAction(action)
-        action = QAction("PoE Builds", self)
-        action.triggered.connect(open_url("https://www.poebuilds.cc/"))
-        poe1_guides.addAction(action)
-        action = QAction("Pohx (Righteous Fire)", self)
-        action.triggered.connect(open_url("https://pohx.net/"))
-        poe1_guides.addAction(action)
-
-        # PoE1 - Economy & Trading
-        poe1_economy = poe1_menu.addMenu("Economy && Trading")
-        action = QAction("Wealthy Exile", self)
-        action.triggered.connect(open_url("https://wealthyexile.com/"))
-        poe1_economy.addAction(action)
-        action = QAction("Map Trade", self)
-        action.triggered.connect(open_url("https://poemap.trade/"))
-        poe1_economy.addAction(action)
-        action = QAction("poe.how Economy Guide", self)
-        action.triggered.connect(open_url("https://poe.how/economy"))
-        poe1_economy.addAction(action)
-
-        # PoE1 - Tools
-        poe1_tools = poe1_menu.addMenu("Tools")
-        action = QAction("FilterBlade (Loot Filters)", self)
-        action.triggered.connect(open_url("https://www.filterblade.xyz/?game=Poe1"))
-        poe1_tools.addAction(action)
-
-        # PoE1 - Community
-        poe1_menu.addSeparator()
-        action = QAction("Reddit", self)
-        action.triggered.connect(open_url("https://www.reddit.com/r/pathofexile/"))
-        poe1_menu.addAction(action)
-
-        # PoE2 submenu
-        poe2_menu = menu.addMenu("Path of Exile &2")
-
-        # PoE2 - Official
-        poe2_official = poe2_menu.addMenu("Official")
-        action = QAction("Official Website", self)
-        action.triggered.connect(open_url("https://pathofexile2.com/"))
-        poe2_official.addAction(action)
-        action = QAction("Official Trade", self)
-        action.triggered.connect(open_url("https://www.pathofexile.com/trade2/search/poe2/Rise%20of%20the%20Abyssal"))
-        poe2_official.addAction(action)
-
-        # PoE2 - Wiki & Database
-        poe2_wiki = poe2_menu.addMenu("Wiki && Database")
-        action = QAction("Community Wiki", self)
-        action.triggered.connect(open_url("https://www.poe2wiki.net/wiki/Path_of_Exile_2_Wiki"))
-        poe2_wiki.addAction(action)
-        action = QAction("PoE2 DB", self)
-        action.triggered.connect(open_url("https://poe2db.tw/"))
-        poe2_wiki.addAction(action)
-
-        # PoE2 - Build Planning
-        poe2_planning = poe2_menu.addMenu("Build Planning")
-        action = QAction("Path of Building PoE2 (GitHub)", self)
-        action.triggered.connect(open_url("https://github.com/PathOfBuildingCommunity/PathOfBuilding-PoE2"))
-        poe2_planning.addAction(action)
-
-        # PoE2 - Build Guides
-        poe2_guides = poe2_menu.addMenu("Build Guides")
-        action = QAction("Maxroll", self)
-        action.triggered.connect(open_url("https://maxroll.gg/poe2"))
-        poe2_guides.addAction(action)
-        action = QAction("Mobalytics", self)
-        action.triggered.connect(open_url("https://mobalytics.gg/poe-2"))
-        poe2_guides.addAction(action)
-
-        # PoE2 - Tools
-        poe2_tools = poe2_menu.addMenu("Tools")
-        action = QAction("FilterBlade (Loot Filters)", self)
-        action.triggered.connect(open_url("https://www.filterblade.xyz/?game=Poe2"))
-        poe2_tools.addAction(action)
-
-        # PoE2 - Community
-        poe2_menu.addSeparator()
-        action = QAction("Reddit", self)
-        action.triggered.connect(open_url("https://www.reddit.com/r/PathOfExile2/"))
-        poe2_menu.addAction(action)
-        action = QAction("Reddit Builds", self)
-        action.triggered.connect(open_url("https://www.reddit.com/r/pathofexile2builds/"))
-        poe2_menu.addAction(action)
-
-        # Separator before shared resources
-        menu.addSeparator()
-
-        # Shared resources (both games)
-        action = QAction("poe.ninja (Economy)", self)
-        action.triggered.connect(open_url("https://poe.ninja/"))
-        menu.addAction(action)
-
-        action = QAction("PoB Archives (Meta Builds)", self)
-        action.triggered.connect(open_url("https://pobarchives.com/"))
-        menu.addAction(action)
 
     # -------------------------------------------------------------------------
     # Central Widget

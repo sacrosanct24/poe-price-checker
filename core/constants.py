@@ -112,3 +112,45 @@ BACKOFF_BASE_DELAY = 1.0
 
 # Maximum delay cap for backoff (seconds)
 BACKOFF_MAX_DELAY = 60.0
+
+
+# =============================================================================
+# Session Management
+# =============================================================================
+
+# Maximum number of concurrent sessions
+MAX_SESSIONS = 10
+
+# Default session name prefix
+SESSION_NAME_PREFIX = "Session"
+
+
+# =============================================================================
+# UI Configuration
+# =============================================================================
+
+# Toast notification display duration (milliseconds)
+TOAST_DURATION_MS = 3000
+
+# Search input debounce delay (milliseconds)
+DEBOUNCE_DELAY_MS = 300
+
+# Tooltip show delay (milliseconds)
+TOOLTIP_DELAY_MS = 500
+
+# History deque maximum size
+HISTORY_MAX_ENTRIES = 100
+
+
+# =============================================================================
+# Connection Pool Configuration
+# =============================================================================
+
+# Number of connection pools to cache
+POOL_CONNECTIONS = 10
+
+# Maximum connections per pool
+POOL_MAXSIZE = 20
+
+# Retry status codes for connection errors
+RETRY_STATUS_CODES = frozenset({500, 502, 503, 504})

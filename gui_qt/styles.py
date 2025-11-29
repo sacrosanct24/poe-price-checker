@@ -574,6 +574,7 @@ class ThemeManager:
             cls._instance._current_theme = Theme.DARK
             cls._instance._accent_color = None  # None = use theme default
             cls._instance._colors = {}
+            cls._instance._stylesheet_cache: Dict[tuple, str] = {}  # Cache by (theme, accent)
             cls._instance._update_colors()
         return cls._instance
 
@@ -649,6 +650,8 @@ class ThemeManager:
         if self._current_theme != theme:
             self._current_theme = theme
             self._update_colors()
+            # Note: Don't clear entire cache - old entries may still be useful
+            # if user switches back to previous theme
             logger.info(f"Theme changed to: {theme.value}")
 
             # Notify callbacks
@@ -742,14 +745,35 @@ class ThemeManager:
         """Get the display name for a theme."""
         return THEME_DISPLAY_NAMES.get(theme, theme.value)
 
+    def clear_stylesheet_cache(self) -> None:
+        """Clear the stylesheet cache. Useful when theme definitions change."""
+        self._stylesheet_cache.clear()
+        logger.debug("Stylesheet cache cleared")
+
+    @classmethod
+    def _reset_for_testing(cls) -> None:
+        """Reset singleton state for test isolation. Only use in tests."""
+        cls._instance = None
+        cls._theme_change_callbacks = []
+
     def get_stylesheet(self) -> str:
-        """Generate the complete application stylesheet for current theme."""
+        """Generate the complete application stylesheet for current theme.
+
+        Uses caching to avoid regenerating stylesheets for the same theme/accent combination.
+        """
+        # Check cache first
+        cache_key = (self._current_theme, self._accent_color)
+        if cache_key in self._stylesheet_cache:
+            logger.debug(f"Stylesheet cache hit: {cache_key}")
+            return self._stylesheet_cache[cache_key]
+
+        # Generate new stylesheet
         c = self._colors
 
         # Dark background for menu selection text
         dark_bg = "#1a1a1e"
 
-        return f"""
+        stylesheet = f"""
 QMainWindow {{
     background-color: {c["background"]};
 }}
@@ -1045,6 +1069,11 @@ QDialog {{
     background-color: {c["background"]};
 }}
 """
+
+        # Cache and return
+        self._stylesheet_cache[cache_key] = stylesheet
+        logger.debug(f"Stylesheet cached: {cache_key}")
+        return stylesheet
 
 
 # Global theme manager instance
