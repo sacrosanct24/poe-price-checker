@@ -12,8 +12,9 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Python-3.12+-3776ab?logo=python&logoColor=white" alt="Python">
-  <img src="https://img.shields.io/badge/Tests-1200%2B%20passing-brightgreen?logo=pytest" alt="Tests">
+  <a href="https://github.com/sacrosanct24/poe-price-checker/actions/workflows/python-package.yml"><img src="https://github.com/sacrosanct24/poe-price-checker/actions/workflows/python-package.yml/badge.svg" alt="CI"></a>
+  <a href="https://codecov.io/gh/sacrosanct24/poe-price-checker"><img src="https://codecov.io/gh/sacrosanct24/poe-price-checker/graph/badge.svg" alt="Coverage"></a>
+  <img src="https://img.shields.io/badge/Python-3.10+-3776ab?logo=python&logoColor=white" alt="Python">
   <img src="https://img.shields.io/badge/GUI-PyQt6-41cd52?logo=qt" alt="PyQt6">
   <img src="https://img.shields.io/github/license/sacrosanct24/poe-price-checker" alt="License">
 </p>

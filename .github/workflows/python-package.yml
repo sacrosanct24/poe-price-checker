@@ -69,6 +69,7 @@ jobs:
       run: |
         xvfb-run --auto-servernum pytest tests/ --ignore=tests/integration \
           --cov=core --cov=gui_qt --cov-report=term-missing \
+          --cov-report=xml \
           --junitxml=test-results-${{ matrix.python-version }}.xml \
           -v
 
@@ -80,13 +81,13 @@ jobs:
         path: test-results-${{ matrix.python-version }}.xml
         retention-days: 30
 
-    - name: Upload coverage report
+    - name: Upload coverage to Codecov
       if: matrix.python-version == '3.11'
-      uses: actions/upload-artifact@v4
+      uses: codecov/codecov-action@v4
       with:
-        name: coverage-report
-        path: .coverage
-        retention-days: 5
+        files: ./coverage.xml
+        fail_ci_if_error: false
+        verbose: true
 
     - name: Test Report Summary
       if: always()
