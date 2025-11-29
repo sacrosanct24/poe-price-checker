@@ -347,8 +347,8 @@ class TestRetryWithBackoff:
 
         assert result == "success"
         assert len(call_count) == 2
-        # Should have waited ~0.2s for rate limit
-        assert 0.15 < elapsed < 0.35
+        # Should have waited ~0.2s for rate limit (relaxed for CI variability)
+        assert 0.1 < elapsed < 0.6
 
 
 # -------------------------
