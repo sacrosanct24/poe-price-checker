@@ -30,6 +30,7 @@ from PyQt6.QtGui import QAction, QKeySequence, QShortcut, QIcon
 from PyQt6.QtWidgets import (
     QApplication,
     QMainWindow,
+    QMenuBar,
     QWidget,
     QVBoxLayout,
     QHBoxLayout,
