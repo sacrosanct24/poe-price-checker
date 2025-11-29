@@ -63,6 +63,7 @@ from gui_qt.widgets.pinned_items_widget import PinnedItemsWidget
 from gui_qt.widgets.session_tabs import SessionTabWidget, SessionPanel
 from gui_qt.workers import RankingsPopulationWorker
 from core.build_stat_calculator import BuildStats
+from core.constants import HISTORY_MAX_ENTRIES
 
 if TYPE_CHECKING:
     from core.app_context import AppContext
@@ -167,8 +168,8 @@ class PriceCheckerWindow(QMainWindow):
 
         # State
         self._check_in_progress = False
-        # Bounded history to prevent unbounded memory growth (keeps last 100 checks)
-        self._history: Deque[Dict[str, Any]] = deque(maxlen=100)
+        # Bounded history to prevent unbounded memory growth
+        self._history: Deque[Dict[str, Any]] = deque(maxlen=HISTORY_MAX_ENTRIES)
 
         # Child windows (cached references)
         self._recent_sales_window = None

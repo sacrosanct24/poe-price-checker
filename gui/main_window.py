@@ -38,6 +38,7 @@ from core.rare_item_evaluator import RareItemEvaluator
 from core.build_matcher import BuildMatcher
 from core.pob_integration import CharacterManager, UpgradeChecker
 from core.price_service import PriceExplanation
+from core.constants import HISTORY_MAX_ENTRIES
 
 if TYPE_CHECKING:  # pragma: no cover
     from core.app_context import AppContext  # type: ignore
@@ -659,8 +660,8 @@ class PriceCheckerGUI:
         self._column_visibility_vars: dict[str, tk.BooleanVar] = {}
         self._column_visibility_window: tk.Toplevel | None = None
 
-        # Session history - bounded to prevent unbounded memory growth (keeps last 100 checks)
-        self._history: Deque[dict[str, Any]] = deque(maxlen=100)
+        # Session history - bounded to prevent unbounded memory growth
+        self._history: Deque[dict[str, Any]] = deque(maxlen=HISTORY_MAX_ENTRIES)
         self._history_window: tk.Toplevel | None = None
         self._history_listbox: tk.Listbox | None = None
 
