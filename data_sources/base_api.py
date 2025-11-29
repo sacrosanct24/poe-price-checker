@@ -12,8 +12,7 @@ from datetime import datetime, timedelta
 from functools import wraps
 import threading
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
+# Get logger - configuration should be done by application entrypoint, not library modules
 logger = logging.getLogger(__name__)
 
 
@@ -282,6 +281,15 @@ class BaseAPIClient(ABC):
         """Clean up resources"""
         self.session.close()
         logger.info(f"Closed {self.__class__.__name__}")
+
+    def __enter__(self):
+        """Context manager entry - returns self for use in 'with' blocks."""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit - ensures session is closed."""
+        self.close()
+        return False  # Don't suppress exceptions
 
 
 # Example usage / testing

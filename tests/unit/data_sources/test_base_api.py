@@ -660,3 +660,48 @@ class TestBaseAPIClientCleanup:
         client.close()
 
         client.session.close.assert_called_once()
+
+    def test_context_manager_enter_returns_self(self):
+        """__enter__ should return the client instance."""
+        client = DummyAPIClient(base_url="https://api.example.com")
+
+        result = client.__enter__()
+
+        assert result is client
+        client.close()
+
+    def test_context_manager_exit_closes_session(self):
+        """__exit__ should close the session."""
+        client = DummyAPIClient(base_url="https://api.example.com")
+        client.session.close = Mock()
+
+        client.__exit__(None, None, None)
+
+        client.session.close.assert_called_once()
+
+    def test_context_manager_with_statement(self):
+        """Client should work with 'with' statement."""
+        with DummyAPIClient(base_url="https://api.example.com") as client:
+            assert client is not None
+            assert isinstance(client, DummyAPIClient)
+
+    def test_context_manager_closes_on_exception(self):
+        """Client should close even when exception occurs."""
+        client = DummyAPIClient(base_url="https://api.example.com")
+        client.session.close = Mock()
+
+        try:
+            with client:
+                raise ValueError("Test exception")
+        except ValueError:
+            pass
+
+        client.session.close.assert_called_once()
+
+    def test_context_manager_does_not_suppress_exceptions(self):
+        """__exit__ should not suppress exceptions."""
+        client = DummyAPIClient(base_url="https://api.example.com")
+
+        with pytest.raises(ValueError, match="Test exception"):
+            with client:
+                raise ValueError("Test exception")
