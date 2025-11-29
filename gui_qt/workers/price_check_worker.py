@@ -2,12 +2,10 @@
 Price check worker for background item price lookups.
 """
 
-from typing import TYPE_CHECKING, Tuple, List, Any
+from typing import Tuple, List, Any
 
 from gui_qt.workers.base_worker import BaseWorker
-
-if TYPE_CHECKING:
-    from core.app_context import AppContext
+from core.interfaces import IAppContext
 
 
 class PriceCheckWorker(BaseWorker):
@@ -18,7 +16,7 @@ class PriceCheckWorker(BaseWorker):
     Emits a tuple of (parsed_item, results) on success.
     """
 
-    def __init__(self, ctx: "AppContext", item_text: str):
+    def __init__(self, ctx: IAppContext, item_text: str):
         """
         Initialize the price check worker.
 

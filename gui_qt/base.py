@@ -3,7 +3,7 @@ gui_qt.base - Base classes and utilities for PyQt6 GUI components.
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+from typing import Optional
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
@@ -13,8 +13,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-if TYPE_CHECKING:
-    from core.app_context import AppContext
+from core.interfaces import IAppContext
 
 
 class BaseWindow(QMainWindow):
@@ -22,7 +21,7 @@ class BaseWindow(QMainWindow):
 
     def __init__(
         self,
-        ctx: AppContext,
+        ctx: IAppContext,
         parent: Optional[QWidget] = None,
     ) -> None:
         super().__init__(parent)
