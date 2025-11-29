@@ -55,13 +55,18 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        python -m pip install flake8 pytest pytest-cov pytest-qt
+        python -m pip install flake8 pytest pytest-cov pytest-qt pytest-xdist mypy types-requests
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
     - name: Lint with flake8
       run: |
         # Lint project code using .flake8 config (fails on errors)
         flake8 core gui_qt data_sources tests --count --show-source --statistics
+
+    - name: Type check with mypy
+      run: |
+        # Run mypy on core modules with strict type hints
+        mypy core --config-file=mypy.ini || echo "::warning::mypy found type errors (non-blocking)"
 
     - name: Test with pytest (with xvfb for Qt)
       id: pytest
@@ -125,16 +130,17 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        python -m pip install pytest pytest-qt
+        python -m pip install pytest pytest-qt pytest-xdist
         pip install -r requirements.txt
 
-    - name: Test with pytest
+    - name: Test with pytest (parallel)
       id: pytest
       env:
         QT_QPA_PLATFORM: offscreen
       run: |
         pytest tests/ --ignore=tests/integration `
           --junitxml=test-results-windows.xml `
+          -n auto `
           -v
 
     - name: Upload test results
@@ -169,16 +175,17 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        python -m pip install pytest pytest-qt
+        python -m pip install pytest pytest-qt pytest-xdist
         pip install -r requirements.txt
 
-    - name: Test with pytest
+    - name: Test with pytest (parallel)
       id: pytest
       env:
         QT_QPA_PLATFORM: offscreen
       run: |
         pytest tests/ --ignore=tests/integration \
           --junitxml=test-results-macos.xml \
+          -n auto \
           -v
 
     - name: Upload test results
