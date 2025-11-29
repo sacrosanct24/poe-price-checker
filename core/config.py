@@ -16,6 +16,18 @@ from core.secure_storage import encrypt_credential, decrypt_credential
 logger = logging.getLogger(__name__)
 
 
+def get_config_dir() -> Path:
+    """
+    Get the application config directory.
+
+    Returns:
+        Path to the config directory (~/.poe_price_checker/)
+    """
+    config_dir = Path.home() / ".poe_price_checker"
+    config_dir.mkdir(parents=True, exist_ok=True)
+    return config_dir
+
+
 class Config:
     """
     Application configuration with JSON persistence.
@@ -49,6 +61,7 @@ class Config:
             "window_width": 1200,
             "window_height": 800,
             "theme": "dark",  # dark, light, or system
+            "accent_color": None,  # None = theme default, or currency key like "chaos", "divine"
         },
         "api": {
             "auto_detect_league": True,
@@ -290,6 +303,17 @@ class Config:
         if value not in ("dark", "light", "system"):
             value = "dark"
         self.data["ui"]["theme"] = value
+        self.save()
+
+    @property
+    def accent_color(self) -> Optional[str]:
+        """Get the accent color (None = theme default, or currency key)."""
+        return self.data["ui"].get("accent_color")
+
+    @accent_color.setter
+    def accent_color(self, value: Optional[str]) -> None:
+        """Set the accent color and persist."""
+        self.data["ui"]["accent_color"] = value
         self.save()
 
     # ------------------------------------------------------------------

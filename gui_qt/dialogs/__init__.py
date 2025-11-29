@@ -10,6 +10,7 @@ from gui_qt.dialogs.loadout_selector_dialog import LoadoutSelectorDialog
 from gui_qt.dialogs.clear_builds_dialog import ClearBuildsDialog
 from gui_qt.dialogs.find_builds_dialog import FindBuildsDialog
 from gui_qt.dialogs.item_comparison_dialog import ItemComparisonDialog
+from gui_qt.dialogs.recent_items_dialog import RecentItemsDialog
 
 __all__ = [
     "RecordSaleDialog",
@@ -20,4 +21,5 @@ __all__ = [
     "ClearBuildsDialog",
     "FindBuildsDialog",
     "ItemComparisonDialog",
+    "RecentItemsDialog",
 ]

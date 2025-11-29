@@ -18,8 +18,9 @@ from PyQt6.QtWidgets import (
     QTextBrowser,
 )
 
-from gui_qt.styles import COLORS, get_rarity_color
+from gui_qt.styles import COLORS, get_rarity_color, get_tier_color, TIER_COLORS
 from core.build_stat_calculator import BuildStatCalculator, BuildStats
+from core.mod_tier_detector import detect_mod_tier
 from core.build_archetype import BuildArchetype
 from core.upgrade_calculator import UpgradeCalculator, UpgradeImpact
 from core.dps_impact_calculator import DPSImpactCalculator, DPSStats
@@ -256,26 +257,52 @@ class ItemInspectorWidget(QWidget):
                 f'<p style="color: {COLORS["corrupted"]}; font-weight: bold; margin: 4px 0;">Corrupted</p>'
             )
 
-        # Implicit mods
+        # Implicit mods (with tier highlighting)
         implicits = getattr(item, "implicits", []) or getattr(item, "implicit_mods", [])
         if implicits:
             html_parts.append(f'<hr style="border: 1px solid {COLORS["border"]}; margin: 8px 0;">')
+            html_parts.append(
+                f'<p style="color: {COLORS["text_secondary"]}; font-size: 10px; margin: 0 0 4px 0;">Implicit:</p>'
+            )
             for mod in implicits:
+                tier_result = detect_mod_tier(mod, is_implicit=True)
+                if tier_result.tier:
+                    tier_color = get_tier_color(tier_result.tier)
+                    tier_label = f'<span style="color: {tier_color}; font-weight: bold;">[{tier_result.tier_label}]</span> '
+                else:
+                    tier_label = ""
+                    tier_color = TIER_COLORS["implicit"]
                 html_parts.append(
-                    f'<p style="color: {COLORS["magic"]}; margin: 2px 0;">{mod}</p>'
+                    f'<p style="color: {TIER_COLORS["implicit"]}; margin: 2px 0;">{tier_label}{mod}</p>'
                 )
 
-        # Explicit mods
+        # Explicit mods (with tier highlighting)
         explicits = getattr(item, "explicits", []) or getattr(item, "explicit_mods", []) or getattr(item, "mods", [])
         if explicits:
             html_parts.append(f'<hr style="border: 1px solid {COLORS["border"]}; margin: 8px 0;">')
+            html_parts.append(
+                f'<p style="color: {COLORS["text_secondary"]}; font-size: 10px; margin: 0 0 4px 0;">Explicit:</p>'
+            )
             for mod in explicits:
-                if "(crafted)" in mod.lower():
-                    color = "#b4b4ff"
+                tier_result = detect_mod_tier(mod, is_implicit=False)
+
+                # Determine base color
+                if tier_result.is_crafted:
+                    base_color = TIER_COLORS["crafted"]
+                elif tier_result.tier:
+                    base_color = get_tier_color(tier_result.tier)
                 else:
-                    color = COLORS["text"]
+                    base_color = COLORS["text"]
+
+                # Build tier label if tier was detected
+                if tier_result.tier:
+                    tier_color = get_tier_color(tier_result.tier)
+                    tier_label = f'<span style="color: {tier_color}; font-weight: bold;">[{tier_result.tier_label}]</span> '
+                else:
+                    tier_label = ""
+
                 html_parts.append(
-                    f'<p style="color: {color}; margin: 2px 0;">{mod}</p>'
+                    f'<p style="color: {base_color}; margin: 2px 0;">{tier_label}{mod}</p>'
                 )
 
         # Flavor text
