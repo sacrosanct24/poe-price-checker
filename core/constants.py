@@ -48,6 +48,9 @@ CACHE_TTL_SHORT = 300
 # Long cache TTL for stable data - 24 hours
 CACHE_TTL_LONG = 86400
 
+# Maximum cache entries to prevent unbounded memory growth
+CACHE_MAX_SIZE = 1000
+
 
 # =============================================================================
 # Item Level Thresholds for Mod Tiers

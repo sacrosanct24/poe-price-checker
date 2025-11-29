@@ -4,6 +4,7 @@ All API clients (poe.ninja, official trade, etc.) inherit from this.
 """
 
 from abc import ABC, abstractmethod
+from collections import OrderedDict
 from typing import Optional, Dict, Any, Callable
 import requests
 from requests.adapters import HTTPAdapter
@@ -13,6 +14,8 @@ import logging
 from datetime import datetime, timedelta
 from functools import wraps
 import threading
+
+from core.constants import CACHE_MAX_SIZE
 
 # Get logger - configuration should be done by application entrypoint, not library modules
 logger = logging.getLogger(__name__)
@@ -59,23 +62,27 @@ class RateLimiter:
 
 
 class ResponseCache:
-    """Simple in-memory cache with TTL"""
+    """Thread-safe in-memory cache with TTL and LRU eviction."""
 
-    def __init__(self, default_ttl: int = 3600):
+    def __init__(self, default_ttl: int = 3600, max_size: int = CACHE_MAX_SIZE):
         """
         Args:
             default_ttl: Time-to-live in seconds (default 1 hour)
+            max_size: Maximum cache entries before LRU eviction
         """
-        self.cache: Dict[str, tuple[Any, datetime]] = {}
+        self.cache: OrderedDict[str, tuple[Any, datetime]] = OrderedDict()
         self.default_ttl = default_ttl
+        self.max_size = max_size
         self.lock = threading.Lock()
 
     def get(self, key: str) -> Optional[Any]:
-        """Get cached value if not expired"""
+        """Get cached value if not expired. Moves item to end for LRU ordering."""
         with self.lock:
             if key in self.cache:
                 value, expiry = self.cache[key]
                 if datetime.now() < expiry:
+                    # Move to end (most recently used)
+                    self.cache.move_to_end(key)
                     logger.debug(f"Cache hit: {key}")
                     return value
                 else:
@@ -85,12 +92,17 @@ class ResponseCache:
         return None
 
     def set(self, key: str, value: Any, ttl: Optional[int] = None):
-        """Store value in cache with expiry"""
+        """Store value in cache with expiry. Evicts oldest if at capacity."""
         with self.lock:
+            # Evict oldest entries if at capacity
+            while len(self.cache) >= self.max_size:
+                oldest_key, _ = self.cache.popitem(last=False)
+                logger.debug(f"Cache evicted (LRU): {oldest_key}")
+
             ttl = ttl or self.default_ttl
             expiry = datetime.now() + timedelta(seconds=ttl)
             self.cache[key] = (value, expiry)
-            logger.debug(f"Cache set: {key} (TTL: {ttl}s)")
+            logger.debug(f"Cache set: {key} (TTL: {ttl}s, size: {len(self.cache)}/{self.max_size})")
 
     def clear(self):
         """Clear entire cache"""

@@ -255,6 +255,66 @@ class TestResponseCache:
         # Should complete without errors
         assert len(results) <= 10  # Some gets might be before sets
 
+    def test_creates_cache_with_default_max_size(self):
+        """Should create cache with default max size."""
+        cache = ResponseCache()
+
+        from core.constants import CACHE_MAX_SIZE
+        assert cache.max_size == CACHE_MAX_SIZE
+
+    def test_creates_cache_with_custom_max_size(self):
+        """Should create cache with custom max size."""
+        cache = ResponseCache(max_size=100)
+
+        assert cache.max_size == 100
+
+    def test_evicts_oldest_when_at_capacity(self):
+        """Should evict oldest entries when cache is full."""
+        cache = ResponseCache(max_size=3)
+
+        cache.set("key1", "value1")
+        cache.set("key2", "value2")
+        cache.set("key3", "value3")
+
+        # Cache is now full, adding key4 should evict key1
+        cache.set("key4", "value4")
+
+        assert cache.get("key1") is None  # Evicted
+        assert cache.get("key2") == "value2"
+        assert cache.get("key3") == "value3"
+        assert cache.get("key4") == "value4"
+        assert cache.size() == 3
+
+    def test_lru_ordering_on_access(self):
+        """Accessing a value should move it to most recently used."""
+        cache = ResponseCache(max_size=3)
+
+        cache.set("key1", "value1")
+        cache.set("key2", "value2")
+        cache.set("key3", "value3")
+
+        # Access key1, making it most recently used
+        cache.get("key1")
+
+        # Add key4, should evict key2 (oldest) not key1
+        cache.set("key4", "value4")
+
+        assert cache.get("key1") == "value1"  # Still present
+        assert cache.get("key2") is None  # Evicted
+        assert cache.get("key3") == "value3"
+        assert cache.get("key4") == "value4"
+
+    def test_cache_respects_max_size_under_load(self):
+        """Cache should never exceed max_size under heavy use."""
+        cache = ResponseCache(max_size=10)
+
+        # Add many more items than max_size
+        for i in range(100):
+            cache.set(f"key{i}", f"value{i}")
+
+        # Size should never exceed max_size
+        assert cache.size() <= 10
+
 
 # -------------------------
 # retry_with_backoff Tests
