@@ -25,7 +25,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Deque, Dict, List, Optional, TYPE_CHECKING
 
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QThread, QObject
+from PyQt6.QtCore import Qt, QTimer, QObject
 from PyQt6.QtGui import QAction, QKeySequence, QShortcut, QIcon
 from PyQt6.QtWidgets import (
     QApplication,
@@ -61,6 +61,7 @@ from gui_qt.widgets.rare_evaluation_panel import RareEvaluationPanelWidget
 from gui_qt.widgets.toast_notification import ToastManager
 from gui_qt.widgets.pinned_items_widget import PinnedItemsWidget
 from gui_qt.widgets.session_tabs import SessionTabWidget, SessionPanel
+from gui_qt.workers import RankingsPopulationWorker
 from core.build_stat_calculator import BuildStats
 
 if TYPE_CHECKING:
@@ -155,90 +156,6 @@ Leather Belt
 }
 
 
-class PriceCheckWorker(QObject):
-    """Worker for running price checks in a background thread."""
-
-    finished = pyqtSignal(object)  # Emits result or exception
-    error = pyqtSignal(str)
-
-    def __init__(self, ctx: "AppContext", item_text: str):
-        super().__init__()
-        self.ctx = ctx
-        self.item_text = item_text
-
-    def run(self):
-        """Run the price check."""
-        try:
-            # Parse item
-            parsed = self.ctx.parser.parse(self.item_text)
-            if not parsed:
-                self.error.emit("Could not parse item text")
-                return
-
-            # Get price (pass item text, not parsed object)
-            results = self.ctx.price_service.check_item(self.item_text)
-            self.finished.emit((parsed, results))
-        except Exception as e:
-            self.error.emit(str(e))
-
-
-class RankingsPopulationWorker(QThread):
-    """Background worker to populate price rankings on startup."""
-
-    finished = pyqtSignal(int)  # Emits number of categories populated
-    progress = pyqtSignal(str)  # Emits status message
-    error = pyqtSignal(str)
-
-    def __init__(self, parent: Optional[QObject] = None):
-        super().__init__(parent)
-        self._league: Optional[str] = None
-
-    def run(self):
-        """Check and populate rankings if needed."""
-        try:
-            from core.price_rankings import (
-                PriceRankingCache,
-                Top20Calculator,
-                PriceRankingHistory,
-            )
-            from data_sources.pricing.poe_ninja import PoeNinjaAPI
-
-            self.progress.emit("Checking price rankings cache...")
-
-            # Detect current league
-            api = PoeNinjaAPI()
-            league = api.detect_current_league()
-            self._league = league
-
-            # Check if cache is valid
-            cache = PriceRankingCache(league=league)
-
-            if cache.is_cache_valid():
-                age = cache.get_cache_age_days()
-                self.progress.emit(f"Rankings cache valid ({age:.1f} days old)")
-                self.finished.emit(0)
-                return
-
-            # Need to populate
-            self.progress.emit(f"Fetching Top 20 rankings for {league}...")
-
-            calculator = Top20Calculator(cache, poe_ninja_api=api)
-            rankings = calculator.refresh_all(force=False)
-
-            # Save to history database
-            self.progress.emit("Saving rankings to database...")
-            history = PriceRankingHistory()
-            history.save_all_snapshots(rankings, league)
-            history.close()
-
-            self.progress.emit(f"Populated {len(rankings)} categories")
-            self.finished.emit(len(rankings))
-
-        except Exception as e:
-            logging.getLogger(__name__).exception("Failed to populate rankings")
-            self.error.emit(str(e))
-
-
 class PriceCheckerWindow(QMainWindow):
     """Main window for the PoE Price Checker application."""
 
@@ -304,8 +221,8 @@ class PriceCheckerWindow(QMainWindow):
         """Start background task to populate price rankings if needed."""
         try:
             self._rankings_worker = RankingsPopulationWorker(self)
-            self._rankings_worker.progress.connect(self._on_rankings_progress)
-            self._rankings_worker.finished.connect(self._on_rankings_finished)
+            self._rankings_worker.status.connect(self._on_rankings_progress)
+            self._rankings_worker.result.connect(self._on_rankings_finished)
             self._rankings_worker.error.connect(self._on_rankings_error)
             self._rankings_worker.start()
         except Exception as e:
@@ -321,9 +238,10 @@ class PriceCheckerWindow(QMainWindow):
             self.logger.info(f"Rankings: Populated {count} categories")
         self._rankings_worker = None
 
-    def _on_rankings_error(self, error: str) -> None:
+    def _on_rankings_error(self, error: str, traceback: str) -> None:
         """Handle rankings population error."""
         self.logger.warning(f"Rankings population failed: {error}")
+        self.logger.debug(f"Traceback:\n{traceback}")
         self._rankings_worker = None
 
     def _init_rare_evaluator(self) -> None:
