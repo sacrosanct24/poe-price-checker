@@ -60,13 +60,30 @@ class SessionState:
 
 
 class SessionPanel(QWidget):
-    """A single session panel with input, results, and inspector."""
+    """A single session panel with input, results, and inspector.
 
-    # Signals
-    check_price_requested = pyqtSignal(str)  # Emits item text
-    row_selected = pyqtSignal(dict)  # Emits selected row data
-    pin_requested = pyqtSignal(list)  # Emits list of items to pin
-    compare_requested = pyqtSignal(list)  # Emits list of items to compare
+    Signals:
+        check_price_requested(item_text: str):
+            Emitted when user clicks "Check Price" button or presses Enter.
+            The item_text is the raw pasted item text from Path of Exile.
+
+        row_selected(row_data: Dict[str, Any]):
+            Emitted when user selects a row in the results table.
+            Contains item_name, chaos_value, divine_value, source, and _item (ParsedItem).
+
+        pin_requested(items: List[Dict[str, Any]]):
+            Emitted when user requests to pin selected items.
+            Each dict contains the full row data for the item.
+
+        compare_requested(items: List[Dict[str, Any]]):
+            Emitted when user requests to compare 2-3 selected items.
+            Each dict contains the full row data including _item (ParsedItem).
+    """
+
+    check_price_requested: pyqtSignal = pyqtSignal(str)
+    row_selected: pyqtSignal = pyqtSignal(dict)
+    pin_requested: pyqtSignal = pyqtSignal(list)
+    compare_requested: pyqtSignal = pyqtSignal(list)
 
     def __init__(self, session_name: str = "Session 1", parent: Optional[QWidget] = None):
         super().__init__(parent)
@@ -253,15 +270,36 @@ class SessionPanel(QWidget):
 
 
 class SessionTabWidget(QTabWidget):
-    """Tab widget for managing multiple price-checking sessions."""
+    """Tab widget for managing multiple price-checking sessions.
+
+    Supports up to MAX_SESSIONS concurrent sessions with add/close/rename.
+    Each session maintains independent state (input, results, filters).
+
+    Signals:
+        check_price_requested(item_text: str, session_index: int):
+            Emitted when a session requests a price check.
+            item_text: The raw item text to price check.
+            session_index: Index of the requesting session tab.
+
+        row_selected(row_data: Dict[str, Any]):
+            Emitted when user selects a result row in any session.
+            Forwarded from the active SessionPanel.
+
+        pin_requested(items: List[Dict[str, Any]]):
+            Emitted when user requests to pin items from any session.
+            Forwarded from the active SessionPanel.
+
+        compare_requested(items: List[Dict[str, Any]]):
+            Emitted when user requests to compare items from any session.
+            Forwarded from the active SessionPanel.
+    """
 
     MAX_SESSIONS = 10
 
-    # Signals
-    check_price_requested = pyqtSignal(str, int)  # item_text, session_index
-    row_selected = pyqtSignal(dict)
-    pin_requested = pyqtSignal(list)
-    compare_requested = pyqtSignal(list)
+    check_price_requested: pyqtSignal = pyqtSignal(str, int)
+    row_selected: pyqtSignal = pyqtSignal(dict)
+    pin_requested: pyqtSignal = pyqtSignal(list)
+    compare_requested: pyqtSignal = pyqtSignal(list)
 
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
