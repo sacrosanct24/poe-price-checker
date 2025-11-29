@@ -60,6 +60,7 @@ oauth_config.json
 
 # Claude Code local settings
 .claude/
+claude.md
 
 # User data files
 data/characters.json

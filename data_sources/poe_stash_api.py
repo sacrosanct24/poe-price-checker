@@ -263,6 +263,7 @@ class PoEStashClient:
             tab_name = tab_meta.get("n", f"Tab {i}")
             tab_type = tab_meta.get("type", "NormalStash")
             tab_id = tab_meta.get("id", str(i))
+            children_meta = tab_meta.get("children", [])
 
             if progress_callback:
                 progress_callback(i + 1, total_tabs)
@@ -276,12 +277,47 @@ class PoEStashClient:
                 logger.warning(f"Failed to fetch tab {i} ({tab_name}): {e}")
                 items = []
 
+            # Create child tabs for tabs with children (like UniqueStash, FolderStash)
+            children: List[StashTab] = []
+            if children_meta:
+                logger.debug(f"  Tab has {len(children_meta)} sub-tabs")
+                for j, child_meta in enumerate(children_meta):
+                    child_name = child_meta.get("n", f"{tab_name} ({j})")
+                    child_type = child_meta.get("type", tab_type)
+                    child_id = child_meta.get("id", f"{tab_id}_{j}")
+                    child_index = child_meta.get("i", j)
+
+                    # Fetch items from child tab using its index
+                    try:
+                        child_data = self.get_stash_tab_items(
+                            account_name, league, child_index
+                        )
+                        child_items = child_data.get("items", [])
+                    except Exception as e:
+                        logger.warning(
+                            f"Failed to fetch sub-tab {child_index} ({child_name}): {e}"
+                        )
+                        child_items = []
+
+                    child_tab = StashTab(
+                        id=child_id,
+                        name=child_name,
+                        index=child_index,
+                        type=child_type,
+                        items=child_items,
+                        folder=tab_name,
+                    )
+                    children.append(child_tab)
+                    total_items += len(child_items)
+                    logger.debug(f"    -> Sub-tab '{child_name}': {len(child_items)} items")
+
             tab = StashTab(
                 id=tab_id,
                 name=tab_name,
                 index=i,
                 type=tab_type,
                 items=items,
+                children=children,
             )
 
             tabs.append(tab)
