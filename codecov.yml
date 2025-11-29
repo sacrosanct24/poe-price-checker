@@ -1,0 +1,36 @@
+# Codecov configuration
+# https://docs.codecov.com/docs/codecov-yaml
+
+coverage:
+  status:
+    project:
+      default:
+        # Require at least 60% coverage for the project
+        target: 60%
+        # Allow coverage to drop up to 1% on PRs
+        threshold: 1%
+    patch:
+      default:
+        # New code should have at least 70% coverage
+        target: 70%
+        # Allow some flexibility for complex changes
+        threshold: 5%
+
+  # Don't fail CI on coverage changes (just report)
+  # This avoids blocking PRs while we build up coverage
+  precision: 2
+  round: down
+  range: "60...100"
+
+comment:
+  layout: "reach,diff,flags,files"
+  behavior: default
+  require_changes: false
+
+ignore:
+  # Ignore GUI code (hard to unit test)
+  - "gui_qt/**/*"
+  # Ignore test files themselves
+  - "tests/**/*"
+  # Ignore scripts
+  - "scripts/**/*"
