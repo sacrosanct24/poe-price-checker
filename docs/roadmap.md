@@ -12,7 +12,7 @@ review_frequency: monthly
 
 ---
 
-## Current State (v1.1.0)
+## Current State (v1.3.1)
 
 **Completed Features:**
 - Multi-source pricing (poe.ninja, poe.watch, Trade API)
@@ -21,6 +21,7 @@ review_frequency: monthly
 - BiS search system with affix tier calculations
 - OAuth stash tab scanning
 - MCP integration for AI assistants
+- Session tabs for multiple price-checking sessions
 - 1226 tests passing, ~60% coverage
 - Security hardening (encrypted tokens, CSRF protection)
 
@@ -29,33 +30,33 @@ review_frequency: monthly
 ## Phase A: UX/UI Enhancements (Next Priority)
 
 ### A.1 Visual Polish & Theming
-- [ ] **Dark/Light theme toggle** with system preference detection
-- [ ] **Accent color customization** (match PoE currency colors)
+- [x] **Dark/Light theme toggle** with system preference detection ✅
+- [x] **Accent color customization** (match PoE currency colors) ✅
 - [ ] **Compact mode** for smaller screens / overlay use
 - [ ] **Font scaling** for accessibility
 - [ ] **High-DPI support** improvements
 
 ### A.2 Results Table Improvements
-- [ ] **Inline item preview** - hover shows item tooltip with mods
-- [ ] **Profit column** - show margin vs purchase price
-- [ ] **Trend indicators** - up/down arrows for price movement
-- [ ] **Bulk selection** - multi-select for batch operations
-- [ ] **Custom column ordering** - drag-and-drop
+- [x] **Inline item preview** - hover shows item tooltip with mods ✅
+- [x] **Profit column** - show margin vs purchase price ✅
+- [x] **Trend indicators** - up/down arrows for price movement ✅
+- [x] **Bulk selection** - multi-select for batch operations ✅
+- [x] **Custom column ordering** - drag-and-drop with persistence ✅
 - [ ] **Saved column presets** - "Currency mode", "Gear mode", "Crafting mode"
 
 ### A.3 Item Inspector Enhancements
-- [ ] **Side-by-side comparison** - compare 2-3 items simultaneously
-- [ ] **DPS/EHP calculator** - show theoretical impact on build
-- [ ] **Mod tier highlighting** - color-code T1/T2/T3+ affixes
+- [x] **Side-by-side comparison** - compare 2-3 items simultaneously ✅
+- [x] **DPS/EHP calculator** - show theoretical impact on build ✅
+- [x] **Mod tier highlighting** - color-code T1/T2/T3+ affixes ✅
 - [ ] **Craft potential indicator** - "can become X with Y craft"
 - [ ] **Similar items search** - one-click Trade search for comparable
 
 ### A.4 Navigation & Workflow
-- [ ] **Keyboard shortcuts** - configurable hotkeys for all actions
-- [ ] **Command palette** (Ctrl+Shift+P) - quick access to any feature
-- [ ] **Recent items history** - quick re-check previous items
-- [ ] **Pinned items** - keep important items visible
-- [ ] **Session tabs** - multiple price-checking sessions
+- [x] **Keyboard shortcuts** - configurable hotkeys for all actions ✅
+- [x] **Command palette** (Ctrl+K) - quick access to any feature ✅
+- [x] **Recent items history** - quick re-check previous items ✅
+- [x] **Pinned items** - keep important items visible ✅
+- [x] **Session tabs** - multiple price-checking sessions ✅
 
 ### A.5 Stash Visualization
 - [ ] **Stash grid preview** - visual representation of tab contents
@@ -64,7 +65,7 @@ review_frequency: monthly
 - [ ] **Tab comparison** - diff between snapshots over time
 
 ### A.6 Notifications & Feedback
-- [ ] **Toast notifications** - non-blocking status updates
+- [x] **Toast notifications** - non-blocking status updates ✅
 - [ ] **Sound alerts** - configurable audio for price thresholds
 - [ ] **System tray** - minimize to tray with price alerts
 - [ ] **Progress indicators** - better feedback for long operations
@@ -219,12 +220,12 @@ review_frequency: monthly
 
 ## Implementation Priority
 
-### Immediate (Next 2-4 weeks)
-1. **Dark/Light theme toggle** - quick UX win
-2. **Keyboard shortcuts** - power user essential
-3. **Price trend indicators** - add value to existing data
-4. **Side-by-side item comparison** - highly requested
-5. **DPS impact calculator** - build-aware intelligence
+### Immediate (Next 2-4 weeks) - ✅ COMPLETED
+1. ~~**Dark/Light theme toggle**~~ - ✅ `gui_qt/styles.py`, Ctrl+T
+2. ~~**Keyboard shortcuts**~~ - ✅ `gui_qt/shortcuts.py`, F1/Ctrl+K
+3. ~~**Price trend indicators**~~ - ✅ `core/price_trend_calculator.py`, 7d Trend column
+4. ~~**Side-by-side item comparison**~~ - ✅ `gui_qt/dialogs/item_comparison_dialog.py`, Ctrl+Shift+I
+5. ~~**DPS impact calculator**~~ - ✅ `core/dps_impact_calculator.py`, Item Inspector
 
 ### Short-term (1-2 months)
 1. **Upgrade finder** - killer feature for build management

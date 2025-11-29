@@ -49,12 +49,15 @@ from PyQt6.QtWidgets import (
 
 from gui_qt.styles import (
     APP_STYLESHEET, COLORS, Theme, get_theme_manager, get_app_stylesheet,
-    THEME_CATEGORIES, THEME_DISPLAY_NAMES
+    THEME_CATEGORIES, THEME_DISPLAY_NAMES, POE_CURRENCY_COLORS
 )
 from gui_qt.shortcuts import get_shortcut_manager, get_shortcuts_help_text
 from gui_qt.widgets.results_table import ResultsTableWidget
 from gui_qt.widgets.item_inspector import ItemInspectorWidget
 from gui_qt.widgets.rare_evaluation_panel import RareEvaluationPanelWidget
+from gui_qt.widgets.toast_notification import ToastManager
+from gui_qt.widgets.pinned_items_widget import PinnedItemsWidget
+from gui_qt.widgets.session_tabs import SessionTabWidget, SessionPanel
 from core.build_stat_calculator import BuildStats
 
 if TYPE_CHECKING:
@@ -243,7 +246,6 @@ class PriceCheckerWindow(QMainWindow):
         self.logger = logging.getLogger(__name__)
 
         # State
-        self._all_results: List[Dict[str, Any]] = []
         self._check_in_progress = False
         # Bounded history to prevent unbounded memory growth (keeps last 100 checks)
         self._history: Deque[Dict[str, Any]] = deque(maxlen=100)
@@ -373,6 +375,90 @@ class PriceCheckerWindow(QMainWindow):
                 self.item_inspector.set_dps_stats(None)
         except Exception as e:
             self.logger.warning(f"Failed to update build stats: {e}")
+
+    # -------------------------------------------------------------------------
+    # Session Tab Properties (route to current session's widgets)
+    # -------------------------------------------------------------------------
+
+    @property
+    def input_text(self) -> QPlainTextEdit:
+        """Get the input text widget from the current session."""
+        panel = self.session_tabs.get_current_panel()
+        return panel.input_text if panel else None
+
+    @property
+    def item_inspector(self) -> ItemInspectorWidget:
+        """Get the item inspector widget from the current session."""
+        panel = self.session_tabs.get_current_panel()
+        return panel.item_inspector if panel else None
+
+    @property
+    def results_table(self) -> ResultsTableWidget:
+        """Get the results table widget from the current session."""
+        panel = self.session_tabs.get_current_panel()
+        return panel.results_table if panel else None
+
+    @property
+    def filter_input(self) -> QLineEdit:
+        """Get the filter input widget from the current session."""
+        panel = self.session_tabs.get_current_panel()
+        return panel.filter_input if panel else None
+
+    @property
+    def source_filter(self) -> QComboBox:
+        """Get the source filter widget from the current session."""
+        panel = self.session_tabs.get_current_panel()
+        return panel.source_filter if panel else None
+
+    @property
+    def rare_eval_panel(self) -> RareEvaluationPanelWidget:
+        """Get the rare evaluation panel from the current session."""
+        panel = self.session_tabs.get_current_panel()
+        return panel.rare_eval_panel if panel else None
+
+    @property
+    def check_btn(self) -> QPushButton:
+        """Get the check button from the current session."""
+        panel = self.session_tabs.get_current_panel()
+        return panel.check_btn if panel else None
+
+    def _on_session_changed(self, index: int) -> None:
+        """Handle session tab change - connect context menu."""
+        panel = self.session_tabs.get_panel(index)
+        if panel:
+            # Connect context menu for the new session's results table
+            panel.results_table.customContextMenuRequested.connect(
+                self._show_results_context_menu
+            )
+            # Update build stats for the new session's inspector
+            self._update_build_stats_for_session(panel)
+
+    def _on_session_check_price(self, item_text: str, session_index: int) -> None:
+        """Handle check price request from a session tab."""
+        if self._check_in_progress:
+            return
+        self._do_price_check(item_text, session_index)
+
+    def _update_build_stats_for_session(self, panel: SessionPanel) -> None:
+        """Update build stats for a specific session panel's inspector."""
+        from core.dps_impact_calculator import DPSStats
+
+        if not self._character_manager:
+            return
+
+        try:
+            profile = self._character_manager.get_active_profile()
+            if profile and profile.build and profile.build.stats:
+                build_stats = BuildStats.from_pob_stats(profile.build.stats)
+                panel.item_inspector.set_build_stats(build_stats)
+
+                dps_stats = DPSStats.from_pob_stats(profile.build.stats)
+                panel.item_inspector.set_dps_stats(dps_stats)
+            else:
+                panel.item_inspector.set_build_stats(None)
+                panel.item_inspector.set_dps_stats(None)
+        except Exception as e:
+            self.logger.warning(f"Failed to update build stats for session: {e}")
 
     # -------------------------------------------------------------------------
     # Menu Bar
@@ -505,6 +591,27 @@ class PriceCheckerWindow(QMainWindow):
         toggle_theme_action.setShortcut(QKeySequence("Ctrl+T"))
         toggle_theme_action.triggered.connect(self._toggle_theme)
         view_menu.addAction(toggle_theme_action)
+
+        # Accent Color submenu (PoE currency colors)
+        self._accent_menu = view_menu.addMenu("&Accent Color")
+        self._accent_actions: Dict[Optional[str], QAction] = {}
+
+        # Default (theme's accent)
+        default_action = QAction("Theme Default", self)
+        default_action.setCheckable(True)
+        default_action.triggered.connect(lambda: self._set_accent_color(None))
+        self._accent_menu.addAction(default_action)
+        self._accent_actions[None] = default_action
+
+        self._accent_menu.addSeparator()
+
+        # Currency-based accent colors
+        for key, data in POE_CURRENCY_COLORS.items():
+            action = QAction(data["name"], self)
+            action.setCheckable(True)
+            action.triggered.connect(lambda checked, k=key: self._set_accent_color(k))
+            self._accent_menu.addAction(action)
+            self._accent_actions[key] = action
 
         view_menu.addSeparator()
 
@@ -723,7 +830,12 @@ class PriceCheckerWindow(QMainWindow):
 
         main_splitter = QSplitter(Qt.Orientation.Horizontal)
 
-        # ========== LEFT SIDE: PoB Panel ==========
+        # ========== LEFT SIDE: PoB Panel + Pinned Items ==========
+        left_splitter = QSplitter(Qt.Orientation.Vertical)
+        left_splitter.setMinimumWidth(250)
+        left_splitter.setMaximumWidth(400)
+
+        # PoB Equipment panel
         pob_group = QGroupBox("PoB Equipment")
         pob_layout = QVBoxLayout(pob_group)
         pob_layout.setContentsMargins(4, 4, 4, 4)
@@ -737,93 +849,35 @@ class PriceCheckerWindow(QMainWindow):
             self._on_pob_profile_changed
         )
         pob_layout.addWidget(self.pob_panel)
+        left_splitter.addWidget(pob_group)
 
-        pob_group.setMinimumWidth(250)
-        pob_group.setMaximumWidth(400)
-        main_splitter.addWidget(pob_group)
+        # Pinned Items panel
+        pinned_group = QGroupBox("Pinned Items")
+        pinned_layout = QVBoxLayout(pinned_group)
+        pinned_layout.setContentsMargins(4, 4, 4, 4)
 
-        # ========== RIGHT SIDE: Price Check Panel ==========
-        right_panel = QWidget()
-        layout = QVBoxLayout(right_panel)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(8)
+        self.pinned_items_widget = PinnedItemsWidget()
+        self.pinned_items_widget.item_inspected.connect(self._on_pinned_item_inspected)
+        pinned_layout.addWidget(self.pinned_items_widget)
+        left_splitter.addWidget(pinned_group)
 
-        # Top area: input + item inspector (horizontal split)
-        top_splitter = QSplitter(Qt.Orientation.Horizontal)
+        # Set initial splitter sizes (PoB: 60%, Pinned: 40%)
+        left_splitter.setSizes([400, 250])
 
-        # Left: Input area
-        input_group = QGroupBox("Item Input")
-        input_layout = QVBoxLayout(input_group)
+        main_splitter.addWidget(left_splitter)
 
-        self.input_text = QPlainTextEdit()
-        self.input_text.setPlaceholderText(
-            "Paste item text here (Ctrl+C from game, then Ctrl+V here)...\n\n"
-            "Or select an item from PoB Equipment panel on the left."
-        )
-        self.input_text.setMinimumHeight(100)
-        input_layout.addWidget(self.input_text)
+        # ========== RIGHT SIDE: Session Tabs (multiple price-checking sessions) ==========
+        self.session_tabs = SessionTabWidget()
+        self.session_tabs.check_price_requested.connect(self._on_session_check_price)
+        self.session_tabs.row_selected.connect(self._on_result_selected)
+        self.session_tabs.pin_requested.connect(self._on_pin_items_requested)
+        self.session_tabs.compare_requested.connect(self._on_compare_items_requested)
 
-        # Button row
-        btn_layout = QHBoxLayout()
-
-        self.check_btn = QPushButton("Check Price")
-        self.check_btn.clicked.connect(self._on_check_price)
-        self.check_btn.setMinimumWidth(120)
-        btn_layout.addWidget(self.check_btn)
-
-        btn_layout.addStretch()
-        input_layout.addLayout(btn_layout)
-
-        top_splitter.addWidget(input_group)
-
-        # Right: Item inspector
-        inspector_group = QGroupBox("Item Inspector")
-        inspector_layout = QVBoxLayout(inspector_group)
-        self.item_inspector = ItemInspectorWidget()
-        inspector_layout.addWidget(self.item_inspector)
-        top_splitter.addWidget(inspector_group)
-
-        # Give Item Inspector more space (it shows build-effective values)
-        top_splitter.setSizes([300, 500])
-        layout.addWidget(top_splitter)
-
-        # Middle: Results area
-        results_group = QGroupBox("Results")
-        results_layout = QVBoxLayout(results_group)
-
-        # Filter row
-        filter_layout = QHBoxLayout()
-        filter_layout.addWidget(QLabel("Filter:"))
-
-        self.filter_input = QLineEdit()
-        self.filter_input.setPlaceholderText("Type to filter results...")
-        self.filter_input.textChanged.connect(self._apply_filter)
-        filter_layout.addWidget(self.filter_input)
-
-        filter_layout.addWidget(QLabel("Source:"))
-        self.source_filter = QComboBox()
-        self.source_filter.addItem("All sources")
-        self.source_filter.currentTextChanged.connect(self._apply_filter)
-        filter_layout.addWidget(self.source_filter)
-
-        results_layout.addLayout(filter_layout)
-
-        # Results table
-        self.results_table = ResultsTableWidget()
-        self.results_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self.results_table.customContextMenuRequested.connect(self._show_results_context_menu)
-        self.results_table.row_selected.connect(self._on_result_selected)
-        results_layout.addWidget(self.results_table)
-
-        layout.addWidget(results_group, stretch=1)
-
-        # Bottom: Rare evaluation panel (hidden by default)
-        self.rare_eval_panel = RareEvaluationPanelWidget()
-        self.rare_eval_panel.setVisible(False)
-        layout.addWidget(self.rare_eval_panel)
+        # Connect context menu for results table in each session
+        self.session_tabs.currentChanged.connect(self._on_session_changed)
 
         # Add right panel to main splitter
-        main_splitter.addWidget(right_panel)
+        main_splitter.addWidget(self.session_tabs)
 
         # Set initial splitter sizes (PoB panel: 300, Price check: rest)
         main_splitter.setSizes([300, 1100])
@@ -844,19 +898,27 @@ class PriceCheckerWindow(QMainWindow):
         self.summary_label = QLabel()
         self.status_bar.addPermanentWidget(self.summary_label)
 
+        # Toast notification manager
+        self._toast_manager = ToastManager(self)
+
     def _set_status(self, message: str) -> None:
         """Set the status bar message."""
         self.status_bar.showMessage(message)
 
     def _update_summary(self) -> None:
-        """Update the summary label."""
-        count = len(self._all_results)
+        """Update the summary label with current session's results."""
+        panel = self.session_tabs.get_current_panel()
+        if not panel:
+            self.summary_label.setText("No results")
+            return
+
+        count = len(panel._all_results)
         if count == 0:
             self.summary_label.setText("No results")
         else:
             # Ensure chaos_value is numeric
             total_chaos = 0.0
-            for r in self._all_results:
+            for r in panel._all_results:
                 val = r.get("chaos_value", 0)
                 try:
                     total_chaos += float(val) if val else 0.0
@@ -979,7 +1041,7 @@ class PriceCheckerWindow(QMainWindow):
     # -------------------------------------------------------------------------
 
     def _on_check_price(self) -> None:
-        """Handle Check Price button click."""
+        """Handle Check Price button click (keyboard shortcut)."""
         if self._check_in_progress:
             return
 
@@ -988,8 +1050,19 @@ class PriceCheckerWindow(QMainWindow):
             self._set_status("No item text to check")
             return
 
+        # Use the current session tab index
+        current_index = self.session_tabs.currentIndex()
+        self._do_price_check(item_text, current_index)
+
+    def _do_price_check(self, item_text: str, session_index: int) -> None:
+        """Perform price check for a specific session."""
+        panel = self.session_tabs.get_panel(session_index)
+        if not panel:
+            self._set_status("No active session")
+            return
+
         self._check_in_progress = True
-        self.check_btn.setEnabled(False)
+        panel.check_btn.setEnabled(False)
         self._set_status("Checking price...")
 
         # Run price check
@@ -998,20 +1071,20 @@ class PriceCheckerWindow(QMainWindow):
             if not parsed:
                 self._set_status("Could not parse item text")
                 self._check_in_progress = False
-                self.check_btn.setEnabled(True)
+                panel.check_btn.setEnabled(True)
                 return
 
             # Update item inspector
-            self.item_inspector.set_item(parsed)
+            panel.item_inspector.set_item(parsed)
 
             # Clear the paste window - item is now shown in inspector
-            self.input_text.clear()
+            panel.input_text.clear()
 
             # Get price results (pass item text, not parsed object)
             results = self.ctx.price_service.check_item(item_text)
 
             # Convert to display format (results are dicts from check_item)
-            self._all_results = []
+            all_results = []
             for result in results:
                 # Handle explanation - could be dict or object
                 explanation = result.get("explanation")
@@ -1049,6 +1122,7 @@ class PriceCheckerWindow(QMainWindow):
                     "source": result.get("source") or "",
                     "upgrade": "",
                     "price_explanation": explanation_str,
+                    "_item": parsed,  # Store for tooltip preview
                 }
 
                 # Check for upgrade potential
@@ -1057,47 +1131,50 @@ class PriceCheckerWindow(QMainWindow):
                     if is_upgrade:
                         row["upgrade"] = "Yes"
 
-                self._all_results.append(row)
+                all_results.append(row)
 
-            # Update display
-            self.results_table.set_data(self._all_results)
+            # Update session panel with results (handles table and filters)
+            panel.set_results(all_results)
             self._update_summary()
-
-            # Update sources filter
-            sources = set(r.get("source", "") for r in self._all_results)
-            self.source_filter.clear()
-            self.source_filter.addItem("All sources")
-            for source in sorted(sources):
-                if source:
-                    self.source_filter.addItem(source)
 
             # Evaluate rare items
             if parsed.rarity == "Rare" and self._rare_evaluator:
                 try:
                     evaluation = self._rare_evaluator.evaluate(parsed)
-                    self.rare_eval_panel.set_evaluation(evaluation)
-                    self.rare_eval_panel.setVisible(True)
+                    panel.rare_eval_panel.set_evaluation(evaluation)
+                    panel.rare_eval_panel.setVisible(True)
                 except Exception as e:
                     self.logger.warning(f"Rare evaluation failed: {e}")
-                    self.rare_eval_panel.setVisible(False)
+                    panel.rare_eval_panel.setVisible(False)
             else:
-                self.rare_eval_panel.setVisible(False)
+                panel.rare_eval_panel.setVisible(False)
 
-            # Add to history
+            # Add to history (store full item text for re-checking)
             self._history.append({
                 "timestamp": datetime.now().isoformat(),
-                "item": parsed.name or item_text[:50],
+                "item_name": parsed.name or item_text[:50],
+                "item_text": item_text,  # Full text for re-checking
                 "results_count": len(results),
+                "best_price": max((r.get("chaos_value", 0) or 0) for r in results) if results else 0,
+                "_parsed": parsed,  # Keep parsed item reference
             })
 
             self._set_status(f"Found {len(results)} price result(s)")
+            # Show toast for notable results
+            if results:
+                best_price = max((r.get("chaos_value", 0) or 0) for r in results)
+                if best_price >= 100:
+                    self._toast_manager.success(f"High value item: {best_price:.0f}c")
+                elif best_price >= 10:
+                    self._toast_manager.info(f"Found {len(results)} result(s)")
 
         except Exception as e:
             self.logger.exception("Price check failed")
             self._set_status(f"Error: {e}")
+            self._toast_manager.error(f"Price check failed: {e}")
         finally:
             self._check_in_progress = False
-            self.check_btn.setEnabled(True)
+            panel.check_btn.setEnabled(True)
 
     def _clear_input(self) -> None:
         """Clear the input text."""
@@ -1111,32 +1188,6 @@ class PriceCheckerWindow(QMainWindow):
         if text:
             self.input_text.setPlainText(text)
             self._on_check_price()
-
-    # -------------------------------------------------------------------------
-    # Results Filtering
-    # -------------------------------------------------------------------------
-
-    def _apply_filter(self) -> None:
-        """Apply text and source filters to results."""
-        text_filter = self.filter_input.text().lower()
-        source_filter = self.source_filter.currentText()
-
-        filtered = []
-        for row in self._all_results:
-            # Source filter
-            if source_filter != "All sources":
-                if row.get("source", "") != source_filter:
-                    continue
-
-            # Text filter
-            if text_filter:
-                searchable = " ".join(str(v).lower() for v in row.values())
-                if text_filter not in searchable:
-                    continue
-
-            filtered.append(row)
-
-        self.results_table.set_data(filtered)
 
     # -------------------------------------------------------------------------
     # Results Context Menu
@@ -1170,6 +1221,52 @@ class PriceCheckerWindow(QMainWindow):
         """Handle result row selection."""
         # Could update item inspector or show details
         pass
+
+    def _on_pin_items_requested(self, items: List[Dict[str, Any]]) -> None:
+        """Handle request to pin items from results table."""
+        pinned_count = self.pinned_items_widget.pin_items(items)
+        if pinned_count > 0:
+            self._toast_manager.success(f"Pinned {pinned_count} item(s)")
+        elif len(items) > 0:
+            self._toast_manager.warning("Items already pinned or limit reached")
+
+    def _on_pinned_item_inspected(self, item_data: Dict[str, Any]) -> None:
+        """Handle request to inspect a pinned item."""
+        # Update item inspector with the pinned item
+        item = item_data.get("_item")
+        if item:
+            self.item_inspector.set_item(item, self._current_build_stats)
+        else:
+            # Just show the item name in status
+            item_name = item_data.get("item_name", "Unknown")
+            self._set_status(f"Inspecting: {item_name}")
+
+    def _on_compare_items_requested(self, items: List[Dict[str, Any]]) -> None:
+        """Handle request to compare items from results table."""
+        if len(items) < 2 or len(items) > 3:
+            self._toast_manager.warning("Select 2-3 items to compare")
+            return
+
+        # Extract ParsedItems from row data
+        parsed_items = []
+        for item_data in items:
+            item = item_data.get("_item")
+            if item:
+                parsed_items.append(item)
+
+        if len(parsed_items) >= 2:
+            try:
+                from gui_qt.dialogs.item_comparison_dialog import ItemComparisonDialog
+                dialog = ItemComparisonDialog(
+                    parsed_items,
+                    build_stats=self._current_build_stats,
+                    parent=self
+                )
+                dialog.exec()
+            except ImportError:
+                self._toast_manager.error("Comparison dialog not available")
+        else:
+            self._toast_manager.warning("Not enough valid items to compare")
 
     def _copy_selected_row(self) -> None:
         """Copy selected row to clipboard."""
@@ -1286,6 +1383,7 @@ class PriceCheckerWindow(QMainWindow):
                     notes=notes,
                 )
                 self._set_status(f"Sale recorded: {row.get('item_name', '')} for {price}c")
+                self._toast_manager.success(f"Sale recorded: {price:.0f}c")
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"Failed to record sale: {e}")
 
@@ -1302,7 +1400,7 @@ class PriceCheckerWindow(QMainWindow):
     # -------------------------------------------------------------------------
 
     def _init_theme(self) -> None:
-        """Initialize theme from config and apply stylesheet."""
+        """Initialize theme and accent color from config and apply stylesheet."""
         theme_manager = get_theme_manager()
 
         # Load theme from config
@@ -1315,11 +1413,17 @@ class PriceCheckerWindow(QMainWindow):
         # Set theme (this also updates colors)
         theme_manager.set_theme(theme)
 
+        # Load accent color from config
+        saved_accent = self.ctx.config.accent_color if hasattr(self.ctx, 'config') else None
+        if saved_accent is not None:
+            theme_manager.set_accent_color(saved_accent)
+
         # Apply stylesheet
         self.setStyleSheet(theme_manager.get_stylesheet())
 
         # Update menu checkmarks
         self._update_theme_menu_checks(theme)
+        self._update_accent_menu_checks(saved_accent)
 
         # Register callback for future theme changes
         theme_manager.register_callback(self._on_theme_changed)
@@ -1371,6 +1475,36 @@ class PriceCheckerWindow(QMainWindow):
         for theme, action in self._theme_actions.items():
             action.setChecked(theme == current_theme)
 
+    def _set_accent_color(self, accent_key: Optional[str]) -> None:
+        """Set the application accent color."""
+        theme_manager = get_theme_manager()
+        theme_manager.set_accent_color(accent_key)
+
+        # Save to config
+        if hasattr(self.ctx, 'config'):
+            self.ctx.config.accent_color = accent_key
+
+        # Apply stylesheet (accent affects the stylesheet)
+        app = QApplication.instance()
+        if app:
+            app.setStyleSheet(theme_manager.get_stylesheet())
+        self.setStyleSheet(theme_manager.get_stylesheet())
+
+        # Update menu checkmarks
+        self._update_accent_menu_checks(accent_key)
+
+        # Get display name
+        if accent_key is None:
+            display_name = "Theme Default"
+        else:
+            display_name = POE_CURRENCY_COLORS.get(accent_key, {}).get("name", accent_key)
+        self._set_status(f"Accent color changed to: {display_name}")
+
+    def _update_accent_menu_checks(self, current_accent: Optional[str]) -> None:
+        """Update the checkmarks in the accent menu."""
+        for accent_key, action in self._accent_actions.items():
+            action.setChecked(accent_key == current_accent)
+
     def _on_theme_changed(self, theme: Theme) -> None:
         """Handle theme change callback from ThemeManager."""
         # Update stylesheet
@@ -1404,7 +1538,8 @@ class PriceCheckerWindow(QMainWindow):
 
     def _export_results(self) -> None:
         """Export results to TSV file."""
-        if not self._all_results:
+        panel = self.session_tabs.get_current_panel()
+        if not panel or not panel._all_results:
             QMessageBox.information(self, "Export", "No results to export.")
             return
 
@@ -1414,7 +1549,7 @@ class PriceCheckerWindow(QMainWindow):
 
         if path:
             try:
-                self.results_table.export_tsv(path)
+                panel.results_table.export_tsv(path)
                 self._set_status(f"Exported to {path}")
             except Exception as e:
                 QMessageBox.critical(self, "Export Error", f"Failed to export: {e}")
@@ -1426,16 +1561,22 @@ class PriceCheckerWindow(QMainWindow):
         self._set_status("All results copied as TSV")
 
     def _show_history(self) -> None:
-        """Show session history dialog."""
+        """Show session history dialog with re-check capability."""
         if not self._history:
-            QMessageBox.information(self, "Session History", "No items checked this session.")
+            QMessageBox.information(self, "Recent Items", "No items checked this session.")
             return
 
-        text = "Session History:\n\n"
-        for entry in self._history[-20:]:  # Last 20
-            text += f"{entry['timestamp']}: {entry['item']} ({entry['results_count']} results)\n"
+        from gui_qt.dialogs.recent_items_dialog import RecentItemsDialog
 
-        QMessageBox.information(self, "Session History", text)
+        dialog = RecentItemsDialog(list(self._history), self)
+        dialog.item_selected.connect(self._recheck_item_from_history)
+        dialog.exec()
+
+    def _recheck_item_from_history(self, item_text: str) -> None:
+        """Re-check an item from history."""
+        if item_text:
+            self.input_text.setPlainText(item_text)
+            self._on_check_price()
 
     def _show_data_sources(self) -> None:
         """Show data sources dialog."""
