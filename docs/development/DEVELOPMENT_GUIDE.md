@@ -2,7 +2,7 @@
 title: Development Guide
 status: current
 stability: stable
-last_reviewed: 2025-11-28
+last_reviewed: 2025-11-29
 review_frequency: quarterly
 related_code:
   - core/
@@ -517,7 +517,67 @@ pytest
 
 ---
 
-## 5. Logging & Error Handling
+## 5. CI/CD Pipeline
+
+The project uses GitHub Actions for continuous integration with the following workflows:
+
+### 5.1 Main CI Workflow (`python-package.yml`)
+
+Runs on every push and pull request to `main`:
+
+**Ubuntu (Primary)**
+- Tests on Python 3.10, 3.11, and 3.12
+- Runs flake8 linting (using `.flake8` config)
+- Executes full test suite with coverage
+- Uploads coverage reports to Codecov
+
+**Windows & macOS (Cross-platform)**
+- Tests on Python 3.11
+- Ensures cross-platform compatibility
+- No coverage collection (for efficiency)
+
+### 5.2 CodeQL Security Scanning (`codeql.yml`)
+
+- Runs on push/PR to main + weekly schedule (Mondays)
+- Scans Python code for security vulnerabilities
+- Uses `security-and-quality` query suite
+
+### 5.3 Build Release (`build-release.yml`)
+
+- Triggered on release publication or manual dispatch
+- Builds Windows executable using PyInstaller
+- Uploads artifact to GitHub release
+
+### 5.4 Dependabot (`dependabot.yml`)
+
+- Weekly automatic dependency updates (Mondays)
+- Covers both pip dependencies and GitHub Actions versions
+- Creates labeled PRs for easy identification
+
+### 5.5 Coverage Configuration
+
+The `codecov.yml` file configures coverage thresholds:
+- **Project target:** 60% minimum coverage
+- **Patch target:** 70% for new code
+- **Ignored:** GUI code (`gui_qt/**`), tests, scripts
+
+### 5.6 Local Development
+
+Run tests locally:
+```bash
+# Run all tests
+pytest tests/ --ignore=tests/integration
+
+# Run with coverage
+pytest tests/ --ignore=tests/integration --cov=core --cov-report=term
+
+# Run linting
+flake8 core gui_qt data_sources tests
+```
+
+---
+
+## 6. Logging & Error Handling
 
 **File:** `core/logging_setup.py`
 
