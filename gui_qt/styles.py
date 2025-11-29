@@ -671,6 +671,24 @@ class ThemeManager:
             logger.warning(f"Unknown theme: {theme_name}")
             return False
 
+    @classmethod
+    def reset_for_testing(cls) -> None:
+        """
+        Reset the singleton instance for test isolation.
+
+        Call this in test fixtures (e.g., pytest's autouse fixture) to ensure
+        tests don't affect each other through shared ThemeManager state.
+
+        Example:
+            @pytest.fixture(autouse=True)
+            def reset_theme():
+                yield
+                ThemeManager.reset_for_testing()
+        """
+        cls._instance = None
+        cls._theme_change_callbacks.clear()
+        logger.debug("ThemeManager reset for testing")
+
     def toggle_theme(self) -> Theme:
         """Toggle between dark and light themes. Returns the new theme."""
         # Simple toggle between dark/light variants
