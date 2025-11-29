@@ -357,7 +357,7 @@ class TestConfigUtilities:
 
     def test_export_config(self, tmp_path):
         path = get_unique_config_path(tmp_path)
-        out = tmp_path / f"export_{time.time_ns()}.json"
+        out = tmp_path / f"export_{uuid.uuid4().hex}.json"
 
         cfg = Config(path)
         cfg.min_value_chaos = 123.45
