@@ -64,6 +64,7 @@ from gui_qt.widgets.session_tabs import SessionTabWidget, SessionPanel
 from gui_qt.workers import RankingsPopulationWorker
 from core.build_stat_calculator import BuildStats
 from core.constants import HISTORY_MAX_ENTRIES
+from core.history import HistoryEntry
 
 if TYPE_CHECKING:
     from core.app_context import AppContext
@@ -169,7 +170,7 @@ class PriceCheckerWindow(QMainWindow):
         # State
         self._check_in_progress = False
         # Bounded history to prevent unbounded memory growth
-        self._history: Deque[Dict[str, Any]] = deque(maxlen=HISTORY_MAX_ENTRIES)
+        self._history: Deque[HistoryEntry] = deque(maxlen=HISTORY_MAX_ENTRIES)
 
         # Child windows (cached references)
         self._recent_sales_window = None
@@ -864,14 +865,9 @@ class PriceCheckerWindow(QMainWindow):
                 panel.rare_eval_panel.setVisible(False)
 
             # Add to history (store full item text for re-checking)
-            self._history.append({
-                "timestamp": datetime.now().isoformat(),
-                "item_name": parsed.name or item_text[:50],
-                "item_text": item_text,  # Full text for re-checking
-                "results_count": len(results),
-                "best_price": max((r.get("chaos_value", 0) or 0) for r in results) if results else 0,
-                "_parsed": parsed,  # Keep parsed item reference
-            })
+            self._history.append(
+                HistoryEntry.from_price_check(item_text, parsed, results)
+            )
 
             self._set_status(f"Found {len(results)} price result(s)")
             # Show toast for notable results

@@ -7,9 +7,11 @@ Dialog for viewing and re-checking recently checked items.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Union
 
 from PyQt6.QtCore import Qt, pyqtSignal
+
+from core.history import HistoryEntry
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
     QDialog,
@@ -33,7 +35,7 @@ class RecentItemsDialog(QDialog):
 
     def __init__(
         self,
-        history: List[Dict[str, Any]],
+        history: List[Union[HistoryEntry, Dict[str, Any]]],
         parent: Optional[Any] = None,
     ):
         super().__init__(parent)
