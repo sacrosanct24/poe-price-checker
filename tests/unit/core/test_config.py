@@ -6,7 +6,7 @@ Unit tests for core.config module (finalized + isolated)
 
 import pytest
 import json
-import time
+import uuid
 from pathlib import Path
 
 from core.config import Config
@@ -21,7 +21,7 @@ pytestmark = pytest.mark.unit
 
 def get_unique_config_path(tmp_path):
     """Generate a unique config file path to prevent test interference"""
-    return tmp_path / f"config_{time.time_ns()}.json"
+    return tmp_path / f"config_{uuid.uuid4().hex}.json"
 
 
 # -------------------------
