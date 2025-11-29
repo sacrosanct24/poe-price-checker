@@ -299,50 +299,36 @@ class PriceCheckerWindow(QMainWindow):
             self.logger.warning(f"Failed to update build stats: {e}")
 
     # -------------------------------------------------------------------------
-    # Session Tab Properties (route to current session's widgets)
+    # Session Tab Widget Delegation
+    # -------------------------------------------------------------------------
+    # These widget attributes are delegated to the current session panel.
+    # Uses __getattr__ to avoid repetitive property definitions.
+    #
+    # Delegated attributes:
+    #   input_text: QPlainTextEdit - Item text input area
+    #   item_inspector: ItemInspectorWidget - Parsed item display
+    #   results_table: ResultsTableWidget - Price results grid
+    #   filter_input: QLineEdit - Results filter text field
+    #   source_filter: QComboBox - Data source dropdown
+    #   rare_eval_panel: RareEvaluationPanelWidget - Rare item analysis
+    #   check_btn: QPushButton - Price check trigger button
     # -------------------------------------------------------------------------
 
-    @property
-    def input_text(self) -> QPlainTextEdit:
-        """Get the input text widget from the current session."""
-        panel = self.session_tabs.get_current_panel()
-        return panel.input_text if panel else None
+    _DELEGATED_ATTRS: frozenset = frozenset({
+        'input_text', 'item_inspector', 'results_table',
+        'filter_input', 'source_filter', 'rare_eval_panel', 'check_btn'
+    })
 
-    @property
-    def item_inspector(self) -> ItemInspectorWidget:
-        """Get the item inspector widget from the current session."""
-        panel = self.session_tabs.get_current_panel()
-        return panel.item_inspector if panel else None
-
-    @property
-    def results_table(self) -> ResultsTableWidget:
-        """Get the results table widget from the current session."""
-        panel = self.session_tabs.get_current_panel()
-        return panel.results_table if panel else None
-
-    @property
-    def filter_input(self) -> QLineEdit:
-        """Get the filter input widget from the current session."""
-        panel = self.session_tabs.get_current_panel()
-        return panel.filter_input if panel else None
-
-    @property
-    def source_filter(self) -> QComboBox:
-        """Get the source filter widget from the current session."""
-        panel = self.session_tabs.get_current_panel()
-        return panel.source_filter if panel else None
-
-    @property
-    def rare_eval_panel(self) -> RareEvaluationPanelWidget:
-        """Get the rare evaluation panel from the current session."""
-        panel = self.session_tabs.get_current_panel()
-        return panel.rare_eval_panel if panel else None
-
-    @property
-    def check_btn(self) -> QPushButton:
-        """Get the check button from the current session."""
-        panel = self.session_tabs.get_current_panel()
-        return panel.check_btn if panel else None
+    def __getattr__(self, name: str) -> Any:
+        """Delegate widget access to the current session panel."""
+        if name in PriceCheckerWindow._DELEGATED_ATTRS:
+            # Avoid infinite recursion by checking __dict__ directly
+            if 'session_tabs' in self.__dict__:
+                panel = self.session_tabs.get_current_panel()
+                if panel:
+                    return getattr(panel, name)
+            return None  # Match original behavior - return None when no panel
+        raise AttributeError(f"'{type(self).__name__}' has no attribute '{name}'")
 
     def _on_session_changed(self, index: int) -> None:
         """Handle session tab change - connect context menu."""
