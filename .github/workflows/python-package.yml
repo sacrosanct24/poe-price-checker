@@ -10,7 +10,8 @@ on:
     branches: [ "main" ]
 
 jobs:
-  build:
+  # Primary testing on Ubuntu with full Python version matrix
+  test-ubuntu:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -70,15 +71,15 @@ jobs:
         xvfb-run --auto-servernum pytest tests/ --ignore=tests/integration \
           --cov=core --cov=gui_qt --cov-report=term-missing \
           --cov-report=xml \
-          --junitxml=test-results-${{ matrix.python-version }}.xml \
+          --junitxml=test-results-ubuntu-${{ matrix.python-version }}.xml \
           -v
 
     - name: Upload test results
       uses: actions/upload-artifact@v4
       if: always()
       with:
-        name: test-results-${{ matrix.python-version }}
-        path: test-results-${{ matrix.python-version }}.xml
+        name: test-results-ubuntu-${{ matrix.python-version }}
+        path: test-results-ubuntu-${{ matrix.python-version }}.xml
         retention-days: 30
 
     - name: Upload coverage to Codecov
@@ -92,9 +93,97 @@ jobs:
     - name: Test Report Summary
       if: always()
       run: |
-        echo "## Test Results for Python ${{ matrix.python-version }}" >> $GITHUB_STEP_SUMMARY
+        echo "## Test Results for Ubuntu Python ${{ matrix.python-version }}" >> $GITHUB_STEP_SUMMARY
         if [ "${{ steps.pytest.outcome }}" == "success" ]; then
           echo "✅ All tests passed" >> $GITHUB_STEP_SUMMARY
         else
           echo "⚠️ Some tests failed - check artifacts for details" >> $GITHUB_STEP_SUMMARY
         fi
+
+  # Cross-platform testing on Windows
+  test-windows:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Cache pip dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~\AppData\Local\pip\Cache
+        key: ${{ runner.os }}-pip-3.11-${{ hashFiles('**/requirements*.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-3.11-
+          ${{ runner.os }}-pip-
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install pytest pytest-qt
+        pip install -r requirements.txt
+
+    - name: Test with pytest
+      id: pytest
+      env:
+        QT_QPA_PLATFORM: offscreen
+      run: |
+        pytest tests/ --ignore=tests/integration `
+          --junitxml=test-results-windows.xml `
+          -v
+
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: test-results-windows
+        path: test-results-windows.xml
+        retention-days: 30
+
+  # Cross-platform testing on macOS
+  test-macos:
+    runs-on: macos-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Cache pip dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~/Library/Caches/pip
+        key: ${{ runner.os }}-pip-3.11-${{ hashFiles('**/requirements*.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-3.11-
+          ${{ runner.os }}-pip-
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install pytest pytest-qt
+        pip install -r requirements.txt
+
+    - name: Test with pytest
+      id: pytest
+      env:
+        QT_QPA_PLATFORM: offscreen
+      run: |
+        pytest tests/ --ignore=tests/integration \
+          --junitxml=test-results-macos.xml \
+          -v
+
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: test-results-macos
+        path: test-results-macos.xml
+        retention-days: 30
