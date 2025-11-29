@@ -153,6 +153,124 @@ STATUS_COLORS_COLORBLIND = {
 
 
 # ============================================================================
+# PoE Currency Accent Colors (for user customization)
+# ============================================================================
+
+POE_CURRENCY_COLORS = {
+    "chaos": {
+        "name": "Chaos Orb",
+        "accent": "#c8a656",           # Gold
+        "accent_hover": "#d8b666",
+        "accent_blue": "#3ba4d8",
+    },
+    "divine": {
+        "name": "Divine Orb",
+        "accent": "#3ba4d8",           # Blue
+        "accent_hover": "#5bc4f8",
+        "accent_blue": "#c8a656",      # Swap for contrast
+    },
+    "exalt": {
+        "name": "Exalted Orb",
+        "accent": "#a89090",           # Silver/gray
+        "accent_hover": "#c8b0b0",
+        "accent_blue": "#3ba4d8",
+    },
+    "mirror": {
+        "name": "Mirror of Kalandra",
+        "accent": "#50c8ff",           # Cyan/mirror blue
+        "accent_hover": "#70e8ff",
+        "accent_blue": "#c8a656",
+    },
+    "alchemy": {
+        "name": "Orb of Alchemy",
+        "accent": "#ffcc00",           # Yellow
+        "accent_hover": "#ffdd44",
+        "accent_blue": "#3ba4d8",
+    },
+    "annul": {
+        "name": "Orb of Annulment",
+        "accent": "#ffffff",           # White
+        "accent_hover": "#e0e0ff",
+        "accent_blue": "#3ba4d8",
+    },
+    "vaal": {
+        "name": "Vaal Orb",
+        "accent": "#d04040",           # Red
+        "accent_hover": "#e06060",
+        "accent_blue": "#50c8ff",
+    },
+    "ancient": {
+        "name": "Ancient Orb",
+        "accent": "#ff8855",           # Orange
+        "accent_hover": "#ffaa77",
+        "accent_blue": "#3ba4d8",
+    },
+    "awakener": {
+        "name": "Awakener's Orb",
+        "accent": "#9060d0",           # Purple
+        "accent_hover": "#b080f0",
+        "accent_blue": "#50c8ff",
+    },
+    "hinekora": {
+        "name": "Hinekora's Lock",
+        "accent": "#40d080",           # Green
+        "accent_hover": "#60f0a0",
+        "accent_blue": "#3ba4d8",
+    },
+}
+
+
+# ============================================================================
+# Mod Tier Colors (for affix tier highlighting)
+# ============================================================================
+
+TIER_COLORS = {
+    "t1": "#ffcc00",              # T1 - Gold (best tier)
+    "t2": "#66bbff",              # T2 - Blue
+    "t3": "#ffffff",              # T3 - White
+    "t4": "#aaaaaa",              # T4 - Light gray
+    "t5": "#888888",              # T5+ - Gray (lower tiers)
+    "crafted": "#b4b4ff",         # Crafted mods - Light purple
+    "implicit": "#8888ff",        # Implicit mods - Magic blue
+}
+
+TIER_COLORS_COLORBLIND = {
+    "t1": "#e69f00",              # T1 - Orange (universally visible)
+    "t2": "#56b4e9",              # T2 - Sky blue
+    "t3": "#f0e442",              # T3 - Yellow
+    "t4": "#cc79a7",              # T4 - Pink
+    "t5": "#999999",              # T5+ - Gray
+    "crafted": "#009e73",         # Crafted - Bluish green
+    "implicit": "#0072b2",        # Implicit - Blue
+}
+
+
+def get_tier_color(tier: int, is_colorblind: bool = False) -> str:
+    """
+    Get the color for a given affix tier.
+
+    Args:
+        tier: Tier number (1 = best, 5+ = lowest)
+        is_colorblind: Whether to use colorblind-friendly colors
+
+    Returns:
+        Hex color string
+    """
+    colors = TIER_COLORS_COLORBLIND if is_colorblind else TIER_COLORS
+
+    if tier == 1:
+        return colors["t1"]
+    elif tier == 2:
+        return colors["t2"]
+    elif tier == 3:
+        return colors["t3"]
+    elif tier == 4:
+        return colors["t4"]
+    else:
+        return colors["t5"]
+
+
+# ============================================================================
 # Theme Color Definitions
 # ============================================================================
 
@@ -454,6 +572,7 @@ class ThemeManager:
         if cls._instance is None:
             cls._instance = super().__new__(cls)
             cls._instance._current_theme = Theme.DARK
+            cls._instance._accent_color = None  # None = use theme default
             cls._instance._colors = {}
             cls._instance._update_colors()
         return cls._instance
@@ -468,15 +587,27 @@ class ThemeManager:
         """Get the current color palette (merged theme + rarity + value + stat + status)."""
         return self._colors
 
+    @property
+    def accent_color(self) -> Optional[str]:
+        """Get the current accent color override (None = use theme default)."""
+        return self._accent_color
+
     def _update_colors(self) -> None:
-        """Update the merged color dictionary based on current theme."""
+        """Update the merged color dictionary based on current theme and accent."""
         theme = self._current_theme
 
         # For system theme, try to detect preference
         if theme == Theme.SYSTEM:
             theme = Theme.DARK if self._is_system_dark_mode() else Theme.LIGHT
 
-        theme_colors = THEME_COLORS.get(theme, DARK_THEME)
+        theme_colors = THEME_COLORS.get(theme, DARK_THEME).copy()
+
+        # Apply custom accent color if set
+        if self._accent_color and self._accent_color in POE_CURRENCY_COLORS:
+            accent_data = POE_CURRENCY_COLORS[self._accent_color]
+            theme_colors["accent"] = accent_data["accent"]
+            theme_colors["accent_hover"] = accent_data["accent_hover"]
+            theme_colors["accent_blue"] = accent_data["accent_blue"]
 
         # Use colorblind-safe colors for accessibility themes
         if self._current_theme in COLORBLIND_THEMES:
@@ -549,6 +680,49 @@ class ThemeManager:
 
         self.set_theme(new_theme)
         return new_theme
+
+    def set_accent_color(self, accent_key: Optional[str]) -> None:
+        """
+        Set the accent color override.
+
+        Args:
+            accent_key: Key from POE_CURRENCY_COLORS (e.g., "chaos", "divine")
+                       or None to use theme default.
+        """
+        if accent_key != self._accent_color:
+            self._accent_color = accent_key
+            self._update_colors()
+            logger.info(f"Accent color changed to: {accent_key or 'theme default'}")
+
+            # Notify callbacks (same as theme change)
+            for callback in self._theme_change_callbacks:
+                try:
+                    callback(self._current_theme)
+                except Exception as e:
+                    logger.error(f"Accent change callback error: {e}")
+
+    def get_available_accent_colors(self) -> Dict[str, str]:
+        """
+        Get available accent colors with their display names.
+
+        Returns:
+            Dict mapping accent key to display name (e.g., {"chaos": "Chaos Orb"})
+        """
+        return {key: data["name"] for key, data in POE_CURRENCY_COLORS.items()}
+
+    def get_accent_color_preview(self, accent_key: str) -> Optional[str]:
+        """
+        Get the hex color for previewing an accent color.
+
+        Args:
+            accent_key: Key from POE_CURRENCY_COLORS
+
+        Returns:
+            Hex color string or None if not found
+        """
+        if accent_key in POE_CURRENCY_COLORS:
+            return POE_CURRENCY_COLORS[accent_key]["accent"]
+        return None
 
     def register_callback(self, callback: Callable[['Theme'], None]) -> None:
         """Register a callback to be called when theme changes."""
