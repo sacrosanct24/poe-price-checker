@@ -9,6 +9,9 @@ from __future__ import annotations
 import logging
 from typing import Dict, List, Optional, TYPE_CHECKING
 
+if TYPE_CHECKING:
+    from core.stash_valuator import PricedTab
+
 from PyQt6.QtCore import Qt, pyqtSignal, QRectF
 from PyQt6.QtGui import (
     QBrush,
