@@ -36,7 +36,7 @@ from gui_qt.styles import COLORS
 
 if TYPE_CHECKING:
     from core.stash_grid_renderer import StashGridCell, StashGridLayout
-    from core.stash_valuator import PricedTab, PricedItem
+    from core.stash_valuator import PricedTab
 
 logger = logging.getLogger(__name__)
 
