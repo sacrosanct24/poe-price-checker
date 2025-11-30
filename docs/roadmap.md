@@ -30,6 +30,7 @@ review_frequency: monthly
 - Controller/Service architecture refactoring
 - 1413 tests passing, ~51% coverage
 - Security hardening (encrypted tokens, CSRF protection, URL sanitization)
+- **FastAPI Backend** - RESTful API skeleton for web/mobile clients
 
 ---
 
@@ -233,11 +234,11 @@ review_frequency: monthly
 4. ~~**Side-by-side item comparison**~~ - ✅ `gui_qt/dialogs/item_comparison_dialog.py`, Ctrl+Shift+I
 5. ~~**DPS impact calculator**~~ - ✅ `core/dps_impact_calculator.py`, Item Inspector
 
-### Short-term (1-2 months)
+### Short-term (1-2 months) - ✅ COMPLETED
 1. ~~**Upgrade finder**~~ - ✅ `core/upgrade_finder.py`, Ctrl+U
 2. ~~**Stash grid visualization**~~ - ✅ `gui_qt/widgets/stash_grid_visualizer.py`, Grid View in Stash Viewer
 3. ~~**Build profiles/library**~~ - ✅ `gui_qt/dialogs/build_library_dialog.py`, Ctrl+Alt+B
-4. **FastAPI backend skeleton** - web foundation
+4. ~~**FastAPI backend skeleton**~~ - ✅ `api/` package with endpoints for price-check, items, sales, stats
 
 ### Medium-term (3-6 months)
 1. **Full web implementation** - React frontend
