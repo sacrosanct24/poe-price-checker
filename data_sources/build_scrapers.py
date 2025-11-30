@@ -14,9 +14,39 @@ import time
 from typing import List, Optional
 from dataclasses import dataclass, field
 from datetime import datetime
+from urllib.parse import urlparse
 
 import requests
 from bs4 import BeautifulSoup
+
+# Allowed hosts for PoB code links
+ALLOWED_POB_HOSTS = frozenset({
+    'pastebin.com',
+    'www.pastebin.com',
+    'pobb.in',
+    'www.pobb.in',
+})
+
+
+def is_allowed_pob_url(url: str) -> bool:
+    """
+    Check if a URL is from an allowed PoB hosting domain.
+
+    Properly validates the hostname to prevent URL substring bypass attacks
+    like 'evil.com/pastebin.com' or 'pastebin.com.evil.com'.
+
+    Args:
+        url: URL to validate
+
+    Returns:
+        True if the URL's host is in the allowed list
+    """
+    try:
+        parsed = urlparse(url)
+        # Check the actual hostname, not a substring match
+        return parsed.netloc.lower() in ALLOWED_POB_HOSTS
+    except Exception:
+        return False
 
 logger = logging.getLogger(__name__)
 
@@ -205,7 +235,7 @@ class PoeNinjaBuildScraper:
             links = soup.find_all('a', href=True)
             for link in links:
                 href = link['href']
-                if 'pastebin.com' in href or 'pobb.in' in href:
+                if is_allowed_pob_url(href):
                     logger.info(f"Found PoB link: {href}")
                     return href
 
