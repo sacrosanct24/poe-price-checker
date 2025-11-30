@@ -15,7 +15,6 @@ PyQt6 GUI for the PoE Price Checker.
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 import random
@@ -63,6 +62,8 @@ from gui_qt.widgets.toast_notification import ToastManager
 from gui_qt.widgets.pinned_items_widget import PinnedItemsWidget
 from gui_qt.widgets.session_tabs import SessionTabWidget, SessionPanel
 from gui_qt.workers import RankingsPopulationWorker
+from gui_qt.services import get_window_manager
+from gui_qt.controllers import PriceCheckController
 from core.build_stat_calculator import BuildStats
 from core.constants import HISTORY_MAX_ENTRIES
 from core.history import HistoryEntry
@@ -173,17 +174,9 @@ class PriceCheckerWindow(QMainWindow):
         # Bounded history to prevent unbounded memory growth
         self._history: Deque[HistoryEntry] = deque(maxlen=HISTORY_MAX_ENTRIES)
 
-        # Child windows (cached references)
-        self._recent_sales_window = None
-        self._sales_dashboard_window = None
-        self._stash_viewer_window = None
-        self._pob_character_window = None
-        self._rare_eval_config_window = None
-        self._price_rankings_window = None
-        self._build_comparison_dialog = None
-        self._bis_search_dialog = None
-        self._loadout_selector_dialog = None
-        self._item_comparison_dialog = None
+        # Window manager for child window lifecycle
+        self._window_manager = get_window_manager()
+        self._window_manager.set_main_window(self)
 
         # PoB integration
         self._character_manager = None
@@ -195,6 +188,14 @@ class PriceCheckerWindow(QMainWindow):
 
         # Initialize PoB character manager
         self._init_character_manager()
+
+        # Price check controller
+        self._price_controller = PriceCheckController(
+            parser=ctx.parser,
+            price_service=ctx.price_service,
+            rare_evaluator=self._rare_evaluator,
+            upgrade_checker=self._upgrade_checker,
+        )
 
         # Rankings population worker
         self._rankings_worker: Optional[RankingsPopulationWorker] = None
@@ -771,7 +772,7 @@ class PriceCheckerWindow(QMainWindow):
         self._do_price_check(item_text, current_index)
 
     def _do_price_check(self, item_text: str, session_index: int) -> None:
-        """Perform price check for a specific session."""
+        """Perform price check for a specific session using PriceCheckController."""
         panel = self.session_tabs.get_panel(session_index)
         if not panel:
             self._set_status("No active session")
@@ -781,103 +782,47 @@ class PriceCheckerWindow(QMainWindow):
         panel.check_btn.setEnabled(False)
         self._set_status("Checking price...")
 
-        # Run price check
         try:
-            parsed = self.ctx.parser.parse(item_text)
-            if not parsed:
-                self._set_status("Could not parse item text")
-                self._check_in_progress = False
-                panel.check_btn.setEnabled(True)
+            # Use the controller for price checking
+            result = self._price_controller.check_price(item_text)
+
+            if result.is_err():
+                self._set_status(result.error)
                 return
 
+            # Unwrap the successful result
+            data = result.unwrap()
+
             # Update item inspector
-            panel.item_inspector.set_item(parsed)
+            panel.item_inspector.set_item(data.parsed_item)
 
             # Clear the paste window - item is now shown in inspector
             panel.input_text.clear()
 
-            # Get price results (pass item text, not parsed object)
-            results = self.ctx.price_service.check_item(item_text)
-
-            # Convert to display format (results are dicts from check_item)
-            all_results = []
-            for result in results:
-                # Handle explanation - could be dict or object
-                explanation = result.get("explanation")
-                if explanation:
-                    if isinstance(explanation, dict):
-                        explanation_str = json.dumps(explanation)
-                    elif hasattr(explanation, "__dict__"):
-                        explanation_str = json.dumps(explanation.__dict__)
-                    else:
-                        explanation_str = str(explanation)
-                else:
-                    explanation_str = ""
-
-                # Convert numeric values safely
-                try:
-                    chaos_val = float(result.get("chaos_value") or 0)
-                except (ValueError, TypeError):
-                    chaos_val = 0.0
-                try:
-                    divine_val = float(result.get("divine_value") or 0)
-                except (ValueError, TypeError):
-                    divine_val = 0.0
-                try:
-                    listing_count = int(result.get("listing_count") or 0)
-                except (ValueError, TypeError):
-                    listing_count = 0
-
-                row = {
-                    "item_name": result.get("item_name") or parsed.name or "",
-                    "variant": result.get("variant") or "",
-                    "links": result.get("links") or "",
-                    "chaos_value": chaos_val,
-                    "divine_value": divine_val,
-                    "listing_count": listing_count,
-                    "source": result.get("source") or "",
-                    "upgrade": "",
-                    "price_explanation": explanation_str,
-                    "_item": parsed,  # Store for tooltip preview
-                }
-
-                # Check for upgrade potential
-                if self._upgrade_checker and hasattr(parsed, 'slot'):
-                    is_upgrade = self._upgrade_checker.is_upgrade(parsed)
-                    if is_upgrade:
-                        row["upgrade"] = "Yes"
-
-                all_results.append(row)
-
-            # Update session panel with results (handles table and filters)
-            panel.set_results(all_results)
+            # Update session panel with formatted results
+            panel.set_results(data.formatted_rows)
             self._update_summary()
 
-            # Evaluate rare items
-            if parsed.rarity == "Rare" and self._rare_evaluator:
-                try:
-                    evaluation = self._rare_evaluator.evaluate(parsed)
-                    panel.rare_eval_panel.set_evaluation(evaluation)
-                    panel.rare_eval_panel.setVisible(True)
-                except Exception as e:
-                    self.logger.warning(f"Rare evaluation failed: {e}")
-                    panel.rare_eval_panel.setVisible(False)
+            # Handle rare item evaluation panel
+            if data.is_rare and data.evaluation:
+                panel.rare_eval_panel.set_evaluation(data.evaluation)
+                panel.rare_eval_panel.setVisible(True)
             else:
                 panel.rare_eval_panel.setVisible(False)
 
-            # Add to history (store full item text for re-checking)
+            # Add to history
             self._history.append(
-                HistoryEntry.from_price_check(item_text, parsed, results)
+                HistoryEntry.from_price_check(item_text, data.parsed_item, data.results)
             )
 
-            self._set_status(f"Found {len(results)} price result(s)")
-            # Show toast for notable results
-            if results:
-                best_price = max((r.get("chaos_value", 0) or 0) for r in results)
-                if best_price >= 100:
-                    self._toast_manager.success(f"High value item: {best_price:.0f}c")
-                elif best_price >= 10:
-                    self._toast_manager.info(f"Found {len(results)} result(s)")
+            # Update status and show toast
+            self._set_status(self._price_controller.get_price_summary(data))
+            show_toast, toast_type, message = self._price_controller.should_show_toast(data)
+            if show_toast:
+                if toast_type == "success":
+                    self._toast_manager.success(message)
+                else:
+                    self._toast_manager.info(message)
 
         except Exception as e:
             self.logger.exception("Price check failed")
@@ -1301,32 +1246,17 @@ class PriceCheckerWindow(QMainWindow):
     def _show_recent_sales(self) -> None:
         """Show recent sales window."""
         from gui_qt.windows.recent_sales_window import RecentSalesWindow
-
-        if self._recent_sales_window is None or not self._recent_sales_window.isVisible():
-            self._recent_sales_window = RecentSalesWindow(self.ctx, self)
-
-        self._recent_sales_window.show()
-        self._recent_sales_window.raise_()
+        self._window_manager.show_window("recent_sales", RecentSalesWindow, ctx=self.ctx)
 
     def _show_sales_dashboard(self) -> None:
         """Show sales dashboard window."""
         from gui_qt.windows.sales_dashboard_window import SalesDashboardWindow
-
-        if self._sales_dashboard_window is None or not self._sales_dashboard_window.isVisible():
-            self._sales_dashboard_window = SalesDashboardWindow(self.ctx, self)
-
-        self._sales_dashboard_window.show()
-        self._sales_dashboard_window.raise_()
+        self._window_manager.show_window("sales_dashboard", SalesDashboardWindow, ctx=self.ctx)
 
     def _show_stash_viewer(self) -> None:
         """Show stash viewer window."""
         from gui_qt.windows.stash_viewer_window import StashViewerWindow
-
-        if self._stash_viewer_window is None or not self._stash_viewer_window.isVisible():
-            self._stash_viewer_window = StashViewerWindow(self.ctx, self)
-
-        self._stash_viewer_window.show()
-        self._stash_viewer_window.raise_()
+        self._window_manager.show_window("stash_viewer", StashViewerWindow, ctx=self.ctx)
 
     def _show_pob_characters(self) -> None:
         """Show PoB character manager window."""
@@ -1339,17 +1269,21 @@ class PriceCheckerWindow(QMainWindow):
             )
             return
 
-        if self._pob_character_window is None or not self._pob_character_window.isVisible():
-            self._pob_character_window = PoBCharacterWindow(
-                self._character_manager,
-                self,
-                on_profile_selected=self._on_pob_profile_selected,
-                on_price_check=self._on_pob_price_check,
+        # Register factory for complex initialization
+        if "pob_characters" not in self._window_manager._factories:
+            self._window_manager.register_factory(
+                "pob_characters",
+                lambda: PoBCharacterWindow(
+                    self._character_manager,
+                    self,
+                    on_profile_selected=self._on_pob_profile_selected,
+                    on_price_check=self._on_pob_price_check,
+                )
             )
 
-        self._pob_character_window.show()
-        self._pob_character_window.raise_()
-        self._pob_character_window.activateWindow()
+        window = self._window_manager.show_window("pob_characters")
+        if window:
+            window.activateWindow()
 
     def _on_pob_profile_selected(self, profile_name: str) -> None:
         """Handle PoB profile selection."""
@@ -1358,6 +1292,8 @@ class PriceCheckerWindow(QMainWindow):
             profile = self._character_manager.get_profile(profile_name)
             if profile and profile.build:
                 self._upgrade_checker = UpgradeChecker(profile.build)
+                # Update the controller with new upgrade checker
+                self._price_controller.set_upgrade_checker(self._upgrade_checker)
                 self._set_status(f"Upgrade checking enabled for: {profile_name}")
         except Exception as e:
             self.logger.warning(f"Failed to setup upgrade checker: {e}")
@@ -1428,54 +1364,61 @@ class PriceCheckerWindow(QMainWindow):
 
         data_dir = Path(__file__).parent.parent / "data"
 
-        if self._rare_eval_config_window is None or not self._rare_eval_config_window.isVisible():
-            self._rare_eval_config_window = RareEvalConfigWindow(
-                data_dir,
-                self,
-                on_save=self._reload_rare_evaluator,
+        # Register factory for complex initialization
+        if "rare_eval_config" not in self._window_manager._factories:
+            self._window_manager.register_factory(
+                "rare_eval_config",
+                lambda: RareEvalConfigWindow(
+                    data_dir,
+                    self,
+                    on_save=self._reload_rare_evaluator,
+                )
             )
 
-        self._rare_eval_config_window.show()
-        self._rare_eval_config_window.raise_()
+        self._window_manager.show_window("rare_eval_config")
 
     def _reload_rare_evaluator(self) -> None:
         """Reload the rare item evaluator."""
         self._init_rare_evaluator()
+        # Update the controller with new evaluator
+        self._price_controller.set_rare_evaluator(self._rare_evaluator)
         self._set_status("Rare evaluation settings reloaded")
 
     def _show_price_rankings(self) -> None:
         """Show price rankings window."""
         from gui_qt.windows.price_rankings_window import PriceRankingsWindow
-
-        if self._price_rankings_window is None or not self._price_rankings_window.isVisible():
-            self._price_rankings_window = PriceRankingsWindow(self.ctx, self)
-
-        self._price_rankings_window.show()
-        self._price_rankings_window.raise_()
+        self._window_manager.show_window("price_rankings", PriceRankingsWindow, ctx=self.ctx)
 
     def _show_build_comparison(self) -> None:
         """Show build comparison dialog."""
         from gui_qt.dialogs.build_comparison_dialog import BuildComparisonDialog
 
-        if self._build_comparison_dialog is None or not self._build_comparison_dialog.isVisible():
-            self._build_comparison_dialog = BuildComparisonDialog(
-                self,
-                character_manager=self._character_manager,
+        # Register factory for complex initialization
+        if "build_comparison" not in self._window_manager._factories:
+            self._window_manager.register_factory(
+                "build_comparison",
+                lambda: BuildComparisonDialog(
+                    self,
+                    character_manager=self._character_manager,
+                )
             )
 
-        self._build_comparison_dialog.show()
-        self._build_comparison_dialog.raise_()
+        self._window_manager.show_window("build_comparison")
 
     def _show_loadout_selector(self) -> None:
         """Show loadout selector dialog for browsing PoB loadouts."""
         from gui_qt.dialogs.loadout_selector_dialog import LoadoutSelectorDialog
 
-        if self._loadout_selector_dialog is None or not self._loadout_selector_dialog.isVisible():
-            self._loadout_selector_dialog = LoadoutSelectorDialog(self)
-            self._loadout_selector_dialog.loadout_selected.connect(self._on_loadout_selected)
+        # Register factory for signal connection
+        if "loadout_selector" not in self._window_manager._factories:
+            def create_loadout_selector():
+                dialog = LoadoutSelectorDialog(self)
+                dialog.loadout_selected.connect(self._on_loadout_selected)
+                return dialog
 
-        self._loadout_selector_dialog.show()
-        self._loadout_selector_dialog.raise_()
+            self._window_manager.register_factory("loadout_selector", create_loadout_selector)
+
+        self._window_manager.show_window("loadout_selector")
 
     def _on_loadout_selected(self, config: dict) -> None:
         """Handle loadout selection from the selector dialog."""
@@ -1499,24 +1442,22 @@ class PriceCheckerWindow(QMainWindow):
         """Show BiS item search dialog."""
         from gui_qt.dialogs.bis_search_dialog import BiSSearchDialog
 
-        if self._bis_search_dialog is None or not self._bis_search_dialog.isVisible():
-            self._bis_search_dialog = BiSSearchDialog(
-                self,
-                character_manager=self._character_manager,
+        # Register factory for complex initialization
+        if "bis_search" not in self._window_manager._factories:
+            self._window_manager.register_factory(
+                "bis_search",
+                lambda: BiSSearchDialog(
+                    self,
+                    character_manager=self._character_manager,
+                )
             )
 
-        self._bis_search_dialog.show()
-        self._bis_search_dialog.raise_()
+        self._window_manager.show_window("bis_search")
 
     def _show_item_comparison(self) -> None:
         """Show item comparison dialog."""
         from gui_qt.dialogs.item_comparison_dialog import ItemComparisonDialog
-
-        if self._item_comparison_dialog is None or not self._item_comparison_dialog.isVisible():
-            self._item_comparison_dialog = ItemComparisonDialog(self, self.ctx)
-
-        self._item_comparison_dialog.show()
-        self._item_comparison_dialog.raise_()
+        self._window_manager.show_window("item_comparison", ItemComparisonDialog, ctx=self.ctx)
 
     def _paste_sample(self, item_type: str) -> None:
         """Paste a sample item of the given type."""
@@ -1660,17 +1601,9 @@ class PriceCheckerWindow(QMainWindow):
             self._rankings_worker.quit()
             self._rankings_worker.wait(2000)
 
-        # Close child windows
-        for win in [
-            self._recent_sales_window,
-            self._sales_dashboard_window,
-            self._stash_viewer_window,
-            self._pob_character_window,
-            self._rare_eval_config_window,
-            self._price_rankings_window,
-        ]:
-            if win:
-                win.close()
+        # Close all managed child windows
+        closed_count = self._window_manager.close_all()
+        self.logger.debug(f"Closed {closed_count} child windows")
 
         # Clean up AppContext resources (database, API sessions)
         if self.ctx:
