@@ -230,7 +230,7 @@ review_frequency: monthly
 ### Short-term (1-2 months)
 1. ~~**Upgrade finder**~~ - ✅ `core/upgrade_finder.py`, Ctrl+U
 2. ~~**Stash grid visualization**~~ - ✅ `gui_qt/widgets/stash_grid_visualizer.py`, Grid View in Stash Viewer
-3. ~~**Build profiles/library**~~ - ✅ `gui_qt/dialogs/build_library_dialog.py`, Ctrl+Shift+L
+3. ~~**Build profiles/library**~~ - ✅ `gui_qt/dialogs/build_library_dialog.py`, Ctrl+Alt+B
 4. **FastAPI backend skeleton** - web foundation
 
 ### Medium-term (3-6 months)

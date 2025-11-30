@@ -65,7 +65,7 @@ DEFAULT_SHORTCUTS: List[ShortcutDef] = [
     ShortcutDef("show_pob_characters", "PoB Characters", "Open PoB character manager", "Ctrl+B", ShortcutCategory.BUILD),
     ShortcutDef("show_bis_search", "BiS Item Search", "Find best-in-slot items", "Ctrl+I", ShortcutCategory.BUILD),
     ShortcutDef("show_upgrade_finder", "Upgrade Finder", "Find gear upgrades within budget", "Ctrl+U", ShortcutCategory.BUILD),
-    ShortcutDef("show_build_library", "Build Library", "Manage saved build profiles", "Ctrl+Shift+L", ShortcutCategory.BUILD),
+    ShortcutDef("show_build_library", "Build Library", "Manage saved build profiles", "Ctrl+Alt+B", ShortcutCategory.BUILD),
     ShortcutDef("show_build_comparison", "Compare Builds", "Compare passive tree builds", "Ctrl+Shift+B", ShortcutCategory.BUILD),
     ShortcutDef("show_item_comparison", "Compare Items", "Side-by-side item comparison", "Ctrl+Shift+I", ShortcutCategory.BUILD),
     ShortcutDef("show_rare_eval_config", "Rare Item Settings", "Configure rare item evaluation", "Ctrl+Shift+R", ShortcutCategory.BUILD),

@@ -320,7 +320,7 @@ class PriceCheckerWindow(QMainWindow):
                 MenuItem("&Compare Build Trees...", handler=self._show_build_comparison),
                 MenuItem("Browse &Loadouts...", handler=self._show_loadout_selector),
                 MenuItem("Build &Library...", handler=self._show_build_library,
-                         shortcut="Ctrl+Shift+L"),
+                         shortcut="Ctrl+Alt+B"),
                 MenuItem("Find &BiS Item...", handler=self._show_bis_search,
                          shortcut="Ctrl+I"),
                 MenuItem("&Upgrade Finder...", handler=self._show_upgrade_finder,
