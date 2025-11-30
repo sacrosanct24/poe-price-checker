@@ -6,6 +6,9 @@ on:
     types: [published]
   workflow_dispatch:  # Allow manual trigger
 
+permissions:
+  contents: write  # Required for softprops/action-gh-release to upload assets
+
 jobs:
   build-windows:
     runs-on: windows-latest
