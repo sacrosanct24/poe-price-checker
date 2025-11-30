@@ -316,6 +316,10 @@ class PriceCheckerWindow(QMainWindow):
                              shortcut="Ctrl+Shift+C"),
                 ]),
                 MenuSection([
+                    MenuItem("&Settings...", handler=self._show_settings,
+                             shortcut="Ctrl+,"),
+                ]),
+                MenuSection([
                     MenuItem("E&xit", handler=self.close, shortcut="Alt+F4"),
                 ]),
             ]),
@@ -1099,9 +1103,12 @@ class PriceCheckerWindow(QMainWindow):
         QApplication.instance().quit()
 
     def _show_settings(self) -> None:
-        """Show settings dialog (placeholder for future implementation)."""
-        # TODO: Implement settings dialog
-        self._set_status("Settings dialog not yet implemented")
+        """Show settings dialog."""
+        from gui_qt.dialogs.settings_dialog import SettingsDialog
+
+        dialog = SettingsDialog(self.ctx.config, parent=self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            self._set_status("Settings saved")
 
     def _cleanup_before_close(self) -> None:
         """Clean up resources before closing."""
