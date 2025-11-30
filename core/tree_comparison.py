@@ -13,10 +13,8 @@ from typing import List, Optional, Set, Tuple
 from core.build_comparison import (
     GuideBuildParser,
     BuildComparator,
-    TreeSpec,
-    TreeDelta,
 )
-from core.pob_integration import PoBBuild, PoBDecoder, CharacterManager
+from core.pob_integration import PoBDecoder, CharacterManager
 
 logger = logging.getLogger(__name__)
 

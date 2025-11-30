@@ -11,7 +11,6 @@ import logging
 from typing import Any, Dict, List, Optional, Tuple
 
 from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
     QDialog,
     QVBoxLayout,
@@ -27,12 +26,11 @@ from PyQt6.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QTabWidget,
-    QSplitter,
     QTextBrowser,
     QMessageBox,
 )
 
-from gui_qt.styles import COLORS, apply_window_icon
+from gui_qt.styles import apply_window_icon
 
 logger = logging.getLogger(__name__)
 
@@ -41,8 +39,6 @@ try:
     from core.build_comparison import (
         GuideBuildParser,
         MaxrollBuildFetcher,
-        TreeSpec,
-        SkillSetSpec,
     )
     from core.pob_integration import PoBDecoder
     IMPORTS_AVAILABLE = True

@@ -27,7 +27,6 @@ from PyQt6.QtWidgets import (
     QFrame,
     QStackedWidget,
     QSplitter,
-    QScrollArea,
 )
 
 from gui_qt.styles import COLORS, apply_window_icon
@@ -36,7 +35,6 @@ from core.tree_comparison import TreeComparisonService, TreeComparisonResult
 from core.pob_integration import CharacterManager, PoBDecoder
 from core.build_comparison import GuideBuildParser
 from core.passive_tree_data import get_passive_tree_provider, PassiveNode
-from core.game_data import detect_game_version
 
 logger = logging.getLogger(__name__)
 

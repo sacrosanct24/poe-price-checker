@@ -15,7 +15,7 @@ import logging
 import webbrowser
 from typing import Dict, List, Optional
 
-from PyQt6.QtCore import Qt, QThread, pyqtSignal
+from PyQt6.QtCore import QThread, pyqtSignal
 from PyQt6.QtWidgets import (
     QDialog,
     QVBoxLayout,

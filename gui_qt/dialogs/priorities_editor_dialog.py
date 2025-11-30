@@ -21,8 +21,6 @@ from PyQt6.QtWidgets import (
     QGroupBox,
     QListWidget,
     QListWidgetItem,
-    QScrollArea,
-    QFrame,
     QMessageBox,
     QLineEdit,
 )

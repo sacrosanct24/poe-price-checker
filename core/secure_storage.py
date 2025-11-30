@@ -7,7 +7,6 @@ defense-in-depth against credential theft if config files are copied.
 """
 
 import base64
-import hashlib
 import logging
 import os
 import platform

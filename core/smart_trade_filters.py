@@ -15,10 +15,10 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 
-from core.build_archetype import BuildArchetype, DefenseType, DamageType, AttackType
+from core.build_archetype import BuildArchetype, DefenseType, AttackType
 from core.build_stat_calculator import BuildStats
-from core.upgrade_calculator import UpgradeCalculator, ResistanceGaps
-from data_sources.pricing.trade_stat_ids import AFFIX_TO_STAT_ID, get_stat_id
+from core.upgrade_calculator import UpgradeCalculator
+from data_sources.pricing.trade_stat_ids import get_stat_id
 
 logger = logging.getLogger(__name__)
 

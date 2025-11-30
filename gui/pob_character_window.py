@@ -13,10 +13,10 @@ Features:
 from __future__ import annotations
 
 import tkinter as tk
-from tkinter import ttk, messagebox, simpledialog
+from tkinter import ttk, messagebox
 from typing import Any, Dict, List, Optional, Callable
 
-from core.pob_integration import CharacterManager, PoBDecoder, PoBBuild, PoBItem, BuildCategory
+from core.pob_integration import CharacterManager, BuildCategory
 
 
 class PoBCharacterWindow(tk.Toplevel):

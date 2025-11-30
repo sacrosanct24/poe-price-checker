@@ -10,8 +10,7 @@ from __future__ import annotations
 import logging
 from typing import Callable, Dict, List, Optional
 
-from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QKeySequence
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QDialog,
     QVBoxLayout,
