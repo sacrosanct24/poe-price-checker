@@ -1,0 +1,7 @@
+[bandit]
+# Exclude test directories - assert statements are expected in tests
+exclude_dirs = tests
+
+# Skip B101 (assert_used) globally as a backup
+# pytest relies on assert statements for test assertions
+skips = B101
