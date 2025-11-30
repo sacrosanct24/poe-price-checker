@@ -71,10 +71,8 @@ class TestGetAllMods:
     def test_handles_none_item(self):
         """Test handling None item."""
         item = None
-        if not item:
-            all_mods = []
-        else:
-            all_mods = []
+        # When item is None, we return empty list
+        all_mods = [] if not item else []
 
         assert all_mods == []
 
@@ -210,15 +208,7 @@ class TestComparisonState:
         item1 = None
         item2 = None
 
-        if not item1 and not item2:
-            state = "waiting_both"
-        elif not item1:
-            state = "waiting_item1"
-        elif not item2:
-            state = "waiting_item2"
-        else:
-            state = "ready"
-
+        state = self._get_state(item1, item2)
         assert state == "waiting_both"
 
     def test_one_item_state(self):
@@ -226,15 +216,7 @@ class TestComparisonState:
         item1 = MockItem(name="Item A")
         item2 = None
 
-        if not item1 and not item2:
-            state = "waiting_both"
-        elif not item1:
-            state = "waiting_item1"
-        elif not item2:
-            state = "waiting_item2"
-        else:
-            state = "ready"
-
+        state = self._get_state(item1, item2)
         assert state == "waiting_item2"
 
     def test_both_items_state(self):
@@ -242,16 +224,19 @@ class TestComparisonState:
         item1 = MockItem(name="Item A")
         item2 = MockItem(name="Item B")
 
-        if not item1 and not item2:
-            state = "waiting_both"
-        elif not item1:
-            state = "waiting_item1"
-        elif not item2:
-            state = "waiting_item2"
-        else:
-            state = "ready"
-
+        state = self._get_state(item1, item2)
         assert state == "ready"
+
+    def _get_state(self, item1, item2):
+        """Helper to determine comparison state."""
+        if not item1 and not item2:
+            return "waiting_both"
+        elif not item1:
+            return "waiting_item1"
+        elif not item2:
+            return "waiting_item2"
+        else:
+            return "ready"
 
 
 class TestComparisonHtmlGeneration:
@@ -400,10 +385,7 @@ class TestSetItemProgrammatically:
         """Test setting None as item."""
         item = None
 
-        if item:
-            has_item = True
-        else:
-            has_item = False
+        has_item = bool(item)
 
         assert has_item is False
 
