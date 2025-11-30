@@ -46,9 +46,14 @@ class TestGameVersionEnum:
 
     def test_enum_comparison(self):
         """Enum values should be comparable."""
-        assert GameVersion.POE1 == GameVersion.POE1
-        assert GameVersion.POE2 == GameVersion.POE2
-        assert GameVersion.POE1 != GameVersion.POE2
+        # Test that same enum values are equal (using variables to avoid tautology)
+        poe1_a = GameVersion.POE1
+        poe1_b = GameVersion.POE1
+        poe2_a = GameVersion.POE2
+        poe2_b = GameVersion.POE2
+        assert poe1_a == poe1_b
+        assert poe2_a == poe2_b
+        assert poe1_a != poe2_a
 
 
 # -------------------------

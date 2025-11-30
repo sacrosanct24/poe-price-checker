@@ -203,6 +203,7 @@ class TestLoadoutSelectorDialogIntegration:
             from PyQt6.QtWidgets import QApplication
         except ImportError as e:
             pytest.skip(f"PyQt6 display backend not available: {e}")
+            return  # Explicit return to help static analysis
 
         import sys
 

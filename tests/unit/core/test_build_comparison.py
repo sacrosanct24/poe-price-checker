@@ -246,6 +246,7 @@ class TestMaxrollIntegration:
             xml_string = fetcher.fetch_and_decode("0nws0aiy")
         except Exception as e:
             pytest.skip(f"Could not fetch from Maxroll API: {e}")
+            return  # Explicit return to help static analysis
 
         # Parse tree specs
         specs = parser.parse_tree_specs(xml_string)
@@ -268,6 +269,7 @@ class TestMaxrollIntegration:
             xml_string = fetcher.fetch_and_decode("0nws0aiy")
         except Exception as e:
             pytest.skip(f"Could not fetch from Maxroll API: {e}")
+            return  # Explicit return to help static analysis
 
         specs = parser.parse_tree_specs(xml_string)
 
