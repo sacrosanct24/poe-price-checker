@@ -6,7 +6,7 @@ Reduces ~350 lines of boilerplate to ~50 lines of configuration.
 """
 
 from dataclasses import dataclass, field
-from typing import Optional, Callable, Dict, List, Union, Any
+from typing import Optional, Callable, Dict, List, Union
 import webbrowser
 import logging
 

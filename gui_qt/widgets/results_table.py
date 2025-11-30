@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from PyQt6.QtCore import Qt, pyqtSignal, QAbstractTableModel, QModelIndex
-from PyQt6.QtGui import QColor, QBrush, QAction
+from PyQt6.QtGui import QColor, QBrush
 from PyQt6.QtWidgets import (
     QTableView,
     QWidget,

@@ -7,7 +7,7 @@ Dialog for viewing and re-checking recently checked items.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 from PyQt6.QtCore import Qt, pyqtSignal
 

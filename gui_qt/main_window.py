@@ -20,12 +20,11 @@ import os
 import random
 import sys
 from collections import deque
-from datetime import datetime
 from pathlib import Path
 from typing import Any, Deque, Dict, List, Optional, TYPE_CHECKING
 
-from PyQt6.QtCore import Qt, QTimer, QObject
-from PyQt6.QtGui import QAction, QKeySequence, QShortcut, QIcon
+from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtGui import QAction, QKeySequence, QIcon
 from PyQt6.QtWidgets import (
     QApplication,
     QMainWindow,

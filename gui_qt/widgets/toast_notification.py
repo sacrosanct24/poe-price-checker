@@ -9,8 +9,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Optional, List
 
-from PyQt6.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve, QPoint
-from PyQt6.QtGui import QColor
+from PyQt6.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve
 from PyQt6.QtWidgets import (
     QFrame,
     QLabel,
