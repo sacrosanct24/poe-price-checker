@@ -343,7 +343,7 @@ class TestBuildSourceProvider:
 
         assert url is not None
         parsed = urlparse(url)
-        assert parsed.netloc.endswith("pobarchives.com")
+        assert parsed.hostname == "pobarchives.com"
 
     def test_get_source_url_with_category(self):
         """Should include category filter in URL."""
