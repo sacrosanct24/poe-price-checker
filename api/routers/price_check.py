@@ -72,6 +72,7 @@ async def check_price(
         # Convert to response format
         prices: list[PriceSource] = []
         best_price: float | None = None
+        explanation: str | None = None
 
         if price_result:
             # Handle different result formats
@@ -102,7 +103,6 @@ async def check_price(
                             best_price = chaos_value
 
             # Get explanation if available
-            explanation = None
             if hasattr(price_result, 'explanation'):
                 explanation = str(price_result.explanation)
 

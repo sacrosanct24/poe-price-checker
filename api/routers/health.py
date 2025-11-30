@@ -34,14 +34,13 @@ async def health_check(
     services: dict[str, str] = {}
 
     # Check database
-    db_status = "disconnected"
     try:
         # Try a simple query
         ctx.database.get_checked_items(limit=1)
         db_status = "connected"
     except Exception as e:
         logger.warning(f"Database health check failed: {e}")
-        db_status = f"error: {str(e)[:50]}"
+        db_status = "error"
 
     services["database"] = db_status
 

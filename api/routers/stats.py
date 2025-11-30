@@ -204,5 +204,5 @@ async def get_quick_summary(
             "items_checked_today": 0,
             "sales_completed_today": 0,
             "pending_sales": 0,
-            "error": str(e),
+            "error": "Failed to retrieve summary statistics",
         }
