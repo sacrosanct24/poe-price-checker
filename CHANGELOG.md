@@ -18,6 +18,77 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.4.0] - 2025-11-30
+
+### Added
+
+#### Major Features
+- **Upgrade Finder** (`Ctrl+U`) - Find best gear upgrades for your build within a budget
+  - Queries Trade API for items matching your build's stat priorities
+  - Ranks results by defensive impact, DPS improvement, and resistance gaps
+  - Supports all equipment slots with build-aware filtering
+
+- **Stash Grid Visualization** - Visual representation of stash tab contents
+  - Heatmap overlay showing item values (red=high, blue=low)
+  - Click items to inspect, double-click to price check
+  - Grid View toggle in Stash Viewer window
+
+- **Build Library** (`Ctrl+Alt+B`) - Comprehensive build management
+  - Save, organize, and categorize your PoB builds
+  - Filter by category (League Starter, Mapper, Bosser, etc.)
+  - Quick-switch between builds with one click
+  - Import from Maxroll.gg guides
+
+#### Security & CI
+- **Bandit Security Scanning** - Automated Python security analysis in CI
+  - Excludes test directories from security scanning
+  - Integrated with GitHub Actions workflow
+
+- **Enhanced Code Quality** - Comprehensive CodeQL improvements
+  - Fixed URL substring sanitization vulnerabilities
+  - Proper hostname validation using `urlparse()`
+  - MD5 hash usage marked with `usedforsecurity=False`
+  - Shell injection prevention with `subprocess.run()`
+
+#### Architecture Improvements
+- **WindowManager Service** - Centralized window lifecycle management
+- **PriceCheckController** - Extracted business logic from main window
+- **ThemeController** - Dedicated theme management with persistence
+- **Result Type** - Consistent error handling across codebase
+- **BaseWorker Pattern** - Reusable background thread base class
+- **MenuBuilder** - Declarative menu construction system
+
+### Changed
+- Refactored `main_window.py` to use controller/service architecture
+- Improved session panel with `__getattr__` delegation pattern
+- Added LRU cache size limits to ResponseCache to prevent memory leaks
+- Test suite expanded from 1226 to 1413 tests
+
+### Fixed
+- **Top 20 Rankings** - Fixed tier colors and added context menu support
+- **UniqueStash handling** - Proper support for specialized stash tabs
+- **History TypeError** - Fixed crash when chaos_value is string
+- **Shortcut conflicts** - Resolved duplicate hotkey assignments
+- **Flaky tests** - Improved timing and isolation in CI tests
+- Removed 50+ unused imports across codebase
+- Fixed unreachable code in test files
+- Fixed variable redefinition warnings
+
+### Security
+- URL sanitization now uses proper hostname validation instead of substring checks
+- Shell commands use `subprocess.run()` with argument lists (no shell injection)
+- MD5 usage explicitly marked as non-security (cache key generation only)
+
+### Technical Details
+- `core/upgrade_finder.py` - Upgrade finding service with trade integration
+- `gui_qt/widgets/stash_grid_visualizer.py` - Visual stash representation
+- `gui_qt/dialogs/build_library_dialog.py` - Build management UI
+- `gui_qt/controllers/` - New controller layer for business logic
+- `gui_qt/services/window_manager.py` - Window lifecycle service
+- `bandit.yaml` - Security scanner configuration
+
+---
+
 ## [1.1.0] - 2025-11-28
 
 ### Security
@@ -125,6 +196,7 @@ This is the initial public release (v1.0.0). The project was developed privately
 
 ---
 
-[Unreleased]: https://github.com/sacrosanct24/exilePriceCheck/compare/v1.1.0...HEAD
-[1.1.0]: https://github.com/sacrosanct24/exilePriceCheck/compare/v1.0.0...v1.1.0
-[1.0.0]: https://github.com/sacrosanct24/exilePriceCheck/releases/tag/v1.0.0
+[Unreleased]: https://github.com/sacrosanct24/poe-price-checker/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/sacrosanct24/poe-price-checker/compare/v1.1.0...v1.4.0
+[1.1.0]: https://github.com/sacrosanct24/poe-price-checker/compare/v1.0.0...v1.1.0
+[1.0.0]: https://github.com/sacrosanct24/poe-price-checker/releases/tag/v1.0.0

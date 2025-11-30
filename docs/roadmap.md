@@ -12,7 +12,7 @@ review_frequency: monthly
 
 ---
 
-## Current State (v1.3.1)
+## Current State (v1.4.0)
 
 **Completed Features:**
 - Multi-source pricing (poe.ninja, poe.watch, Trade API)
@@ -22,8 +22,14 @@ review_frequency: monthly
 - OAuth stash tab scanning
 - MCP integration for AI assistants
 - Session tabs for multiple price-checking sessions
-- 1226 tests passing, ~60% coverage
-- Security hardening (encrypted tokens, CSRF protection)
+- **Upgrade Finder** - Find best gear upgrades within budget (Ctrl+U)
+- **Stash Grid Visualization** - Heatmap overlay for stash contents
+- **Build Library** - Save, organize, and categorize PoB builds (Ctrl+Alt+B)
+- Bandit security scanning in CI
+- Enhanced CodeQL security fixes
+- Controller/Service architecture refactoring
+- 1413 tests passing, ~51% coverage
+- Security hardening (encrypted tokens, CSRF protection, URL sanitization)
 
 ---
 
@@ -291,5 +297,5 @@ review_frequency: monthly
 
 ---
 
-*Last updated: 2025-11-29*
-*Next review: 2025-12-29*
+*Last updated: 2025-11-30*
+*Next review: 2025-12-30*

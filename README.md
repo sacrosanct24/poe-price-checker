@@ -58,12 +58,28 @@
 - Import builds directly from Maxroll.gg guides
 - Compare against meta builds
 
+### Upgrade Finder *(New in v1.4.0)*
+- **Smart gear recommendations** within your budget
+- Queries Trade API for items matching your build priorities
+- Ranks results by defensive impact, DPS improvement, resistance gaps
+
+### Build Library *(New in v1.4.0)*
+- Save and organize multiple PoB builds
+- Categorize builds (League Starter, Mapper, Bosser, etc.)
+- Quick-switch between builds with one click
+
+### Stash Visualization *(New in v1.4.0)*
+- **Visual grid view** of stash tab contents
+- Heatmap overlay showing item values
+- Click to inspect, double-click to price check
+
 ### Modern Interface
 - Dark theme with PoE-style colors
 - **Rare Item Evaluator** - scores items 0-100 with tier badges
 - Item Inspector with mod breakdown
 - Sales tracking and history
 - Right-click menus for quick actions
+- Session tabs for multiple price-checking workflows
 
 ---
 
@@ -129,7 +145,7 @@ poe-price-checker/
 ├── gui_qt/         # PyQt6 interface (default)
 ├── data_sources/   # PoE Ninja, poe.watch, and more
 ├── plugins/        # Custom pricing sources
-├── tests/          # 1200+ unit & integration tests
+├── tests/          # 1400+ unit & integration tests
 └── docs/           # Documentation
 ```
 
