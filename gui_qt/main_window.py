@@ -48,13 +48,17 @@ from PyQt6.QtWidgets import (
 )
 
 from gui_qt.styles import (
-    APP_STYLESHEET, COLORS, Theme, get_theme_manager, get_app_stylesheet,
+    COLORS, Theme, get_theme_manager,
     THEME_CATEGORIES, THEME_DISPLAY_NAMES, POE_CURRENCY_COLORS
 )
 from gui_qt.menus.menu_builder import (
     MenuBuilder, MenuConfig, MenuItem, MenuSection, SubMenu, create_resources_menu
 )
-from gui_qt.shortcuts import get_shortcut_manager, get_shortcuts_help_text
+from gui_qt.shortcuts import get_shortcut_manager
+from gui_qt.sample_items import SAMPLE_ITEMS
+from gui_qt.dialogs.help_dialogs import (
+    show_shortcuts_dialog, show_tips_dialog, show_about_dialog
+)
 from gui_qt.widgets.results_table import ResultsTableWidget
 from gui_qt.widgets.item_inspector import ItemInspectorWidget
 from gui_qt.widgets.rare_evaluation_panel import RareEvaluationPanelWidget
@@ -63,101 +67,13 @@ from gui_qt.widgets.pinned_items_widget import PinnedItemsWidget
 from gui_qt.widgets.session_tabs import SessionTabWidget, SessionPanel
 from gui_qt.workers import RankingsPopulationWorker
 from gui_qt.services import get_window_manager
-from gui_qt.controllers import PriceCheckController
+from gui_qt.controllers import PriceCheckController, ThemeController
 from core.build_stat_calculator import BuildStats
 from core.constants import HISTORY_MAX_ENTRIES
 from core.history import HistoryEntry
 
 if TYPE_CHECKING:
     from core.app_context import AppContext
-
-
-# Sample items for Dev menu (abbreviated for brevity - full versions below)
-SAMPLE_ITEMS: Dict[str, List[str]] = {
-    "map": [
-        """Rarity: Normal
-Cemetery Map
---------
-Map Tier: 5
---------
-Travel to this Map by using it in a personal Map Device.
-""",
-    ],
-    "currency": [
-        """Rarity: Currency
-Chaos Orb
---------
-Stack Size: 1/10
---------
-Reforges a rare item with new random modifiers
-""",
-        """Rarity: Currency
-Divine Orb
---------
-Stack Size: 1/10
---------
-Randomises the numeric values of the random modifiers on an item
-""",
-    ],
-    "unique": [
-        """Rarity: Unique
-Tabula Rasa
-Simple Robe
---------
-Sockets: W-W-W-W-W-W
---------
-Item Level: 68
---------
-Item has no Level requirement
-""",
-        """Rarity: Unique
-Headhunter
-Leather Belt
---------
-Requires Level 40
---------
-+40 to maximum Life
-+50 to Strength
-+20% to Fire Resistance
-When you Kill a Rare monster, you gain its Modifiers for 20 seconds
-""",
-    ],
-    "rare": [
-        """Rarity: Rare
-Gale Gyre
-Opal Ring
---------
-Requires Level 80
---------
-Item Level: 84
---------
-+29% to Fire and Lightning Resistances
-+16% to all Elemental Resistances
-+55 to Maximum Life
-+38% to Global Critical Strike Multiplier
-""",
-    ],
-    "gem": [
-        """Rarity: Gem
-Vaal Grace
---------
-Level: 21
-Quality: +23%
---------
-Casts an aura that grants evasion to you and nearby allies.
-""",
-    ],
-    "divination": [
-        """Rarity: Divination Card
-The Doctor
---------
-Stack Size: 1/8
---------
-Headhunter
-Leather Belt
-""",
-    ],
-}
 
 
 class PriceCheckerWindow(QMainWindow):
@@ -197,6 +113,9 @@ class PriceCheckerWindow(QMainWindow):
             upgrade_checker=self._upgrade_checker,
         )
 
+        # Theme controller (initialized after menu bar creation)
+        self._theme_controller: Optional[ThemeController] = None
+
         # Rankings population worker
         self._rankings_worker: Optional[RankingsPopulationWorker] = None
 
@@ -210,8 +129,8 @@ class PriceCheckerWindow(QMainWindow):
         self._create_status_bar()
         self._setup_shortcuts()
 
-        # Initialize theme from config and apply stylesheet
-        self._init_theme()
+        # Initialize theme controller and apply theme
+        self._init_theme_controller()
 
         self._set_status("Ready")
 
@@ -710,21 +629,7 @@ class PriceCheckerWindow(QMainWindow):
 
     def _cycle_theme(self) -> None:
         """Cycle through all available themes."""
-        from gui_qt.styles import Theme
-
-        theme_manager = get_theme_manager()
-        current = theme_manager.current_theme
-
-        # Get all themes in order
-        all_themes = list(Theme)
-        try:
-            current_idx = all_themes.index(current)
-            next_idx = (current_idx + 1) % len(all_themes)
-            next_theme = all_themes[next_idx]
-        except ValueError:
-            next_theme = Theme.DARK
-
-        self._set_theme(next_theme)
+        self._theme_controller.cycle_theme(self)
 
     def _show_command_palette(self) -> None:
         """Show the command palette for quick access to all actions."""
@@ -1055,122 +960,28 @@ class PriceCheckerWindow(QMainWindow):
     # Theme Management
     # -------------------------------------------------------------------------
 
-    def _init_theme(self) -> None:
-        """Initialize theme and accent color from config and apply stylesheet."""
-        theme_manager = get_theme_manager()
-
-        # Load theme from config
-        saved_theme = self.ctx.config.theme if hasattr(self.ctx, 'config') else "dark"
-        try:
-            theme = Theme(saved_theme)
-        except ValueError:
-            theme = Theme.DARK
-
-        # Set theme (this also updates colors)
-        theme_manager.set_theme(theme)
-
-        # Load accent color from config
-        saved_accent = self.ctx.config.accent_color if hasattr(self.ctx, 'config') else None
-        if saved_accent is not None:
-            theme_manager.set_accent_color(saved_accent)
-
-        # Apply stylesheet
-        self.setStyleSheet(theme_manager.get_stylesheet())
-
-        # Update menu checkmarks
-        self._update_theme_menu_checks(theme)
-        self._update_accent_menu_checks(saved_accent)
-
-        # Register callback for future theme changes
-        theme_manager.register_callback(self._on_theme_changed)
+    def _init_theme_controller(self) -> None:
+        """Initialize the theme controller and apply theme from config."""
+        config = self.ctx.config if hasattr(self.ctx, 'config') else None
+        self._theme_controller = ThemeController(
+            config=config,
+            on_status=self._set_status,
+        )
+        self._theme_controller.set_theme_actions(self._theme_actions)
+        self._theme_controller.set_accent_actions(self._accent_actions)
+        self._theme_controller.initialize(self)
 
     def _set_theme(self, theme: Theme) -> None:
         """Set the application theme."""
-        theme_manager = get_theme_manager()
-        theme_manager.set_theme(theme)
-
-        # Save to config
-        if hasattr(self.ctx, 'config'):
-            self.ctx.config.theme = theme.value
-
-        # Apply stylesheet
-        app = QApplication.instance()
-        if app:
-            app.setStyleSheet(theme_manager.get_stylesheet())
-        self.setStyleSheet(theme_manager.get_stylesheet())
-
-        # Update menu checkmarks
-        self._update_theme_menu_checks(theme)
-
-        display_name = THEME_DISPLAY_NAMES.get(theme, theme.value)
-        self._set_status(f"Theme changed to: {display_name}")
+        self._theme_controller.set_theme(theme, self)
 
     def _toggle_theme(self) -> None:
         """Toggle between dark and light themes."""
-        theme_manager = get_theme_manager()
-        new_theme = theme_manager.toggle_theme()
-
-        # Save to config
-        if hasattr(self.ctx, 'config'):
-            self.ctx.config.theme = new_theme.value
-
-        # Apply stylesheet
-        app = QApplication.instance()
-        if app:
-            app.setStyleSheet(theme_manager.get_stylesheet())
-        self.setStyleSheet(theme_manager.get_stylesheet())
-
-        # Update menu checkmarks
-        self._update_theme_menu_checks(new_theme)
-
-        display_name = THEME_DISPLAY_NAMES.get(new_theme, new_theme.value)
-        self._set_status(f"Theme toggled to: {display_name}")
-
-    def _update_theme_menu_checks(self, current_theme: Theme) -> None:
-        """Update the checkmarks in the theme menu."""
-        for theme, action in self._theme_actions.items():
-            action.setChecked(theme == current_theme)
+        self._theme_controller.toggle_theme(self)
 
     def _set_accent_color(self, accent_key: Optional[str]) -> None:
         """Set the application accent color."""
-        theme_manager = get_theme_manager()
-        theme_manager.set_accent_color(accent_key)
-
-        # Save to config
-        if hasattr(self.ctx, 'config'):
-            self.ctx.config.accent_color = accent_key
-
-        # Apply stylesheet (accent affects the stylesheet)
-        app = QApplication.instance()
-        if app:
-            app.setStyleSheet(theme_manager.get_stylesheet())
-        self.setStyleSheet(theme_manager.get_stylesheet())
-
-        # Update menu checkmarks
-        self._update_accent_menu_checks(accent_key)
-
-        # Get display name
-        if accent_key is None:
-            display_name = "Theme Default"
-        else:
-            display_name = POE_CURRENCY_COLORS.get(accent_key, {}).get("name", accent_key)
-        self._set_status(f"Accent color changed to: {display_name}")
-
-    def _update_accent_menu_checks(self, current_accent: Optional[str]) -> None:
-        """Update the checkmarks in the accent menu."""
-        for accent_key, action in self._accent_actions.items():
-            action.setChecked(accent_key == current_accent)
-
-    def _on_theme_changed(self, theme: Theme) -> None:
-        """Handle theme change callback from ThemeManager."""
-        # Update stylesheet
-        app = QApplication.instance()
-        if app:
-            app.setStyleSheet(get_theme_manager().get_stylesheet())
-        self.setStyleSheet(get_theme_manager().get_stylesheet())
-
-        # Update menu checkmarks
-        self._update_theme_menu_checks(theme)
+        self._theme_controller.set_accent_color(accent_key, self)
 
     # -------------------------------------------------------------------------
     # Menu Actions
@@ -1485,112 +1296,16 @@ class PriceCheckerWindow(QMainWindow):
                 QMessageBox.critical(self, "Error", f"Failed to wipe database: {e}")
 
     def _show_shortcuts(self) -> None:
-        """Show keyboard shortcuts in a scrollable dialog."""
-        text = get_shortcuts_help_text()
-
-        # Use a larger dialog for the full shortcuts list
-        dialog = QDialog(self)
-        dialog.setWindowTitle("Keyboard Shortcuts")
-        dialog.setMinimumSize(450, 500)
-
-        layout = QVBoxLayout(dialog)
-
-        from PyQt6.QtWidgets import QTextEdit
-        text_widget = QTextEdit()
-        text_widget.setReadOnly(True)
-        text_widget.setPlainText(text)
-        text_widget.setStyleSheet(
-            f"background-color: {COLORS['background']}; "
-            f"color: {COLORS['text']}; "
-            f"font-family: monospace; "
-            f"font-size: 12px;"
-        )
-        layout.addWidget(text_widget)
-
-        # Hint about command palette
-        hint_label = QLabel("Tip: Press Ctrl+Shift+P to open Command Palette for quick access to all actions")
-        hint_label.setStyleSheet(f"color: {COLORS['accent']}; font-size: 11px; padding: 8px;")
-        hint_label.setWordWrap(True)
-        layout.addWidget(hint_label)
-
-        close_btn = QPushButton("Close")
-        close_btn.clicked.connect(dialog.accept)
-        layout.addWidget(close_btn)
-
-        dialog.exec()
+        """Show keyboard shortcuts dialog."""
+        show_shortcuts_dialog(self)
 
     def _show_tips(self) -> None:
-        """Show usage tips."""
-        text = """Usage Tips:
-
-1. Copy items from the game using Ctrl+C while hovering over them.
-
-2. Paste the item text into the input box and click Check Price.
-
-3. Right-click results for more options like recording sales.
-
-4. Use the filter to narrow down results.
-
-5. Import PoB builds to check for upgrade opportunities.
-
-6. Configure rare item evaluation weights for your build.
-"""
-        QMessageBox.information(self, "Usage Tips", text)
+        """Show usage tips dialog."""
+        show_tips_dialog(self)
 
     def _show_about(self) -> None:
-        """Show about dialog with logo."""
-        from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QPushButton
-        from PyQt6.QtCore import Qt
-        from gui_qt.styles import get_app_banner_pixmap, apply_window_icon
-
-        dialog = QDialog(self)
-        dialog.setWindowTitle("About PoE Price Checker")
-        dialog.setFixedSize(400, 400)
-        apply_window_icon(dialog)
-
-        layout = QVBoxLayout(dialog)
-        layout.setSpacing(16)
-
-        # Logo
-        banner = get_app_banner_pixmap(180)
-        if banner:
-            logo_label = QLabel()
-            logo_label.setPixmap(banner)
-            logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            layout.addWidget(logo_label)
-
-        # Title
-        title_label = QLabel("<h2 style='color: #3498db;'>PoE Price Checker</h2>")
-        title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(title_label)
-
-        # Version
-        version_label = QLabel("Version 1.0")
-        version_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        version_label.setStyleSheet(f"color: {COLORS['text_secondary']};")
-        layout.addWidget(version_label)
-
-        # Description
-        desc_label = QLabel(
-            "A tool for checking Path of Exile item prices.\n\n"
-            "Features:\n"
-            "• Multi-source pricing (poe.ninja, poe.watch, Trade API)\n"
-            "• PoB build integration for upgrade checking\n"
-            "• BiS item search with affix tier analysis\n"
-            "• Rare item evaluation system"
-        )
-        desc_label.setWordWrap(True)
-        desc_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(desc_label)
-
-        layout.addStretch()
-
-        # Close button
-        close_btn = QPushButton("Close")
-        close_btn.clicked.connect(dialog.accept)
-        layout.addWidget(close_btn)
-
-        dialog.exec()
+        """Show about dialog."""
+        show_about_dialog(self)
 
     def closeEvent(self, event) -> None:
         """Handle window close - clean up application resources."""
