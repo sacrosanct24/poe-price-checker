@@ -284,7 +284,17 @@ class PoEStashClient:
 
                 # Specialized stash tabs (UniqueStash, MapStash, etc.) store ALL items
                 # in the parent tab. The "children" are just organizational categories.
-                # We need to distribute the parent's items to the appropriate children.
+                #
+                # NOTE: UniqueStash has known API limitations - GGG's API doesn't fully
+                # support the "tab-in-tab" structure. Items may not be returned reliably.
+                # See: https://github.com/viktorgullmark/exilence/issues/246
+                #
+                # For specialized tabs, we DON'T distribute items to children because:
+                # 1. UniqueStash API is unreliable for item placement data
+                # 2. The x/y coordinates don't map to category indices
+                # 3. Creating empty children tabs is confusing for users
+                #
+                # Instead, we keep all items in the parent tab.
                 specialized_types = {
                     "UniqueStash", "MapStash", "FragmentStash", "DivinationCardStash",
                     "EssenceStash", "DelveStash", "BlightStash", "MetamorphStash",
@@ -292,38 +302,14 @@ class PoEStashClient:
                 }
 
                 if tab_type in specialized_types:
-                    # For specialized tabs, items are in the parent - distribute to children
-                    # Group items by their inventoryId which matches child index
-                    items_by_subtab: Dict[int, List[Dict[str, Any]]] = {}
-                    for item in items:
-                        # inventoryId format is like "Stash1" or just use x position
-                        subtab_idx = item.get("x", 0)  # x coord often indicates sub-tab
-                        if subtab_idx not in items_by_subtab:
-                            items_by_subtab[subtab_idx] = []
-                        items_by_subtab[subtab_idx].append(item)
-
-                    for j, child_meta in enumerate(children_meta):
-                        child_name = child_meta.get("n", f"{tab_name} ({j})")
-                        child_type = child_meta.get("type", tab_type)
-                        child_id = child_meta.get("id", f"{tab_id}_{j}")
-
-                        # Get items for this sub-tab (by index j)
-                        child_items = items_by_subtab.get(j, [])
-
-                        child_tab = StashTab(
-                            id=child_id,
-                            name=f"{tab_name}: {child_name}",
-                            index=j,
-                            type=child_type,
-                            items=child_items,
-                            folder=tab_name,
-                        )
-                        children.append(child_tab)
-                        logger.debug(f"    -> Sub-tab '{child_name}': {len(child_items)} items")
-
-                    # Clear parent items since they're now in children
-                    # But keep them for backwards compatibility
-                    logger.debug(f"  Distributed {len(items)} items to {len(children)} sub-tabs")
+                    # For specialized tabs, keep all items in parent - don't create children
+                    # The children metadata is just category info, not separate data stores
+                    logger.debug(
+                        f"  Specialized tab ({tab_type}): keeping {len(items)} items in parent, "
+                        f"ignoring {len(children_meta)} category children"
+                    )
+                    # Don't create children - they would be empty or have incorrectly
+                    # distributed items. All items stay in the parent tab.
 
                 else:
                     # For FolderStash, children are separate fetchable tabs

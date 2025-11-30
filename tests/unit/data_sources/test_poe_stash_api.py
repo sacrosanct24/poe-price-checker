@@ -411,8 +411,14 @@ class TestPoEStashClient:
 
     @patch.object(PoEStashClient, 'get_stash_tabs')
     @patch.object(PoEStashClient, 'get_stash_tab_items')
-    def test_fetch_all_stashes_with_children(self, mock_items, mock_tabs, client):
-        """Should fetch items from child tabs (like UniqueStash)."""
+    def test_fetch_all_stashes_specialized_tabs_keep_items_in_parent(
+        self, mock_items, mock_tabs, client
+    ):
+        """Specialized tabs (UniqueStash, etc.) should keep all items in parent.
+
+        Due to GGG API limitations, specialized tabs don't reliably support
+        distributing items to children. Items are kept in the parent tab.
+        """
         mock_tabs.return_value = [
             {
                 "n": "Unique Items",
@@ -427,11 +433,9 @@ class TestPoEStashClient:
         ]
 
         # For specialized tabs (UniqueStash), ALL items come from parent tab fetch
-        # Items are distributed to children based on x coordinate
         def items_side_effect(account, league, tab_index):
             if tab_index == 0:
                 # Parent UniqueStash tab contains all items
-                # x=0 -> first child (Helmets), x=1 -> second child (Boots)
                 return {"items": [
                     {"name": "Goldrim", "x": 0},
                     {"name": "Hrimsorrow", "x": 0},
@@ -448,21 +452,17 @@ class TestPoEStashClient:
         # Should have 2 parent tabs
         assert len(snapshot.tabs) == 2
 
-        # First tab (UniqueStash) should have 2 children
+        # First tab (UniqueStash) should have NO children (not distributed)
+        # All items stay in the parent tab
         unique_tab = snapshot.tabs[0]
         assert unique_tab.name == "Unique Items"
-        assert len(unique_tab.children) == 2
+        assert len(unique_tab.children) == 0  # No children created for specialized tabs
+        assert unique_tab.item_count == 3  # All items in parent
 
-        # Children should have items distributed from parent
-        helmets_tab = unique_tab.children[0]
-        assert helmets_tab.name == "Unique Items: Helmets"
-        assert helmets_tab.item_count == 2  # Goldrim and Hrimsorrow (x=0)
-        assert helmets_tab.folder == "Unique Items"
-
-        boots_tab = unique_tab.children[1]
-        assert boots_tab.name == "Unique Items: Boots"
-        assert boots_tab.item_count == 1  # Wanderlust (x=1)
-        assert boots_tab.folder == "Unique Items"
+        # Currency tab
+        currency_tab = snapshot.tabs[1]
+        assert currency_tab.name == "Currency"
+        assert currency_tab.item_count == 1
 
         # Total items: 3 in unique parent + 1 in currency
         assert snapshot.total_items == 4
