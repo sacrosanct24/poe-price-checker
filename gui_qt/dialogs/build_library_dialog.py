@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import List, Optional
+from typing import Optional
 
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (

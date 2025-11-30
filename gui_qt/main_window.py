@@ -48,7 +48,7 @@ from PyQt6.QtWidgets import (
 )
 
 from gui_qt.styles import (
-    COLORS, Theme, get_theme_manager,
+    COLORS, Theme,
     THEME_CATEGORIES, THEME_DISPLAY_NAMES, POE_CURRENCY_COLORS
 )
 from gui_qt.menus.menu_builder import (

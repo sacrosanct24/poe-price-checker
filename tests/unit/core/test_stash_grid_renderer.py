@@ -2,7 +2,7 @@
 Tests for Stash Grid Renderer.
 """
 import pytest
-from unittest.mock import Mock, MagicMock
+from unittest.mock import Mock
 from dataclasses import dataclass, field
 from typing import List
 

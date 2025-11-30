@@ -4,10 +4,8 @@ Tests for Build Library functionality.
 Tests the CharacterManager methods for build organization,
 search, export/import, and the new build library fields.
 """
-import json
 import pytest
 from pathlib import Path
-from unittest.mock import patch
 
 from core.pob_integration import (
     CharacterManager,

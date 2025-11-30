@@ -1,7 +1,7 @@
 """Tests for PriceCheckController."""
 
 import pytest
-from unittest.mock import MagicMock, Mock
+from unittest.mock import MagicMock
 from dataclasses import dataclass
 
 from gui_qt.controllers.price_check_controller import (

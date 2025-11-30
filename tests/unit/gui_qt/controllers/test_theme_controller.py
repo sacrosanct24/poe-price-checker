@@ -1,7 +1,7 @@
 """Tests for ThemeController."""
 
 import pytest
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, patch
 from PyQt6.QtWidgets import QMainWindow
 
 from gui_qt.controllers.theme_controller import ThemeController

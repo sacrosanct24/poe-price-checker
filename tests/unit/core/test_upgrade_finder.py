@@ -2,7 +2,7 @@
 Tests for the Upgrade Finder Service.
 """
 import pytest
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import Mock, patch
 
 from core.upgrade_finder import (
     UpgradeFinderService,

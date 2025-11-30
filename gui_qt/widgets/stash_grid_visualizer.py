@@ -7,12 +7,9 @@ with heatmap coloring based on item values.
 from __future__ import annotations
 
 import logging
-from typing import Dict, List, Optional, TYPE_CHECKING
+from typing import List, Optional, TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from core.stash_valuator import PricedTab
-
-from PyQt6.QtCore import Qt, pyqtSignal, QRectF
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import (
     QBrush,
     QColor,
@@ -31,9 +28,7 @@ from PyQt6.QtWidgets import (
     QSlider,
     QVBoxLayout,
     QWidget,
-    QComboBox,
     QSpinBox,
-    QCheckBox,
     QGroupBox,
 )
 
@@ -41,7 +36,7 @@ from gui_qt.styles import COLORS
 
 if TYPE_CHECKING:
     from core.stash_grid_renderer import StashGridCell, StashGridLayout
-    from core.stash_valuator import PricedItem
+    from core.stash_valuator import PricedTab, PricedItem
 
 logger = logging.getLogger(__name__)
 
@@ -416,16 +411,6 @@ class StashGridVisualizerWidget(QWidget):
         if not self._layout:
             self.stats_label.setText("No tab loaded")
             return
-
-        from core.stash_grid_renderer import StashGridRenderer
-        renderer = StashGridRenderer()
-        stats = renderer.get_value_statistics(self._layout)
-
-        # Count visible items
-        visible = sum(
-            1 for tier, count in stats.items()
-            if tier != "empty" and count > 0
-        )
 
         total_value = self._layout.total_value
         if total_value >= 1000:

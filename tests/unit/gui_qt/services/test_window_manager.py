@@ -1,7 +1,7 @@
 """Tests for WindowManager service."""
 
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 from PyQt6.QtWidgets import QWidget, QMainWindow
 
 from gui_qt.services.window_manager import WindowManager, get_window_manager

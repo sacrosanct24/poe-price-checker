@@ -7,7 +7,7 @@ with heatmap coloring based on item values.
 from __future__ import annotations
 
 import logging
-from typing import Dict, List, Optional, TYPE_CHECKING
+from typing import Dict, Optional, TYPE_CHECKING
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
@@ -307,7 +307,6 @@ class StashGridDialog(QDialog):
 
         # Calculate statistics
         items = tab.items
-        total_value = sum(item.total_price for item in items)
 
         # Value tier counts
         tier_counts = {

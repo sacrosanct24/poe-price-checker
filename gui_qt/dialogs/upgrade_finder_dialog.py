@@ -7,7 +7,7 @@ Shows current gear, finds upgrades via trade API, and ranks by impact.
 from __future__ import annotations
 
 import logging
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional
 
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtWidgets import (
@@ -36,7 +36,6 @@ from core.upgrade_finder import (
     UpgradeFinderService,
     UpgradeFinderResult,
     UpgradeCandidate,
-    SlotUpgradeResult,
 )
 
 logger = logging.getLogger(__name__)
