@@ -8,7 +8,7 @@ Provides cached top 20 items by median price for various categories:
 - Divination Cards
 - Essences, Fossils, Scarabs, Oils, Incubators, Vials
 
-Cache is stored locally and only refreshed after 5 days.
+Cache is stored locally and only refreshed after 24 hours.
 """
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ from typing import Any, Dict, List, Optional
 logger = logging.getLogger(__name__)
 
 # Cache expiry in days
-CACHE_EXPIRY_DAYS = 5
+CACHE_EXPIRY_DAYS = 1
 
 # Time constants
 SECONDS_PER_DAY = 86400
@@ -95,7 +95,7 @@ class PriceRankingCache:
     """
     Manages cached price rankings with file-based storage.
 
-    Rankings are stored in JSON format and refreshed after 5 days.
+    Rankings are stored in JSON format and refreshed after 24 hours.
     """
 
     # Category definitions with display names

@@ -404,22 +404,22 @@ class TestCacheExpiry:
     """Tests specifically for cache expiry behavior."""
 
     def test_expiry_days_constant(self):
-        assert CACHE_EXPIRY_DAYS == 5
+        assert CACHE_EXPIRY_DAYS == 1  # 24-hour cache
 
-    def test_cache_expires_after_five_days(self):
+    def test_cache_expires_after_one_day(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             cache = PriceRankingCache(cache_dir=Path(tmpdir), league="Standard")
 
-            # Set cache to 4 days old (should be valid)
-            four_days_ago = datetime.now(timezone.utc) - timedelta(days=4)
-            cache._cache_metadata["last_updated"] = four_days_ago.isoformat()
+            # Set cache to 12 hours old (should be valid)
+            twelve_hours_ago = datetime.now(timezone.utc) - timedelta(hours=12)
+            cache._cache_metadata["last_updated"] = twelve_hours_ago.isoformat()
 
-            # Should be valid at 4 days
+            # Should be valid at 12 hours
             assert cache.is_cache_valid() is True
 
-            # Set to 6 days old (should be expired)
-            six_days_ago = datetime.now(timezone.utc) - timedelta(days=6)
-            cache._cache_metadata["last_updated"] = six_days_ago.isoformat()
+            # Set to 2 days old (should be expired)
+            two_days_ago = datetime.now(timezone.utc) - timedelta(days=2)
+            cache._cache_metadata["last_updated"] = two_days_ago.isoformat()
 
             # Should be expired
             assert cache.is_cache_valid() is False
