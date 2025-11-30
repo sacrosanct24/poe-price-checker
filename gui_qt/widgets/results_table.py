@@ -12,7 +12,7 @@ import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from PyQt6.QtCore import Qt, pyqtSignal, QAbstractTableModel, QModelIndex
+from PyQt6.QtCore import Qt, pyqtSignal, QAbstractTableModel, QModelIndex, QPoint
 from PyQt6.QtGui import QColor, QBrush
 from PyQt6.QtWidgets import (
     QTableView,
@@ -24,6 +24,7 @@ from PyQt6.QtWidgets import (
 )
 
 from gui_qt.styles import COLORS, get_rarity_color, get_tier_color, TIER_COLORS
+from gui_qt.widgets.poe_item_tooltip import ItemTooltipMixin
 from core.mod_tier_detector import detect_mod_tier
 
 logger = logging.getLogger(__name__)
@@ -400,8 +401,11 @@ class ResultsTableModel(QAbstractTableModel):
         self.endResetModel()
 
 
-class ResultsTableWidget(QTableView):
-    """Table widget for displaying price check results."""
+class ResultsTableWidget(QTableView, ItemTooltipMixin):
+    """Table widget for displaying price check results.
+
+    Supports Alt+hover to show PoE-style item tooltips.
+    """
 
     row_selected = pyqtSignal(dict)  # Emits selected row data (for single selection)
     rows_selected = pyqtSignal(list)  # Emits list of selected row data (for multi-selection)
@@ -457,6 +461,9 @@ class ResultsTableWidget(QTableView):
         # Connect selection
         self.selectionModel().currentRowChanged.connect(self._on_row_changed)
         self.selectionModel().selectionChanged.connect(self._on_selection_changed)
+
+        # Initialize Alt+hover tooltip support
+        self._init_item_tooltip()
 
     @property
     def columns(self) -> List[str]:
@@ -518,6 +525,36 @@ class ResultsTableWidget(QTableView):
     def clear_selection(self) -> None:
         """Clear all selection."""
         self.clearSelection()
+
+    # ------------------------------------------------------------------
+    # Alt+Hover Tooltip Support (ItemTooltipMixin implementation)
+    # ------------------------------------------------------------------
+
+    def _get_item_at_pos(self, pos: QPoint) -> Optional[Any]:
+        """Get the ParsedItem at the given viewport position.
+
+        Required by ItemTooltipMixin.
+        """
+        # Get the index at the viewport position
+        index = self.indexAt(pos)
+        if not index.isValid():
+            return None
+
+        # Get the row data
+        row_data = self._model.get_row(index.row())
+        if row_data is None:
+            return None
+
+        # Return the stored ParsedItem if available
+        return row_data.get("_item")
+
+    def mouseMoveEvent(self, event) -> None:
+        """Handle mouse move to show/hide Alt+hover tooltip."""
+        # Let the base class handle the event first
+        super().mouseMoveEvent(event)
+
+        # Handle tooltip display (from ItemTooltipMixin)
+        self._handle_tooltip_mouse_move(event.pos(), event.globalPosition().toPoint())
 
     def _show_context_menu(self, position) -> None:
         """Show context menu for batch operations."""

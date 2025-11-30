@@ -11,8 +11,8 @@ import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QColor
+from PyQt6.QtCore import Qt, pyqtSignal, QPoint
+from PyQt6.QtGui import QColor, QMouseEvent
 from PyQt6.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -27,6 +27,7 @@ from PyQt6.QtWidgets import (
 )
 
 from gui_qt.styles import COLORS
+from gui_qt.widgets.poe_item_tooltip import PoEItemTooltip
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +45,9 @@ class PinnedItemWidget(QFrame):
         self.setFrameStyle(QFrame.Shape.StyledPanel | QFrame.Shadow.Raised)
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self._show_context_menu)
+
+        # Enable mouse tracking for Alt+hover tooltip
+        self.setMouseTracking(True)
 
         self._setup_ui()
         self._apply_style()
@@ -127,6 +131,31 @@ class PinnedItemWidget(QFrame):
         """Handle double-click to inspect."""
         self.inspect_requested.emit(self._item_data)
         super().mouseDoubleClickEvent(event)
+
+    def mouseMoveEvent(self, event: QMouseEvent) -> None:
+        """Handle mouse move to show/hide Alt+hover tooltip."""
+        super().mouseMoveEvent(event)
+
+        # Check if Alt is pressed
+        modifiers = QApplication.keyboardModifiers()
+        alt_pressed = bool(modifiers & Qt.KeyboardModifier.AltModifier)
+
+        if alt_pressed:
+            # Show tooltip for the item stored in this widget
+            item = self._item_data.get("_item")
+            if item is not None:
+                tooltip = PoEItemTooltip.instance()
+                tooltip.show_for_item(item, event.globalPosition().toPoint())
+        else:
+            # Hide tooltip
+            tooltip = PoEItemTooltip.instance()
+            tooltip.hide_after_delay(50)
+
+    def leaveEvent(self, event) -> None:
+        """Hide tooltip when mouse leaves the widget."""
+        super().leaveEvent(event)
+        tooltip = PoEItemTooltip.instance()
+        tooltip.hide_after_delay(50)
 
     @property
     def item_data(self) -> Dict[str, Any]:
