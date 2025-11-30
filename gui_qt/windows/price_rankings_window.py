@@ -28,9 +28,10 @@ from PyQt6.QtWidgets import (
     QProgressBar,
     QCheckBox,
     QMessageBox,
+    QMenu,
 )
 
-from gui_qt.styles import COLORS, apply_window_icon
+from gui_qt.styles import COLORS, RARITY_COLORS, apply_window_icon
 
 if TYPE_CHECKING:
     from core.app_context import AppContext
@@ -264,14 +265,10 @@ class RankingsTableModel(QAbstractTableModel):
                     color = TREND_COLORS.get(trend.trend, TREND_COLORS["stable"])
                     return QBrush(QColor(color))
 
-            # Color high-value items
-            chaos = row_data.get("chaos_value", 0) or 0
-            if chaos >= 10000:
-                return QBrush(QColor(COLORS["unique"]))
-            elif chaos >= 1000:
-                return QBrush(QColor(COLORS["rare"]))
-            elif chaos >= 100:
-                return QBrush(QColor(COLORS["magic"]))
+            # Color items by their actual rarity
+            rarity = row_data.get("rarity", "normal")
+            if rarity and rarity in RARITY_COLORS:
+                return QBrush(QColor(RARITY_COLORS[rarity]))
 
         elif role == Qt.ItemDataRole.ToolTipRole:
             if col_key == "trend_7d":
@@ -321,6 +318,7 @@ class RankingsTableModel(QAbstractTableModel):
                 "base_type": item.base_type or "",
                 "chaos_value": item.chaos_value,
                 "divine_value": item.divine_value,
+                "rarity": item.rarity or "normal",
             }
 
             # Calculate trend if enabled
@@ -410,6 +408,9 @@ class FetchWorker(QThread):
 
 class PriceRankingsWindow(QDialog):
     """Window for viewing Top 20 price rankings."""
+
+    # Signal emitted when user wants to price check an item from rankings
+    priceCheckRequested = pyqtSignal(str)  # Emits item name
 
     def __init__(self, ctx: "AppContext", parent: Optional[QWidget] = None):
         super().__init__(parent)
@@ -668,6 +669,12 @@ class PriceRankingsWindow(QDialog):
             table.setAlternatingRowColors(True)
             table.verticalHeader().setVisible(False)
 
+            # Enable context menu
+            table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+            table.customContextMenuRequested.connect(
+                lambda pos, t=table, m=model: self._show_context_menu(pos, t, m)
+            )
+
             # Set row height for icons
             table.verticalHeader().setDefaultSectionSize(RankingsTableModel.ICON_SIZE + 6)
 
@@ -693,6 +700,59 @@ class PriceRankingsWindow(QDialog):
             else:
                 display_name = PriceRankingCache.CATEGORIES.get(category, category)
             self.tab_widget.addTab(table, display_name)
+
+    def _show_context_menu(
+        self,
+        pos,
+        table: QTableView,
+        model: RankingsTableModel,
+    ) -> None:
+        """Show context menu for right-click on table row."""
+        index = table.indexAt(pos)
+        if not index.isValid():
+            return
+
+        row = index.row()
+        if row < 0 or row >= len(model._data):
+            return
+
+        item_data = model._data[row]
+        item_name = item_data.get("name", "")
+        if not item_name:
+            return
+
+        # Create context menu
+        menu = QMenu(table)
+
+        # Price check action
+        price_check_action = menu.addAction(f"Price Check: {item_name}")
+        price_check_action.triggered.connect(
+            lambda: self._on_price_check_item(item_name)
+        )
+
+        menu.addSeparator()
+
+        # Copy name action
+        copy_name_action = menu.addAction("Copy Name")
+        copy_name_action.triggered.connect(
+            lambda: self._copy_to_clipboard(item_name)
+        )
+
+        # Show at cursor position
+        menu.exec(table.viewport().mapToGlobal(pos))
+
+    def _on_price_check_item(self, item_name: str) -> None:
+        """Handle price check request from context menu."""
+        logger.info(f"Price check requested for: {item_name}")
+        self.priceCheckRequested.emit(item_name)
+
+    def _copy_to_clipboard(self, text: str) -> None:
+        """Copy text to clipboard."""
+        from PyQt6.QtWidgets import QApplication
+        clipboard = QApplication.clipboard()
+        if clipboard:
+            clipboard.setText(text)
+            logger.debug(f"Copied to clipboard: {text}")
 
     def closeEvent(self, event) -> None:
         """Clean up when window closes."""

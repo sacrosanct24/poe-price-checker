@@ -41,6 +41,9 @@ class RankedItem:
     # For uniques, track the item type
     item_class: Optional[str] = None
 
+    # Item rarity for display coloring (unique, rare, magic, normal, currency, divination)
+    rarity: Optional[str] = None
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {k: v for k, v in asdict(self).items() if v is not None}
@@ -56,6 +59,7 @@ class RankedItem:
             base_type=data.get("base_type"),
             icon=data.get("icon"),
             item_class=data.get("item_class"),
+            rarity=data.get("rarity"),
         )
 
 
@@ -419,7 +423,7 @@ class Top20Calculator:
             if category == "currency":
                 items = self._fetch_currency_top20(divine_rate)
             else:
-                items = self._fetch_item_top20(api_type, divine_rate)
+                items = self._fetch_item_top20(api_type, divine_rate, category)
 
             ranking = CategoryRanking(
                 category=category,
@@ -457,11 +461,17 @@ class Top20Calculator:
                 chaos_value=chaos_value,
                 divine_value=chaos_value / divine_rate if divine_rate > 0 else None,
                 icon=item.get("icon"),
+                rarity="currency",
             ))
 
         return items
 
-    def _fetch_item_top20(self, api_type: str, divine_rate: float) -> List[RankedItem]:
+    def _fetch_item_top20(
+        self,
+        api_type: str,
+        divine_rate: float,
+        category: str = "",
+    ) -> List[RankedItem]:
         """Fetch top 20 items for a given API type."""
         data = self.api._get_item_overview(api_type)
         if not data:
@@ -476,6 +486,9 @@ class Top20Calculator:
             reverse=True
         )
 
+        # Determine rarity from category
+        rarity = get_rarity_for_category(category)
+
         items = []
         for i, item in enumerate(sorted_items[:20], start=1):
             chaos_value = float(item.get("chaosValue") or 0)
@@ -487,6 +500,7 @@ class Top20Calculator:
                 base_type=item.get("baseType"),
                 icon=item.get("icon"),
                 item_class=item.get("itemClass"),
+                rarity=rarity,
             ))
 
         return items
@@ -608,6 +622,7 @@ class Top20Calculator:
                 base_type=item.get("baseType"),
                 icon=item.get("icon"),
                 item_class=item.get("itemClass"),
+                rarity="unique",  # All equipment slots are unique items
             ))
 
         return items
@@ -639,6 +654,44 @@ UNIQUE_CATEGORIES = ["unique_weapons", "unique_armour", "unique_accessories", "u
 EQUIPMENT_CATEGORIES = UNIQUE_CATEGORIES  # Aliases for clarity
 CONSUMABLE_CATEGORIES = ["currency", "fragments", "essences", "fossils", "scarabs", "oils", "incubators", "vials"]
 CARD_CATEGORIES = ["divination_cards"]
+
+# Map categories to rarity for display coloring
+CATEGORY_TO_RARITY = {
+    # Unique items
+    "unique_weapons": "unique",
+    "unique_armour": "unique",
+    "unique_accessories": "unique",
+    "unique_flasks": "unique",
+    "unique_jewels": "unique",
+    # Currency and consumables
+    "currency": "currency",
+    "fragments": "currency",
+    "essences": "currency",
+    "fossils": "currency",
+    "scarabs": "currency",
+    "oils": "currency",
+    "incubators": "currency",
+    "vials": "currency",
+    # Cards
+    "divination_cards": "divination",
+}
+
+
+def get_rarity_for_category(category: str) -> str:
+    """
+    Get the item rarity for a category.
+
+    Args:
+        category: Category key (e.g., "unique_weapons", "currency")
+
+    Returns:
+        Rarity string for display coloring
+    """
+    # Check if it's a slot category (all slots are unique items)
+    if category.startswith("slot_"):
+        return "unique"
+
+    return CATEGORY_TO_RARITY.get(category, "normal")
 
 
 def get_rankings_by_group(

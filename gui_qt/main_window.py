@@ -1204,7 +1204,23 @@ class PriceCheckerWindow(QMainWindow):
     def _show_price_rankings(self) -> None:
         """Show price rankings window."""
         from gui_qt.windows.price_rankings_window import PriceRankingsWindow
-        self._window_manager.show_window("price_rankings", PriceRankingsWindow, ctx=self.ctx)
+
+        # Register factory for signal connection
+        if "price_rankings" not in self._window_manager._factories:
+            def create_price_rankings():
+                window = PriceRankingsWindow(ctx=self.ctx, parent=self)
+                window.priceCheckRequested.connect(self._on_ranking_price_check)
+                return window
+
+            self._window_manager.register_factory("price_rankings", create_price_rankings)
+
+        self._window_manager.show_window("price_rankings")
+
+    def _on_ranking_price_check(self, item_name: str) -> None:
+        """Handle price check request from rankings window."""
+        # Set the item text in the input field and trigger price check
+        self._input_text.setText(item_name)
+        self._on_price_check()
 
     def _show_build_comparison(self) -> None:
         """Show build comparison dialog."""
