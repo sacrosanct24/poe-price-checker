@@ -355,17 +355,23 @@ class TestClearAll:
         assert state["text1"] != ""
         assert state["text2"] != ""
 
-        # Simulate clear operation
-        state["item1"] = None
-        state["item2"] = None
-        state["text1"] = ""
-        state["text2"] = ""
+        # Simulate clear operation by replacing state
+        cleared_state = self._clear_state(state)
 
         # Verify cleared state
-        assert state["item1"] is None
-        assert state["item2"] is None
-        assert state["text1"] == ""
-        assert state["text2"] == ""
+        assert cleared_state["item1"] is None
+        assert cleared_state["item2"] is None
+        assert cleared_state["text1"] == ""
+        assert cleared_state["text2"] == ""
+
+    def _clear_state(self, state: dict) -> dict:
+        """Clear all values in state dict."""
+        return {
+            "item1": None,
+            "item2": None,
+            "text1": "",
+            "text2": "",
+        }
 
 
 class TestSetItemProgrammatically:

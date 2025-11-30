@@ -823,23 +823,18 @@ class PriceService:
         cv = safe_ratio(stddev, mean)  # coefficient of variation
 
         # --- Step 3: confidence heuristics ---
-        # Default
-        confidence = "low"
-        reason = f"{count} listings"
-
         if count >= 20 and iqr_ratio <= 0.35 and cv <= 0.35:
             confidence = "high"
             reason = f"High sample size ({count}) with tight spread"
         elif count >= 8 and iqr_ratio <= 0.6 and cv <= 0.6:
             confidence = "medium"
             reason = f"Moderate sample size ({count}) with acceptable spread"
+        elif iqr_ratio > 0.8 or cv > 0.8:
+            confidence = "low"
+            reason = f"Volatile prices ({count} listings, high spread)"
         else:
             confidence = "low"
-            # If very noisy, note that in the reason
-            if iqr_ratio > 0.8 or cv > 0.8:
-                reason = f"Volatile prices ({count} listings, high spread)"
-            else:
-                reason = f"Limited or noisy data ({count} listings)"
+            reason = f"Limited or noisy data ({count} listings)"
 
         # --- Step 4: rounding policy for display ---
 

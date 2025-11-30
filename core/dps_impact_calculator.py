@@ -123,15 +123,16 @@ class DPSStats:
             primary_type = DamageType.DOT
         elif total_dps > 0:
             if total_ele > total_dps * 0.6:
-                primary_type = DamageType.ELEMENTAL
                 # Find dominant element
                 max_ele = max(fire_dps, cold_dps, lightning_dps)
                 if max_ele == fire_dps:
                     primary_type = DamageType.FIRE
                 elif max_ele == cold_dps:
                     primary_type = DamageType.COLD
-                else:
+                elif max_ele == lightning_dps:
                     primary_type = DamageType.LIGHTNING
+                else:
+                    primary_type = DamageType.ELEMENTAL
             elif phys_dps > total_dps * 0.5:
                 primary_type = DamageType.PHYSICAL
             elif chaos_dps > total_dps * 0.5:

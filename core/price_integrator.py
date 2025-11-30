@@ -359,7 +359,6 @@ class PriceIntegrator:
             (chaos_value, notes)
         """
         notes = []
-        base_chaos = 0.0
 
         # Map tier to base value
         tier_values = {
