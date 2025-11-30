@@ -53,8 +53,17 @@ class HistoryEntry:
         """
         best_price = 0.0
         if results:
+            def safe_float(val) -> float:
+                """Convert value to float safely."""
+                if val is None:
+                    return 0.0
+                try:
+                    return float(val)
+                except (ValueError, TypeError):
+                    return 0.0
+
             best_price = max(
-                (r.get("chaos_value", 0) or 0) for r in results
+                safe_float(r.get("chaos_value", 0)) for r in results
             )
 
         return cls(
