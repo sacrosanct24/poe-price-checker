@@ -1277,15 +1277,15 @@ class PriceCheckerGUI:
         )
 
     def _open_path_in_explorer(self, path: Path) -> None:
-        import subprocess
+        import subprocess  # nosec B404 - subprocess needed for cross-platform file opening
 
         try:
             if sys.platform.startswith("win"):
-                os.startfile(path)  # type: ignore[attr-defined]
+                os.startfile(path)  # type: ignore[attr-defined]  # nosec B606 - trusted path from app
             elif sys.platform == "darwin":
-                subprocess.run(["open", str(path)], check=False)
+                subprocess.run(["open", str(path)], check=False)  # nosec B603,B607 - fixed command with validated path
             else:
-                subprocess.run(["xdg-open", str(path)], check=False)
+                subprocess.run(["xdg-open", str(path)], check=False)  # nosec B603,B607 - fixed command with validated path
         except Exception as exc:  # pragma: no cover
             self.logger.exception("Failed to open path %s: %s", path, exc)
             messagebox.showerror("Error", f"Failed to open path:\n{path}\n\n{exc}")
