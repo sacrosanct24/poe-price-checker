@@ -43,6 +43,38 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# Allowed hosts for PoB code fetching
+_PASTEBIN_HOSTS = frozenset({'pastebin.com', 'www.pastebin.com'})
+_POBBIN_HOSTS = frozenset({'pobb.in', 'www.pobb.in'})
+
+
+def _is_pastebin_url(url: str) -> bool:
+    """Check if URL is from pastebin.com using proper hostname validation."""
+    try:
+        parsed = urlparse(url)
+        return parsed.netloc.lower() in _PASTEBIN_HOSTS
+    except Exception:
+        return False
+
+
+def _is_pobbin_url(url: str) -> bool:
+    """Check if URL is from pobb.in using proper hostname validation."""
+    try:
+        parsed = urlparse(url)
+        return parsed.netloc.lower() in _POBBIN_HOSTS
+    except Exception:
+        return False
+
+
+def _url_host_matches(url: str, host: str) -> bool:
+    """Check if URL's hostname matches the given host (case-insensitive)."""
+    try:
+        parsed = urlparse(url)
+        netloc = parsed.netloc.lower()
+        return netloc == host or netloc == f'www.{host}'
+    except Exception:
+        return False
+
 
 class BuildCategory(str, Enum):
     """Categories for organizing builds."""
@@ -233,10 +265,10 @@ class PoBDecoder:
         if len(code) > PoBDecoder.MAX_CODE_SIZE:
             raise ValueError(f"PoB code too large ({len(code)} bytes, max {PoBDecoder.MAX_CODE_SIZE})")
 
-        # Handle pastebin URLs
-        if "pastebin.com" in code:
+        # Handle pastebin URLs - use proper URL parsing to prevent bypass attacks
+        if _is_pastebin_url(code):
             code = PoBDecoder._fetch_pastebin(code)
-        elif "pobb.in" in code:
+        elif _is_pobbin_url(code):
             code = PoBDecoder._fetch_pobbin(code)
         elif PoBDecoder._looks_like_url(code):
             # Detect URLs from sites that don't have PoB codes directly
@@ -332,11 +364,13 @@ class PoBDecoder:
     def _looks_like_url(text: str) -> bool:
         """Check if text looks like a URL rather than a PoB code."""
         text_lower = text.lower()
-        # Check for URL patterns
+        # Check for URL patterns (protocol prefix)
         if text_lower.startswith(("http://", "https://", "www.")):
             return True
-        # Check for common build site domains
-        url_indicators = [
+
+        # Check for common build site domains using proper hostname validation
+        # This prevents bypass attacks with URLs like "evil.com?redirect=maxroll.gg"
+        build_site_hosts = [
             "maxroll.gg",
             "mobalytics.gg",
             "poe.ninja",
@@ -345,15 +379,19 @@ class PoBDecoder:
             "poebuilds.cc",
             "pobarchives.com",
         ]
-        return any(indicator in text_lower for indicator in url_indicators)
+
+        # Try to parse as URL and validate hostname
+        for host in build_site_hosts:
+            if _url_host_matches(text, host):
+                return True
+
+        return False
 
     @staticmethod
     def _raise_url_error(url: str) -> None:
         """Raise a helpful error message for URLs that can't be auto-imported."""
-        url_lower = url.lower()
-
-        # Site-specific messages
-        if "maxroll.gg" in url_lower:
+        # Site-specific messages using proper hostname validation
+        if _url_host_matches(url, "maxroll.gg"):
             raise ValueError(
                 "Maxroll.gg URLs cannot be imported directly.\n\n"
                 "To import this build:\n"
@@ -361,7 +399,7 @@ class PoBDecoder:
                 "2. Look for the 'Export to PoB' or 'Copy PoB Code' button\n"
                 "3. Copy the PoB code and paste it here"
             )
-        elif "mobalytics.gg" in url_lower:
+        elif _url_host_matches(url, "mobalytics.gg"):
             raise ValueError(
                 "Mobalytics URLs cannot be imported directly.\n\n"
                 "To import this build:\n"
@@ -369,7 +407,7 @@ class PoBDecoder:
                 "2. Find the 'Path of Building' section\n"
                 "3. Copy the PoB code and paste it here"
             )
-        elif "poe.ninja" in url_lower:
+        elif _url_host_matches(url, "poe.ninja"):
             raise ValueError(
                 "poe.ninja URLs cannot be imported directly.\n\n"
                 "To import this build:\n"
@@ -377,7 +415,7 @@ class PoBDecoder:
                 "2. Click 'Export to Path of Building'\n"
                 "3. Copy the PoB code and paste it here"
             )
-        elif "pobarchives.com" in url_lower:
+        elif _url_host_matches(url, "pobarchives.com"):
             raise ValueError(
                 "PoB Archives URLs cannot be imported directly.\n\n"
                 "To import this build:\n"

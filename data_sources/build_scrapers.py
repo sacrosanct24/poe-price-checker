@@ -48,6 +48,16 @@ def is_allowed_pob_url(url: str) -> bool:
     except Exception:
         return False
 
+
+def _is_pobarchives_url(url: str) -> bool:
+    """Check if URL is from pobarchives.com using proper hostname validation."""
+    try:
+        parsed = urlparse(url)
+        host = parsed.netloc.lower()
+        return host == 'pobarchives.com' or host == 'www.pobarchives.com'
+    except Exception:
+        return False
+
 logger = logging.getLogger(__name__)
 
 
@@ -447,7 +457,8 @@ class PoBArchivesScraper:
             # Optionally fetch pobb.in URLs and PoB codes
             if fetch_pob_codes:
                 for build in builds:
-                    if build.url and 'pobarchives.com' in build.url:
+                    # Check if URL is from pobarchives using proper hostname validation
+                    if build.url and _is_pobarchives_url(build.url):
                         # First get pobb.in URL from build page
                         pobb_url = self._fetch_pobb_url_from_build_page(build.url)
                         if pobb_url:
