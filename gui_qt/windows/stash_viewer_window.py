@@ -423,6 +423,13 @@ class StashViewerWindow(QDialog):
 
         toolbar.addSpacing(20)
 
+        # Grid View button
+        self.grid_view_btn = QPushButton("Grid View")
+        self.grid_view_btn.setToolTip("View stash as visual grid with heatmap")
+        self.grid_view_btn.clicked.connect(self._show_grid_view)
+        self.grid_view_btn.setEnabled(False)  # Enabled after fetch
+        toolbar.addWidget(self.grid_view_btn)
+
         # Settings button
         self.settings_btn = QPushButton("Settings")
         self.settings_btn.clicked.connect(self._show_settings)
@@ -565,6 +572,20 @@ class StashViewerWindow(QDialog):
         """Handle include standard checkbox change."""
         self._update_league_combo()
 
+    def _show_grid_view(self) -> None:
+        """Show stash grid visualization dialog."""
+        if not self._result:
+            QMessageBox.warning(
+                self,
+                "No Data",
+                "Please fetch stash data first using the Refresh button."
+            )
+            return
+
+        from gui_qt.dialogs.stash_grid_dialog import StashGridDialog
+        dialog = StashGridDialog(self._result, self)
+        dialog.exec()
+
     def _show_settings(self) -> None:
         """Show settings dialog for POESESSID."""
         dialog = QDialog(self)
@@ -705,6 +726,7 @@ class StashViewerWindow(QDialog):
         """Handle fetch completion."""
         self._result = result
         self.refresh_btn.setEnabled(True)
+        self.grid_view_btn.setEnabled(True)  # Enable grid view
         self.progress_bar.hide()
         self.status_label.setText("")
 

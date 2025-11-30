@@ -319,8 +319,12 @@ class PriceCheckerWindow(QMainWindow):
                          shortcut="Ctrl+B"),
                 MenuItem("&Compare Build Trees...", handler=self._show_build_comparison),
                 MenuItem("Browse &Loadouts...", handler=self._show_loadout_selector),
+                MenuItem("Build &Library...", handler=self._show_build_library,
+                         shortcut="Ctrl+Shift+L"),
                 MenuItem("Find &BiS Item...", handler=self._show_bis_search,
                          shortcut="Ctrl+I"),
+                MenuItem("&Upgrade Finder...", handler=self._show_upgrade_finder,
+                         shortcut="Ctrl+U"),
                 MenuItem("Compare &Items...", handler=self._show_item_comparison,
                          shortcut="Ctrl+Shift+I"),
                 MenuSection([
@@ -588,6 +592,8 @@ class PriceCheckerWindow(QMainWindow):
         # Build & PoB
         manager.register("show_pob_characters", self._show_pob_characters)
         manager.register("show_bis_search", self._show_bis_search)
+        manager.register("show_upgrade_finder", self._show_upgrade_finder)
+        manager.register("show_build_library", self._show_build_library)
         manager.register("show_build_comparison", self._show_build_comparison)
         manager.register("show_item_comparison", self._show_item_comparison)
         manager.register("show_rare_eval_config", self._show_rare_eval_config)
@@ -1264,6 +1270,38 @@ class PriceCheckerWindow(QMainWindow):
             )
 
         self._window_manager.show_window("bis_search")
+
+    def _show_upgrade_finder(self) -> None:
+        """Show upgrade finder dialog."""
+        from gui_qt.dialogs.upgrade_finder_dialog import UpgradeFinderDialog
+
+        # Register factory for complex initialization
+        if "upgrade_finder" not in self._window_manager._factories:
+            self._window_manager.register_factory(
+                "upgrade_finder",
+                lambda: UpgradeFinderDialog(
+                    self,
+                    character_manager=self._character_manager,
+                )
+            )
+
+        self._window_manager.show_window("upgrade_finder")
+
+    def _show_build_library(self) -> None:
+        """Show build library dialog."""
+        from gui_qt.dialogs.build_library_dialog import BuildLibraryDialog
+
+        # Register factory for complex initialization
+        if "build_library" not in self._window_manager._factories:
+            self._window_manager.register_factory(
+                "build_library",
+                lambda: BuildLibraryDialog(
+                    self,
+                    character_manager=self._character_manager,
+                )
+            )
+
+        self._window_manager.show_window("build_library")
 
     def _show_item_comparison(self) -> None:
         """Show item comparison dialog."""

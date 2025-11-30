@@ -426,14 +426,17 @@ class TestPoEStashClient:
             {"n": "Currency", "type": "CurrencyStash", "id": "2"},
         ]
 
-        # Map tab index to returned items
+        # For specialized tabs (UniqueStash), ALL items come from parent tab fetch
+        # Items are distributed to children based on x coordinate
         def items_side_effect(account, league, tab_index):
             if tab_index == 0:
-                return {"items": []}  # Parent tab (no direct items)
-            elif tab_index == 10:
-                return {"items": [{"name": "Goldrim"}, {"name": "Hrimsorrow"}]}
-            elif tab_index == 11:
-                return {"items": [{"name": "Wanderlust"}]}
+                # Parent UniqueStash tab contains all items
+                # x=0 -> first child (Helmets), x=1 -> second child (Boots)
+                return {"items": [
+                    {"name": "Goldrim", "x": 0},
+                    {"name": "Hrimsorrow", "x": 0},
+                    {"name": "Wanderlust", "x": 1},
+                ]}
             elif tab_index == 1:
                 return {"items": [{"name": "Chaos Orb"}]}
             return {"items": []}
@@ -450,41 +453,44 @@ class TestPoEStashClient:
         assert unique_tab.name == "Unique Items"
         assert len(unique_tab.children) == 2
 
-        # Children should have items
+        # Children should have items distributed from parent
         helmets_tab = unique_tab.children[0]
-        assert helmets_tab.name == "Helmets"
-        assert helmets_tab.item_count == 2
+        assert helmets_tab.name == "Unique Items: Helmets"
+        assert helmets_tab.item_count == 2  # Goldrim and Hrimsorrow (x=0)
         assert helmets_tab.folder == "Unique Items"
 
         boots_tab = unique_tab.children[1]
-        assert boots_tab.name == "Boots"
-        assert boots_tab.item_count == 1
+        assert boots_tab.name == "Unique Items: Boots"
+        assert boots_tab.item_count == 1  # Wanderlust (x=1)
         assert boots_tab.folder == "Unique Items"
 
-        # Total items should include children
-        assert snapshot.total_items == 4  # 0 + 2 + 1 + 1
+        # Total items: 3 in unique parent + 1 in currency
+        assert snapshot.total_items == 4
 
     @patch.object(PoEStashClient, 'get_stash_tabs')
     @patch.object(PoEStashClient, 'get_stash_tab_items')
-    def test_fetch_all_stashes_child_tab_error(self, mock_items, mock_tabs, client):
-        """Should handle child tab fetch errors gracefully."""
+    def test_fetch_all_stashes_folder_child_tab_error(self, mock_items, mock_tabs, client):
+        """Should handle child tab fetch errors gracefully for FolderStash."""
+        # FolderStash children ARE fetched separately (unlike specialized tabs)
         mock_tabs.return_value = [
             {
-                "n": "Unique Items",
-                "type": "UniqueStash",
-                "id": "unique-parent",
+                "n": "My Folder",
+                "type": "FolderStash",
+                "id": "folder-parent",
                 "children": [
-                    {"n": "Helmets", "type": "UniqueStash", "id": "unique-helmets", "i": 10},
-                    {"n": "Boots", "type": "UniqueStash", "id": "unique-boots", "i": 11},
+                    {"n": "Tab A", "type": "NormalStash", "id": "child-a", "i": 10},
+                    {"n": "Tab B", "type": "NormalStash", "id": "child-b", "i": 11},
                 ],
             },
         ]
 
         def items_side_effect(account, league, tab_index):
-            if tab_index == 10:
-                raise Exception("Failed to fetch helmets")
+            if tab_index == 0:
+                return {"items": []}  # Parent folder has no direct items
+            elif tab_index == 10:
+                raise Exception("Failed to fetch Tab A")
             elif tab_index == 11:
-                return {"items": [{"name": "Wanderlust"}]}
+                return {"items": [{"name": "Item B"}]}
             return {"items": []}
 
         mock_items.side_effect = items_side_effect
@@ -492,13 +498,13 @@ class TestPoEStashClient:
         snapshot = client.fetch_all_stashes("TestAccount", "Standard")
 
         # Should still have parent tab with both children
-        unique_tab = snapshot.tabs[0]
-        assert len(unique_tab.children) == 2
+        folder_tab = snapshot.tabs[0]
+        assert len(folder_tab.children) == 2
 
         # First child should have no items due to error
-        assert unique_tab.children[0].item_count == 0
+        assert folder_tab.children[0].item_count == 0
         # Second child should have items
-        assert unique_tab.children[1].item_count == 1
+        assert folder_tab.children[1].item_count == 1
 
 
 class TestGetAvailableLeagues:

@@ -59,9 +59,9 @@ review_frequency: monthly
 - [x] **Session tabs** - multiple price-checking sessions ✅
 
 ### A.5 Stash Visualization
-- [ ] **Stash grid preview** - visual representation of tab contents
-- [ ] **Heatmap overlay** - color by value (red=high, blue=low)
-- [ ] **Quick-filter** - show only items matching criteria
+- [x] **Stash grid preview** - visual representation of tab contents ✅
+- [x] **Heatmap overlay** - color by value (red=high, blue=low) ✅
+- [x] **Quick-filter** - show only items matching criteria ✅
 - [ ] **Tab comparison** - diff between snapshots over time
 
 ### A.6 Notifications & Feedback
@@ -82,7 +82,7 @@ review_frequency: monthly
 - [ ] **Historical price lookup** - "what was X worth last league?"
 
 ### B.2 Build-Aware Recommendations
-- [ ] **Upgrade finder** - "best upgrades for your build under X budget"
+- [x] **Upgrade finder** - "best upgrades for your build under X budget" ✅
 - [ ] **Stat gap analysis** - "you need 30 more cold res, here are options"
 - [ ] **DPS optimization** - "swap X for Y = +15% DPS for 50c"
 - [ ] **Build archetype detection** - auto-classify from PoB
@@ -126,11 +126,11 @@ review_frequency: monthly
 - [ ] **Goal tracking** - "save for Headhunter: 45/120 div"
 
 ### C.3 Build Library
-- [ ] **Build profiles** - save/load complete character setups
+- [x] **Build profiles** - save/load complete character setups ✅
 - [ ] **Build comparison** - diff two builds side-by-side
-- [ ] **Build sharing** - export/import build configurations
-- [ ] **Guide integration** - link builds to Maxroll/poe.ninja guides
-- [ ] **SSF mode** - filter recommendations for self-found
+- [x] **Build sharing** - export/import build configurations ✅
+- [x] **Guide integration** - link builds to Maxroll/poe.ninja guides ✅
+- [x] **SSF mode** - filter recommendations for self-found ✅
 
 ### C.4 Passive Tree Integration
 - [ ] **Tree visualization** - display allocated passives
@@ -228,10 +228,10 @@ review_frequency: monthly
 5. ~~**DPS impact calculator**~~ - ✅ `core/dps_impact_calculator.py`, Item Inspector
 
 ### Short-term (1-2 months)
-1. **Upgrade finder** - killer feature for build management
-2. **Stash grid visualization** - visual inventory
-3. **FastAPI backend skeleton** - web foundation
-4. **Build profiles/library** - character management core
+1. ~~**Upgrade finder**~~ - ✅ `core/upgrade_finder.py`, Ctrl+U
+2. ~~**Stash grid visualization**~~ - ✅ `gui_qt/widgets/stash_grid_visualizer.py`, Grid View in Stash Viewer
+3. ~~**Build profiles/library**~~ - ✅ `gui_qt/dialogs/build_library_dialog.py`, Ctrl+Shift+L
+4. **FastAPI backend skeleton** - web foundation
 
 ### Medium-term (3-6 months)
 1. **Full web implementation** - React frontend
@@ -291,5 +291,5 @@ review_frequency: monthly
 
 ---
 
-*Last updated: 2025-11-28*
-*Next review: 2025-12-28*
+*Last updated: 2025-11-29*
+*Next review: 2025-12-29*

@@ -281,35 +281,81 @@ class PoEStashClient:
             children: List[StashTab] = []
             if children_meta:
                 logger.debug(f"  Tab has {len(children_meta)} sub-tabs")
-                for j, child_meta in enumerate(children_meta):
-                    child_name = child_meta.get("n", f"{tab_name} ({j})")
-                    child_type = child_meta.get("type", tab_type)
-                    child_id = child_meta.get("id", f"{tab_id}_{j}")
-                    child_index = child_meta.get("i", j)
 
-                    # Fetch items from child tab using its index
-                    try:
-                        child_data = self.get_stash_tab_items(
-                            account_name, league, child_index
-                        )
-                        child_items = child_data.get("items", [])
-                    except Exception as e:
-                        logger.warning(
-                            f"Failed to fetch sub-tab {child_index} ({child_name}): {e}"
-                        )
-                        child_items = []
+                # Specialized stash tabs (UniqueStash, MapStash, etc.) store ALL items
+                # in the parent tab. The "children" are just organizational categories.
+                # We need to distribute the parent's items to the appropriate children.
+                specialized_types = {
+                    "UniqueStash", "MapStash", "FragmentStash", "DivinationCardStash",
+                    "EssenceStash", "DelveStash", "BlightStash", "MetamorphStash",
+                    "DeliriumStash", "GemStash", "FlaskStash",
+                }
 
-                    child_tab = StashTab(
-                        id=child_id,
-                        name=child_name,
-                        index=child_index,
-                        type=child_type,
-                        items=child_items,
-                        folder=tab_name,
-                    )
-                    children.append(child_tab)
-                    total_items += len(child_items)
-                    logger.debug(f"    -> Sub-tab '{child_name}': {len(child_items)} items")
+                if tab_type in specialized_types:
+                    # For specialized tabs, items are in the parent - distribute to children
+                    # Group items by their inventoryId which matches child index
+                    items_by_subtab: Dict[int, List[Dict[str, Any]]] = {}
+                    for item in items:
+                        # inventoryId format is like "Stash1" or just use x position
+                        subtab_idx = item.get("x", 0)  # x coord often indicates sub-tab
+                        if subtab_idx not in items_by_subtab:
+                            items_by_subtab[subtab_idx] = []
+                        items_by_subtab[subtab_idx].append(item)
+
+                    for j, child_meta in enumerate(children_meta):
+                        child_name = child_meta.get("n", f"{tab_name} ({j})")
+                        child_type = child_meta.get("type", tab_type)
+                        child_id = child_meta.get("id", f"{tab_id}_{j}")
+
+                        # Get items for this sub-tab (by index j)
+                        child_items = items_by_subtab.get(j, [])
+
+                        child_tab = StashTab(
+                            id=child_id,
+                            name=f"{tab_name}: {child_name}",
+                            index=j,
+                            type=child_type,
+                            items=child_items,
+                            folder=tab_name,
+                        )
+                        children.append(child_tab)
+                        logger.debug(f"    -> Sub-tab '{child_name}': {len(child_items)} items")
+
+                    # Clear parent items since they're now in children
+                    # But keep them for backwards compatibility
+                    logger.debug(f"  Distributed {len(items)} items to {len(children)} sub-tabs")
+
+                else:
+                    # For FolderStash, children are separate fetchable tabs
+                    for j, child_meta in enumerate(children_meta):
+                        child_name = child_meta.get("n", f"{tab_name} ({j})")
+                        child_type = child_meta.get("type", tab_type)
+                        child_id = child_meta.get("id", f"{tab_id}_{j}")
+                        child_index = child_meta.get("i", j)
+
+                        # Fetch items from child tab using its index
+                        try:
+                            child_data = self.get_stash_tab_items(
+                                account_name, league, child_index
+                            )
+                            child_items = child_data.get("items", [])
+                        except Exception as e:
+                            logger.warning(
+                                f"Failed to fetch sub-tab {child_index} ({child_name}): {e}"
+                            )
+                            child_items = []
+
+                        child_tab = StashTab(
+                            id=child_id,
+                            name=child_name,
+                            index=child_index,
+                            type=child_type,
+                            items=child_items,
+                            folder=tab_name,
+                        )
+                        children.append(child_tab)
+                        total_items += len(child_items)
+                        logger.debug(f"    -> Sub-tab '{child_name}': {len(child_items)} items")
 
             tab = StashTab(
                 id=tab_id,

@@ -11,6 +11,9 @@ from gui_qt.dialogs.clear_builds_dialog import ClearBuildsDialog
 from gui_qt.dialogs.find_builds_dialog import FindBuildsDialog
 from gui_qt.dialogs.item_comparison_dialog import ItemComparisonDialog
 from gui_qt.dialogs.recent_items_dialog import RecentItemsDialog
+from gui_qt.dialogs.upgrade_finder_dialog import UpgradeFinderDialog
+from gui_qt.dialogs.stash_grid_dialog import StashGridDialog
+from gui_qt.dialogs.build_library_dialog import BuildLibraryDialog
 
 __all__ = [
     "RecordSaleDialog",
@@ -22,4 +25,7 @@ __all__ = [
     "FindBuildsDialog",
     "ItemComparisonDialog",
     "RecentItemsDialog",
+    "UpgradeFinderDialog",
+    "StashGridDialog",
+    "BuildLibraryDialog",
 ]

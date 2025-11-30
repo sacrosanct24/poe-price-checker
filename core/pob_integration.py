@@ -128,6 +128,12 @@ class CharacterProfile:
     priorities: Optional[Any] = None  # BuildPriorities for BiS search (lazy import to avoid circular)
     _archetype: Optional["BuildArchetype"] = field(default=None, repr=False)  # Cached archetype
 
+    # Build library fields
+    tags: List[str] = field(default_factory=list)  # User-defined tags for organization
+    guide_url: str = ""  # Link to build guide (Maxroll, poe.ninja, etc.)
+    ssf_friendly: bool = False  # Whether build is viable for SSF
+    favorite: bool = False  # Mark as favorite for quick access
+
     def get_item_for_slot(self, slot: str) -> Optional[PoBItem]:
         """Get the item equipped in a specific slot."""
         return self.build.items.get(slot)
@@ -723,6 +729,11 @@ class CharacterManager:
         # Add cached archetype if computed
         if profile._archetype is not None:
             result["archetype"] = profile._archetype.to_dict()
+        # Add build library fields
+        result["tags"] = profile.tags
+        result["guide_url"] = profile.guide_url
+        result["ssf_friendly"] = profile.ssf_friendly
+        result["favorite"] = profile.favorite
         return result
 
     def _deserialize_profile(self, data: dict) -> CharacterProfile:
@@ -778,6 +789,10 @@ class CharacterManager:
             is_upgrade_target=data.get("is_upgrade_target", False),
             priorities=priorities,
             _archetype=archetype,
+            tags=data.get("tags", []),
+            guide_url=data.get("guide_url", ""),
+            ssf_friendly=data.get("ssf_friendly", False),
+            favorite=data.get("favorite", False),
         )
 
     def add_from_pob_code(self, name: str, pob_code: str, notes: str = "") -> CharacterProfile:
@@ -979,6 +994,198 @@ class CharacterManager:
             {"value": c.value, "name": c.name.replace("_", " ").title()}
             for c in BuildCategory
         ]
+
+    def update_profile(self, name: str, **kwargs) -> bool:
+        """
+        Update profile fields.
+
+        Args:
+            name: Profile name
+            **kwargs: Fields to update (notes, tags, guide_url, ssf_friendly, favorite)
+
+        Returns:
+            True if successful
+        """
+        if name not in self._profiles:
+            return False
+
+        from datetime import datetime
+        profile = self._profiles[name]
+
+        for key, value in kwargs.items():
+            if hasattr(profile, key) and key not in ("name", "build", "pob_code"):
+                setattr(profile, key, value)
+
+        profile.updated_at = datetime.now().isoformat()
+        self._save_profiles()
+        logger.info(f"Updated profile '{name}': {list(kwargs.keys())}")
+        return True
+
+    def set_tags(self, name: str, tags: List[str]) -> bool:
+        """Set tags for a build profile."""
+        return self.update_profile(name, tags=tags)
+
+    def add_tag(self, name: str, tag: str) -> bool:
+        """Add a tag to a build profile."""
+        if name not in self._profiles:
+            return False
+        profile = self._profiles[name]
+        if tag not in profile.tags:
+            profile.tags.append(tag)
+            self._save_profiles()
+        return True
+
+    def remove_tag(self, name: str, tag: str) -> bool:
+        """Remove a tag from a build profile."""
+        if name not in self._profiles:
+            return False
+        profile = self._profiles[name]
+        if tag in profile.tags:
+            profile.tags.remove(tag)
+            self._save_profiles()
+        return True
+
+    def set_guide_url(self, name: str, url: str) -> bool:
+        """Set guide URL for a build profile."""
+        return self.update_profile(name, guide_url=url)
+
+    def set_ssf_friendly(self, name: str, ssf_friendly: bool) -> bool:
+        """Set SSF-friendly status for a build profile."""
+        return self.update_profile(name, ssf_friendly=ssf_friendly)
+
+    def toggle_favorite(self, name: str) -> bool:
+        """Toggle favorite status for a build profile."""
+        if name not in self._profiles:
+            return False
+        profile = self._profiles[name]
+        profile.favorite = not profile.favorite
+        self._save_profiles()
+        return True
+
+    def get_favorite_builds(self) -> List[CharacterProfile]:
+        """Get all favorite builds."""
+        return [p for p in self._profiles.values() if p.favorite]
+
+    def get_ssf_builds(self) -> List[CharacterProfile]:
+        """Get all SSF-friendly builds."""
+        return [p for p in self._profiles.values() if p.ssf_friendly]
+
+    def get_builds_by_tag(self, tag: str) -> List[CharacterProfile]:
+        """Get all builds with a specific tag."""
+        return [p for p in self._profiles.values() if tag in p.tags]
+
+    def get_all_tags(self) -> List[str]:
+        """Get all unique tags across all builds."""
+        tags = set()
+        for profile in self._profiles.values():
+            tags.update(profile.tags)
+        return sorted(tags)
+
+    def search_builds(
+        self,
+        query: str = "",
+        categories: Optional[List[str]] = None,
+        tags: Optional[List[str]] = None,
+        ssf_only: bool = False,
+        favorites_only: bool = False,
+    ) -> List[CharacterProfile]:
+        """
+        Search builds with multiple filters.
+
+        Args:
+            query: Search string (matches name, notes, ascendancy)
+            categories: Filter by categories (any match)
+            tags: Filter by tags (any match)
+            ssf_only: Only show SSF-friendly builds
+            favorites_only: Only show favorites
+
+        Returns:
+            List of matching profiles
+        """
+        results = list(self._profiles.values())
+
+        if query:
+            query_lower = query.lower()
+            results = [
+                p for p in results
+                if query_lower in p.name.lower()
+                or query_lower in p.notes.lower()
+                or query_lower in p.build.ascendancy.lower()
+                or query_lower in p.build.main_skill.lower()
+            ]
+
+        if categories:
+            results = [
+                p for p in results
+                if any(c in p.categories for c in categories)
+            ]
+
+        if tags:
+            results = [
+                p for p in results
+                if any(t in p.tags for t in tags)
+            ]
+
+        if ssf_only:
+            results = [p for p in results if p.ssf_friendly]
+
+        if favorites_only:
+            results = [p for p in results if p.favorite]
+
+        return results
+
+    def export_profile(self, name: str) -> Optional[dict]:
+        """
+        Export a profile as a JSON-serializable dict.
+
+        Args:
+            name: Profile name to export
+
+        Returns:
+            Dict with profile data or None if not found
+        """
+        if name not in self._profiles:
+            return None
+        return self._serialize_profile(self._profiles[name])
+
+    def import_profile(self, data: dict, overwrite: bool = False) -> Optional[str]:
+        """
+        Import a profile from exported data.
+
+        Args:
+            data: Profile data dict
+            overwrite: If True, overwrite existing profile with same name
+
+        Returns:
+            Profile name if successful, None if failed
+        """
+        try:
+            name = data.get("name", "")
+            if not name:
+                logger.error("Import failed: no name in profile data")
+                return None
+
+            if name in self._profiles and not overwrite:
+                # Generate unique name
+                base_name = name
+                counter = 1
+                while name in self._profiles:
+                    name = f"{base_name} ({counter})"
+                    counter += 1
+                data["name"] = name
+
+            profile = self._deserialize_profile(data)
+            self._profiles[profile.name] = profile
+            self._save_profiles()
+            logger.info(f"Imported profile: {profile.name}")
+            return profile.name
+        except Exception as e:
+            logger.error(f"Failed to import profile: {e}")
+            return None
+
+    def get_all_profiles(self) -> List[CharacterProfile]:
+        """Get all profiles as a list."""
+        return list(self._profiles.values())
 
 
 class UpgradeChecker:
