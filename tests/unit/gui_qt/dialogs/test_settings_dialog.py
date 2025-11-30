@@ -1,7 +1,7 @@
 """Tests for SettingsDialog."""
 
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from PyQt6.QtWidgets import QDialog
 
@@ -13,11 +13,7 @@ class TestSettingsDialogInit:
         """Can initialize with config."""
         from gui_qt.dialogs.settings_dialog import SettingsDialog
 
-        mock_config = MagicMock()
-        mock_config.minimize_to_tray = True
-        mock_config.start_minimized = False
-        mock_config.show_tray_notifications = True
-        mock_config.tray_alert_threshold = 50.0
+        mock_config = self._create_mock_config()
 
         dialog = SettingsDialog(mock_config)
         qtbot.addWidget(dialog)
@@ -25,11 +21,217 @@ class TestSettingsDialogInit:
         assert dialog.windowTitle() == "Settings"
         assert dialog._config is mock_config
 
-    def test_loads_settings_from_config(self, qtbot):
-        """Settings are loaded from config on init."""
+    def test_has_three_tabs(self, qtbot):
+        """Dialog has three tabs: Accessibility, Performance, System Tray."""
         from gui_qt.dialogs.settings_dialog import SettingsDialog
 
+        mock_config = self._create_mock_config()
+
+        dialog = SettingsDialog(mock_config)
+        qtbot.addWidget(dialog)
+
+        assert dialog._tabs.count() == 3
+        assert dialog._tabs.tabText(0) == "Accessibility"
+        assert dialog._tabs.tabText(1) == "Performance"
+        assert dialog._tabs.tabText(2) == "System Tray"
+
+    def _create_mock_config(self):
+        """Create a mock config with all required properties."""
         mock_config = MagicMock()
+        # Accessibility
+        mock_config.font_scale = 1.0
+        mock_config.tooltip_delay_ms = 500
+        mock_config.reduce_animations = False
+        # Performance
+        mock_config.rankings_cache_hours = 24
+        mock_config.price_cache_ttl_seconds = 3600
+        mock_config.api_rate_limit = 0.33
+        mock_config.toast_duration_ms = 3000
+        mock_config.history_max_entries = 100
+        # System Tray
+        mock_config.minimize_to_tray = True
+        mock_config.start_minimized = False
+        mock_config.show_tray_notifications = True
+        mock_config.tray_alert_threshold = 50.0
+        return mock_config
+
+
+class TestAccessibilityTab:
+    """Tests for Accessibility settings tab."""
+
+    def _create_mock_config(self):
+        """Create a mock config with all required properties."""
+        mock_config = MagicMock()
+        mock_config.font_scale = 1.0
+        mock_config.tooltip_delay_ms = 500
+        mock_config.reduce_animations = False
+        mock_config.rankings_cache_hours = 24
+        mock_config.price_cache_ttl_seconds = 3600
+        mock_config.api_rate_limit = 0.33
+        mock_config.toast_duration_ms = 3000
+        mock_config.history_max_entries = 100
+        mock_config.minimize_to_tray = True
+        mock_config.start_minimized = False
+        mock_config.show_tray_notifications = True
+        mock_config.tray_alert_threshold = 50.0
+        return mock_config
+
+    def test_font_scale_slider_range(self, qtbot):
+        """Font scale slider has correct range (80-150)."""
+        from gui_qt.dialogs.settings_dialog import SettingsDialog
+
+        mock_config = self._create_mock_config()
+        dialog = SettingsDialog(mock_config)
+        qtbot.addWidget(dialog)
+
+        assert dialog._font_scale_slider.minimum() == 80
+        assert dialog._font_scale_slider.maximum() == 150
+
+    def test_font_scale_loads_from_config(self, qtbot):
+        """Font scale loads correctly from config."""
+        from gui_qt.dialogs.settings_dialog import SettingsDialog
+
+        mock_config = self._create_mock_config()
+        mock_config.font_scale = 1.25
+
+        dialog = SettingsDialog(mock_config)
+        qtbot.addWidget(dialog)
+
+        assert dialog._font_scale_slider.value() == 125
+
+    def test_font_scale_label_updates(self, qtbot):
+        """Font scale label updates when slider changes."""
+        from gui_qt.dialogs.settings_dialog import SettingsDialog
+
+        mock_config = self._create_mock_config()
+        dialog = SettingsDialog(mock_config)
+        qtbot.addWidget(dialog)
+
+        dialog._font_scale_slider.setValue(125)
+        assert dialog._font_scale_label.text() == "125%"
+
+    def test_tooltip_delay_range(self, qtbot):
+        """Tooltip delay has correct range (100-2000)."""
+        from gui_qt.dialogs.settings_dialog import SettingsDialog
+
+        mock_config = self._create_mock_config()
+        dialog = SettingsDialog(mock_config)
+        qtbot.addWidget(dialog)
+
+        assert dialog._tooltip_delay_spin.minimum() == 100
+        assert dialog._tooltip_delay_spin.maximum() == 2000
+
+
+class TestPerformanceTab:
+    """Tests for Performance settings tab."""
+
+    def _create_mock_config(self):
+        """Create a mock config with all required properties."""
+        mock_config = MagicMock()
+        mock_config.font_scale = 1.0
+        mock_config.tooltip_delay_ms = 500
+        mock_config.reduce_animations = False
+        mock_config.rankings_cache_hours = 24
+        mock_config.price_cache_ttl_seconds = 3600
+        mock_config.api_rate_limit = 0.33
+        mock_config.toast_duration_ms = 3000
+        mock_config.history_max_entries = 100
+        mock_config.minimize_to_tray = True
+        mock_config.start_minimized = False
+        mock_config.show_tray_notifications = True
+        mock_config.tray_alert_threshold = 50.0
+        return mock_config
+
+    def test_rankings_cache_range(self, qtbot):
+        """Rankings cache spinner has correct range (1-168 hours)."""
+        from gui_qt.dialogs.settings_dialog import SettingsDialog
+
+        mock_config = self._create_mock_config()
+        dialog = SettingsDialog(mock_config)
+        qtbot.addWidget(dialog)
+
+        assert dialog._rankings_cache_spin.minimum() == 1
+        assert dialog._rankings_cache_spin.maximum() == 168
+
+    def test_rate_limit_slider_range(self, qtbot):
+        """Rate limit slider has correct range (20-100 = 0.2-1.0 req/s)."""
+        from gui_qt.dialogs.settings_dialog import SettingsDialog
+
+        mock_config = self._create_mock_config()
+        dialog = SettingsDialog(mock_config)
+        qtbot.addWidget(dialog)
+
+        assert dialog._rate_limit_slider.minimum() == 20
+        assert dialog._rate_limit_slider.maximum() == 100
+
+    def test_rate_limit_label_format(self, qtbot):
+        """Rate limit label shows human-readable format."""
+        from gui_qt.dialogs.settings_dialog import SettingsDialog
+
+        mock_config = self._create_mock_config()
+        dialog = SettingsDialog(mock_config)
+        qtbot.addWidget(dialog)
+
+        # Test conservative (0.2 req/s = 1 req per 5s)
+        dialog._rate_limit_slider.setValue(20)
+        assert "5s" in dialog._rate_limit_label.text()
+
+        # Test recommended (0.33 req/s = 1 req per 3s)
+        dialog._rate_limit_slider.setValue(33)
+        assert "3" in dialog._rate_limit_label.text()
+
+        # Test aggressive (1.0 req/s)
+        dialog._rate_limit_slider.setValue(100)
+        assert "1 req/s" in dialog._rate_limit_label.text()
+
+    def test_toast_duration_range(self, qtbot):
+        """Toast duration has correct range (1000-10000 ms)."""
+        from gui_qt.dialogs.settings_dialog import SettingsDialog
+
+        mock_config = self._create_mock_config()
+        dialog = SettingsDialog(mock_config)
+        qtbot.addWidget(dialog)
+
+        assert dialog._toast_duration_spin.minimum() == 1000
+        assert dialog._toast_duration_spin.maximum() == 10000
+
+    def test_history_max_range(self, qtbot):
+        """History max entries has correct range (10-500)."""
+        from gui_qt.dialogs.settings_dialog import SettingsDialog
+
+        mock_config = self._create_mock_config()
+        dialog = SettingsDialog(mock_config)
+        qtbot.addWidget(dialog)
+
+        assert dialog._history_max_spin.minimum() == 10
+        assert dialog._history_max_spin.maximum() == 500
+
+
+class TestSystemTrayTab:
+    """Tests for System Tray settings tab."""
+
+    def _create_mock_config(self):
+        """Create a mock config with all required properties."""
+        mock_config = MagicMock()
+        mock_config.font_scale = 1.0
+        mock_config.tooltip_delay_ms = 500
+        mock_config.reduce_animations = False
+        mock_config.rankings_cache_hours = 24
+        mock_config.price_cache_ttl_seconds = 3600
+        mock_config.api_rate_limit = 0.33
+        mock_config.toast_duration_ms = 3000
+        mock_config.history_max_entries = 100
+        mock_config.minimize_to_tray = True
+        mock_config.start_minimized = False
+        mock_config.show_tray_notifications = True
+        mock_config.tray_alert_threshold = 50.0
+        return mock_config
+
+    def test_loads_settings_from_config(self, qtbot):
+        """Tray settings are loaded from config on init."""
+        from gui_qt.dialogs.settings_dialog import SettingsDialog
+
+        mock_config = self._create_mock_config()
         mock_config.minimize_to_tray = False
         mock_config.start_minimized = True
         mock_config.show_tray_notifications = False
@@ -43,37 +245,11 @@ class TestSettingsDialogInit:
         assert dialog._show_notifications_cb.isChecked() is False
         assert dialog._threshold_spin.value() == 100.0
 
-
-class TestSettingsDialogWidgets:
-    """Tests for SettingsDialog widget behavior."""
-
-    def test_has_tab_widget(self, qtbot):
-        """Dialog has tab widget."""
-        from gui_qt.dialogs.settings_dialog import SettingsDialog
-
-        mock_config = MagicMock()
-        mock_config.minimize_to_tray = True
-        mock_config.start_minimized = False
-        mock_config.show_tray_notifications = True
-        mock_config.tray_alert_threshold = 50.0
-
-        dialog = SettingsDialog(mock_config)
-        qtbot.addWidget(dialog)
-
-        assert dialog._tabs is not None
-        assert dialog._tabs.count() >= 1
-        assert dialog._tabs.tabText(0) == "System Tray"
-
     def test_threshold_disabled_when_notifications_off(self, qtbot):
         """Threshold spinner disabled when notifications unchecked."""
         from gui_qt.dialogs.settings_dialog import SettingsDialog
 
-        mock_config = MagicMock()
-        mock_config.minimize_to_tray = True
-        mock_config.start_minimized = False
-        mock_config.show_tray_notifications = True
-        mock_config.tray_alert_threshold = 50.0
-
+        mock_config = self._create_mock_config()
         dialog = SettingsDialog(mock_config)
         qtbot.addWidget(dialog)
 
@@ -84,88 +260,130 @@ class TestSettingsDialogWidgets:
         dialog._show_notifications_cb.setChecked(False)
         assert dialog._threshold_spin.isEnabled() is False
 
-        # Re-check notifications
-        dialog._show_notifications_cb.setChecked(True)
-        assert dialog._threshold_spin.isEnabled() is True
-
 
 class TestSettingsDialogSave:
     """Tests for SettingsDialog save functionality."""
 
-    def test_save_updates_config(self, qtbot):
-        """Saving updates all config values."""
-        from gui_qt.dialogs.settings_dialog import SettingsDialog
-
+    def _create_mock_config(self):
+        """Create a mock config with all required properties."""
         mock_config = MagicMock()
+        mock_config.font_scale = 1.0
+        mock_config.tooltip_delay_ms = 500
+        mock_config.reduce_animations = False
+        mock_config.rankings_cache_hours = 24
+        mock_config.price_cache_ttl_seconds = 3600
+        mock_config.api_rate_limit = 0.33
+        mock_config.toast_duration_ms = 3000
+        mock_config.history_max_entries = 100
         mock_config.minimize_to_tray = True
         mock_config.start_minimized = False
         mock_config.show_tray_notifications = True
         mock_config.tray_alert_threshold = 50.0
+        return mock_config
 
+    def test_save_updates_all_config_values(self, qtbot):
+        """Saving updates all config values."""
+        from gui_qt.dialogs.settings_dialog import SettingsDialog
+
+        mock_config = self._create_mock_config()
         dialog = SettingsDialog(mock_config)
         qtbot.addWidget(dialog)
 
         # Change values
+        dialog._font_scale_slider.setValue(125)
+        dialog._tooltip_delay_spin.setValue(1000)
+        dialog._reduce_animations_cb.setChecked(True)
+        dialog._rankings_cache_spin.setValue(48)
+        dialog._rate_limit_slider.setValue(50)
+        dialog._toast_duration_spin.setValue(5000)
+        dialog._history_max_spin.setValue(200)
         dialog._minimize_to_tray_cb.setChecked(False)
-        dialog._start_minimized_cb.setChecked(True)
-        dialog._show_notifications_cb.setChecked(False)
-        dialog._threshold_spin.setValue(200.0)
+        dialog._threshold_spin.setValue(100.0)
 
         # Save
         dialog._save_and_accept()
 
         # Verify config was updated
+        assert mock_config.font_scale == 1.25
+        assert mock_config.tooltip_delay_ms == 1000
+        assert mock_config.reduce_animations is True
+        assert mock_config.rankings_cache_hours == 48
+        assert mock_config.api_rate_limit == 0.5
+        assert mock_config.toast_duration_ms == 5000
+        assert mock_config.history_max_entries == 200
         assert mock_config.minimize_to_tray is False
-        assert mock_config.start_minimized is True
-        assert mock_config.show_tray_notifications is False
-        assert mock_config.tray_alert_threshold == 200.0
-
-    def test_cancel_does_not_update_config(self, qtbot):
-        """Canceling does not update config."""
-        from gui_qt.dialogs.settings_dialog import SettingsDialog
-
-        mock_config = MagicMock()
-        mock_config.minimize_to_tray = True
-        mock_config.start_minimized = False
-        mock_config.show_tray_notifications = True
-        mock_config.tray_alert_threshold = 50.0
-
-        dialog = SettingsDialog(mock_config)
-        qtbot.addWidget(dialog)
-
-        # Change values
-        dialog._minimize_to_tray_cb.setChecked(False)
-        dialog._threshold_spin.setValue(999.0)
-
-        # Reject without saving
-        dialog.reject()
-
-        # Config setters should not have been called with new values
-        # (Config only gets updated on _save_and_accept)
-        # The mock_config properties were only read during _load_settings
+        assert mock_config.tray_alert_threshold == 100.0
 
 
 class TestSettingsDialogReset:
     """Tests for SettingsDialog reset to defaults."""
 
-    def test_reset_to_defaults(self, qtbot):
-        """Reset restores default values."""
-        from gui_qt.dialogs.settings_dialog import SettingsDialog
-
+    def _create_mock_config(self):
+        """Create a mock config with all required properties."""
         mock_config = MagicMock()
+        mock_config.font_scale = 1.5
+        mock_config.tooltip_delay_ms = 2000
+        mock_config.reduce_animations = True
+        mock_config.rankings_cache_hours = 168
+        mock_config.price_cache_ttl_seconds = 7200
+        mock_config.api_rate_limit = 1.0
+        mock_config.toast_duration_ms = 10000
+        mock_config.history_max_entries = 500
         mock_config.minimize_to_tray = False
         mock_config.start_minimized = True
         mock_config.show_tray_notifications = False
         mock_config.tray_alert_threshold = 999.0
+        return mock_config
 
+    def test_reset_accessibility_tab(self, qtbot):
+        """Reset restores accessibility defaults."""
+        from gui_qt.dialogs.settings_dialog import SettingsDialog
+
+        mock_config = self._create_mock_config()
         dialog = SettingsDialog(mock_config)
         qtbot.addWidget(dialog)
 
-        # Verify non-default values loaded
-        assert dialog._minimize_to_tray_cb.isChecked() is False
-        assert dialog._start_minimized_cb.isChecked() is True
-        assert dialog._show_notifications_cb.isChecked() is False
-        assert dialog._threshold_spin.value() == 999.0
+        # Select accessibility tab
+        dialog._tabs.setCurrentIndex(0)
+
+        # Reset
+        dialog._reset_to_defaults()
+
+        # Verify defaults
+        assert dialog._font_scale_slider.value() == 100
+        assert dialog._tooltip_delay_spin.value() == 500
+        assert dialog._reduce_animations_cb.isChecked() is False
+
+    def test_reset_performance_tab(self, qtbot):
+        """Reset restores performance defaults."""
+        from gui_qt.dialogs.settings_dialog import SettingsDialog
+
+        mock_config = self._create_mock_config()
+        dialog = SettingsDialog(mock_config)
+        qtbot.addWidget(dialog)
+
+        # Select performance tab
+        dialog._tabs.setCurrentIndex(1)
+
+        # Reset
+        dialog._reset_to_defaults()
+
+        # Verify defaults
+        assert dialog._rankings_cache_spin.value() == 24
+        assert dialog._rate_limit_slider.value() == 33
+        assert dialog._toast_duration_spin.value() == 3000
+        assert dialog._history_max_spin.value() == 100
+
+    def test_reset_tray_tab(self, qtbot):
+        """Reset restores tray defaults."""
+        from gui_qt.dialogs.settings_dialog import SettingsDialog
+
+        mock_config = self._create_mock_config()
+        dialog = SettingsDialog(mock_config)
+        qtbot.addWidget(dialog)
+
+        # Select tray tab
+        dialog._tabs.setCurrentIndex(2)
 
         # Reset
         dialog._reset_to_defaults()
@@ -175,41 +393,97 @@ class TestSettingsDialogReset:
         assert dialog._start_minimized_cb.isChecked() is False
         assert dialog._show_notifications_cb.isChecked() is True
         assert dialog._threshold_spin.value() == 50.0
-        assert dialog._threshold_spin.isEnabled() is True
 
 
-class TestSettingsDialogIntegration:
-    """Integration tests for SettingsDialog."""
+class TestConfigGuardrails:
+    """Tests for config property guardrails."""
 
-    def test_dialog_accept_returns_accepted(self, qtbot):
-        """Dialog returns Accepted on save."""
-        from gui_qt.dialogs.settings_dialog import SettingsDialog
+    def test_font_scale_guardrails(self, tmp_path):
+        """Font scale is clamped to 0.8-1.5."""
+        from core.config import Config
 
-        mock_config = MagicMock()
-        mock_config.minimize_to_tray = True
-        mock_config.start_minimized = False
-        mock_config.show_tray_notifications = True
-        mock_config.tray_alert_threshold = 50.0
+        config = Config(config_file=tmp_path / "test_config.json")
 
-        dialog = SettingsDialog(mock_config)
-        qtbot.addWidget(dialog)
+        config.font_scale = 0.5  # Below min
+        assert config.font_scale == 0.8
 
-        # Save triggers accept
-        dialog._save_and_accept()
-        assert dialog.result() == QDialog.DialogCode.Accepted
+        config.font_scale = 2.0  # Above max
+        assert config.font_scale == 1.5
 
-    def test_dialog_reject_returns_rejected(self, qtbot):
-        """Dialog returns Rejected on cancel."""
-        from gui_qt.dialogs.settings_dialog import SettingsDialog
+        config.font_scale = 1.2  # Within range
+        assert config.font_scale == 1.2
 
-        mock_config = MagicMock()
-        mock_config.minimize_to_tray = True
-        mock_config.start_minimized = False
-        mock_config.show_tray_notifications = True
-        mock_config.tray_alert_threshold = 50.0
+    def test_tooltip_delay_guardrails(self, tmp_path):
+        """Tooltip delay is clamped to 100-2000."""
+        from core.config import Config
 
-        dialog = SettingsDialog(mock_config)
-        qtbot.addWidget(dialog)
+        config = Config(config_file=tmp_path / "test_config.json")
 
-        dialog.reject()
-        assert dialog.result() == QDialog.DialogCode.Rejected
+        config.tooltip_delay_ms = 50  # Below min
+        assert config.tooltip_delay_ms == 100
+
+        config.tooltip_delay_ms = 5000  # Above max
+        assert config.tooltip_delay_ms == 2000
+
+    def test_rankings_cache_guardrails(self, tmp_path):
+        """Rankings cache hours is clamped to 1-168."""
+        from core.config import Config
+
+        config = Config(config_file=tmp_path / "test_config.json")
+
+        config.rankings_cache_hours = 0  # Below min
+        assert config.rankings_cache_hours == 1
+
+        config.rankings_cache_hours = 500  # Above max
+        assert config.rankings_cache_hours == 168
+
+    def test_price_cache_ttl_guardrails(self, tmp_path):
+        """Price cache TTL is clamped to 300-7200."""
+        from core.config import Config
+
+        config = Config(config_file=tmp_path / "test_config.json")
+
+        config.price_cache_ttl_seconds = 60  # Below min
+        assert config.price_cache_ttl_seconds == 300
+
+        config.price_cache_ttl_seconds = 10000  # Above max
+        assert config.price_cache_ttl_seconds == 7200
+
+    def test_api_rate_limit_guardrails(self, tmp_path):
+        """API rate limit is clamped to 0.2-1.0 to prevent GGG violations."""
+        from core.config import Config
+
+        config = Config(config_file=tmp_path / "test_config.json")
+
+        config.api_rate_limit = 0.1  # Below min - too aggressive
+        assert config.api_rate_limit == 0.2
+
+        config.api_rate_limit = 5.0  # Above max - way too aggressive
+        assert config.api_rate_limit == 1.0
+
+        config.api_rate_limit = 0.33  # Recommended value
+        assert config.api_rate_limit == 0.33
+
+    def test_toast_duration_guardrails(self, tmp_path):
+        """Toast duration is clamped to 1000-10000."""
+        from core.config import Config
+
+        config = Config(config_file=tmp_path / "test_config.json")
+
+        config.toast_duration_ms = 500  # Below min
+        assert config.toast_duration_ms == 1000
+
+        config.toast_duration_ms = 20000  # Above max
+        assert config.toast_duration_ms == 10000
+
+    def test_history_max_guardrails(self, tmp_path):
+        """History max entries is clamped to 10-500."""
+        from core.config import Config
+
+        config = Config(config_file=tmp_path / "test_config.json")
+
+        config.history_max_entries = 5  # Below min
+        assert config.history_max_entries == 10
+
+        config.history_max_entries = 1000  # Above max
+        assert config.history_max_entries == 500

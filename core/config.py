@@ -67,9 +67,29 @@ class Config:
             "show_tray_notifications": True,  # Show system notifications for price alerts
             "tray_alert_threshold": 50.0,  # Chaos value threshold for tray notifications
         },
+        "accessibility": {
+            "font_scale": 1.0,  # Font scaling factor (0.8 to 1.5)
+            "tooltip_delay_ms": 500,  # Delay before showing tooltips
+            "reduce_animations": False,  # Reduce motion for accessibility
+        },
+        "performance": {
+            # Rankings cache expiry in hours (min 1, max 168 = 1 week)
+            # Lower = fresher data but more API calls
+            "rankings_cache_hours": 24,
+            # Price data cache TTL in seconds (min 300 = 5 min, max 7200 = 2 hours)
+            # GGG rate limits: ~1 request per 3 seconds is safe
+            "price_cache_ttl_seconds": 3600,
+            # Toast notification duration in milliseconds
+            "toast_duration_ms": 3000,
+            # Maximum history entries to keep (min 10, max 500)
+            "history_max_entries": 100,
+        },
         "api": {
             "auto_detect_league": True,
             "cache_ttl_seconds": 3600,
+            # Rate limit for PoE API (requests per second)
+            # GUARDRAIL: Min 0.2 (1 req/5s), Max 1.0 (1 req/s)
+            # GGG recommends ~0.33 (1 req/3s) to avoid 429 errors
             "rate_limit_per_second": 0.33,
         },
         "plugins": {
@@ -369,6 +389,102 @@ class Config:
         self.save()
 
     # ------------------------------------------------------------------
+    # Accessibility Settings
+    # ------------------------------------------------------------------
+
+    @property
+    def font_scale(self) -> float:
+        """Font scaling factor (0.8 to 1.5)."""
+        return self.data.get("accessibility", {}).get("font_scale", 1.0)
+
+    @font_scale.setter
+    def font_scale(self, value: float) -> None:
+        """Set font scale with guardrails (0.8 to 1.5)."""
+        self.data.setdefault("accessibility", {})["font_scale"] = max(0.8, min(1.5, float(value)))
+        self.save()
+
+    @property
+    def tooltip_delay_ms(self) -> int:
+        """Delay before showing tooltips in milliseconds."""
+        return self.data.get("accessibility", {}).get("tooltip_delay_ms", 500)
+
+    @tooltip_delay_ms.setter
+    def tooltip_delay_ms(self, value: int) -> None:
+        """Set tooltip delay with guardrails (100 to 2000 ms)."""
+        self.data.setdefault("accessibility", {})["tooltip_delay_ms"] = max(100, min(2000, int(value)))
+        self.save()
+
+    @property
+    def reduce_animations(self) -> bool:
+        """Whether to reduce animations for accessibility."""
+        return self.data.get("accessibility", {}).get("reduce_animations", False)
+
+    @reduce_animations.setter
+    def reduce_animations(self, value: bool) -> None:
+        """Set reduce animations preference."""
+        self.data.setdefault("accessibility", {})["reduce_animations"] = bool(value)
+        self.save()
+
+    # ------------------------------------------------------------------
+    # Performance Settings
+    # ------------------------------------------------------------------
+
+    @property
+    def rankings_cache_hours(self) -> int:
+        """
+        How long to cache Top 20 rankings data in hours.
+
+        Guardrails: Min 1 hour, Max 168 hours (1 week).
+        Lower values = fresher data but more API calls.
+        Default 24 hours balances freshness with API usage.
+        """
+        return self.data.get("performance", {}).get("rankings_cache_hours", 24)
+
+    @rankings_cache_hours.setter
+    def rankings_cache_hours(self, value: int) -> None:
+        """Set rankings cache hours with guardrails (1 to 168)."""
+        self.data.setdefault("performance", {})["rankings_cache_hours"] = max(1, min(168, int(value)))
+        self.save()
+
+    @property
+    def price_cache_ttl_seconds(self) -> int:
+        """
+        Price data cache TTL in seconds.
+
+        Guardrails: Min 300 (5 min), Max 7200 (2 hours).
+        GGG recommends conservative API usage to avoid rate limits.
+        """
+        return self.data.get("performance", {}).get("price_cache_ttl_seconds", 3600)
+
+    @price_cache_ttl_seconds.setter
+    def price_cache_ttl_seconds(self, value: int) -> None:
+        """Set price cache TTL with guardrails (300 to 7200 seconds)."""
+        self.data.setdefault("performance", {})["price_cache_ttl_seconds"] = max(300, min(7200, int(value)))
+        self.save()
+
+    @property
+    def toast_duration_ms(self) -> int:
+        """Toast notification display duration in milliseconds."""
+        return self.data.get("performance", {}).get("toast_duration_ms", 3000)
+
+    @toast_duration_ms.setter
+    def toast_duration_ms(self, value: int) -> None:
+        """Set toast duration with guardrails (1000 to 10000 ms)."""
+        self.data.setdefault("performance", {})["toast_duration_ms"] = max(1000, min(10000, int(value)))
+        self.save()
+
+    @property
+    def history_max_entries(self) -> int:
+        """Maximum number of history entries to keep."""
+        return self.data.get("performance", {}).get("history_max_entries", 100)
+
+    @history_max_entries.setter
+    def history_max_entries(self, value: int) -> None:
+        """Set history max entries with guardrails (10 to 500)."""
+        self.data.setdefault("performance", {})["history_max_entries"] = max(10, min(500, int(value)))
+        self.save()
+
+    # ------------------------------------------------------------------
     # API Settings
     # ------------------------------------------------------------------
 
@@ -381,6 +497,28 @@ class Config:
     def auto_detect_league(self, value: bool) -> None:
         """Set auto-detect league behavior and persist."""
         self.data["api"]["auto_detect_league"] = bool(value)
+        self.save()
+
+    @property
+    def api_rate_limit(self) -> float:
+        """
+        API rate limit in requests per second.
+
+        Guardrails: Min 0.2 (1 req/5s), Max 1.0 (1 req/s).
+        GGG recommends ~0.33 (1 req/3s) to avoid 429 rate limit errors.
+        Setting this too high WILL result in temporary bans from the API.
+        """
+        return self.data["api"].get("rate_limit_per_second", 0.33)
+
+    @api_rate_limit.setter
+    def api_rate_limit(self, value: float) -> None:
+        """
+        Set API rate limit with strict guardrails.
+
+        IMPORTANT: Values outside 0.2-1.0 are clamped to protect
+        against violating GGG's rate limiting rules.
+        """
+        self.data["api"]["rate_limit_per_second"] = max(0.2, min(1.0, float(value)))
         self.save()
 
     # ------------------------------------------------------------------
