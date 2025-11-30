@@ -74,7 +74,7 @@ review_frequency: monthly
 ### A.6 Notifications & Feedback
 - [x] **Toast notifications** - non-blocking status updates ✅
 - [ ] **Sound alerts** - configurable audio for price thresholds
-- [ ] **System tray** - minimize to tray with price alerts
+- [x] **System tray** - minimize to tray with price alerts ✅
 - [ ] **Progress indicators** - better feedback for long operations
 
 ---

@@ -62,6 +62,10 @@ class Config:
             "window_height": 800,
             "theme": "dark",  # dark, light, or system
             "accent_color": None,  # None = theme default, or currency key like "chaos", "divine"
+            "minimize_to_tray": True,  # Minimize to system tray instead of taskbar
+            "start_minimized": False,  # Start application minimized to tray
+            "show_tray_notifications": True,  # Show system notifications for price alerts
+            "tray_alert_threshold": 50.0,  # Chaos value threshold for tray notifications
         },
         "api": {
             "auto_detect_league": True,
@@ -314,6 +318,54 @@ class Config:
     def accent_color(self, value: Optional[str]) -> None:
         """Set the accent color and persist."""
         self.data["ui"]["accent_color"] = value
+        self.save()
+
+    # ------------------------------------------------------------------
+    # System Tray Settings
+    # ------------------------------------------------------------------
+
+    @property
+    def minimize_to_tray(self) -> bool:
+        """Whether to minimize to system tray instead of taskbar."""
+        return self.data["ui"].get("minimize_to_tray", True)
+
+    @minimize_to_tray.setter
+    def minimize_to_tray(self, value: bool) -> None:
+        """Set minimize to tray behavior and persist."""
+        self.data["ui"]["minimize_to_tray"] = value
+        self.save()
+
+    @property
+    def start_minimized(self) -> bool:
+        """Whether to start the application minimized to tray."""
+        return self.data["ui"].get("start_minimized", False)
+
+    @start_minimized.setter
+    def start_minimized(self, value: bool) -> None:
+        """Set start minimized behavior and persist."""
+        self.data["ui"]["start_minimized"] = value
+        self.save()
+
+    @property
+    def show_tray_notifications(self) -> bool:
+        """Whether to show system tray notifications for price alerts."""
+        return self.data["ui"].get("show_tray_notifications", True)
+
+    @show_tray_notifications.setter
+    def show_tray_notifications(self, value: bool) -> None:
+        """Set tray notifications behavior and persist."""
+        self.data["ui"]["show_tray_notifications"] = value
+        self.save()
+
+    @property
+    def tray_alert_threshold(self) -> float:
+        """Chaos value threshold for triggering tray notifications."""
+        return self.data["ui"].get("tray_alert_threshold", 50.0)
+
+    @tray_alert_threshold.setter
+    def tray_alert_threshold(self, value: float) -> None:
+        """Set tray alert threshold and persist."""
+        self.data["ui"]["tray_alert_threshold"] = max(0.0, float(value))
         self.save()
 
     # ------------------------------------------------------------------
