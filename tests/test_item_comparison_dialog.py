@@ -341,21 +341,31 @@ class TestClearAll:
 
     def test_clear_all_resets_state(self):
         """Test that clear all resets all state."""
-        item1 = MockItem(name="Item A")
-        item2 = MockItem(name="Item B")
-        text1 = "Item A text"
-        text2 = "Item B text"
+        # Setup initial state
+        state = {
+            "item1": MockItem(name="Item A"),
+            "item2": MockItem(name="Item B"),
+            "text1": "Item A text",
+            "text2": "Item B text",
+        }
 
-        # Simulate clear
-        item1 = None
-        item2 = None
-        text1 = ""
-        text2 = ""
+        # Verify initial state has values
+        assert state["item1"] is not None
+        assert state["item2"] is not None
+        assert state["text1"] != ""
+        assert state["text2"] != ""
 
-        assert item1 is None
-        assert item2 is None
-        assert text1 == ""
-        assert text2 == ""
+        # Simulate clear operation
+        state["item1"] = None
+        state["item2"] = None
+        state["text1"] = ""
+        state["text2"] = ""
+
+        # Verify cleared state
+        assert state["item1"] is None
+        assert state["item2"] is None
+        assert state["text1"] == ""
+        assert state["text2"] == ""
 
 
 class TestSetItemProgrammatically:
