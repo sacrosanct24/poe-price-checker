@@ -58,8 +58,8 @@ class IconCache:
 
     def _url_to_filename(self, url: str) -> str:
         """Convert URL to cache filename."""
-        # Use hash of URL for filename
-        url_hash = hashlib.md5(url.encode()).hexdigest()
+        # Use hash of URL for filename (not for security, just cache key)
+        url_hash = hashlib.md5(url.encode(), usedforsecurity=False).hexdigest()
         return f"{url_hash}.png"
 
     def get_icon(self, url: str, callback: Optional[callable] = None) -> Optional[QPixmap]:

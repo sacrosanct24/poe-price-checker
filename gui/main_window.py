@@ -1277,13 +1277,15 @@ class PriceCheckerGUI:
         )
 
     def _open_path_in_explorer(self, path: Path) -> None:
+        import subprocess
+
         try:
             if sys.platform.startswith("win"):
                 os.startfile(path)  # type: ignore[attr-defined]
             elif sys.platform == "darwin":
-                os.system(f'open "{path}"')
+                subprocess.run(["open", str(path)], check=False)
             else:
-                os.system(f'xdg-open "{path}"')
+                subprocess.run(["xdg-open", str(path)], check=False)
         except Exception as exc:  # pragma: no cover
             self.logger.exception("Failed to open path %s: %s", path, exc)
             messagebox.showerror("Error", f"Failed to open path:\n{path}\n\n{exc}")

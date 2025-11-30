@@ -337,10 +337,13 @@ class TestBuildSourceProvider:
 
     def test_get_source_url_basic(self):
         """Should return URL for known source."""
+        from urllib.parse import urlparse
+
         url = BuildSourceProvider.get_source_url("pobarchives")
 
         assert url is not None
-        assert "pobarchives.com" in url
+        parsed = urlparse(url)
+        assert parsed.netloc.endswith("pobarchives.com")
 
     def test_get_source_url_with_category(self):
         """Should include category filter in URL."""

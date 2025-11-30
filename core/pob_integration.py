@@ -115,13 +115,12 @@ class PoBItem:
         """Count the largest link group."""
         if not self.sockets:
             return 0
-        groups = self.sockets.replace(" ", "").split("-")
+        # Sockets format might be like "R-R-R G-G B" where space separates groups
         # Each group connected by - is linked
-        # But sockets format might be like "R-R-R G-G B" where space separates groups
-        # Let's handle both formats
         if " " in self.sockets:
             groups = self.sockets.split(" ")
             return max(len(g.replace("-", "")) for g in groups) if groups else 0
+        # No spaces - treat entire string as one group
         return len(self.sockets.replace("-", ""))
 
 
