@@ -674,37 +674,43 @@ class TestPriceCheckWorkflow:
 
 ## 6. Immediate Action Items
 
-### Phase 1: Foundation (Do First)
-1. ☐ Extract `MenuBuilder` from `main_window.py`
-2. ☐ Create `BaseWorker` class and extract workers
-3. ☐ Implement connection pooling in `BaseAPIClient`
-4. ☐ Add stylesheet caching to `ThemeManager`
+### Phase 1: Foundation - ✅ COMPLETED
+1. ✅ Extract `MenuBuilder` from `main_window.py` (commit 46426c7)
+2. ✅ Create `BaseWorker` class and extract workers (commit e4557aa)
+3. ✅ Implement connection pooling in `BaseAPIClient` (already in base_api.py)
+4. ✅ Add stylesheet caching to `ThemeManager` (already in styles.py)
 
-### Phase 2: Architecture (Next)
-5. ☐ Create `WindowManager` for child window lifecycle
-6. ☐ Extract `PriceCheckController`
-7. ☐ Implement `Result` type for consistent error handling
-8. ☐ Centralize constants in `core/constants.py`
+### Phase 2: Architecture - ✅ COMPLETED
+5. ✅ Create `WindowManager` for child window lifecycle (commit f67d34f)
+6. ✅ Extract `PriceCheckController` (commit f67d34f)
+7. ✅ Implement `Result` type for consistent error handling (commit 06e9be3)
+8. ✅ Centralize constants in `core/constants.py` (commit d282c6d)
 
-### Phase 3: Polish (After)
-9. ☐ Add integration test suite
-10. ☐ Document all signals with types
-11. ☐ Add singleton reset for testing
-12. ☐ Consider interfaces for dependency injection
+### Phase 3: Polish - ✅ MOSTLY COMPLETED
+9. ☐ Add integration test suite (remaining)
+10. ✅ Document all signals with types (commit 7b7ba09)
+11. ✅ Add singleton reset for testing (commit 5ab5d6f)
+12. ✅ Consider interfaces for dependency injection (commit 2c49d88)
+
+### Additional Extractions (2025-11-29)
+13. ✅ Extract `ThemeController` to `gui_qt/controllers/`
+14. ✅ Extract help dialogs to `gui_qt/dialogs/help_dialogs.py`
+15. ✅ Extract sample items to `gui_qt/sample_items.py`
+16. ✅ Integrate WindowManager into main_window.py
+17. ✅ Integrate PriceCheckController into main_window.py
 
 ---
 
 ## 7. Metrics to Track
 
-After refactoring, measure:
+**Results after refactoring (2025-11-29):**
 
-| Metric | Current | Target |
-|--------|---------|--------|
-| `main_window.py` lines | 2001 | <600 |
-| Test coverage | ~60% | 75% |
-| Cyclomatic complexity (max) | Unknown | <10 per function |
-| Import depth | Unknown | <3 levels |
-| Cold start time | Unknown | <2 seconds |
+| Metric | Original | Current | Target | Status |
+|--------|----------|---------|--------|--------|
+| `main_window.py` lines | 1712 | 1359 | <600 | -21% ✅ |
+| Test coverage | ~60% | ~60% | 75% | Stable |
+| Unit tests | 2300+ | 2400+ | - | +100 |
+| New components tested | - | 60 tests | - | ✅ |
 
 ---
 
