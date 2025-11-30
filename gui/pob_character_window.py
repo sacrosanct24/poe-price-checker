@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import tkinter as tk
 from tkinter import ttk, messagebox
-from typing import Dict, List, Optional, Callable
+from typing import Any, Dict, Optional, Callable
 
 from core.pob_integration import CharacterManager, BuildCategory
 
