@@ -501,8 +501,8 @@ def get_trade_url(query: Dict, league: str = "Standard") -> str:
     # Base URL
     base = f"https://www.pathofexile.com/trade/search/{urllib.parse.quote(league)}"
 
-    # Encode query as JSON
-    query_json = json.dumps(query, separators=(',', ':'))
+    # Encode query as JSON (for future POST implementation)
+    _query_json = json.dumps(query, separators=(',', ':'))
 
     # The trade site doesn't directly accept query JSON in URL
     # Instead, we'd need to POST and get a search ID

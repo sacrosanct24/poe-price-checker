@@ -286,7 +286,7 @@ class SmartFilterBuilder:
 
         # Crit build filters
         if self.archetype.is_crit:
-            crit_chance = self._get_stat_id("critical_strike_chance")
+            _crit_chance = self._get_stat_id("critical_strike_chance")  # Reserved for future use
             crit_multi = self._get_stat_id("critical_strike_multiplier")
 
             if crit_multi:

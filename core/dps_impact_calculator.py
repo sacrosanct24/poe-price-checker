@@ -101,9 +101,9 @@ class DPSStats:
         crit_chance = stats.get("CritChance", stats.get("MeleeCritChance", stats.get("SpellCritChance", 0)))
         crit_multi = stats.get("CritMultiplier", stats.get("CritDamage", 150))
 
-        # Speed
-        attack_speed = stats.get("Speed", stats.get("AttackRate", 1.0))
-        cast_speed = stats.get("CastSpeed", stats.get("CastRate", 1.0))
+        # Speed (for future per-hit damage calculations)
+        _attack_speed = stats.get("Speed", stats.get("AttackRate", 1.0))
+        _cast_speed = stats.get("CastSpeed", stats.get("CastRate", 1.0))
 
         # Determine primary damage type
         damage_totals = {
@@ -494,7 +494,7 @@ class DPSImpactCalculator:
         if not result.mod_impacts:
             return "No offensive mods detected"
 
-        high_impacts = [m for m in result.mod_impacts if m.relevance == "high"]
+        _high_impacts = [m for m in result.mod_impacts if m.relevance == "high"]  # Reserved for future summary
         total_percent = result.total_dps_percent
 
         if total_percent >= 5:

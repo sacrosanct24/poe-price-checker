@@ -517,8 +517,8 @@ class BuildComparisonDialog(QDialog):
         if not hasattr(self, '_all_profiles'):
             return
 
-        # Get current filter
-        filter_data = self.build_filter.get_filter()
+        # Get current filter (reserved for future filtering)
+        _filter_data = self.build_filter.get_filter()
 
         # Remember current selections
         your_current = self.your_profile_combo.currentText()

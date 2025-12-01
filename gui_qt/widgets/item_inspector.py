@@ -429,9 +429,9 @@ class ItemInspectorWidget(QWidget):
         for detail in affix_details:
             affix_type = detail.get('affix_type', '')
             multiplier = detail.get('multiplier', 1.0)
-            base_weight = detail.get('base_weight', 0)
-            weighted_weight = detail.get('weighted_weight', 0)
-            tier = detail.get('tier', '')
+            _base_weight = detail.get('base_weight', 0)  # Reserved for future display
+            _weighted_weight = detail.get('weighted_weight', 0)  # Reserved for future display
+            _tier = detail.get('tier', '')  # Reserved for future display
 
             # Skip if no meaningful change
             if abs(multiplier - 1.0) < 0.01:
@@ -469,7 +469,7 @@ class ItemInspectorWidget(QWidget):
             new_mods,
             self._current_equipped_mods
         )
-        impact = comparison["impact"]
+        _impact = comparison["impact"]  # Reserved for future detailed impact display
 
         html_parts = []
 

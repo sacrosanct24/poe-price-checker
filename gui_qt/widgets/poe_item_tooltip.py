@@ -345,7 +345,7 @@ class PoEItemTooltip(QFrame):
 
         # Tier info line (gray, smaller)
         if tier_result.tier is not None:
-            tier_color = get_tier_color(tier_result.tier)
+            _tier_color = get_tier_color(tier_result.tier)  # Reserved for future color-coded tier display
             mod_type = "Implicit Modifier" if is_implicit else ("Prefix" if "prefix" in str(tier_result.stat_type or "").lower() else "Suffix")
 
             # Build tier info like: Prefix Modifier "Name" (Tier: X) — Category

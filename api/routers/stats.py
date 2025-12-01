@@ -36,10 +36,10 @@ async def get_stats(
         # Get stats from database if available
         db = ctx.database
 
-        # Get basic stats
-        stats = {}
+        # Get basic stats (reserved for future use)
+        _stats = {}
         if hasattr(db, 'get_stats'):
-            stats = db.get_stats(days=days) or {}
+            _stats = db.get_stats(days=days) or {}
 
         # Get daily summary if available
         daily_data: list[DailySummary] = []

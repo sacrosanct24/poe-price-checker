@@ -48,10 +48,10 @@ async def list_items(
         # Get items from database
         from core.game_version import GameVersion as CoreGameVersion
 
-        # Convert game version if provided
-        core_game_version = None
+        # Convert game version if provided (for future filtering)
+        _core_game_version = None
         if game_version:
-            core_game_version = CoreGameVersion(game_version.value)
+            _core_game_version = CoreGameVersion(game_version.value)
 
         # Get items - database may have different signature
         all_items = ctx.database.get_checked_items(

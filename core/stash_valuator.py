@@ -198,7 +198,7 @@ class StashValuator:
         """Determine item category for pricing."""
         frame_type = item.get("frameType", 0)
         type_line = item.get("typeLine", "").lower()
-        base_type = item.get("baseType", "").lower()
+        _base_type = item.get("baseType", "").lower()  # Reserved for future classification
         icon = item.get("icon", "").lower()
 
         # Currency/stackable

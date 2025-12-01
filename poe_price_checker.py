@@ -13,7 +13,7 @@ def main() -> None:
     ctx = create_app_context()
 
     root = tk.Tk()
-    app = PriceCheckerGUI(root, ctx)
+    _app = PriceCheckerGUI(root, ctx)  # noqa: F841 - app runs via mainloop
     root.mainloop()
 
 

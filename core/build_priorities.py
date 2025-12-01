@@ -273,7 +273,7 @@ def suggest_priorities_from_build(build_stats: Dict[str, float]) -> BuildPriorit
 
     # Analyze damage type from DPS stats
     combined_dps = build_stats.get("CombinedDPS", 0)
-    ignite_dps = build_stats.get("IgniteDPS", 0)
+    _ignite_dps = build_stats.get("IgniteDPS", 0)  # Reserved for future ignite-specific filtering
     total_dot = build_stats.get("TotalDotDPS", 0)
 
     if total_dot > combined_dps * 0.5:
