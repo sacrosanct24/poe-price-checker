@@ -4,9 +4,7 @@ Tests for gui_qt.dialogs.item_comparison_dialog module.
 Tests the side-by-side item comparison dialog functionality.
 """
 
-import pytest
-from unittest.mock import MagicMock, patch, PropertyMock
-from typing import Any, List, Optional
+from typing import List, Optional
 
 
 class MockItem:

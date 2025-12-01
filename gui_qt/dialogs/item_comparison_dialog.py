@@ -23,7 +23,6 @@ from PyQt6.QtWidgets import (
     QTextBrowser,
     QGroupBox,
     QWidget,
-    QFrame,
 )
 
 from gui_qt.styles import COLORS, apply_window_icon
@@ -205,7 +204,6 @@ class ItemComparisonDialog(QDialog):
 
     def _on_text2_changed(self) -> None:
         """Auto-parse when text changes significantly."""
-        pass
 
     def _parse_item1(self) -> None:
         """Parse item 1 from text input."""

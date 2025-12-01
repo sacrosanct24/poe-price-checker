@@ -17,7 +17,7 @@ import zlib
 from pathlib import Path
 from unittest.mock import Mock
 
-from core.build_matcher import BuildMatcher, BuildRequirement
+from core.build_matcher import BuildMatcher
 from core.rare_item_evaluator import AffixMatch
 
 pytestmark = pytest.mark.unit

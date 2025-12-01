@@ -11,7 +11,6 @@ from __future__ import annotations
 import html
 from typing import Any, List, Optional
 
-from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -22,7 +21,7 @@ from gui_qt.styles import COLORS, get_rarity_color, get_tier_color, TIER_COLORS
 from core.build_stat_calculator import BuildStatCalculator, BuildStats
 from core.mod_tier_detector import detect_mod_tier
 from core.build_archetype import BuildArchetype
-from core.upgrade_calculator import UpgradeCalculator, UpgradeImpact
+from core.upgrade_calculator import UpgradeCalculator
 from core.dps_impact_calculator import DPSImpactCalculator, DPSStats
 
 

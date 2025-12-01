@@ -1,5 +1,5 @@
 """Tests for core/guide_gear_extractor.py - Build guide gear extraction."""
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 

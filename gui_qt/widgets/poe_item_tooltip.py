@@ -13,8 +13,8 @@ import html
 import logging
 from typing import TYPE_CHECKING, Any, Optional
 
-from PyQt6.QtCore import Qt, QPoint, QTimer, QEvent
-from PyQt6.QtGui import QFont, QFontMetrics, QPainter, QPen, QColor, QBrush
+from PyQt6.QtCore import Qt, QPoint, QTimer
+from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -24,11 +24,11 @@ from PyQt6.QtWidgets import (
     QGraphicsDropShadowEffect,
 )
 
-from gui_qt.styles import RARITY_COLORS, TIER_COLORS, get_rarity_color, get_tier_color
+from gui_qt.styles import get_rarity_color, get_tier_color
 from core.mod_tier_detector import detect_mod_tier
 
 if TYPE_CHECKING:
-    from core.item_parser import ParsedItem
+    pass
 
 logger = logging.getLogger(__name__)
 

@@ -10,7 +10,7 @@ Tests the meta affix analysis functionality including:
 import json
 import pytest
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 from datetime import datetime
 import tempfile
 

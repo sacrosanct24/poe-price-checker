@@ -1,5 +1,4 @@
 """Tests for core/build_priorities.py - Build stat priorities."""
-import pytest
 
 from core.build_priorities import (
     PriorityTier,

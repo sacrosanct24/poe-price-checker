@@ -21,7 +21,6 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QHBoxLayout,
     QTabWidget,
-    QTabBar,
     QSplitter,
     QGroupBox,
     QLabel,
@@ -39,7 +38,7 @@ from gui_qt.widgets.item_inspector import ItemInspectorWidget
 from gui_qt.widgets.rare_evaluation_panel import RareEvaluationPanelWidget
 
 if TYPE_CHECKING:
-    from core.app_context import AppContext
+    pass
 
 logger = logging.getLogger(__name__)
 

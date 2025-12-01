@@ -1,10 +1,7 @@
 """Tests for core/game_data.py - Game version, class, and ascendancy data."""
-import pytest
 
 from core.game_data import (
     GameVersion,
-    AscendancyInfo,
-    ClassInfo,
     POE1_CLASSES,
     POE2_CLASSES,
     get_classes_for_game,

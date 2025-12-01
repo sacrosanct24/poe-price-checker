@@ -1,6 +1,5 @@
 """Tests for data_sources/repoe_client.py - RePoE data client."""
 import json
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest

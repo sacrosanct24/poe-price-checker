@@ -14,7 +14,6 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from core.item_parser import ItemParser
 from core.rare_item_evaluator import RareItemEvaluator
-from data_sources.pricing.trade_stat_ids import build_stat_filters
 import json
 
 

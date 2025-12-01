@@ -12,8 +12,7 @@ Tests cover:
 import pytest
 import time
 import threading
-from datetime import datetime, timedelta
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 import requests
 
 from data_sources.base_api import (

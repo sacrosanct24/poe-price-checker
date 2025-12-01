@@ -12,7 +12,6 @@ from core.skill_analyzer import (
     SkillAnalyzer,
     SkillInfo,
     SkillAffinity,
-    SkillTag,
     analyze_skill,
     SKILL_TAG_DATABASE,
     AFFIX_AFFINITIES,

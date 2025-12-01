@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import time
 import pytest
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 
 
 pytestmark = pytest.mark.unit

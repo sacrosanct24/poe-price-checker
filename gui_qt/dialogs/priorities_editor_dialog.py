@@ -7,7 +7,7 @@ Dialog for editing build stat priorities for BiS item searching.
 from __future__ import annotations
 
 import logging
-from typing import Dict, List, Optional, Callable
+from typing import Optional, Callable
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (

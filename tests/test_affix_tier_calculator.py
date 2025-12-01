@@ -9,7 +9,7 @@ Tests the affix tier calculation functionality including:
 - Ideal rare item generation
 """
 import pytest
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 
 from core.affix_tier_calculator import (
     AffixTier,

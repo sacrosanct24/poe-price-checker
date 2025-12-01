@@ -1,7 +1,6 @@
 """Tests for core/passive_tree_data.py - Passive tree node data provider."""
 import json
-from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 import pytest
 

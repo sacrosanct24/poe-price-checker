@@ -1,6 +1,5 @@
 """Tests for price check endpoints."""
 
-import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import MagicMock
 

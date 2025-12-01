@@ -1,5 +1,5 @@
 """Tests for core/derived_sources.py - Undercut price derivation."""
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 

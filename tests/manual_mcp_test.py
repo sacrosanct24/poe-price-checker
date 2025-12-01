@@ -7,7 +7,7 @@ import sys
 
 # Check if MCP is available
 try:
-    from mcp.server.fastmcp import FastMCP
+    pass
 except ImportError:
     print("MCP SDK not installed. Skipping test.")
     print("Install with: pip install 'mcp[cli]'")

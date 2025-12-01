@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Mapping, List
+from typing import Any, Mapping
 import pytest
 
 from core.price_multi import RESULT_COLUMNS

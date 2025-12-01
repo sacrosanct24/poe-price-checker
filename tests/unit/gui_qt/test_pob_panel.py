@@ -5,7 +5,6 @@ Tests the embedded PoB character panel widget.
 """
 
 import pytest
-from unittest.mock import Mock, MagicMock, patch
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
@@ -13,7 +12,6 @@ from typing import Dict, List, Optional
 pytest.importorskip("PyQt6")
 
 from PyQt6.QtWidgets import QApplication
-from PyQt6.QtCore import Qt
 
 
 # Ensure QApplication exists for widget tests
@@ -389,7 +387,6 @@ class TestPoBPanelSignals:
     def test_emits_price_check_on_double_click(self, qapp):
         """Should emit price_check_requested on item double-click."""
         from gui_qt.widgets.pob_panel import PoBPanel
-        from PyQt6.QtWidgets import QTreeWidgetItem
 
         items = {"Helmet": MockPoBItem(slot="Helmet", name="Test Helmet")}
         build = MockPoBBuild(items=items)

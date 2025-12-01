@@ -346,7 +346,6 @@ class UpgradeFinderService:
         budget_chaos: float,
     ) -> Dict[str, Any]:
         """Build a trade API query from BiS requirements with price filter."""
-        from data_sources.pricing.trade_stat_ids import AFFIX_TO_STAT_ID
 
         query: Dict[str, Any] = {
             "query": {

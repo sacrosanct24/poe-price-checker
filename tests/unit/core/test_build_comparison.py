@@ -10,9 +10,6 @@ from core.build_comparison import (
     GuideBuildParser,
     MaxrollBuildFetcher,
     ProgressionStage,
-    TreeDelta,
-    SkillDelta,
-    EquipmentDelta,
 )
 
 pytestmark = pytest.mark.unit

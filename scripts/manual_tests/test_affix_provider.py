@@ -58,7 +58,6 @@ def test_empty_database():
     # Create empty database
     from pathlib import Path
     import tempfile
-    import os
 
     with tempfile.TemporaryDirectory() as tmpdir:
         db_path = Path(tmpdir) / "test_empty.db"

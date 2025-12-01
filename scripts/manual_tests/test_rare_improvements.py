@@ -10,7 +10,6 @@ Tests:
 
 from core.item_parser import ItemParser
 from core.rare_item_evaluator import RareItemEvaluator
-from pathlib import Path
 
 
 def test_tier_detection():

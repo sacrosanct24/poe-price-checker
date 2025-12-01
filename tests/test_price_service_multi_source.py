@@ -3,7 +3,7 @@ Test PriceService with poe.watch integration.
 """
 
 import pytest
-from unittest.mock import Mock, MagicMock
+from unittest.mock import Mock
 from core.price_service import PriceService
 from core.config import Config
 from core.item_parser import ItemParser

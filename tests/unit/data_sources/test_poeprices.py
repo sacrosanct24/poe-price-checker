@@ -5,7 +5,7 @@ Tests the PoePricesAPI client and PoePricesPrediction data class.
 """
 
 import pytest
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import patch
 import base64
 
 from data_sources.pricing.poeprices import (

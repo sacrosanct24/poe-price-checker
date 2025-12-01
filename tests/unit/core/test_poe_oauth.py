@@ -13,11 +13,9 @@ import pytest
 import json
 import hashlib
 import base64
-import time
 from pathlib import Path
 from datetime import datetime, timedelta
-from unittest.mock import Mock, patch, MagicMock
-from http.server import HTTPServer
+from unittest.mock import Mock, patch
 
 from core.poe_oauth import PoeOAuthClient, OAuthCallbackHandler
 

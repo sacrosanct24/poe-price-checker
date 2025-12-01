@@ -7,7 +7,7 @@ Provides test client and mock dependencies for testing API endpoints.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Generator
+from typing import Generator
 from unittest.mock import MagicMock
 
 import pytest

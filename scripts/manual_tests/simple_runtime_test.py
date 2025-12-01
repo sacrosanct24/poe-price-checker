@@ -2,7 +2,6 @@
 """Simple runtime verification test for multi-source pricing."""
 
 import logging
-import sys
 
 # Enable verbose logging
 logging.basicConfig(

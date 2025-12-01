@@ -19,7 +19,6 @@ from PyQt6.QtWidgets import (
     QGraphicsOpacityEffect,
 )
 
-from gui_qt.styles import COLORS
 
 
 class ToastType(Enum):

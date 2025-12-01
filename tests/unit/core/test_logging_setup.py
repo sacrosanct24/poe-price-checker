@@ -7,7 +7,7 @@ from __future__ import annotations
 import logging
 import pytest
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from core.logging_setup import setup_logging
 

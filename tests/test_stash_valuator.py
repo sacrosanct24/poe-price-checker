@@ -4,7 +4,7 @@ Tests for Stash Valuator.
 Tests the stash valuation module structure and pricing logic.
 """
 import pytest
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import patch
 
 from core.stash_valuator import (
     PriceSource,

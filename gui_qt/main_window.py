@@ -35,10 +35,7 @@ from PyQt6.QtWidgets import (
     QSplitter,
     QGroupBox,
     QLabel,
-    QLineEdit,
-    QPlainTextEdit,
     QPushButton,
-    QComboBox,
     QMenu,
     QStatusBar,
     QMessageBox,
@@ -51,16 +48,13 @@ from gui_qt.styles import (
     THEME_CATEGORIES, THEME_DISPLAY_NAMES, POE_CURRENCY_COLORS
 )
 from gui_qt.menus.menu_builder import (
-    MenuBuilder, MenuConfig, MenuItem, MenuSection, SubMenu, create_resources_menu
+    MenuBuilder, MenuConfig, MenuItem, MenuSection, create_resources_menu
 )
 from gui_qt.shortcuts import get_shortcut_manager
 from gui_qt.sample_items import SAMPLE_ITEMS
 from gui_qt.dialogs.help_dialogs import (
     show_shortcuts_dialog, show_tips_dialog, show_about_dialog
 )
-from gui_qt.widgets.results_table import ResultsTableWidget
-from gui_qt.widgets.item_inspector import ItemInspectorWidget
-from gui_qt.widgets.rare_evaluation_panel import RareEvaluationPanelWidget
 from gui_qt.widgets.toast_notification import ToastManager
 from gui_qt.widgets.pinned_items_widget import PinnedItemsWidget
 from gui_qt.widgets.session_tabs import SessionTabWidget, SessionPanel
@@ -799,7 +793,6 @@ class PriceCheckerWindow(QMainWindow):
     def _on_result_selected(self, row_data: Dict[str, Any]) -> None:
         """Handle result row selection."""
         # Could update item inspector or show details
-        pass
 
     def _on_pin_items_requested(self, items: List[Dict[str, Any]]) -> None:
         """Handle request to pin items from results table."""

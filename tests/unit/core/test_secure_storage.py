@@ -1,9 +1,7 @@
 """Tests for core/secure_storage.py - Secure credential storage."""
 import base64
 import os
-import tempfile
-from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 import pytest
 

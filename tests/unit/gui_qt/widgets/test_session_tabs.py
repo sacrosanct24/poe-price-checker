@@ -3,7 +3,7 @@ Tests for the Session Tabs widget.
 """
 
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from gui_qt.widgets.session_tabs import SessionState, SessionPanel, SessionTabWidget
 

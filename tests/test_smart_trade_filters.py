@@ -17,7 +17,6 @@ from core.smart_trade_filters import (
 from core.build_archetype import (
     BuildArchetype,
     DefenseType,
-    DamageType,
     AttackType,
     detect_archetype,
 )

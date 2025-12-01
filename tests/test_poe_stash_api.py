@@ -5,8 +5,7 @@ Tests the stash API client structure and data classes.
 Network tests are mocked to avoid requiring real credentials.
 """
 import pytest
-from unittest.mock import Mock, patch, MagicMock
-from datetime import datetime
+from unittest.mock import Mock, patch
 
 from data_sources.poe_stash_api import (
     StashTab,

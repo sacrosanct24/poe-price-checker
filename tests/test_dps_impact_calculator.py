@@ -8,8 +8,6 @@ import pytest
 from core.dps_impact_calculator import (
     DamageType,
     DPSStats,
-    DPSModImpact,
-    DPSImpactResult,
     DPSImpactCalculator,
     get_dps_calculator,
 )

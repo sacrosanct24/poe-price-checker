@@ -1,6 +1,5 @@
 """Tests for gui_qt/styles.py - Theme system and color definitions."""
 
-from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -16,13 +15,8 @@ from gui_qt.styles import (
     STATUS_COLORS,
     DARK_THEME,
     LIGHT_THEME,
-    HIGH_CONTRAST_DARK_THEME,
-    SOLARIZED_DARK_THEME,
     DRACULA_THEME,
     NORD_THEME,
-    MONOKAI_THEME,
-    GRUVBOX_DARK_THEME,
-    COLORBLIND_DEUTERANOPIA_THEME,
     THEME_COLORS,
     COLORBLIND_THEMES,
     THEME_BANNER_MAP,

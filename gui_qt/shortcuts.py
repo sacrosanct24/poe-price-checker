@@ -15,9 +15,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Callable, Dict, List, Optional, TYPE_CHECKING
 
-from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QKeySequence, QShortcut
-from PyQt6.QtWidgets import QWidget
 
 if TYPE_CHECKING:
     from PyQt6.QtWidgets import QMainWindow

@@ -5,7 +5,7 @@ These tests focus on error handling and less common code paths.
 from __future__ import annotations
 
 import pytest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 from core.price_service import PriceService
 from core.game_version import GameVersion
 

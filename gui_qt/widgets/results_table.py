@@ -20,7 +20,6 @@ from PyQt6.QtWidgets import (
     QAbstractItemView,
     QMenu,
     QApplication,
-    QHeaderView,
 )
 
 from gui_qt.styles import COLORS, get_rarity_color, get_tier_color, TIER_COLORS

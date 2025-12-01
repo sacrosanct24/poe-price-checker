@@ -11,7 +11,6 @@ Or standalone: python tests/acceptance/test_real_world.py
 from __future__ import annotations
 
 import json
-import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Optional
@@ -1307,7 +1306,7 @@ def run_tests_directly():
 
 
 if __name__ == "__main__":
-    import sys
+    pass
 
     print("Running Real-World Acceptance Tests...")
     print("=" * 60)

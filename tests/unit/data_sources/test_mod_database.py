@@ -1,6 +1,5 @@
 """Tests for data_sources/mod_database.py - Local mod/affix database."""
 from datetime import datetime, timedelta
-from pathlib import Path
 
 import pytest
 

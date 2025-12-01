@@ -8,13 +8,10 @@ To run these tests, install MCP: pip install "mcp[cli]"
 
 import pytest
 from unittest.mock import Mock, patch
-from core.item_parser import ItemParser, ParsedItem
-from core.database import Database
-from datetime import datetime, timedelta, timezone
+from core.item_parser import ParsedItem
 
 # Check if MCP is available
 try:
-    from mcp.server.fastmcp import FastMCP
     MCP_AVAILABLE = True
 except ImportError:
     MCP_AVAILABLE = False
@@ -83,7 +80,6 @@ class TestMCPServerTools:
     
     def test_get_item_price(self, mock_db, mock_config):
         """Test getting item price from database"""
-        from core.game_version import GameVersion
         
         # Setup mocks
         mock_game_config = Mock()

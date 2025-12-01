@@ -6,7 +6,7 @@ Shows rare item evaluation results in a dedicated panel.
 
 import tkinter as tk
 from tkinter import ttk
-from typing import Optional, Any
+from typing import Optional
 
 from core.rare_item_evaluator import RareItemEvaluation
 

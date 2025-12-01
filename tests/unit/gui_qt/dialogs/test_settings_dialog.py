@@ -1,9 +1,7 @@
 """Tests for SettingsDialog."""
 
-import pytest
 from unittest.mock import MagicMock
 
-from PyQt6.QtWidgets import QDialog
 
 
 class TestSettingsDialogInit:

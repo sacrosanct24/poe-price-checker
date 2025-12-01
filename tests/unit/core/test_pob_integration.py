@@ -9,10 +9,7 @@ Tests cover:
 from __future__ import annotations
 
 import base64
-import json
 import zlib
-from pathlib import Path
-from unittest.mock import MagicMock, patch
 
 import pytest
 

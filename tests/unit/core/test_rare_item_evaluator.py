@@ -14,13 +14,10 @@ Tests cover:
 
 import pytest
 import json
-from pathlib import Path
-from unittest.mock import Mock, patch
 
 from core.rare_item_evaluator import (
     RareItemEvaluator,
-    AffixMatch,
-    RareItemEvaluation
+    AffixMatch
 )
 from core.item_parser import ParsedItem
 

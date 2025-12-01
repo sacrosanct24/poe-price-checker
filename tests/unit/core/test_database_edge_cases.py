@@ -5,7 +5,6 @@ Focus on error handling, edge cases, and less common operations.
 from __future__ import annotations
 
 import pytest
-import sqlite3
 from datetime import datetime, timedelta
 from pathlib import Path
 

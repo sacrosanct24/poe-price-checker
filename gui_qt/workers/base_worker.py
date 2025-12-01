@@ -79,7 +79,6 @@ class BaseWorker(QObject):
         Raises:
             Exception: Any exception will be caught and emitted via error signal
         """
-        pass
 
     def run(self) -> None:
         """
@@ -162,7 +161,6 @@ class BaseThreadWorker(QThread):
         Returns:
             The result to emit via the result signal
         """
-        pass
 
     def run(self) -> None:
         """Execute the worker task with standardized error handling."""

@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 import tkinter as tk
-from tkinter import ttk
 
 import pytest
 
-from gui.main_window import PriceCheckerGUI, RESULT_COLUMNS
+from gui.main_window import PriceCheckerGUI
 
 pytestmark = pytest.mark.integration
 

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import pytest
 from core.item_parser import ItemParser, ParsedItem
-from core.game_version import GameVersion
 
 pytestmark = pytest.mark.unit
 

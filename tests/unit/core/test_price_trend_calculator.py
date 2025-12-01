@@ -1,6 +1,6 @@
 """Tests for core/price_trend_calculator.py - Price trend calculations."""
 import time
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock
 
 import pytest
 

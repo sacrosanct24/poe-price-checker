@@ -13,7 +13,6 @@ pytestmark = pytest.mark.unit
 
 def test_pyqt6_available():
     """Test that PyQt6 is installed and importable."""
-    import PyQt6
     from PyQt6.QtWidgets import QApplication
     assert QApplication is not None
 

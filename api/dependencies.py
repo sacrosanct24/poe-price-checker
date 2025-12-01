@@ -8,10 +8,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from fastapi import Depends
 
 if TYPE_CHECKING:
-    from core.interfaces import IAppContext, IConfig, IDatabase, IPriceService
+    from core.interfaces import IAppContext
 
 
 def get_app_context() -> "IAppContext":

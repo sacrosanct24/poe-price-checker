@@ -5,7 +5,7 @@ Tests the client structure and data classes.
 Network tests are mocked to avoid requiring real API calls.
 """
 import pytest
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 from data_sources.poe_ninja_client import (
     NinjaPrice,

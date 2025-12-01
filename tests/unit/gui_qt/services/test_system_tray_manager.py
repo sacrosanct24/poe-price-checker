@@ -1,7 +1,7 @@
 """Tests for SystemTrayManager."""
 
 import pytest
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import patch
 
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QMainWindow, QSystemTrayIcon

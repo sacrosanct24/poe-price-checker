@@ -6,8 +6,6 @@ if it can be added as an additional pricing data source.
 """
 
 import requests
-import json
-from datetime import datetime
 
 
 class PoeWatchAPI:

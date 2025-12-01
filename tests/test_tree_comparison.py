@@ -7,7 +7,7 @@ Tests the tree comparison functionality including:
 - Report formatting
 """
 import pytest
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 
 from core.tree_comparison import (
     TreeComparisonResult,

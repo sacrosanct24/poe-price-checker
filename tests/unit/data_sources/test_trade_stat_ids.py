@@ -4,7 +4,6 @@ Tests for data_sources.pricing.trade_stat_ids module.
 Tests the mapping of affix types to PoE Trade API stat IDs.
 """
 
-import pytest
 from data_sources.pricing.trade_stat_ids import (
     AFFIX_TO_STAT_ID,
     AFFIX_MIN_VALUES,

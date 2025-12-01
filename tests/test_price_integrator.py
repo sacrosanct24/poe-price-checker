@@ -9,8 +9,7 @@ Tests the price integration functionality including:
 - Singleton getter functions
 """
 import pytest
-from unittest.mock import Mock, patch, MagicMock
-from dataclasses import asdict
+from unittest.mock import Mock, patch
 
 from core.price_integrator import (
     PriceResult,

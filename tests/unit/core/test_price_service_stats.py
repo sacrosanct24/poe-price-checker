@@ -1,5 +1,4 @@
 from __future__ import annotations
-import pytest
 
 from core.price_service import PriceService
 

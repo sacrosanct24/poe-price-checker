@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from typing import Any, Iterable, Mapping
-import logging
 import pytest
 
 from core.price_multi import (

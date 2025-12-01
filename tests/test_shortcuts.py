@@ -5,7 +5,7 @@ Tests the keyboard shortcuts management system.
 """
 
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from gui_qt.shortcuts import (
     ShortcutCategory,

@@ -8,7 +8,7 @@ Tests the RePoE tier data extraction functionality including:
 - Singleton getter functions
 """
 import pytest
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 
 from core.repoe_tier_provider import (
     RePoETier,

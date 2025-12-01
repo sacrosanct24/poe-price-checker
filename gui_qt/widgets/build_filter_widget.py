@@ -9,7 +9,7 @@ Provides cascading dropdowns:
 from __future__ import annotations
 
 import logging
-from typing import Optional, List, Callable
+from typing import Optional, List
 
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import (
@@ -23,8 +23,6 @@ from PyQt6.QtWidgets import (
 from core.game_data import (
     GameVersion,
     get_classes_for_game,
-    get_all_ascendancies,
-    ClassInfo,
 )
 
 logger = logging.getLogger(__name__)

@@ -1,6 +1,5 @@
 """Tests for data_sources/affix_data_provider.py - Affix data provider."""
 import json
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest

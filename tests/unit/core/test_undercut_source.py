@@ -17,7 +17,6 @@ pytestmark = pytest.mark.unit
 from typing import Any, Mapping
 
 from core.derived_sources import UndercutPriceSource
-from core.price_service import PriceService
 from core.price_multi import RESULT_COLUMNS
 
 

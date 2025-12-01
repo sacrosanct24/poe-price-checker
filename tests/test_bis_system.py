@@ -8,18 +8,17 @@ Tests:
 - BiS Calculator integration
 """
 import pytest
-from unittest.mock import Mock, patch
 
 from core.build_priorities import (
-    BuildPriorities, StatPriority, PriorityTier,
-    AVAILABLE_STATS, suggest_priorities_from_build
+    BuildPriorities, PriorityTier, AVAILABLE_STATS,
+    suggest_priorities_from_build
 )
 from core.affix_tier_calculator import (
-    AffixTierCalculator, AffixTier, IdealRareSpec,
-    AFFIX_TIER_DATA, SLOT_AVAILABLE_AFFIXES
+    AffixTierCalculator, AffixTier, AFFIX_TIER_DATA,
+    SLOT_AVAILABLE_AFFIXES
 )
 from core.guide_gear_extractor import (
-    GuideGearExtractor, GuideGearRecommendation, GuideGearSummary
+    GuideGearExtractor
 )
 from core.pob_integration import PoBBuild, PoBItem
 
