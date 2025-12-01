@@ -431,7 +431,7 @@ class ItemInspectorWidget(QWidget):
             multiplier = detail.get('multiplier', 1.0)
             _base_weight = detail.get('base_weight', 0)  # Reserved for future display
             _weighted_weight = detail.get('weighted_weight', 0)  # Reserved for future display
-            _tier = detail.get('tier', '')  # Reserved for future display
+            tier = detail.get('tier', '')
 
             # Skip if no meaningful change
             if abs(multiplier - 1.0) < 0.01:
