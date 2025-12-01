@@ -102,8 +102,8 @@ class DPSStats:
         crit_multi = stats.get("CritMultiplier", stats.get("CritDamage", 150))
 
         # Speed (for future per-hit damage calculations)
-        _attack_speed = stats.get("Speed", stats.get("AttackRate", 1.0))
-        _cast_speed = stats.get("CastSpeed", stats.get("CastRate", 1.0))
+        attack_speed = stats.get("Speed", stats.get("AttackRate", 1.0))
+        cast_speed = stats.get("CastSpeed", stats.get("CastRate", 1.0))
 
         # Determine primary damage type
         damage_totals = {
