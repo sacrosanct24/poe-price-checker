@@ -319,7 +319,7 @@ class PoeOAuthClient:
             data['client_secret'] = self.client_secret
 
         try:
-            response = requests.post(self.TOKEN_URL, data=data)
+            response = requests.post(self.TOKEN_URL, data=data, timeout=30)
             response.raise_for_status()
 
             token_data = response.json()
@@ -368,7 +368,7 @@ class PoeOAuthClient:
             data['client_secret'] = self.client_secret
 
         try:
-            response = requests.post(self.TOKEN_URL, data=data)
+            response = requests.post(self.TOKEN_URL, data=data, timeout=30)
             response.raise_for_status()
 
             token_data = response.json()

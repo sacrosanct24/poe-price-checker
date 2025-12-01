@@ -1107,6 +1107,7 @@ class Database:
         if clauses:
             where_sql = "WHERE " + " AND ".join(clauses)
 
+        # nosec B608 - where_sql is constructed from hardcoded clauses, all values use parameterized queries
         sql = f"""
             SELECT
                 id,

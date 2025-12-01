@@ -100,6 +100,7 @@ class StashScanner:
             response = requests.get(
                 "https://www.pathofexile.com/api/profile",
                 headers=headers,
+                timeout=30,
             )
             response.raise_for_status()
 
@@ -144,6 +145,7 @@ class StashScanner:
                 self.STASH_TABS_URL,
                 headers=headers,
                 params=params,
+                timeout=30,
             )
             response.raise_for_status()
 
@@ -191,6 +193,7 @@ class StashScanner:
                 self.STASH_ITEMS_URL,
                 headers=headers,
                 params=params,
+                timeout=30,
             )
             response.raise_for_status()
 
