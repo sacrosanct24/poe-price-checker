@@ -127,7 +127,7 @@ class PoeNinjaAPI(BaseAPIClient):
                 if rate > 10.0:  # Anything <= 10c/div is bogus
                     return rate
             except (TypeError, ValueError):
-                pass
+                pass  # Invalid cached rate, refresh
 
         # Cache miss or invalid - refresh from API
         rate = self.refresh_divine_rate_from_currency()

@@ -309,7 +309,7 @@ class PrioritiesEditorDialog(QDialog):
             try:
                 min_value = int(min_text)
             except ValueError:
-                pass
+                pass  # Invalid min value, use None
 
         self._priorities.add_priority(stat_type, tier, min_value)
         self._refresh_lists()

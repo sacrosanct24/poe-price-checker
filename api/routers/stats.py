@@ -71,8 +71,8 @@ async def get_stats(
                 checked_at = getattr(item, 'checked_at', None)
                 if checked_at and checked_at >= cutoff:
                     total_checked += 1
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Failed to count checked items: {e}")
 
         # Calculate sales stats
         total_sales = 0
@@ -98,8 +98,8 @@ async def get_stats(
             # Get top items by price
             sale_items.sort(key=lambda x: x['price'], reverse=True)
             top_items = sale_items[:10]
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Failed to calculate sales stats: {e}")
 
         # Calculate averages
         avg_price = total_chaos / total_sales if total_sales > 0 else None
@@ -115,8 +115,8 @@ async def get_stats(
                     times.append(time_to_sale)
             if times:
                 avg_time = sum(times) / len(times)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Failed to calculate average time to sale: {e}")
 
         # Get divine equivalent if we have exchange rate
         divine_equivalent: float | None = None
@@ -125,8 +125,8 @@ async def get_stats(
                 rate = db.get_currency_rate('divine')
                 if rate and rate > 0:
                     divine_equivalent = total_chaos / rate
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Failed to get divine equivalent: {e}")
 
         return StatsResponse(
             period_days=days,
@@ -177,8 +177,8 @@ async def get_quick_summary(
                 checked_at = getattr(item, 'checked_at', None)
                 if checked_at and checked_at.date() == today:
                     items_today += 1
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Failed to count today's items: {e}")
 
         try:
             sales = db.get_sales(limit=1000)
@@ -188,8 +188,8 @@ async def get_quick_summary(
                     pending_sales += 1
                 elif sold_at.date() == today:
                     sales_today += 1
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Failed to count today's sales: {e}")
 
         return {
             "items_checked_today": items_today,

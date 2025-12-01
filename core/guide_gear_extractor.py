@@ -575,7 +575,7 @@ class GuideGearExtractor:
                     try:
                         item.item_level = int(line.replace("Item Level:", "").strip())
                     except ValueError:
-                        pass
+                        pass  # Invalid item level, skip
                 elif line.startswith("Quality:"):
                     qual = re.search(r"\+?(\d+)%?", line)
                     if qual:
@@ -587,7 +587,7 @@ class GuideGearExtractor:
                         implicit_count = int(line.replace("Implicits:", "").strip())
                         implicits_remaining = implicit_count
                     except ValueError:
-                        pass
+                        pass  # Invalid implicit count, skip
                 continue
 
             # Implicit mods

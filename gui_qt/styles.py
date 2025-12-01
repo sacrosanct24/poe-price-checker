@@ -642,7 +642,7 @@ class ThemeManager:
                 bg = palette.color(QPalette.ColorRole.Window)
                 return bg.lightness() < 128
         except Exception:
-            pass
+            pass  # No app instance, assume dark theme
         return True  # Default to dark
 
     def set_theme(self, theme: Theme) -> None:

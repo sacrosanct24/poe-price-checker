@@ -318,7 +318,7 @@ class ItemParser:
                 try:
                     item.spirit = int(line.split(":", 1)[1].strip())
                 except ValueError:
-                    pass
+                    pass  # Invalid spirit value, skip silently
                 continue
 
             # Quality
@@ -350,11 +350,11 @@ class ItemParser:
             if m_level:
                 try:
                     level_val = int(m_level.group(1))
-                    # Only treat this as gem level when it’s actually a gem
+                    # Only treat this as gem level when it's actually a gem
                     if (item.rarity or "").lower() == "gem":
                         item.gem_level = level_val
                 except ValueError:
-                    pass
+                    pass  # Invalid level value, skip silently
                 continue
 
             # Quality (generic)
@@ -367,7 +367,7 @@ class ItemParser:
                     if (item.rarity or "").lower() == "gem":
                         item.gem_quality = q_val
                 except ValueError:
-                    pass
+                    pass  # Invalid quality value, skip silently
                 continue
 
             # Stack Size (currency)
@@ -486,7 +486,7 @@ class ItemParser:
             try:
                 item.requirements["level"] = int(line.split(":", 1)[1].strip())
             except ValueError:
-                pass
+                pass  # Invalid requirement value, skip silently
             return
 
         for stat in ("Str", "Dex", "Int"):
@@ -494,7 +494,7 @@ class ItemParser:
                 try:
                     item.requirements[stat.lower()] = int(line.split(":", 1)[1].strip())
                 except ValueError:
-                    pass
+                    pass  # Invalid requirement value, skip silently
                 return
 
 

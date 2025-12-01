@@ -337,7 +337,7 @@ class CargoAPIClient:
                     mod_domain = int(mod_domain) if mod_domain else None
                     mod_gen = int(mod_gen) if mod_gen else None
                 except (ValueError, TypeError):
-                    pass
+                    pass  # Keep original values if conversion fails
 
                 # Apply filters
                 if domain is not None and mod_domain != domain:

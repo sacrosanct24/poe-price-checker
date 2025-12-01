@@ -518,7 +518,7 @@ class PriceService:
                 if rate > 10.0:  # Sanity check
                     return rate
             except (AttributeError, Exception):
-                pass
+                pass  # poe_ninja unavailable, try config fallback
 
         # Fallback to config
         try:
@@ -535,7 +535,7 @@ class PriceService:
                     if rate > 10.0:
                         return rate
         except (TypeError, ValueError, AttributeError):
-            pass
+            pass  # Config unavailable or invalid
 
         return 0.0
 

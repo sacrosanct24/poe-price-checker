@@ -327,7 +327,7 @@ class ResultsTableModel(QAbstractTableModel):
                                 parts.append(f"Based on {exp_data['listings_used']} listings")
                             return "\n".join(parts) if parts else None
                     except (json.JSONDecodeError, TypeError):
-                        pass
+                        pass  # Invalid JSON explanation, skip tooltip
 
         elif role == Qt.ItemDataRole.UserRole:
             # Return full row data for selection handling

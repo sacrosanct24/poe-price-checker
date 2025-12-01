@@ -566,7 +566,7 @@ class PriceCheckerWindow(QMainWindow):
                 try:
                     total_chaos += float(val) if val else 0.0
                 except (ValueError, TypeError):
-                    pass
+                    pass  # Skip non-numeric values
             self.summary_label.setText(f"{count} items | {total_chaos:.1f}c total")
 
     # -------------------------------------------------------------------------
