@@ -15,6 +15,7 @@ from core.rare_item_evaluator import RareItemEvaluator
 from data_sources.pricing.poe_ninja import PoeNinjaAPI
 from data_sources.pricing.poe_watch import PoeWatchAPI
 from data_sources.pricing.trade_api import TradeApiSource
+from core.price_estimation import get_active_policy, round_to_step
 
 logger = logging.getLogger(__name__)
 
@@ -823,13 +824,15 @@ class PriceService:
         cv = safe_ratio(stddev, mean)  # coefficient of variation
 
         # --- Step 3: confidence heuristics ---
-        if count >= 20 and iqr_ratio <= 0.35 and cv <= 0.35:
+        policy = get_active_policy()
+
+        if count >= policy.high_count and iqr_ratio <= policy.high_spread and cv <= policy.high_spread:
             confidence = "high"
             reason = f"High sample size ({count}) with tight spread"
-        elif count >= 8 and iqr_ratio <= 0.6 and cv <= 0.6:
+        elif count >= policy.medium_count and iqr_ratio <= policy.medium_spread and cv <= policy.medium_spread:
             confidence = "medium"
             reason = f"Moderate sample size ({count}) with acceptable spread"
-        elif iqr_ratio > 0.8 or cv > 0.8:
+        elif iqr_ratio > policy.low_conf_spread or cv > policy.low_conf_spread:
             confidence = "low"
             reason = f"Volatile prices ({count} listings, high spread)"
         else:
@@ -840,16 +843,12 @@ class PriceService:
 
         raw = base_price
         if raw >= 100:
-            # nearest 5c
-            rounded = round(raw / 5.0) * 5.0
+            rounded = round_to_step(raw, policy.step_ge_100)
         elif raw >= 10:
-            # nearest 1c
-            rounded = round(raw)
+            rounded = round_to_step(raw, policy.step_ge_10)
         elif raw >= 1:
-            # 1 decimal
             rounded = round(raw, 1)
         else:
-            # 2 decimals for very cheap items
             rounded = round(raw, 2)
 
         return {

@@ -6,6 +6,7 @@ All API clients (poe.ninja, official trade, etc.) inherit from this.
 from abc import ABC, abstractmethod
 from collections import OrderedDict
 from typing import Optional, Dict, Any, Callable
+import random
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
@@ -19,6 +20,20 @@ from core.constants import CACHE_MAX_SIZE
 
 # Get logger - configuration should be done by application entrypoint, not library modules
 logger = logging.getLogger(__name__)
+
+# Module-level toggle for retry logging verbosity
+# Values: "minimal" or "detailed"
+_RETRY_LOG_VERBOSITY = "minimal"
+
+
+def set_retry_logging_verbosity(mode: str) -> None:
+    """Set retry logging verbosity for API calls.
+
+    Args:
+        mode: "minimal" (default) or "detailed"
+    """
+    global _RETRY_LOG_VERBOSITY
+    _RETRY_LOG_VERBOSITY = "detailed" if str(mode).lower() == "detailed" else "minimal"
 
 
 class RateLimitExceeded(Exception):
@@ -55,7 +70,10 @@ class RateLimiter:
 
             if time_since_last_call < self.min_interval:
                 sleep_time = self.min_interval - time_since_last_call
-                logger.debug(f"Rate limiting: sleeping {sleep_time:.2f}s")
+                # Add small jitter to avoid thundering herd across threads/processes
+                jitter = min(0.25, 0.1 * self.min_interval)
+                sleep_time += random.uniform(0, jitter)
+                logger.debug(f"Rate limiting: sleeping {sleep_time:.2f}s (with jitter)")
                 time.sleep(sleep_time)
 
             self.last_call_time = time.time()
@@ -74,6 +92,11 @@ class ResponseCache:
         self.default_ttl = default_ttl
         self.max_size = max_size
         self.lock = threading.Lock()
+        # Simple metrics
+        self.hits = 0
+        self.misses = 0
+        self.sets = 0
+        self.evictions = 0
 
     def get(self, key: str) -> Optional[Any]:
         """Get cached value if not expired. Moves item to end for LRU ordering."""
@@ -84,11 +107,14 @@ class ResponseCache:
                     # Move to end (most recently used)
                     self.cache.move_to_end(key)
                     logger.debug(f"Cache hit: {key}")
+                    self.hits += 1
                     return value
                 else:
                     # Expired
                     del self.cache[key]
                     logger.debug(f"Cache expired: {key}")
+            # miss (either absent or expired)
+            self.misses += 1
         return None
 
     def set(self, key: str, value: Any, ttl: Optional[int] = None):
@@ -98,17 +124,31 @@ class ResponseCache:
             while len(self.cache) >= self.max_size:
                 oldest_key, _ = self.cache.popitem(last=False)
                 logger.debug(f"Cache evicted (LRU): {oldest_key}")
+                self.evictions += 1
 
             ttl = ttl or self.default_ttl
             expiry = datetime.now() + timedelta(seconds=ttl)
             self.cache[key] = (value, expiry)
             logger.debug(f"Cache set: {key} (TTL: {ttl}s, size: {len(self.cache)}/{self.max_size})")
+            self.sets += 1
 
     def clear(self):
         """Clear entire cache"""
         with self.lock:
             self.cache.clear()
             logger.info("Cache cleared")
+
+    def stats(self) -> Dict[str, int]:
+        """Return simple cache metrics for observability."""
+        with self.lock:
+            return {
+                "hits": self.hits,
+                "misses": self.misses,
+                "sets": self.sets,
+                "evictions": self.evictions,
+                "size": len(self.cache),
+                "capacity": self.max_size,
+            }
 
     def size(self) -> int:
         """Get number of cached items"""
@@ -128,12 +168,25 @@ def retry_with_backoff(max_retries: int = 3, base_delay: float = 1.0):
     def decorator(func: Callable) -> Callable:
         @wraps(func)
         def wrapper(*args, **kwargs):
+            def _context_str() -> str:
+                # Best-effort extraction of method/endpoint for _make_request
+                try:
+                    if func.__name__ == "_make_request":
+                        method = kwargs.get("method") if "method" in kwargs else (args[1] if len(args) > 1 else "")
+                        endpoint = kwargs.get("endpoint") if "endpoint" in kwargs else (args[2] if len(args) > 2 else "")
+                        return f"{func.__qualname__} {method} {endpoint}"
+                except Exception:
+                    pass
+                return func.__qualname__
+
             for attempt in range(max_retries + 1):
                 try:
+                    if _RETRY_LOG_VERBOSITY == "detailed":
+                        logger.debug(f"API call attempt {attempt + 1}/{max_retries + 1}: {_context_str()}")
                     return func(*args, **kwargs)
                 except (requests.RequestException, RateLimitExceeded) as e:
                     if attempt == max_retries:
-                        logger.error(f"Max retries ({max_retries}) reached for {func.__name__}")
+                        logger.error(f"Max retries ({max_retries}) reached for {_context_str()}: {e}")
                         raise
 
                     if isinstance(e, RateLimitExceeded):
@@ -141,7 +194,12 @@ def retry_with_backoff(max_retries: int = 3, base_delay: float = 1.0):
                     else:
                         delay = base_delay * (2 ** attempt)
 
-                    logger.warning(f"Attempt {attempt + 1} failed: {e}. Retrying in {delay}s...")
+                    if _RETRY_LOG_VERBOSITY == "detailed":
+                        logger.warning(
+                            f"Attempt {attempt + 1} failed for {_context_str()}: {e}. Retrying in {delay}s...")
+                    else:
+                        logger.warning(
+                            f"Attempt {attempt + 1} failed ({type(e).__name__}). Retrying...")
                     time.sleep(delay)
 
             return None  # Should never reach here

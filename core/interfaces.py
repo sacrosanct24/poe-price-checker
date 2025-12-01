@@ -22,7 +22,10 @@ eliminating TYPE_CHECKING blocks and potential circular import issues.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
+from typing import Any, Dict, List, Optional, Protocol, runtime_checkable, Union, TYPE_CHECKING
+
+if TYPE_CHECKING:  # Avoid runtime import cycles
+    from core.price_row import PriceRow
 
 
 @runtime_checkable
@@ -33,14 +36,14 @@ class IPriceService(Protocol):
     This matches MultiSourcePriceService and PriceService.
     """
 
-    def check_item(self, item_text: str) -> List[Dict[str, Any]]:
+    def check_item(self, item_text: str) -> List[Union[Dict[str, Any], "PriceRow"]]:
         """Check prices for an item.
 
         Args:
             item_text: Raw item text from PoE.
 
         Returns:
-            List of price result dictionaries.
+            List of normalized price rows (dicts or PriceRow instances).
         """
         ...
 

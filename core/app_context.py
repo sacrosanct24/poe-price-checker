@@ -19,6 +19,8 @@ from core.price_multi import (
 )
 from core.derived_sources import UndercutPriceSource
 from data_sources.pricing.trade_api import PoeTradeClient, TradeApiSource
+from core.price_estimation import set_active_policy_from_dict
+from data_sources.base_api import set_retry_logging_verbosity
 
 
 @dataclass
@@ -83,6 +85,17 @@ class AppContext:
 
 def create_app_context() -> AppContext:
     config = Config()
+    # Apply pricing display policy from config at startup (runtime-tunable)
+    try:
+        set_active_policy_from_dict(config.display_policy)
+    except Exception:
+        # Defensive: ignore invalid config; keep defaults
+        pass
+    # Apply API retry logging verbosity
+    try:
+        set_retry_logging_verbosity(config.api_retry_logging_verbosity)
+    except Exception:
+        pass
     parser = ItemParser()
     db = Database()  # Uses default ~/.poe_price_checker/data.db
 

@@ -91,6 +91,8 @@ class Config:
             # GUARDRAIL: Min 0.2 (1 req/5s), Max 1.0 (1 req/s)
             # GGG recommends ~0.33 (1 req/3s) to avoid 429 errors
             "rate_limit_per_second": 0.33,
+            # Verbosity of retry logging for API calls: "minimal" or "detailed"
+            "retry_logging_verbosity": "minimal",
         },
         "plugins": {
             "enabled": [],
@@ -99,6 +101,18 @@ class Config:
             "poesessid": "",  # Session cookie for stash access
             "account_name": "",  # PoE account name
             "last_fetch": None,  # Last stash fetch timestamp
+        },
+        "pricing": {
+            # Display policy thresholds (tunable)
+            "display_policy": {
+                "high_count": 20,
+                "medium_count": 8,
+                "high_spread": 0.35,
+                "medium_spread": 0.6,
+                "low_conf_spread": 0.8,
+                "step_ge_100": 5.0,
+                "step_ge_10": 1.0,
+            }
         },
     }
 
@@ -257,6 +271,45 @@ class Config:
         self.data["games"][game_key]["last_price_update"] = datetime.now().isoformat()
 
         self.save()
+
+    # ------------------------------------------------------------------
+    # Pricing policy configuration
+    # ------------------------------------------------------------------
+
+    @property
+    def display_policy(self) -> Dict[str, Any]:
+        """Get the pricing display policy mapping from config.
+
+        Returns a dict with keys matching core.price_estimation.DisplayPolicy.
+        """
+        pricing = self.data.get("pricing", {}) or {}
+        dp = pricing.get("display_policy", {}) or {}
+        # Merge with defaults to ensure all keys present
+        defaults = self.DEFAULT_CONFIG["pricing"]["display_policy"].copy()
+        defaults.update({k: v for k, v in dp.items() if v is not None})
+        return defaults
+
+    def set_display_policy(self, policy: Dict[str, Any]) -> None:
+        """Update the pricing display policy mapping and persist."""
+        if not isinstance(policy, dict):
+            return
+        self.data.setdefault("pricing", {})
+        self.data["pricing"]["display_policy"] = {
+            **self.DEFAULT_CONFIG["pricing"]["display_policy"],
+            **policy,
+        }
+        self.save()
+
+    # ------------------------------------------------------------------
+    # API logging verbosity
+    # ------------------------------------------------------------------
+
+    @property
+    def api_retry_logging_verbosity(self) -> str:
+        """Return retry logging verbosity: "minimal" or "detailed"."""
+        api = self.data.get("api", {}) or {}
+        val = str(api.get("retry_logging_verbosity", "minimal")).lower()
+        return "detailed" if val == "detailed" else "minimal"
 
     # ------------------------------------------------------------------
     # League Management

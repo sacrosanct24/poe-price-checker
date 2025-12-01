@@ -1,7 +1,14 @@
 import logging
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
-from typing import Any, Iterable, Protocol, runtime_checkable, Mapping
+from typing import Any, Iterable, Protocol, runtime_checkable, Mapping, Union
+
+try:
+    # Optional import for stronger typing; code works without it
+    from core.price_row import PriceRow
+except Exception:  # pragma: no cover - typing convenience only
+    PriceRow = Any  # type: ignore
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +26,7 @@ RESULT_COLUMNS: tuple[str, ...] = (
 @runtime_checkable
 class PriceSource(Protocol):
     name: str
-    def check_item(self, item_text: str) -> Iterable[dict[str, Any]]: ...
+    def check_item(self, item_text: str) -> Iterable[Union[dict[str, Any], PriceRow]]: ...
 
 
 @dataclass
@@ -34,6 +41,12 @@ class ExistingServiceAdapter(PriceSource):
         for row in raw_results:
             if isinstance(row, dict):
                 data = dict(row)
+            elif type(row).__name__ == "PriceRow":  # avoid hard dependency at runtime
+                # Support dataclass-based rows
+                try:
+                    data = dict(vars(row))
+                except Exception:
+                    data = {col: getattr(row, col, "") for col in RESULT_COLUMNS}
             else:
                 data = {col: getattr(row, col, "") for col in RESULT_COLUMNS}
 
@@ -124,18 +137,38 @@ class MultiSourcePriceService:
 
             for future in as_completed(future_to_source):
                 source = future_to_source[future]
+                start = time.perf_counter()
                 try:
                     rows = future.result()
+                    ok = True
                 except Exception as e:
                     logger.warning(
                         f"Price source '{source.name}' failed: {e}",
                         exc_info=True
                     )
-                    continue
+                    ok = False
+                    rows = []
+                finally:
+                    dur_ms = (time.perf_counter() - start) * 1000.0
+                    logger.debug(
+                        "price_source_done",
+                        extra={
+                            "source": source.name,
+                            "duration_ms": round(dur_ms, 2),
+                            "ok": ok,
+                            "row_count": len(rows) if isinstance(rows, list) else 0,
+                        },
+                    )
+                    # do not continue here; allow successful rows to be processed below
 
                 for row in rows:
                     if isinstance(row, dict):
                         data = dict(row)
+                    elif type(row).__name__ == "PriceRow":  # support typed rows
+                        try:
+                            data = dict(vars(row))
+                        except Exception:
+                            data = {col: getattr(row, col, "") for col in RESULT_COLUMNS}
                     else:
                         data = {col: getattr(row, col, "") for col in RESULT_COLUMNS}
 
