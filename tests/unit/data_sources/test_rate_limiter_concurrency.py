@@ -56,7 +56,8 @@ def test_rate_limiter_two_threads_spacing(monkeypatch):
 
     t1 = threading.Thread(target=worker, args=(done1,), daemon=True)
     t2 = threading.Thread(target=worker, args=(done2,), daemon=True)
-    t1.start(); t2.start()
+    t1.start()
+    t2.start()
 
     # Release both workers
     start_barrier.wait()
