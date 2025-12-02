@@ -237,11 +237,22 @@ def retry_with_backoff(max_retries: int = 3, base_delay: float = 1.0, use_env_ca
             for attempt in range(max_retries + 1):
                 try:
                     if _RETRY_LOG_VERBOSITY == "detailed":
-                        logger.debug(f"API call attempt {attempt + 1}/{max_retries + 1}: {_context_str()}")
+                        # Use parameterized logging to avoid formatting cost when disabled
+                        logger.debug(
+                            "API call attempt %s/%s: %s",
+                            attempt + 1,
+                            max_retries + 1,
+                            _context_str(),
+                        )
                     return func(*args, **kwargs)
                 except (requests.RequestException, RateLimitExceeded) as e:
                     if attempt == max_retries:
-                        logger.error(f"Max retries ({max_retries}) reached for {_context_str()}: {e}")
+                        logger.error(
+                            "Max retries (%s) reached for %s: %s",
+                            max_retries,
+                            _context_str(),
+                            e,
+                        )
                         raise
 
                     if isinstance(e, RateLimitExceeded):
@@ -251,10 +262,18 @@ def retry_with_backoff(max_retries: int = 3, base_delay: float = 1.0, use_env_ca
 
                     if _RETRY_LOG_VERBOSITY == "detailed":
                         logger.warning(
-                            f"Attempt {attempt + 1} failed for {_context_str()}: {e}. Retrying in {delay}s...")
+                            "Attempt %s failed for %s: %s. Retrying in %ss...",
+                            attempt + 1,
+                            _context_str(),
+                            e,
+                            delay,
+                        )
                     else:
                         logger.warning(
-                            f"Attempt {attempt + 1} failed ({type(e).__name__}). Retrying...")
+                            "Attempt %s failed (%s). Retrying...",
+                            attempt + 1,
+                            type(e).__name__,
+                        )
                     # Apply cap if configured to avoid excessive sleeps during tests
                     if max_sleep_cap is not None and delay > max_sleep_cap:
                         delay = max_sleep_cap
