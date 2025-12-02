@@ -8,6 +8,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Deterministic unit tests for concurrency and resiliency in data_sources:
+  - `test_rate_limiter.py` and `test_rate_limiter_concurrency.py` validate spacing under contention without real sleeps.
+  - `test_retry_with_backoff.py` covers retry success/failure paths deterministically.
+  - `test_retry_env_cap.py` verifies optional retry sleep capping via `RETRY_MAX_SLEEP` and pytest default cap.
+  - Hardened `ResponseCache` tests: TTL/eviction and reentrancy under DEBUG logging; added `test_response_cache_metrics.py` to assert ratio metrics.
+
+### Changed
+- Global hung‑test safeguards: enabled `pytest-timeout` (default 120s, method=thread) via `pytest.ini` and `requirements.txt`.
+- Always report slowest tests with `--durations=20` in `pytest.ini`.
+- Enabled global `faulthandler` at test session start (tests/conftest.py) to dump thread stacks on timeouts/breaks.
+- Observability improvements:
+  - `RateLimiter` now tracks `total_sleeps` and `total_slept_seconds`; added `metrics()` snapshot.
+  - `ResponseCache.stats()` includes `hit_ratio`, `miss_ratio`, and `fill_ratio` in addition to counters.
+- Concurrency hardening:
+  - `ResponseCache` uses `threading.RLock` and guards DEBUG stats logging to avoid re‑entrant deadlocks.
+  - Reduced lock scope and moved logging/callbacks out of locks in `core/clipboard_monitor.py`.
+  - `data_sources/poe_ninja_client.py` and `data_sources/affix_data_provider.py` build outside locks and publish with short double‑checked locks to avoid long critical sections.
+  - `BaseAPIClient._make_request` decorated with `retry_with_backoff(..., use_env_cap=True)` to avoid long sleeps in tests; respects `RETRY_MAX_SLEEP`.
+
+### Fixed
+- Deadlock in `ResponseCache.set()` when DEBUG logging called `stats()` while holding a non‑reentrant lock. Replaced with `RLock` and conditional logging.
+
+### Notes
+- Local environments should `pip install -r requirements.txt` to ensure `pytest-timeout` is active; otherwise `pytest.ini` timeout keys are ignored with a warning.
+
+### Added
 - Nothing yet
 
 ### Changed
