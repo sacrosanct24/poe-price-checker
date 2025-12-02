@@ -8,19 +8,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Deterministic unit tests for concurrency and resiliency in data_sources:
-  - `test_rate_limiter.py` and `test_rate_limiter_concurrency.py` validate spacing under contention without real sleeps.
-  - `test_retry_with_backoff.py` covers retry success/failure paths deterministically.
-  - `test_retry_env_cap.py` verifies optional retry sleep capping via `RETRY_MAX_SLEEP` and pytest default cap.
-  - Hardened `ResponseCache` tests: TTL/eviction and reentrancy under DEBUG logging; added `test_response_cache_metrics.py` to assert ratio metrics.
+- Deterministic concurrency/resiliency tests:
+  - `tests/unit/data_sources/test_rate_limiter.py` and `test_rate_limiter_concurrency.py` validate spacing under contention without real sleeps.
+  - `tests/unit/data_sources/test_retry_with_backoff.py` and `test_retry_env_cap.py` cover retry success/failure and sleep capping via `RETRY_MAX_SLEEP` or pytest default.
+  - `tests/unit/data_sources/test_response_cache_ttl.py`, `test_response_cache_reentrancy.py`, and `test_response_cache_metrics.py` harden TTL/eviction, re‑entrancy under DEBUG logging, and ratio metrics.
+  - `tests/unit/data_sources/test_poe_ninja_singleton_concurrency.py` verifies single DB build under concurrent calls.
+  - `tests/unit/data_sources/test_retry_mixed_exceptions.py` validates mixed 429→network error backoff behavior with capping.
+  - `tests/unit/core/test_clipboard_monitor_locking.py` checks PoE item detection and that callbacks run outside internal locks.
 
 ### Changed
-- Global hung‑test safeguards: enabled `pytest-timeout` (default 120s, method=thread) via `pytest.ini` and `requirements.txt`.
+- Hung‑test safeguards: `pytest-timeout` default 120s (`timeout_method=thread`) via `pytest.ini` and `requirements.txt`.
 - Always report slowest tests with `--durations=20` in `pytest.ini`.
 - Enabled global `faulthandler` at test session start (tests/conftest.py) to dump thread stacks on timeouts/breaks.
-- Observability improvements:
+- Observability:
   - `RateLimiter` now tracks `total_sleeps` and `total_slept_seconds`; added `metrics()` snapshot.
-  - `ResponseCache.stats()` includes `hit_ratio`, `miss_ratio`, and `fill_ratio` in addition to counters.
+  - `ResponseCache.stats()` includes `hit_ratio`, `miss_ratio`, and `fill_ratio`.
 - Concurrency hardening:
   - `ResponseCache` uses `threading.RLock` and guards DEBUG stats logging to avoid re‑entrant deadlocks.
   - Reduced lock scope and moved logging/callbacks out of locks in `core/clipboard_monitor.py`.
@@ -32,15 +34,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Notes
 - Local environments should `pip install -r requirements.txt` to ensure `pytest-timeout` is active; otherwise `pytest.ini` timeout keys are ignored with a warning.
-
-### Added
-- Nothing yet
-
-### Changed
-- Nothing yet
-
-### Fixed
-- Nothing yet
 
 ---
 
