@@ -60,7 +60,9 @@ class RateLimiter:
         self.calls_per_second = calls_per_second
         self.min_interval = 1.0 / calls_per_second
         self.last_call_time = 0
-        self.lock = threading.Lock()
+        # Use RLock to allow safe re-entrant acquisition within methods that may
+        # call other lock-protected helpers (e.g., set() -> stats()).
+        self.lock = threading.RLock()
 
     def wait_if_needed(self):
         """Block if necessary to respect rate limit"""
@@ -129,10 +131,18 @@ class ResponseCache:
             ttl = ttl or self.default_ttl
             expiry = datetime.now() + timedelta(seconds=ttl)
             self.cache[key] = (value, expiry)
-            logger.debug(f"Cache set: {key} (TTL: {ttl}s, size: {len(self.cache)}/{self.max_size})")
+            logger.debug(
+                "Cache set: %s (TTL: %ss, size: %s/%s)",
+                key,
+                ttl,
+                len(self.cache),
+                self.max_size,
+            )
             self.sets += 1
-            # Emit current stats for observability at debug level
-            logger.debug(f"Cache stats: {self.stats()}")
+            # Emit current stats for observability at debug level. Guard to avoid
+            # unnecessary work when DEBUG is disabled.
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug("Cache stats: %s", self.stats())
 
     def clear(self):
         """Clear entire cache"""
