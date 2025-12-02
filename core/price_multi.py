@@ -2,13 +2,21 @@ import logging
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
-from typing import Any, Iterable, Protocol, runtime_checkable, Mapping, Union
+from typing import Any, Iterable, Protocol, runtime_checkable, Mapping, Union, Callable
+
+try:
+    # Arbitration (feature-flagged in service constructor)
+    from core.price_arbitration import arbitrate_rows
+except Exception:  # pragma: no cover - optional until wired
+    arbitrate_rows = None  # type: ignore
 
 try:
     # Optional import for stronger typing; code works without it
-    from core.price_row import PriceRow
+    from core.price_row import PriceRow, validate_and_normalize_row
 except Exception:  # pragma: no cover - typing convenience only
     PriceRow = Any  # type: ignore
+    def validate_and_normalize_row(row):  # type: ignore
+        return dict(row)
 
 logger = logging.getLogger(__name__)
 
@@ -39,23 +47,8 @@ class ExistingServiceAdapter(PriceSource):
         rows: list[dict[str, Any]] = []
 
         for row in raw_results:
-            if isinstance(row, dict):
-                data = dict(row)
-            elif type(row).__name__ == "PriceRow":  # avoid hard dependency at runtime
-                # Support dataclass-based rows
-                try:
-                    data = dict(vars(row))
-                except Exception:
-                    data = {col: getattr(row, col, "") for col in RESULT_COLUMNS}
-            else:
-                data = {col: getattr(row, col, "") for col in RESULT_COLUMNS}
-
-            data.setdefault("item_name", "")
-            data.setdefault("variant", "")
-            data.setdefault("links", "")
-            data.setdefault("chaos_value", "")
-            data.setdefault("divine_value", "")
-            data.setdefault("listing_count", "")
+            data = validate_and_normalize_row(row)
+            # Override/ensure source label corresponds to this adapter
             data["source"] = self.name
 
             rows.append(data)
@@ -76,6 +69,9 @@ class MultiSourcePriceService:
         self,
         sources: list[PriceSource],
         max_workers: int | None = None,
+        on_change_enabled_state: Callable[[dict[str, bool]], None] | None = None,
+        base_log_context: Mapping[str, Any] | None = None,
+        use_arbitration: bool = False,
     ) -> None:
         if not sources:
             raise ValueError("MultiSourcePriceService requires at least one PriceSource.")
@@ -84,6 +80,12 @@ class MultiSourcePriceService:
 
         # Track enabled source names; default = all enabled
         self._enabled_names: set[str] = {s.name for s in self._sources}
+        # Optional persistence callback invoked when enabled state changes
+        self._on_change_enabled_state = on_change_enabled_state
+        # Feature flag for cross-source arbitration
+        self._use_arbitration: bool = bool(use_arbitration)
+        # Structured logging base context (e.g., game, league)
+        self._base_log_context: dict[str, Any] = dict(base_log_context or {})
 
     @property
     def sources(self) -> list[PriceSource]:
@@ -110,6 +112,12 @@ class MultiSourcePriceService:
                 new_enabled.add(s.name)
         # Avoid ending up with an empty set silently; fall back to all enabled
         self._enabled_names = new_enabled or {s.name for s in self._sources}
+        # Persist via callback if provided
+        if self._on_change_enabled_state is not None:
+            try:
+                self._on_change_enabled_state(self.get_enabled_state())
+            except Exception:  # defensive: do not let persistence errors bubble
+                logger.exception("Failed to persist enabled sources state")
 
     # ---------------------------------------------------------------------
 
@@ -150,36 +158,46 @@ class MultiSourcePriceService:
                     rows = []
                 finally:
                     dur_ms = (time.perf_counter() - start) * 1000.0
+                    extra_fields = {
+                        "source": source.name,
+                        "duration_ms": round(dur_ms, 2),
+                        "ok": ok,
+                        "row_count": len(rows) if isinstance(rows, list) else 0,
+                    }
+                    extra_fields.update(self._base_log_context)
                     logger.debug(
                         "price_source_done",
-                        extra={
-                            "source": source.name,
-                            "duration_ms": round(dur_ms, 2),
-                            "ok": ok,
-                            "row_count": len(rows) if isinstance(rows, list) else 0,
-                        },
+                        extra=extra_fields,
                     )
                     # do not continue here; allow successful rows to be processed below
 
                 for row in rows:
-                    if isinstance(row, dict):
-                        data = dict(row)
-                    elif type(row).__name__ == "PriceRow":  # support typed rows
-                        try:
-                            data = dict(vars(row))
-                        except Exception:
-                            data = {col: getattr(row, col, "") for col in RESULT_COLUMNS}
-                    else:
-                        data = {col: getattr(row, col, "") for col in RESULT_COLUMNS}
-
-                    data.setdefault("source", source.name)
-                    data.setdefault("item_name", "")
-                    data.setdefault("variant", "")
-                    data.setdefault("links", "")
-                    data.setdefault("chaos_value", "")
-                    data.setdefault("divine_value", "")
-                    data.setdefault("listing_count", "")
-
+                    data = validate_and_normalize_row(row)
+                    if not data.get("source"):
+                        data["source"] = source.name
                     results.append(data)
+        
+        # Optionally add an arbitrated display row at the top without
+        # changing existing rows, guarded by feature flag
+        if self._use_arbitration and arbitrate_rows is not None:
+            try:
+                priority = [s.name for s in active_sources]
+                chosen = arbitrate_rows(results, source_priority=priority)
+            except Exception:
+                chosen = None
+            if chosen:
+                display = dict(chosen)
+                # Mark row as arbitrated and normalize source label
+                display["source"] = display.get("source", "") or "arbitrated"
+                display["is_arbitrated"] = True
+                results.insert(0, display)
+                # Structured log for arbitration decision
+                arb_extra = {
+                    "chosen_source": display.get("source"),
+                    "chosen_chaos": display.get("chaos_value"),
+                    "is_arbitrated": True,
+                }
+                arb_extra.update(self._base_log_context)
+                logger.debug("price_arbitration_done", extra=arb_extra)
 
         return results

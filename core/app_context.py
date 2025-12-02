@@ -109,6 +109,13 @@ def create_app_context() -> AppContext:
     if game == GameVersion.POE1:
         # Start with whatever league is in the config
         poe_ninja = PoeNinjaAPI(league=game_cfg.league)
+        # Apply timeouts and endpoint TTLs from config (non-breaking defaults)
+        try:
+            connect_to, read_to = config.get_api_timeouts()
+            poe_ninja.timeout = (connect_to, read_to)
+            poe_ninja.endpoint_ttls = config.get_pricing_ttls()
+        except Exception:
+            pass
 
         # Optionally auto-detect the active temp league via poe.ninja
         if config.auto_detect_league:
@@ -139,6 +146,13 @@ def create_app_context() -> AppContext:
         try:
             logger.info("Initializing poe.watch API for league: %s", game_cfg.league)
             poe_watch = PoeWatchAPI(league=game_cfg.league)
+            # Apply timeouts and endpoint TTLs from config
+            try:
+                connect_to, read_to = config.get_api_timeouts()
+                poe_watch.timeout = (connect_to, read_to)
+                poe_watch.endpoint_ttls = config.get_pricing_ttls()
+            except Exception:
+                pass
             logger.info("[OK] poe.watch API initialized successfully")
         except Exception as exc:
             logger.warning(
@@ -224,7 +238,45 @@ def create_app_context() -> AppContext:
     # stats and DB history. Later, if we want a "raw trade listings" source,
     # we can wrap TradeApiSource in its own PriceSource adapter.
 
-    multi_price_service = MultiSourcePriceService(sources=sources)
+    # Persistence callback for enabled source state
+    def _persist_enabled_state(state: dict[str, bool]) -> None:
+        try:
+            config.set_enabled_sources(state)
+        except Exception:
+            logging.getLogger(__name__).exception("Failed to persist enabled source state")
+
+    use_arbitration_flag = False
+    try:
+        use_arbitration_flag = bool(getattr(config, "use_cross_source_arbitration", False))
+    except Exception:
+        use_arbitration_flag = False
+
+    # Construct multi-source service with backward-compatible fallback for
+    # older test doubles that don't accept new keyword arguments.
+    try:
+        multi_price_service = MultiSourcePriceService(
+            sources=sources,
+            on_change_enabled_state=_persist_enabled_state,
+            base_log_context={
+                "game": game.value,
+                "league": game_cfg.league,
+            },
+            use_arbitration=use_arbitration_flag,
+        )
+    except TypeError:
+        # Fallback to minimal constructor signature
+        multi_price_service = MultiSourcePriceService(sources=sources)
+
+    # Load enabled sources from config (if any), defaulting to all enabled
+    try:
+        enabled_map = getattr(config, "enabled_sources", {}) or {}
+        if isinstance(enabled_map, dict) and enabled_map:
+            # Some older test doubles may not implement set_enabled_state
+            if hasattr(multi_price_service, "set_enabled_state"):
+                multi_price_service.set_enabled_state(enabled_map)  # type: ignore[attr-defined]
+    except Exception:
+        # Defensive: ignore bad config
+        pass
 
     return AppContext(
         config=config,

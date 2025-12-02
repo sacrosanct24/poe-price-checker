@@ -5,7 +5,7 @@ All API clients (poe.ninja, official trade, etc.) inherit from this.
 
 from abc import ABC, abstractmethod
 from collections import OrderedDict
-from typing import Optional, Dict, Any, Callable
+from typing import Optional, Dict, Any, Callable, Tuple, Union
 import random
 import requests
 from requests.adapters import HTTPAdapter
@@ -131,6 +131,8 @@ class ResponseCache:
             self.cache[key] = (value, expiry)
             logger.debug(f"Cache set: {key} (TTL: {ttl}s, size: {len(self.cache)}/{self.max_size})")
             self.sets += 1
+            # Emit current stats for observability at debug level
+            logger.debug(f"Cache stats: {self.stats()}")
 
     def clear(self):
         """Clear entire cache"""
@@ -209,6 +211,9 @@ def retry_with_backoff(max_retries: int = 3, base_delay: float = 1.0):
     return decorator
 
 
+TimeoutType = Union[int, float, Tuple[int, int], Tuple[float, float]]
+
+
 class BaseAPIClient(ABC):
     """
     Abstract base class for all API clients.
@@ -228,7 +233,8 @@ class BaseAPIClient(ABC):
             rate_limit: float = 1.0,
             cache_ttl: int = 3600,
             user_agent: Optional[str] = None,
-            timeout: int = 10
+            timeout: TimeoutType = 10,
+            endpoint_ttls: Optional[Dict[str, int]] = None,
     ):
         """
         Args:
@@ -241,7 +247,9 @@ class BaseAPIClient(ABC):
         self.base_url = base_url.rstrip('/')
         self.rate_limiter = RateLimiter(calls_per_second=rate_limit)
         self.cache = ResponseCache(default_ttl=cache_ttl)
-        self.timeout = timeout
+        self.timeout: TimeoutType = timeout  # may be int or (connect, read)
+        # Optional per-endpoint TTLs. Keys are endpoint identifiers or URL paths.
+        self.endpoint_ttls: Dict[str, int] = endpoint_ttls or {}
 
         # Default user agent (APIs like GGG require this)
         self.user_agent = user_agent or "PoE-Price-Checker/2.5 (contact@example.com)"
@@ -285,7 +293,9 @@ class BaseAPIClient(ABC):
             endpoint: str,
             params: Optional[Dict] = None,
             data: Optional[Dict] = None,
-            use_cache: bool = True
+            use_cache: bool = True,
+            ttl_override: Optional[int] = None,
+            timeout_override: Optional[TimeoutType] = None,
     ) -> Dict[str, Any]:
         """
         Make HTTP request with rate limiting and caching.
@@ -326,7 +336,7 @@ class BaseAPIClient(ABC):
                 url=url,
                 params=params,
                 json=data,
-                timeout=self.timeout
+                timeout=(timeout_override if timeout_override is not None else self.timeout)
             )
 
             # Handle rate limiting
@@ -347,7 +357,14 @@ class BaseAPIClient(ABC):
             # Cache successful GET requests
             if method.upper() == 'GET' and use_cache:
                 cache_key = self._get_cache_key(endpoint, params)
-                self.cache.set(cache_key, json_data)
+                # Determine TTL: per-request override, then per-endpoint map, else default
+                ttl_to_use: Optional[int]
+                if ttl_override is not None:
+                    ttl_to_use = int(ttl_override)
+                else:
+                    ttl_to_use = self.endpoint_ttls.get(endpoint)
+                self.cache.set(cache_key, json_data, ttl=ttl_to_use)
+                logger.debug(f"Cache stats after set: {self.cache.stats()}")
 
             logger.info(f"Request successful: {method} {endpoint}")
             return json_data
@@ -356,17 +373,22 @@ class BaseAPIClient(ABC):
             logger.error(f"Request failed: {e}")
             raise APIError(f"Request failed: {e}")
 
-    def get(self, endpoint: str, params: Optional[Dict] = None, use_cache: bool = True) -> Dict[str, Any]:
+    def get(self, endpoint: str, params: Optional[Dict] = None, use_cache: bool = True,
+            ttl_override: Optional[int] = None, timeout_override: Optional[TimeoutType] = None) -> Dict[str, Any]:
         """GET request wrapper"""
-        return self._make_request('GET', endpoint, params=params, use_cache=use_cache)
+        return self._make_request('GET', endpoint, params=params, use_cache=use_cache,
+                                  ttl_override=ttl_override, timeout_override=timeout_override)
 
-    def post(self, endpoint: str, data: Optional[Dict] = None, params: Optional[Dict] = None) -> Dict[str, Any]:
+    def post(self, endpoint: str, data: Optional[Dict] = None, params: Optional[Dict] = None,
+             timeout_override: Optional[TimeoutType] = None) -> Dict[str, Any]:
         """POST request wrapper"""
-        return self._make_request('POST', endpoint, params=params, data=data, use_cache=False)
+        return self._make_request('POST', endpoint, params=params, data=data, use_cache=False,
+                                  timeout_override=timeout_override)
 
     def clear_cache(self):
         """Clear response cache"""
         self.cache.clear()
+        logger.debug(f"Cache stats after clear: {self.cache.stats()}")
 
     def get_cache_size(self) -> int:
         """Get number of cached responses"""

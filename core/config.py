@@ -93,6 +93,23 @@ class Config:
             "rate_limit_per_second": 0.33,
             # Verbosity of retry logging for API calls: "minimal" or "detailed"
             "retry_logging_verbosity": "minimal",
+            # Per-area API config
+            "pricing": {
+                # Per-endpoint TTLs in seconds for pricing endpoints. Keys should
+                # match client endpoint identifiers or URL paths used in requests.
+                # Safe defaults: 1 hour, with guardrails applied in accessors.
+                "ttls": {
+                    # Examples (can be edited by the app at runtime):
+                    # "poe_ninja:currencyoverview": 3600,
+                    # "poe_watch:prices": 1800,
+                }
+            },
+            # Explicit timeouts (seconds). Requests supports tuple (connect, read)
+            # but we store them separately for clarity and compose as needed.
+            "timeouts": {
+                "connect": 10,
+                "read": 10,
+            },
         },
         "plugins": {
             "enabled": [],
@@ -112,7 +129,12 @@ class Config:
                 "low_conf_spread": 0.8,
                 "step_ge_100": 5.0,
                 "step_ge_10": 1.0,
-            }
+            },
+            # Cross-source arbitration feature flag (off by default for safety)
+            "use_cross_source_arbitration": False,
+            # Persist enabled/disabled state of price sources by name
+            # Example: {"poe.ninja": true, "poe.watch": false}
+            "enabled_sources": {},
         },
     }
 
@@ -310,6 +332,36 @@ class Config:
         api = self.data.get("api", {}) or {}
         val = str(api.get("retry_logging_verbosity", "minimal")).lower()
         return "detailed" if val == "detailed" else "minimal"
+
+    # ------------------------------------------------------------------
+    # Cross-source arbitration & enabled sources persistence
+    # ------------------------------------------------------------------
+
+    @property
+    def use_cross_source_arbitration(self) -> bool:
+        pricing = self.data.get("pricing", {}) or {}
+        return bool(pricing.get("use_cross_source_arbitration", False))
+
+    @use_cross_source_arbitration.setter
+    def use_cross_source_arbitration(self, enabled: bool) -> None:
+        self.data.setdefault("pricing", {})
+        self.data["pricing"]["use_cross_source_arbitration"] = bool(enabled)
+        self.save()
+
+    @property
+    def enabled_sources(self) -> Dict[str, bool]:
+        pricing = self.data.get("pricing", {}) or {}
+        es = pricing.get("enabled_sources", {}) or {}
+        # Coerce values to bools
+        return {str(k): bool(v) for k, v in es.items()}
+
+    def set_enabled_sources(self, mapping: Dict[str, Any]) -> None:
+        if not isinstance(mapping, dict):
+            return
+        self.data.setdefault("pricing", {})
+        coerced = {str(k): bool(v) for k, v in mapping.items()}
+        self.data["pricing"]["enabled_sources"] = coerced
+        self.save()
 
     # ------------------------------------------------------------------
     # League Management
@@ -572,6 +624,73 @@ class Config:
         against violating GGG's rate limiting rules.
         """
         self.data["api"]["rate_limit_per_second"] = max(0.2, min(1.0, float(value)))
+        self.save()
+
+    # ------------------------------------------------------------------
+    # API Pricing TTLs and Timeouts
+    # ------------------------------------------------------------------
+
+    def get_pricing_ttls(self) -> Dict[str, int]:
+        """
+        Return per-endpoint TTLs (in seconds) for pricing APIs.
+        Keys are endpoint identifiers (e.g., "poe_ninja:currencyoverview").
+
+        Guardrails are applied when setting values; here we just expose stored map.
+        """
+        return self.data.get("api", {}).get("pricing", {}).get("ttls", {}) or {}
+
+    def set_pricing_ttl(self, endpoint_key: str, ttl_seconds: int) -> None:
+        """
+        Set TTL for a specific pricing endpoint.
+
+        Guardrails: Min 60s, Max 86400s (1 day). Values outside are clamped.
+        """
+        ttl = max(60, min(86400, int(ttl_seconds)))
+        self.data.setdefault("api", {}).setdefault("pricing", {}).setdefault("ttls", {})[
+            endpoint_key
+        ] = ttl
+        self.save()
+
+    def price_cache_ttl_for(self, endpoint_key: str | None, default: Optional[int] = None) -> int:
+        """
+        Resolve a TTL (seconds) for the given endpoint key.
+        Order of precedence:
+        1) api.pricing.ttls[endpoint_key] if provided
+        2) performance.price_cache_ttl_seconds (global)
+        3) api.cache_ttl_seconds (legacy fallback)
+        4) provided default or 3600
+        """
+        if endpoint_key:
+            ttl_map = self.get_pricing_ttls()
+            if endpoint_key in ttl_map:
+                return int(ttl_map[endpoint_key])
+        if default is not None:
+            base_default = int(default)
+        else:
+            base_default = 3600
+        return int(self.data.get("performance", {}).get("price_cache_ttl_seconds",
+                   self.data.get("api", {}).get("cache_ttl_seconds", base_default)))
+
+    def get_api_timeouts(self) -> tuple[int, int]:
+        """
+        Return (connect, read) timeouts in seconds for API calls.
+        """
+        t = self.data.get("api", {}).get("timeouts", {}) or {}
+        connect = int(t.get("connect", 10))
+        read = int(t.get("read", 10))
+        # Guardrails (0.5s .. 120s)
+        connect = max(1, min(120, connect))
+        read = max(1, min(300, read))
+        return connect, read
+
+    def set_api_timeouts(self, connect: int | float, read: int | float) -> None:
+        """
+        Set API timeouts (seconds). Guardrails applied: connect [1..120], read [1..300].
+        """
+        c = int(max(1, min(120, int(connect))))
+        r = int(max(1, min(300, int(read))))
+        self.data.setdefault("api", {}).setdefault("timeouts", {})["connect"] = c
+        self.data.setdefault("api", {}).setdefault("timeouts", {})["read"] = r
         self.save()
 
     # ------------------------------------------------------------------
