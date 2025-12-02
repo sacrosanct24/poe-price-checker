@@ -44,4 +44,8 @@ jobs:
           # Prevent external/auto-discovered pytest plugins (like pytest-qt) from loading in CI
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
         run: |
-          pytest -m unit -q --durations=20
+          # Exclude Qt/GUI-dependent tests from collection in this headless CI job
+          # to keep the unit job deterministic and fast.
+          pytest -m unit -q --durations=20 \
+            --ignore=tests/unit/gui_qt \
+            --ignore=tests/test_shortcuts.py
