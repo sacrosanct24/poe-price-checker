@@ -93,7 +93,9 @@ class ResponseCache:
         self.cache: OrderedDict[str, tuple[Any, datetime]] = OrderedDict()
         self.default_ttl = default_ttl
         self.max_size = max_size
-        self.lock = threading.Lock()
+        # Use RLock for safe re-entrant access when methods call other
+        # lock-protected helpers while holding the lock (e.g., set() -> stats()).
+        self.lock = threading.RLock()
         # Simple metrics
         self.hits = 0
         self.misses = 0
