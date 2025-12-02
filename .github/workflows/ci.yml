@@ -39,6 +39,9 @@ jobs:
         run: |
           mypy --install-types --non-interactive
 
-      - name: Run unit tests only (serial, no Qt plugin)
+      - name: Run unit tests only (serial, no Qt autoload)
+        env:
+          # Prevent external/auto-discovered pytest plugins (like pytest-qt) from loading in CI
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
         run: |
-          pytest -m unit -q -n0 -p no:qt --durations=20
+          pytest -m unit -q -n0 --durations=20
