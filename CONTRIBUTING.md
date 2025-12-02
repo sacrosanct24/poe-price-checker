@@ -66,8 +66,12 @@ python -m gui_qt.main
 ### Run Tests
 
 ```bash
+# Serial run (recommended for diagnosing concurrency issues)
+python -m pytest -q -n0 -p no:qt
+
+# Or the default test run
 python -m pytest tests/ --ignore=tests/integration
-```
+```bash
 
 ## How to Contribute
 
@@ -146,25 +150,26 @@ We welcome feature suggestions! Please:
 ### Example
 
 ```python
+from typing import Optional
+
 def calculate_item_value(
-    item: ParsedItem,
-    price_source: PriceSource,
+    name: str,
+    base_type: Optional[str],
 ) -> Optional[float]:
     """
-    Calculate the chaos value of an item.
+    Example signature with type hints.
 
     Args:
-        item: The parsed item to evaluate
-        price_source: Which pricing API to use
+        name: The item name
+        base_type: The item's base type (if known)
 
     Returns:
-        The chaos value, or None if pricing failed
+        Example chaos value, or None if not applicable
     """
-    if not item.base_type:
+    if not base_type:
         return None
-
-    # Implementation...
-    return value
+    # Placeholder example logic
+    return 1.0
 ```
 
 ### Import Order
@@ -221,6 +226,32 @@ python -m pytest tests/test_item_parser.py -v
 python -m pytest -k "test_parse" -v
 ```
 
+### Testing & Reliability Guidelines
+
+To keep the suite fast, deterministic, and resilient, this repo enables the following safeguards and patterns:
+
+- Per-test timeout via `pytest-timeout` (default 120s, method=thread) configured in `pytest.ini`.
+- Global Python `faulthandler` is enabled at session start (see `tests/conftest.py`) to dump thread stacks on timeouts or manual breaks.
+- Slowest tests are always reported via `--durations=20` to track performance regressions.
+- Time-independent tests: prefer mocking `time`, `datetime`, or sleepers instead of using real `time.sleep(...)` in unit tests. See examples in:
+  - `tests/unit/data_sources/test_rate_limiter*.py`
+  - `tests/unit/data_sources/test_response_cache_*.py`
+- Concurrency best practices:
+  - Do not call user callbacks or `logger.*` while holding locks; keep critical sections minimal.
+  - Use `threading.RLock` only when re-entrancy is required; otherwise shorten lock scope.
+  - When building singletons, build outside locks and publish under a short double-checked lock.
+- Retry/backoff:
+  - Use `retry_with_backoff(..., use_env_cap=True)` on long-running retry loops so sleeps are capped under tests.
+  - `RETRY_MAX_SLEEP` env var can cap retry sleeps; under pytest a 1.0s cap applies by default when enabled.
+
+If a test appears to hang locally, run serial without plugins and with live output:
+
+```
+pytest -vv -s -n0 -p no:qt -k <keyword>
+```
+
+Within CI, a serial job also runs to catch xdist-related deadlocks deterministically.
+
 ### Writing Tests
 
 - Test one thing per test function
@@ -230,22 +261,18 @@ python -m pytest -k "test_parse" -v
 
 Example:
 ```python
-def test_parse_rare_item_with_life_mod():
-    """Test that life mods are correctly parsed from rare items."""
-    parser = ItemParser()
-    item_text = """
-    Rarity: Rare
-    Test Ring
-    Coral Ring
-    --------
-    +50 to maximum Life
-    """
+def test_simple_value_calc():
+    # Demonstrates a small, focused unit test.
+    from core.price_arbitration import arbitrate_rows
 
-    result = parser.parse(item_text)
+    rows = [
+        {"source": "A", "chaos_value": 10.0, "listing_count": 2, "confidence": "low"},
+        {"source": "B", "chaos_value": 12.0, "listing_count": 5, "confidence": "medium"},
+    ]
 
-    assert result is not None
-    assert result.rarity == "Rare"
-    assert any("Life" in mod for mod in result.explicit_mods)
+    chosen = arbitrate_rows(rows)
+    assert chosen is not None
+    assert chosen["source"] == "B"
 ```
 
 ## Documentation

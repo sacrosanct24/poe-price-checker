@@ -28,6 +28,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Reduced lock scope and moved logging/callbacks out of locks in `core/clipboard_monitor.py`.
   - `data_sources/poe_ninja_client.py` and `data_sources/affix_data_provider.py` build outside locks and publish with short double‑checked locks to avoid long critical sections.
   - `BaseAPIClient._make_request` decorated with `retry_with_backoff(..., use_env_cap=True)` to avoid long sleeps in tests; respects `RETRY_MAX_SLEEP`.
+  - CI: mypy scope narrowed via `mypy.ini` `files=` to a stable subset; workflow updated to run `mypy` (respecting config) and to install requirements so `pytest-timeout` is active.
+  - EOL policy normalized using `.gitattributes` and repository renormalization to eliminate CRLF→LF warnings on Windows.
 
 ### Fixed
 - Deadlock in `ResponseCache.set()` when DEBUG logging called `stats()` while holding a non‑reentrant lock. Replaced with `RLock` and conditional logging.
