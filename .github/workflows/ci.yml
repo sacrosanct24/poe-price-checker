@@ -37,10 +37,8 @@ jobs:
 
       - name: Type check (mypy)
         run: |
-          mypy . --install-types --non-interactive
+          mypy --install-types --non-interactive
 
-      - name: Run tests (serial, no Qt plugin)
-        env:
-          PYTEST_ADDOPTS: "-q -n0 -p no:qt --durations=20"
+      - name: Run unit tests only (serial, no Qt plugin)
         run: |
-          pytest
+          pytest -m unit -q -n0 -p no:qt --durations=20

@@ -77,9 +77,9 @@ def arbitrate_rows(
         return None
 
     # Pre-compute median for simple stability heuristic
-    vals = sorted([u["chaos_value"] for u in usable])
+    vals: list[float] = sorted([float(u["chaos_value"]) for u in usable])
     mid = len(vals) // 2
-    median = vals[mid] if len(vals) % 2 == 1 else (vals[mid - 1] + vals[mid]) / 2.0
+    median: float = vals[mid] if len(vals) % 2 == 1 else (vals[mid - 1] + vals[mid]) / 2.0
 
     def stability_score(v: float) -> float:
         # Smaller distance to median is better -> we will sort by abs diff ascending

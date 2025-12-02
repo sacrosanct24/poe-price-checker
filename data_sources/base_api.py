@@ -5,7 +5,7 @@ All API clients (poe.ninja, official trade, etc.) inherit from this.
 
 from abc import ABC, abstractmethod
 from collections import OrderedDict
-from typing import Optional, Dict, Any, Callable, Tuple, Union
+from typing import Optional, Dict, Any, Callable, Tuple, Union, cast
 import random
 import requests
 from requests.adapters import HTTPAdapter
@@ -170,7 +170,7 @@ class ResponseCache:
             self.cache.clear()
             logger.info("Cache cleared")
 
-    def stats(self) -> Dict[str, int]:
+    def stats(self) -> Dict[str, Any]:
         """Return simple cache metrics for observability."""
         with self.lock:
             size = len(self.cache)
@@ -378,7 +378,7 @@ class BaseAPIClient(ABC):
             cache_key = self._get_cache_key(endpoint, params)
             cached_response = self.cache.get(cache_key)
             if cached_response is not None:
-                return cached_response
+                return cast(Dict[str, Any], cached_response)
 
         # Rate limit
         self.rate_limiter.wait_if_needed()
@@ -408,7 +408,7 @@ class BaseAPIClient(ABC):
                 raise APIError(error_msg)
 
             # Parse JSON
-            json_data = response.json()
+            json_data = cast(Dict[str, Any], response.json())
 
             # Cache successful GET requests
             if method.upper() == 'GET' and use_cache:
@@ -432,14 +432,14 @@ class BaseAPIClient(ABC):
     def get(self, endpoint: str, params: Optional[Dict] = None, use_cache: bool = True,
             ttl_override: Optional[int] = None, timeout_override: Optional[TimeoutType] = None) -> Dict[str, Any]:
         """GET request wrapper"""
-        return self._make_request('GET', endpoint, params=params, use_cache=use_cache,
-                                  ttl_override=ttl_override, timeout_override=timeout_override)
+        return cast(Dict[str, Any], self._make_request('GET', endpoint, params=params, use_cache=use_cache,
+                                  ttl_override=ttl_override, timeout_override=timeout_override))
 
     def post(self, endpoint: str, data: Optional[Dict] = None, params: Optional[Dict] = None,
              timeout_override: Optional[TimeoutType] = None) -> Dict[str, Any]:
         """POST request wrapper"""
-        return self._make_request('POST', endpoint, params=params, data=data, use_cache=False,
-                                  timeout_override=timeout_override)
+        return cast(Dict[str, Any], self._make_request('POST', endpoint, params=params, data=data, use_cache=False,
+                                  timeout_override=timeout_override))
 
     def clear_cache(self):
         """Clear response cache"""

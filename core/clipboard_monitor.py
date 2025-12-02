@@ -97,14 +97,16 @@ class ClipboardMonitor:
 
         if PYPERCLIP_AVAILABLE:
             try:
-                return pyperclip.paste() or ""
+                val = pyperclip.paste()
+                return str(val or "")
             except Exception as e:
                 logger.debug(f"pyperclip.paste() failed: {e}")
 
         # Fallback to tkinter
         if self.tk_root:
             try:
-                return self.tk_root.clipboard_get()
+                val2 = self.tk_root.clipboard_get()
+                return str(val2 or "")
             except Exception as e:
                 logger.debug(f"tkinter clipboard_get() failed: {e}")
 

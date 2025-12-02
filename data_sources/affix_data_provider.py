@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, cast
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +39,7 @@ class AffixDataProvider:
         """
         self.db = mod_database
         self.json_path = json_path or Path("data/valuable_affixes.json")
-        self._json_data: Optional[Dict] = None
+        self._json_data: Dict[str, Any] = {}
         self._using_database = False
 
         # Try to use database if available
@@ -93,7 +93,7 @@ class AffixDataProvider:
     ) -> List[Tuple[int, int, int]]:
         """Get tiers from ModDatabase using Cargo data."""
         try:
-            tiers = self.db.get_affix_tiers(stat_text_pattern)
+            tiers = cast(List[Tuple[int, int, int]], self.db.get_affix_tiers(stat_text_pattern))
             logger.debug(f"Found {len(tiers)} tiers for '{stat_text_pattern}' from database")
             return tiers
         except Exception as e:
@@ -108,7 +108,7 @@ class AffixDataProvider:
         if not self._json_data:
             return []
 
-        affix_data = self._json_data.get(affix_type, {})
+        affix_data: Dict[str, Any] = self._json_data.get(affix_type, {})  # fallback to empty dict
         tiers = []
 
         # T1
@@ -144,8 +144,7 @@ class AffixDataProvider:
         """
         if not self._json_data:
             self._load_json()
-
-        return self._json_data.get(affix_type, {})
+        return cast(Dict[str, Any], self._json_data.get(affix_type, {}))
 
     def get_all_affix_types(self) -> List[str]:
         """
@@ -160,20 +159,20 @@ class AffixDataProvider:
         # Filter out special keys like "_synergies", "_red_flags"
         return [
             key for key in self._json_data.keys()
-            if not key.startswith('_')
+            if isinstance(key, str) and not key.startswith('_')
         ]
 
     def get_synergies(self) -> Dict[str, Any]:
         """Get synergy definitions from JSON."""
         if not self._json_data:
             self._load_json()
-        return self._json_data.get('_synergies', {})
+        return cast(Dict[str, Any], self._json_data.get('_synergies', {}))
 
     def get_red_flags(self) -> Dict[str, Any]:
         """Get red flag definitions from JSON."""
         if not self._json_data:
             self._load_json()
-        return self._json_data.get('_red_flags', {})
+        return cast(Dict[str, Any], self._json_data.get('_red_flags', {}))
 
     def is_using_database(self) -> bool:
         """Check if provider is using database or JSON fallback."""

@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Callable
 
 from data_sources.base_api import BaseAPIClient
 
@@ -270,7 +270,7 @@ class PoeNinjaClient(BaseAPIClient):
         self,
         league: str,
         item_types: Optional[List[str]] = None,
-        progress_callback: Optional[callable] = None,
+        progress_callback: Optional[Callable[[int, int, str], None]] = None,
     ) -> NinjaPriceDatabase:
         """
         Build complete price database for a league.

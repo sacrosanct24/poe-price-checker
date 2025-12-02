@@ -27,6 +27,12 @@ logger = logging.getLogger(__name__)
 
 LEVEL_RE = re.compile(r"^Level:\s*(\d+)")
 QUALITY_RE = re.compile(r"^Quality:\s*\+?(-?\d+)%")
+# Precompiled patterns for hot paths (avoid recompiling per line)
+SEPARATOR_RE = re.compile(r"^-{2,}$")
+RARITY_RE = re.compile(r"^Rarity:\s*(\w+)")
+STACK_RE = re.compile(r"Stack Size:\s*(\d+)/(\d+)")
+ITEM_LEVEL_RE = re.compile(r"Item Level:\s*(\d+)")
+QUALITY_SEARCH_RE = re.compile(r"Quality:\s*\+?(\d+)%")
 
 
 @dataclass
@@ -137,6 +143,8 @@ class ItemParser:
     sockets, corruptions, etc.
     """
 
+    # String patterns retained for backward compatibility and readability,
+    # but implementation uses module-level precompiled regex objects above.
     SEPARATOR_PATTERN = r"^-{2,}$"      # -------- separator lines
     RARITY_PATTERN = r"^Rarity:\s*(\w+)"
     STACK_PATTERN = r"Stack Size:\s*(\d+)/(\d+)"
@@ -176,7 +184,7 @@ class ItemParser:
             lines = lines[1:]
 
         # Must begin with Rarity (after skipping Item Class and blanks)
-        if not lines or not re.match(self.RARITY_PATTERN, lines[0]):
+        if not lines or not RARITY_RE.match(lines[0]):
             return None
 
         item = ParsedItem(raw_text=text)
@@ -239,7 +247,7 @@ class ItemParser:
         """
 
         # Rarity: Rare / Magic / Unique / etc.
-        match = re.match(self.RARITY_PATTERN, lines[0])
+        match = RARITY_RE.match(lines[0])
         if match:
             item.rarity = match.group(1).upper()
 
@@ -249,7 +257,7 @@ class ItemParser:
 
         # Helper: is a given line a section separator ("--------")?
         def is_separator(idx: int) -> bool:
-            return 0 <= idx < len(lines) and re.match(self.SEPARATOR_PATTERN, lines[idx]) is not None
+            return 0 <= idx < len(lines) and SEPARATOR_RE.match(lines[idx]) is not None
 
         # Non-unique items normally have a base type line after the name,
         # e.g.:
@@ -299,7 +307,7 @@ class ItemParser:
 
         for line in lines:
             # Section break
-            if re.match(self.SEPARATOR_PATTERN, line):
+            if SEPARATOR_RE.match(line):
                 current_section += 1
                 in_requirements = False
                 continue
@@ -309,7 +317,7 @@ class ItemParser:
             # ───────────────────────────────────────────────
 
             # Item Level
-            if m := re.match(self.ITEM_LEVEL_PATTERN, line):
+            if m := ITEM_LEVEL_RE.match(line):
                 item.item_level = int(m.group(1))
                 continue
 
@@ -322,7 +330,7 @@ class ItemParser:
                 continue
 
             # Quality
-            if m := re.search(self.QUALITY_PATTERN, line):
+            if m := QUALITY_SEARCH_RE.search(line):
                 item.quality = int(m.group(1))
                 continue
 
@@ -371,7 +379,7 @@ class ItemParser:
                 continue
 
             # Stack Size (currency)
-            if m := re.search(self.STACK_PATTERN, line):
+            if m := STACK_RE.search(line):
                 item.stack_size = int(m.group(1))
                 item.max_stack_size = int(m.group(2))
                 continue
