@@ -12,6 +12,7 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 import time
 import logging
+import os
 from datetime import datetime, timedelta
 from functools import wraps
 import threading
@@ -63,6 +64,9 @@ class RateLimiter:
         # Use RLock to allow safe re-entrant acquisition within methods that may
         # call other lock-protected helpers (e.g., set() -> stats()).
         self.lock = threading.RLock()
+        # Observability counters
+        self.total_sleeps: int = 0
+        self.total_slept_seconds: float = 0.0
 
     def wait_if_needed(self):
         """Block if necessary to respect rate limit"""
@@ -76,9 +80,23 @@ class RateLimiter:
                 jitter = min(0.25, 0.1 * self.min_interval)
                 sleep_time += random.uniform(0, jitter)
                 logger.debug(f"Rate limiting: sleeping {sleep_time:.2f}s (with jitter)")
+                # Update metrics before sleeping (deterministic for tests with mocked time)
+                self.total_sleeps += 1
+                self.total_slept_seconds += sleep_time
                 time.sleep(sleep_time)
 
             self.last_call_time = time.time()
+
+    def metrics(self) -> Dict[str, Any]:
+        """Return a thread-safe snapshot of limiter metrics."""
+        with self.lock:
+            return {
+                "calls_per_second": self.calls_per_second,
+                "min_interval": self.min_interval,
+                "total_sleeps": self.total_sleeps,
+                "total_slept_seconds": self.total_slept_seconds,
+                "last_call_time": self.last_call_time,
+            }
 
 
 class ResponseCache:
@@ -155,13 +173,22 @@ class ResponseCache:
     def stats(self) -> Dict[str, int]:
         """Return simple cache metrics for observability."""
         with self.lock:
+            size = len(self.cache)
+            total_lookups = self.hits + self.misses
+            hit_ratio = (self.hits / total_lookups) if total_lookups else 0.0
+            miss_ratio = (self.misses / total_lookups) if total_lookups else 0.0
+            fill_ratio = (size / self.max_size) if self.max_size else 0.0
+            # Keep existing keys for compatibility; add ratios as floats for richer telemetry
             return {
                 "hits": self.hits,
                 "misses": self.misses,
                 "sets": self.sets,
                 "evictions": self.evictions,
-                "size": len(self.cache),
+                "size": size,
                 "capacity": self.max_size,
+                "hit_ratio": hit_ratio,
+                "miss_ratio": miss_ratio,
+                "fill_ratio": fill_ratio,
             }
 
     def size(self) -> int:
@@ -170,7 +197,7 @@ class ResponseCache:
             return len(self.cache)
 
 
-def retry_with_backoff(max_retries: int = 3, base_delay: float = 1.0):
+def retry_with_backoff(max_retries: int = 3, base_delay: float = 1.0, use_env_cap: bool = False):
     """
     Decorator for exponential backoff retry logic.
 
@@ -193,6 +220,20 @@ def retry_with_backoff(max_retries: int = 3, base_delay: float = 1.0):
                     pass
                 return func.__qualname__
 
+            # Optional cap: only enable if decorator is configured with use_env_cap=True
+            max_sleep_cap: Optional[float] = None
+            if use_env_cap:
+                # Determine a max sleep cap for tests/environments where long sleeps are undesirable.
+                # If running under pytest, default-cap sleeps to 1s unless RETRY_MAX_SLEEP overrides.
+                env_cap = os.getenv("RETRY_MAX_SLEEP")
+                if env_cap is not None:
+                    try:
+                        max_sleep_cap = float(env_cap)
+                    except ValueError:
+                        max_sleep_cap = None
+                elif os.getenv("PYTEST_CURRENT_TEST") is not None:
+                    max_sleep_cap = 1.0
+
             for attempt in range(max_retries + 1):
                 try:
                     if _RETRY_LOG_VERBOSITY == "detailed":
@@ -214,6 +255,9 @@ def retry_with_backoff(max_retries: int = 3, base_delay: float = 1.0):
                     else:
                         logger.warning(
                             f"Attempt {attempt + 1} failed ({type(e).__name__}). Retrying...")
+                    # Apply cap if configured to avoid excessive sleeps during tests
+                    if max_sleep_cap is not None and delay > max_sleep_cap:
+                        delay = max_sleep_cap
                     time.sleep(delay)
 
             return None  # Should never reach here
@@ -298,7 +342,7 @@ class BaseAPIClient(ABC):
         """
         pass
 
-    @retry_with_backoff(max_retries=3)
+    @retry_with_backoff(max_retries=3, use_env_cap=True)
     def _make_request(
             self,
             method: str,
