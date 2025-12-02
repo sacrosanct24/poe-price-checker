@@ -400,9 +400,20 @@ def get_ninja_price(name: str, league: str = "Phrecia") -> Optional[NinjaPrice]:
     global _price_db
     client = get_ninja_client()
 
+    # Fast path: if DB is ready for this league, read under lock briefly
+    with _price_db_lock:
+        db = _price_db
+        if db is not None and db.league == league:
+            return db.get_price(name)
+
+    # Slow path: build outside the lock to avoid long critical section/deadlocks
+    new_db = client.build_price_database(league)
+
+    # Publish the new DB with a short lock; double-check in case another thread already did
     with _price_db_lock:
         if _price_db is None or _price_db.league != league:
-            _price_db = client.build_price_database(league)
+            _price_db = new_db
+        # Use the most recent DB (ours or the one set by another thread)
         return _price_db.get_price(name)
 
 

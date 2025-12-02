@@ -219,10 +219,14 @@ def get_affix_provider(
     global _provider
 
     if _provider is None or force_reload:
+        # Build outside the lock to avoid long critical sections and potential deadlocks
+        new_provider = AffixDataProvider(mod_database=mod_database)
+        source_info = new_provider.get_source_info()
         with _provider_lock:
             # Double-check locking pattern
             if _provider is None or force_reload:
-                _provider = AffixDataProvider(mod_database=mod_database)
-                logger.info(f"Initialized affix provider: {_provider.get_source_info()}")
+                _provider = new_provider
+        # Log outside the lock
+        logger.info(f"Initialized affix provider: {source_info}")
 
     return _provider

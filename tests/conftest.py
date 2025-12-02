@@ -1,5 +1,7 @@
 import pytest
 import time
+import sys
+import faulthandler
 from core.config import Config
 from core.database import Database
 from core.item_parser import ItemParser
@@ -42,3 +44,16 @@ def temp_db(tmp_path):
 @pytest.fixture
 def parser():
     return ItemParser()
+
+
+def pytest_sessionstart(session):  # pragma: no cover - test harness init
+    """Enable faulthandler for the entire test run to aid diagnosing hangs.
+
+    When a test times out (via pytest-timeout) or when a manual break occurs,
+    Python will dump stack traces of all threads to stderr. This is a best-effort
+    hook and will silently continue if enabling fails.
+    """
+    try:
+        faulthandler.enable(file=sys.stderr, all_threads=True)
+    except Exception:
+        pass

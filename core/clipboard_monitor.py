@@ -145,6 +145,9 @@ class ClipboardMonitor:
             try:
                 current = self._get_clipboard()
 
+                # Keep critical section minimal: compute whether to notify and update state
+                should_notify = False
+                notify_payload = None
                 with self._lock:
                     if current and current != self._last_clipboard:
                         self._last_clipboard = current
@@ -152,14 +155,17 @@ class ClipboardMonitor:
                         # Check if it's PoE item data
                         if self._is_poe_item(current):
                             self.items_detected += 1
-                            logger.info(f"PoE item detected in clipboard ({len(current)} chars)")
+                            should_notify = True
+                            notify_payload = current
 
-                            if self.on_item_detected:
-                                # Call callback in try block to not crash monitor
-                                try:
-                                    self.on_item_detected(current)
-                                except Exception as e:
-                                    logger.error(f"Item callback error: {e}")
+                # Perform logging and callbacks outside the lock to avoid deadlocks
+                if should_notify:
+                    logger.info(f"PoE item detected in clipboard ({len(current)} chars)")
+                    if self.on_item_detected:
+                        try:
+                            self.on_item_detected(notify_payload)
+                        except Exception as e:
+                            logger.error(f"Item callback error: {e}")
 
                 time.sleep(self.poll_interval)
 

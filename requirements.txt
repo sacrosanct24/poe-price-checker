@@ -18,6 +18,7 @@ pytest-cov>=4.1.0
 pytest-mock>=3.11.0
 pytest-xdist>=3.5.0  # Parallel test execution
 pytest-qt>=4.2.0  # Qt testing support
+pytest-timeout>=2.3.1  # Enforce per-test timeouts to avoid hangs
 
 # Type checking
 mypy>=1.13.0
