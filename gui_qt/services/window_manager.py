@@ -60,13 +60,18 @@ class WindowManager:
 
     _instance: Optional['WindowManager'] = None
 
+    # Instance attributes - declared for type checking
+    _windows: Dict[str, QWidget]
+    _factories: Dict[str, Callable[[], QWidget]]
+    _main_window: Optional[QMainWindow]
+
     def __new__(cls) -> 'WindowManager':
         """Singleton pattern - only one window manager per application."""
         if cls._instance is None:
             cls._instance = super().__new__(cls)
-            cls._instance._windows: Dict[str, QWidget] = {}
-            cls._instance._factories: Dict[str, Callable[[], QWidget]] = {}
-            cls._instance._main_window: Optional[QMainWindow] = None
+            cls._instance._windows = {}
+            cls._instance._factories = {}
+            cls._instance._main_window = None
         return cls._instance
 
     def set_main_window(self, window: 'QMainWindow') -> None:

@@ -89,16 +89,16 @@ class ModDatabase:
         """
         self.db_path = db_path or self.DEFAULT_DB_PATH
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        self.conn: Optional[sqlite3.Connection] = None
-        self._init_database()
+        self.conn: sqlite3.Connection = self._init_database()
 
-    def _init_database(self) -> None:
+    def _init_database(self) -> sqlite3.Connection:
         """Initialize database schema if needed."""
-        self.conn = sqlite3.connect(str(self.db_path))
-        self.conn.row_factory = sqlite3.Row  # Enable dict-like access
-        self.conn.executescript(self.SCHEMA)
-        self.conn.commit()
+        conn = sqlite3.connect(str(self.db_path))
+        conn.row_factory = sqlite3.Row  # Enable dict-like access
+        conn.executescript(self.SCHEMA)
+        conn.commit()
         logger.info(f"Initialized mod database at {self.db_path}")
+        return conn
 
     def get_metadata(self, key: str) -> Optional[str]:
         """Get metadata value by key."""
@@ -232,7 +232,7 @@ class ModDatabase:
         """
         # Search in stat_text_raw (plain text) for better pattern matching
         query = "SELECT * FROM mods WHERE (stat_text_raw LIKE ? OR stat_text LIKE ?)"
-        params = [stat_text_pattern, stat_text_pattern]
+        params: List[Any] = [stat_text_pattern, stat_text_pattern]
 
         if generation_type is not None:
             query += " AND generation_type = ?"
@@ -311,7 +311,8 @@ class ModDatabase:
     def get_mod_count(self) -> int:
         """Get total number of mods in database."""
         cursor = self.conn.execute("SELECT COUNT(*) as count FROM mods")
-        return cursor.fetchone()['count']
+        row = cursor.fetchone()
+        return int(row['count']) if row else 0
 
     # =========================================================================
     # Items table methods
@@ -409,14 +410,16 @@ class ModDatabase:
     def get_item_count(self) -> int:
         """Get total number of items in database."""
         cursor = self.conn.execute("SELECT COUNT(*) as count FROM items")
-        return cursor.fetchone()['count']
+        row = cursor.fetchone()
+        return int(row['count']) if row else 0
 
     def get_unique_item_count(self) -> int:
         """Get number of unique items in database."""
         cursor = self.conn.execute(
             "SELECT COUNT(*) as count FROM items WHERE rarity = 'Unique'"
         )
-        return cursor.fetchone()['count']
+        row = cursor.fetchone()
+        return int(row['count']) if row else 0
 
     def get_items_by_class(self, item_class: str) -> List[Dict[str, Any]]:
         """
@@ -494,7 +497,7 @@ class ModDatabase:
         """Close database connection."""
         if self.conn:
             self.conn.close()
-            self.conn = None
+            self.conn = None  # type: ignore[assignment]
 
     def __enter__(self):
         return self

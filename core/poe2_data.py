@@ -16,7 +16,7 @@ Data sources:
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Mapping, Optional, Tuple, Union
 
 
 # =============================================================================
@@ -688,7 +688,7 @@ def prioritize_mods_by_differential(
 
 def calculate_pseudo_stat(
     rule: PseudoRule,
-    item_mods: Dict[str, float]
+    item_mods: Mapping[str, Union[int, float]]
 ) -> Optional[float]:
     """
     Calculate a pseudo stat total from item mods.
@@ -715,7 +715,7 @@ def calculate_pseudo_stat(
 
 
 def calculate_all_pseudo_stats(
-    item_mods: Dict[str, float]
+    item_mods: Mapping[str, Union[int, float]]
 ) -> Dict[str, float]:
     """
     Calculate all pseudo stats for an item.

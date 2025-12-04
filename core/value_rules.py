@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List, Literal, Sequence, Optional
+from typing import List, Literal, Sequence, Optional, Union
 import re
 
 from core.item_parser import ParsedItem
@@ -142,6 +142,8 @@ def _eval_condition(cond: str, item: ParsedItem, slot: str) -> bool:
         rhs = rhs.strip()
 
         # Get left-hand value from ParsedItem or context
+        lhs: Union[str, int, bool]
+        rhs_val: Union[str, int, bool]
         if field == "rarity":
             lhs = (item.rarity or "").upper()
             rhs_val = rhs.upper()

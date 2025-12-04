@@ -465,7 +465,7 @@ class Database:
             """,
             (game_version.value, league, item_name, item_base_type, chaos_value),
         )
-        return cursor.lastrowid
+        return cursor.lastrowid or 0
 
     def get_checked_items(
         self,
@@ -518,7 +518,7 @@ class Database:
             (item_name, item_base_type, listed_price_chaos, item_id),
         )
         self.conn.commit()
-        return cursor.lastrowid
+        return cursor.lastrowid or 0
 
     def record_instant_sale(
         self,
@@ -594,7 +594,7 @@ class Database:
             ),
         )
         self.conn.commit()
-        return int(cursor.lastrowid)
+        return cursor.lastrowid or 0
 
     def complete_sale(
         self,
@@ -710,7 +710,7 @@ class Database:
             ),
         )
         self.conn.commit()
-        return cursor.lastrowid
+        return cursor.lastrowid or 0
 
     def create_price_check(
         self,
@@ -746,7 +746,7 @@ class Database:
             ),
         )
         self.conn.commit()
-        return int(cursor.lastrowid)
+        return cursor.lastrowid or 0
 
     def add_price_quotes_batch(
         self,
@@ -781,10 +781,13 @@ class Database:
             listed_at = q.get("listed_at")
 
             # Normalize listed_at to string if it's a datetime
+            listed_at_str: str | None
             if isinstance(listed_at, datetime):
                 listed_at_str = listed_at.isoformat(timespec="seconds")
-            else:
+            elif isinstance(listed_at, str):
                 listed_at_str = listed_at
+            else:
+                listed_at_str = None
 
             rows.append(
                 (

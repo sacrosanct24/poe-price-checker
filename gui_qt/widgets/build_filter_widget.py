@@ -16,6 +16,7 @@ from PyQt6.QtWidgets import (
     QWidget,
     QHBoxLayout,
     QVBoxLayout,
+    QBoxLayout,
     QComboBox,
     QLabel,
 )
@@ -67,6 +68,7 @@ class BuildFilterWidget(QWidget):
 
     def _create_widgets(self) -> None:
         """Create the dropdown widgets."""
+        layout: QBoxLayout
         if self._horizontal:
             layout = QHBoxLayout(self)
         else:
@@ -135,7 +137,7 @@ class BuildFilterWidget(QWidget):
 
         if game_version is None:
             # "All Games" selected - show classes from both
-            all_classes = set()
+            all_classes: set[str] = set()
             for gv in [GameVersion.POE1, GameVersion.POE2]:
                 all_classes.update(get_classes_for_game(gv).keys())
             for class_name in sorted(all_classes):
@@ -195,7 +197,7 @@ class BuildFilterWidget(QWidget):
         Returns:
             List of ascendancy names
         """
-        ascendancies = []
+        ascendancies: list[str] = []
 
         games = [game_version] if game_version else [GameVersion.POE1, GameVersion.POE2]
 

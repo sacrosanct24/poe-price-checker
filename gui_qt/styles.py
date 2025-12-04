@@ -567,6 +567,12 @@ class ThemeManager:
     _instance: Optional['ThemeManager'] = None
     _theme_change_callbacks: list[Callable[['Theme'], None]] = []
 
+    # Instance attributes - declared here for type checking
+    _current_theme: Theme
+    _accent_color: Optional[str]
+    _colors: Dict[str, str]
+    _stylesheet_cache: Dict[tuple, str]
+
     def __new__(cls):
         """Singleton pattern - only one theme manager."""
         if cls._instance is None:
@@ -574,7 +580,7 @@ class ThemeManager:
             cls._instance._current_theme = Theme.DARK
             cls._instance._accent_color = None  # None = use theme default
             cls._instance._colors = {}
-            cls._instance._stylesheet_cache: Dict[tuple, str] = {}  # Cache by (theme, accent)
+            cls._instance._stylesheet_cache = {}  # Cache by (theme, accent)
             cls._instance._update_colors()
         return cls._instance
 

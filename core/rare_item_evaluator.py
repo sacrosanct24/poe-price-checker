@@ -14,7 +14,7 @@ import logging
 import re
 from pathlib import Path
 from typing import List, Dict, Optional, Tuple, Any
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from core.item_parser import ParsedItem
 from core.build_archetype import (
     BuildArchetype, get_weight_multiplier
@@ -54,12 +54,12 @@ class RareItemEvaluation:
     estimated_value: str  # "10c+", "50c+", "1div+", etc.
 
     # Fields with defaults must come last
-    synergies_found: List[str] = None  # Names of synergies detected
-    red_flags_found: List[str] = None  # Names of red flags detected
+    synergies_found: List[str] = field(default_factory=list)
+    red_flags_found: List[str] = field(default_factory=list)
 
     # Slot-specific bonuses (Phase 1.3)
     slot_bonus: int = 0  # Bonus from slot-specific rules
-    slot_bonus_reasons: List[str] = None  # Reasons for slot bonuses
+    slot_bonus_reasons: List[str] = field(default_factory=list)
 
     # Crafting potential (Phase 1.3)
     open_prefixes: int = 0  # Estimated open prefix slots
@@ -69,34 +69,22 @@ class RareItemEvaluation:
     # Fractured items (Phase 1.3)
     is_fractured: bool = False
     fractured_bonus: int = 0  # Bonus for fractured T1 mods
-    fractured_mod: str = None  # The fractured mod if detected
+    fractured_mod: Optional[str] = None  # The fractured mod if detected
 
     # Build archetype matching (Phase 2)
-    matched_archetypes: List[str] = None  # Which build archetypes this item fits
+    matched_archetypes: List[str] = field(default_factory=list)
     archetype_bonus: int = 0  # Bonus for fitting meta archetypes
     meta_bonus: int = 0  # Bonus from current meta popularity
 
     # Build matching (if provided)
     matches_build: bool = False
     build_name: Optional[str] = None
-    matching_requirements: List[str] = None
+    matching_requirements: List[str] = field(default_factory=list)
 
     # Build archetype context (Phase 2 - PoB integration)
     build_archetype: Optional[BuildArchetype] = None
     archetype_weighted_score: int = 0  # Score adjusted by archetype weights
-    archetype_affix_details: List[Dict[str, Any]] = None  # Per-affix weight details
-
-    def __post_init__(self):
-        if self.synergies_found is None:
-            self.synergies_found = []
-        if self.red_flags_found is None:
-            self.red_flags_found = []
-        if self.slot_bonus_reasons is None:
-            self.slot_bonus_reasons = []
-        if self.matched_archetypes is None:
-            self.matched_archetypes = []
-        if self.archetype_affix_details is None:
-            self.archetype_affix_details = []
+    archetype_affix_details: List[Dict[str, Any]] = field(default_factory=list)
 
 
 class RareItemEvaluator:
@@ -110,7 +98,7 @@ class RareItemEvaluator:
     - Optional build requirements
     """
 
-    def __init__(self, data_dir: Path = None):
+    def __init__(self, data_dir: Optional[Path] = None):
         """
         Initialize evaluator with data files.
 

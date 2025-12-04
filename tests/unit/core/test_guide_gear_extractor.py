@@ -478,6 +478,431 @@ class TestGuideGearExtractor:
 
         assert result == []
 
+    def test_get_item_sets_from_profile_no_pob_code(self, extractor, mock_char_manager):
+        """Should return empty list when profile has no PoB code."""
+        profile = MagicMock()
+        profile.pob_code = None
+        mock_char_manager.get_profile.return_value = profile
+
+        result = extractor.get_item_sets_from_profile("Test")
+
+        assert result == []
+
+    def test_get_item_sets_from_pob_code(self, extractor):
+        """Should parse item sets from PoB code."""
+        # Mock the decoder to return XML with item sets
+        mock_xml = """<?xml version="1.0" encoding="UTF-8"?>
+        <PathOfBuilding>
+            <Items activeItemSet="1">
+                <ItemSet id="1" title="Main Set">
+                    <Slot name="Helmet" itemId="1"/>
+                    <Slot name="Body Armour" itemId="2"/>
+                </ItemSet>
+                <ItemSet id="2" title="^xFFFFFFBossing Set">
+                    <Slot name="Helmet" itemId="3"/>
+                </ItemSet>
+            </Items>
+        </PathOfBuilding>
+        """
+        extractor._decoder.decode_pob_code = MagicMock(return_value=mock_xml)
+
+        result = extractor.get_item_sets_from_pob_code("test_code")
+
+        assert len(result) == 2
+        assert result[0].id == "1"
+        assert result[0].title == "Main Set"
+        assert result[0].slot_count == 2
+        assert result[0].is_active is True
+        assert result[1].id == "2"
+        assert result[1].title == "Bossing Set"  # Color code stripped
+        assert result[1].is_active is False
+
+    def test_parse_item_sets_cleans_color_codes(self, extractor):
+        """Should clean PoB color codes from titles."""
+        xml = """<?xml version="1.0" encoding="UTF-8"?>
+        <PathOfBuilding>
+            <Items>
+                <ItemSet id="1" title="^xFFFF00Yellow Title^xFFFFFFWhite"/>
+            </Items>
+        </PathOfBuilding>
+        """
+
+        result = extractor._parse_item_sets(xml)
+
+        assert result[0].title == "Yellow TitleWhite"
+
+    def test_parse_item_sets_handles_empty_title(self, extractor):
+        """Should handle empty titles."""
+        xml = """<?xml version="1.0" encoding="UTF-8"?>
+        <PathOfBuilding>
+            <Items>
+                <ItemSet id="1" title=""/>
+            </Items>
+        </PathOfBuilding>
+        """
+
+        result = extractor._parse_item_sets(xml)
+
+        assert result[0].title == "Item Set 1"
+
+    def test_parse_item_sets_no_items_element(self, extractor):
+        """Should handle XML without Items element."""
+        xml = """<?xml version="1.0" encoding="UTF-8"?>
+        <PathOfBuilding>
+        </PathOfBuilding>
+        """
+
+        result = extractor._parse_item_sets(xml)
+
+        assert result == []
+
+    def test_extract_from_pob_code_with_item_set(self, extractor):
+        """Should extract gear from specific item set."""
+        mock_xml = """<?xml version="1.0" encoding="UTF-8"?>
+        <PathOfBuilding>
+            <Build className="Slayer"/>
+            <Items>
+                <Item id="1">Rarity: UNIQUE
+Devoto's Devotion
+Nightmare Bascinet
+Item Level: 70</Item>
+                <ItemSet id="1" title="Main">
+                    <Slot name="Helmet" itemId="1"/>
+                </ItemSet>
+            </Items>
+        </PathOfBuilding>
+        """
+        extractor._decoder.decode_pob_code = MagicMock(return_value=mock_xml)
+
+        result = extractor.extract_from_pob_code_with_item_set(
+            "test_code", "Test Build", "1"
+        )
+
+        assert result is not None
+        assert result.item_set_name == "Main"
+        assert "Helmet" in result.recommendations
+
+    def test_extract_from_item_set_skips_abyssal_slots(self, extractor):
+        """Should skip abyssal socket slots."""
+        xml = """<?xml version="1.0" encoding="UTF-8"?>
+        <PathOfBuilding>
+            <Build className="Test"/>
+            <Items>
+                <Item id="1">Rarity: RARE
+Test Item
+Test Base</Item>
+                <ItemSet id="1" title="Test">
+                    <Slot name="Abyssal Socket 1" itemId="1"/>
+                    <Slot name="Graft 1" itemId="1"/>
+                    <Slot name="Helmet" itemId="1"/>
+                </ItemSet>
+            </Items>
+        </PathOfBuilding>
+        """
+
+        result = extractor._extract_from_item_set(xml, "Test", "1")
+
+        # Should only include Helmet, not Abyssal or Graft
+        assert result is not None
+        assert "Helmet" in result.recommendations
+        assert len(result.recommendations) == 1
+
+    def test_extract_from_item_set_skips_empty_slots(self, extractor):
+        """Should skip slots with itemId="0"."""
+        xml = """<?xml version="1.0" encoding="UTF-8"?>
+        <PathOfBuilding>
+            <Build className="Test"/>
+            <Items>
+                <Item id="1">Rarity: RARE
+Test Item
+Test Base</Item>
+                <ItemSet id="1" title="Test">
+                    <Slot name="Helmet" itemId="1"/>
+                    <Slot name="Body Armour" itemId="0"/>
+                    <Slot name="Gloves" itemId=""/>
+                </ItemSet>
+            </Items>
+        </PathOfBuilding>
+        """
+
+        result = extractor._extract_from_item_set(xml, "Test", "1")
+
+        # Should only include Helmet
+        assert result is not None
+        assert "Helmet" in result.recommendations
+        assert len(result.recommendations) == 1
+
+    def test_extract_from_item_set_not_found(self, extractor):
+        """Should return None when item set not found."""
+        xml = """<?xml version="1.0" encoding="UTF-8"?>
+        <PathOfBuilding>
+            <Items>
+                <ItemSet id="1" title="Test"/>
+            </Items>
+        </PathOfBuilding>
+        """
+
+        result = extractor._extract_from_item_set(xml, "Test", "999")
+
+        assert result is None
+
+    def test_parse_item_element_minimal(self, extractor):
+        """Should handle minimal item element."""
+        from xml.etree.ElementTree import Element
+
+        item_elem = Element("Item")
+        item_elem.text = """Rarity: RARE
+Test Name
+Test Base"""
+
+        result = extractor._parse_item_element(item_elem)
+
+        assert result is not None
+        assert result.name == "Test Name"
+        assert result.base_type == "Test Base"
+        assert result.rarity == "RARE"
+
+    def test_parse_item_element_empty(self, extractor):
+        """Should return None for empty item."""
+        from xml.etree.ElementTree import Element
+
+        item_elem = Element("Item")
+        item_elem.text = ""
+
+        result = extractor._parse_item_element(item_elem)
+
+        assert result is None
+
+    def test_parse_item_element_with_metadata(self, extractor):
+        """Should parse item with metadata correctly."""
+        from xml.etree.ElementTree import Element
+
+        item_elem = Element("Item")
+        item_elem.text = """Rarity: UNIQUE
+Headhunter
+Leather Belt
+Item Level: 84
+Quality: 20
+Sockets: R-R-R
+Implicits: 1
++40 to maximum Life
+Requires Level 40
+{crafted}+30% to Fire Resistance
+{fractured}+100 to Armour"""
+
+        result = extractor._parse_item_element(item_elem)
+
+        assert result is not None
+        assert result.item_level == 84
+        assert result.quality == 20
+        assert result.sockets == "R-R-R"
+        assert len(result.implicit_mods) == 1
+        assert len(result.explicit_mods) == 2
+
+    def test_parse_item_element_removes_crafted_tags(self, extractor):
+        """Should remove crafted tags from mods."""
+        from xml.etree.ElementTree import Element
+
+        item_elem = Element("Item")
+        item_elem.text = """Rarity: RARE
+Test
+Base
+Implicits: 0
+{crafted}+30% to Fire Resistance"""
+
+        result = extractor._parse_item_element(item_elem)
+
+        assert result is not None
+        assert len(result.explicit_mods) == 1
+        # Tags should be stripped
+        assert result.explicit_mods[0] == "+30% to Fire Resistance"
+        assert "{crafted}" not in result.explicit_mods[0]
+
+    def test_parse_item_element_removes_fractured_tags(self, extractor):
+        """Should remove fractured tags from mods."""
+        from xml.etree.ElementTree import Element
+
+        item_elem = Element("Item")
+        item_elem.text = """Rarity: RARE
+Test
+Base
+Implicits: 0
+{fractured}+100 to Armour"""
+
+        result = extractor._parse_item_element(item_elem)
+
+        assert result is not None
+        assert len(result.explicit_mods) == 1
+        # Tags should be stripped
+        assert result.explicit_mods[0] == "+100 to Armour"
+        assert "{fractured}" not in result.explicit_mods[0]
+
+    def test_parse_item_element_skips_metadata_lines(self, extractor):
+        """Should skip all metadata lines."""
+        from xml.etree.ElementTree import Element
+
+        item_elem = Element("Item")
+        item_elem.text = """Rarity: RARE
+Test
+Base
+Elder Item
+Shaper Item
+Corrupted
+Mirrored
+Unique ID: 12345
+Implicits: 0
++50 to maximum Life"""
+
+        result = extractor._parse_item_element(item_elem)
+
+        # Should have 1 explicit mod, metadata should be skipped
+        assert len(result.explicit_mods) == 1
+        assert result.explicit_mods[0] == "+50 to maximum Life"
+
+    def test_compare_with_current_missing_profile(self, extractor, mock_char_manager):
+        """Should return empty dict when current profile not found."""
+        mock_char_manager.get_profile.return_value = None
+        summary = GuideGearSummary(profile_name="Guide", guide_name="Guide")
+
+        result = extractor.compare_with_current(summary, "NonExistent")
+
+        assert result == {}
+
+    def test_compare_with_current_no_build(self, extractor, mock_char_manager):
+        """Should return empty dict when profile has no build."""
+        profile = MagicMock()
+        profile.build = None
+        mock_char_manager.get_profile.return_value = profile
+        summary = GuideGearSummary(profile_name="Guide", guide_name="Guide")
+
+        result = extractor.compare_with_current(summary, "Current")
+
+        assert result == {}
+
+    def test_compare_with_current_empty_slot(self, extractor, mock_char_manager):
+        """Should detect empty slot as upgrade needed."""
+        from core.pob_integration import PoBBuild
+
+        summary = GuideGearSummary(profile_name="Guide", guide_name="Guide")
+        summary.recommendations["Helmet"] = GuideGearRecommendation(
+            slot="Helmet",
+            item_name="Test Helmet",
+            base_type="Test Base",
+            rarity="RARE",
+            is_unique=False,
+        )
+
+        current_profile = MagicMock()
+        current_build = PoBBuild(class_name="Test", ascendancy="Test", level=90)
+        current_build.items = {}  # No helmet
+        current_profile.build = current_build
+        mock_char_manager.get_profile.return_value = current_profile
+
+        result = extractor.compare_with_current(summary, "Current")
+
+        assert result["Helmet"]["has_item"] is False
+        assert result["Helmet"]["upgrade_needed"] is True
+
+    def test_compare_with_current_matching_rare(self, extractor, mock_char_manager):
+        """Should detect matching rare by base type."""
+        from core.pob_integration import PoBBuild, PoBItem
+
+        summary = GuideGearSummary(profile_name="Guide", guide_name="Guide")
+        summary.recommendations["Helmet"] = GuideGearRecommendation(
+            slot="Helmet",
+            item_name="",
+            base_type="Astral Plate",
+            rarity="RARE",
+            is_unique=False,
+        )
+
+        current_profile = MagicMock()
+        current_build = PoBBuild(class_name="Test", ascendancy="Test", level=90)
+        current_build.items = {
+            "Helmet": PoBItem(
+                slot="Helmet",
+                rarity="RARE",
+                name="My Helmet",
+                base_type="Astral Plate",
+            )
+        }
+        current_profile.build = current_build
+        mock_char_manager.get_profile.return_value = current_profile
+
+        result = extractor.compare_with_current(summary, "Current")
+
+        assert result["Helmet"]["is_match"] is True
+        assert result["Helmet"]["upgrade_needed"] is False
+
+    def test_item_to_recommendation_prioritizes_life_mods(self, extractor):
+        """Should prioritize life mods in key_mods."""
+        from core.pob_integration import PoBItem
+
+        item = PoBItem(
+            slot="Body Armour",
+            rarity="RARE",
+            name="",
+            base_type="Astral Plate",
+            explicit_mods=[
+                "+105 to maximum Life",
+                "+45% to Fire Resistance",
+                "+40% to Cold Resistance",
+                "Some random mod",
+            ],
+        )
+
+        rec = extractor._item_to_recommendation(item, "Body Armour")
+
+        # Life should be captured since it matches priority pattern
+        assert any("Life" in mod for mod in rec.key_mods)
+        # At least one resistance should be captured
+        assert any("Resistance" in mod for mod in rec.key_mods) or len(rec.key_mods) >= 2
+
+    def test_item_to_recommendation_limits_key_mods(self, extractor):
+        """Should limit key_mods to 5."""
+        from core.pob_integration import PoBItem
+
+        item = PoBItem(
+            slot="Body Armour",
+            rarity="RARE",
+            name="",
+            base_type="Test",
+            explicit_mods=[
+                "+100 to maximum Life",
+                "+50% to Fire Resistance",
+                "+50% to Cold Resistance",
+                "+50% to Lightning Resistance",
+                "+30% to Chaos Resistance",
+                "+500 to Armour",
+                "10% increased Stun Recovery",
+                "5% increased Movement Speed",
+            ],
+        )
+
+        rec = extractor._item_to_recommendation(item, "Body Armour")
+
+        # Should capture at most 5 mods
+        assert len(rec.key_mods) <= 5
+
+    def test_extract_from_profile_success(self, extractor, mock_char_manager, sample_pob_build):
+        """Should extract from profile successfully."""
+        profile = MagicMock()
+        profile.build = sample_pob_build
+        mock_char_manager.get_profile.return_value = profile
+
+        result = extractor.extract_from_profile("Test Profile")
+
+        assert result is not None
+        assert result.guide_name == "Slayer"
+
+    def test_extract_from_pob_code_exception(self, extractor):
+        """Should handle exceptions in extract_from_pob_code."""
+        extractor._decoder.decode_pob_code = MagicMock(side_effect=Exception("Test error"))
+
+        result = extractor.extract_from_pob_code("bad_code")
+
+        assert result is None
+
 
 class TestEquipmentSlots:
     """Tests for EQUIPMENT_SLOTS constant."""

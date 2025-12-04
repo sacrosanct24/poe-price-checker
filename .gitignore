@@ -58,6 +58,13 @@ oauth_config.json
 # Logs
 *.log
 
+# Coverage reports
+.coverage
+coverage.xml
+htmlcov/
+*.cover
+.hypothesis/
+
 # Claude Code local settings
 .claude/
 claude.md

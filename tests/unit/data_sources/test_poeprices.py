@@ -304,6 +304,397 @@ class TestPoePricesAPI:
         assert top_mods == []
 
 
+class TestPoePricesAPICacheKey:
+    """Tests for PoePricesAPI cache key generation."""
+
+    def test_get_cache_key_with_params(self):
+        """Test cache key generation with params."""
+        api = PoePricesAPI.__new__(PoePricesAPI)
+        api.league = "Standard"
+
+        params = {'l': 'Settlers', 'i': 'base64encodeditem'}
+        cache_key = api._get_cache_key("api", params)
+
+        assert "api" in cache_key
+        assert "Settlers" in cache_key
+        # Hash of item should be included
+        assert str(hash('base64encodeditem')) in cache_key
+
+    def test_get_cache_key_without_params(self):
+        """Test cache key generation without params."""
+        api = PoePricesAPI.__new__(PoePricesAPI)
+        api.league = "Standard"
+
+        cache_key = api._get_cache_key("api", None)
+
+        assert cache_key == "api"
+
+    def test_get_cache_key_empty_params(self):
+        """Test cache key with empty params dict."""
+        api = PoePricesAPI.__new__(PoePricesAPI)
+        api.league = "Standard"
+
+        params = {}
+        cache_key = api._get_cache_key("api", params)
+
+        # With empty params, should include empty league and hash of empty string
+        assert "api" in cache_key
+
+
+class TestPoePricesAPIReconstructItemText:
+    """Tests for PoePricesAPI._reconstruct_item_text method."""
+
+    def test_reconstruct_basic_item(self):
+        """Test reconstructing basic item text."""
+        api = PoePricesAPI.__new__(PoePricesAPI)
+        api.league = "Standard"
+
+        parsed_item = Mock()
+        parsed_item.item_class = "Body Armours"
+        parsed_item.rarity = "Rare"
+        parsed_item.name = "Test Regalia"
+        parsed_item.base_type = "Vaal Regalia"
+        parsed_item.item_level = 86
+        parsed_item.implicit_mods = []
+        parsed_item.explicit_mods = ["+80 to maximum Life", "+40% to Fire Resistance"]
+        parsed_item.requirements = None
+        parsed_item.sockets = None
+
+        result = api._reconstruct_item_text(parsed_item)
+
+        assert "Item Class: Body Armours" in result
+        assert "Rarity: Rare" in result
+        assert "Test Regalia" in result
+        assert "Vaal Regalia" in result
+        assert "Item Level: 86" in result
+        assert "+80 to maximum Life" in result
+        assert "+40% to Fire Resistance" in result
+
+    def test_reconstruct_item_with_requirements(self):
+        """Test reconstructing item with requirements."""
+        api = PoePricesAPI.__new__(PoePricesAPI)
+        api.league = "Standard"
+
+        parsed_item = Mock()
+        parsed_item.item_class = "Body Armours"
+        parsed_item.rarity = "Rare"
+        parsed_item.name = "Test Item"
+        parsed_item.base_type = "Vaal Regalia"
+        parsed_item.item_level = 86
+        parsed_item.implicit_mods = []
+        parsed_item.explicit_mods = []
+        parsed_item.requirements = {"Level": 68, "Int": 194}
+        parsed_item.sockets = None
+
+        result = api._reconstruct_item_text(parsed_item)
+
+        assert "Requirements:" in result
+        assert "Level: 68" in result
+        assert "Int: 194" in result
+
+    def test_reconstruct_item_with_sockets(self):
+        """Test reconstructing item with sockets."""
+        api = PoePricesAPI.__new__(PoePricesAPI)
+        api.league = "Standard"
+
+        parsed_item = Mock()
+        parsed_item.item_class = "Body Armours"
+        parsed_item.rarity = "Rare"
+        parsed_item.name = "Test Item"
+        parsed_item.base_type = "Vaal Regalia"
+        parsed_item.item_level = 86
+        parsed_item.implicit_mods = []
+        parsed_item.explicit_mods = []
+        parsed_item.requirements = None
+        parsed_item.sockets = "B-B-B-B-B-B"
+
+        result = api._reconstruct_item_text(parsed_item)
+
+        assert "Sockets: B-B-B-B-B-B" in result
+
+    def test_reconstruct_item_with_implicit_mods(self):
+        """Test reconstructing item with implicit mods."""
+        api = PoePricesAPI.__new__(PoePricesAPI)
+        api.league = "Standard"
+
+        parsed_item = Mock()
+        parsed_item.item_class = "Amulets"
+        parsed_item.rarity = "Rare"
+        parsed_item.name = "Test Amulet"
+        parsed_item.base_type = "Onyx Amulet"
+        parsed_item.item_level = 80
+        parsed_item.implicit_mods = ["+16 to all Attributes"]
+        parsed_item.explicit_mods = ["+50 to maximum Life"]
+        parsed_item.requirements = None
+        parsed_item.sockets = None
+
+        result = api._reconstruct_item_text(parsed_item)
+
+        assert "+16 to all Attributes" in result
+        assert "+50 to maximum Life" in result
+        # Implicit should be separated from explicit with --------
+        lines = result.split("\n")
+        implicit_idx = lines.index("+16 to all Attributes")
+        separator_after_implicit = lines[implicit_idx + 1]
+        assert separator_after_implicit == "--------"
+
+    def test_reconstruct_item_without_item_class(self):
+        """Test reconstructing item without item_class attribute."""
+        api = PoePricesAPI.__new__(PoePricesAPI)
+        api.league = "Standard"
+
+        # Use spec to exclude item_class
+        parsed_item = Mock(spec=['rarity', 'name', 'base_type', 'item_level',
+                                  'implicit_mods', 'explicit_mods'])
+        parsed_item.rarity = "Rare"
+        parsed_item.name = "Test Item"
+        parsed_item.base_type = "Leather Belt"
+        parsed_item.item_level = 75
+        parsed_item.implicit_mods = []
+        parsed_item.explicit_mods = []
+
+        result = api._reconstruct_item_text(parsed_item)
+
+        assert "Item Class:" not in result
+        assert "Rarity: Rare" in result
+
+    def test_reconstruct_item_without_name(self):
+        """Test reconstructing item without name (e.g., magic item)."""
+        api = PoePricesAPI.__new__(PoePricesAPI)
+        api.league = "Standard"
+
+        parsed_item = Mock()
+        parsed_item.item_class = "Rings"
+        parsed_item.rarity = "Magic"
+        parsed_item.name = None
+        parsed_item.base_type = "Gold Ring"
+        parsed_item.item_level = 70
+        parsed_item.implicit_mods = []
+        parsed_item.explicit_mods = ["+15% to Fire Resistance"]
+        parsed_item.requirements = None
+        parsed_item.sockets = None
+
+        result = api._reconstruct_item_text(parsed_item)
+
+        assert "Rarity: Magic" in result
+        assert "Gold Ring" in result
+        # Name line should not appear for None
+        lines = result.split("\n")
+        assert None not in lines
+
+    def test_reconstruct_item_without_item_level(self):
+        """Test reconstructing item without item_level."""
+        api = PoePricesAPI.__new__(PoePricesAPI)
+        api.league = "Standard"
+
+        parsed_item = Mock()
+        parsed_item.item_class = "Rings"
+        parsed_item.rarity = "Rare"
+        parsed_item.name = "Test Ring"
+        parsed_item.base_type = "Gold Ring"
+        parsed_item.item_level = None
+        parsed_item.implicit_mods = []
+        parsed_item.explicit_mods = []
+        parsed_item.requirements = None
+        parsed_item.sockets = None
+
+        result = api._reconstruct_item_text(parsed_item)
+
+        assert "Item Level:" not in result
+
+
+class TestPoePricesAPIPredictFromParsed:
+    """Tests for PoePricesAPI.predict_price_from_parsed_item method."""
+
+    @patch('data_sources.pricing.poeprices.PoePricesAPI.predict_price')
+    def test_predict_from_parsed_item(self, mock_predict):
+        """Test predicting price from parsed item."""
+        mock_predict.return_value = PoePricesPrediction(
+            min_price=100.0,
+            max_price=150.0,
+            currency="chaos",
+            confidence_score=85.0,
+            error_code=0,
+            error_msg="",
+            warning_msg="",
+            mod_contributions=[],
+        )
+
+        api = PoePricesAPI.__new__(PoePricesAPI)
+        api.league = "Standard"
+
+        parsed_item = Mock()
+        parsed_item.item_class = "Body Armours"
+        parsed_item.rarity = "Rare"
+        parsed_item.name = "Test Item"
+        parsed_item.base_type = "Vaal Regalia"
+        parsed_item.item_level = 86
+        parsed_item.implicit_mods = []
+        parsed_item.explicit_mods = ["+80 to maximum Life"]
+        parsed_item.requirements = None
+        parsed_item.sockets = None
+
+        result = api.predict_price_from_parsed_item(parsed_item)
+
+        assert result.is_valid
+        assert result.min_price == 100.0
+        mock_predict.assert_called_once()
+        # Verify the reconstructed text was passed
+        call_args = mock_predict.call_args[0][0]
+        assert "Vaal Regalia" in call_args
+        assert "+80 to maximum Life" in call_args
+
+    @patch('data_sources.pricing.poeprices.PoePricesAPI.predict_price')
+    def test_predict_from_parsed_item_with_league_override(self, mock_predict):
+        """Test predicting price from parsed item with league override."""
+        mock_predict.return_value = PoePricesPrediction(
+            min_price=50.0,
+            max_price=75.0,
+            currency="chaos",
+            confidence_score=70.0,
+            error_code=0,
+            error_msg="",
+            warning_msg="",
+            mod_contributions=[],
+        )
+
+        api = PoePricesAPI.__new__(PoePricesAPI)
+        api.league = "Standard"
+
+        parsed_item = Mock()
+        parsed_item.item_class = "Rings"
+        parsed_item.rarity = "Rare"
+        parsed_item.name = "Test Ring"
+        parsed_item.base_type = "Gold Ring"
+        parsed_item.item_level = 75
+        parsed_item.implicit_mods = []
+        parsed_item.explicit_mods = []
+        parsed_item.requirements = None
+        parsed_item.sockets = None
+
+        result = api.predict_price_from_parsed_item(parsed_item, league="Settlers")
+
+        assert result.is_valid
+        # Verify league was passed
+        mock_predict.assert_called_once()
+        assert mock_predict.call_args[1].get('league') == "Settlers" or \
+               mock_predict.call_args[0][1] == "Settlers"
+
+
+class TestPoePricesAPIParseResponseEdgeCases:
+    """Tests for edge cases in _parse_response."""
+
+    def test_parse_response_missing_fields(self):
+        """Test parsing response with missing optional fields."""
+        api = PoePricesAPI.__new__(PoePricesAPI)
+        api.league = "Standard"
+
+        # Minimal response
+        response = {
+            'error': 0,
+        }
+
+        prediction = api._parse_response(response)
+
+        assert prediction.error_code == 0
+        assert prediction.min_price == 0
+        assert prediction.max_price == 0
+        assert prediction.currency == 'chaos'
+        assert prediction.confidence_score == 0
+        assert prediction.mod_contributions == []
+
+    def test_parse_response_malformed_pred_explanation(self):
+        """Test parsing response with malformed pred_explanation."""
+        api = PoePricesAPI.__new__(PoePricesAPI)
+        api.league = "Standard"
+
+        response = {
+            'min': 100.0,
+            'max': 150.0,
+            'currency': 'chaos',
+            'pred_confidence_score': 85.0,
+            'error': 0,
+            'pred_explanation': [
+                ['+# to Life', 0.5],  # Valid
+                ['single element'],    # Invalid - only 1 element
+                'not a list',          # Invalid - not a list
+                ['+# to ES', 0.3, 'extra'],  # Valid - extra element ignored
+            ],
+        }
+
+        prediction = api._parse_response(response)
+
+        # Should only have the valid entries
+        assert len(prediction.mod_contributions) == 2
+        assert prediction.mod_contributions[0] == ('+# to Life', 0.5)
+        assert prediction.mod_contributions[1] == ('+# to ES', 0.3)
+
+    def test_parse_response_empty_pred_explanation(self):
+        """Test parsing response with empty pred_explanation."""
+        api = PoePricesAPI.__new__(PoePricesAPI)
+        api.league = "Standard"
+
+        response = {
+            'min': 100.0,
+            'max': 150.0,
+            'currency': 'chaos',
+            'error': 0,
+            'pred_explanation': [],
+        }
+
+        prediction = api._parse_response(response)
+
+        assert prediction.mod_contributions == []
+
+
+class TestPoePricesAPIPredictPriceLeagueOverride:
+    """Tests for predict_price with league parameter."""
+
+    @patch('data_sources.pricing.poeprices.PoePricesAPI.get')
+    def test_predict_price_uses_instance_league(self, mock_get):
+        """Test predict_price uses instance league when not overridden."""
+        mock_get.return_value = {
+            'min': 100.0,
+            'max': 150.0,
+            'currency': 'chaos',
+            'pred_confidence_score': 85.0,
+            'error': 0,
+        }
+
+        api = PoePricesAPI.__new__(PoePricesAPI)
+        api.league = "Standard"
+        api.request_count = 0
+
+        api.predict_price("Test item")
+
+        # Verify the league in the call
+        call_kwargs = mock_get.call_args
+        params = call_kwargs[1]['params'] if 'params' in call_kwargs[1] else call_kwargs[0][1]
+        assert params['l'] == "Standard"
+
+    @patch('data_sources.pricing.poeprices.PoePricesAPI.get')
+    def test_predict_price_league_override(self, mock_get):
+        """Test predict_price with league override."""
+        mock_get.return_value = {
+            'min': 100.0,
+            'max': 150.0,
+            'currency': 'chaos',
+            'pred_confidence_score': 85.0,
+            'error': 0,
+        }
+
+        api = PoePricesAPI.__new__(PoePricesAPI)
+        api.league = "Standard"
+        api.request_count = 0
+
+        api.predict_price("Test item", league="Settlers")
+
+        # Verify the league in the call was overridden
+        call_kwargs = mock_get.call_args
+        params = call_kwargs[1]['params'] if 'params' in call_kwargs[1] else call_kwargs[0][1]
+        assert params['l'] == "Settlers"
+
+
 class TestPoePricesAPIIntegration:
     """Integration tests for PoePricesAPI (marked to skip by default)."""
 

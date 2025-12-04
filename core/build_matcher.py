@@ -51,7 +51,7 @@ class BuildMatcher:
     - Pre-defined popular builds
     """
 
-    def __init__(self, builds_file: Path = None):
+    def __init__(self, builds_file: Optional[Path] = None):
         """
         Initialize build matcher.
 
@@ -108,7 +108,7 @@ class BuildMatcher:
     def import_pob_code(
             self,
             pob_code: str,
-            build_name: str = None) -> BuildRequirement:
+            build_name: Optional[str] = None) -> BuildRequirement:
         """
         Import a Path of Building code and extract build requirements.
 
@@ -178,9 +178,9 @@ class BuildMatcher:
         build_name: str,
         required_life: int = 0,
         required_es: int = 0,
-        resistances: Dict[str, int] = None,
-        desired_affixes: List[str] = None,
-        key_uniques: List[str] = None
+        resistances: Optional[Dict[str, int]] = None,
+        desired_affixes: Optional[List[str]] = None,
+        key_uniques: Optional[List[str]] = None
     ) -> BuildRequirement:
         """
         Manually add a build with requirements.
@@ -215,7 +215,7 @@ class BuildMatcher:
         self,
         item,
         affix_matches: List
-    ) -> List[Dict]:
+    ) -> List[Dict[str, object]]:
         """
         Check if an item matches any build requirements.
 
@@ -277,8 +277,8 @@ class BuildMatcher:
                     "matched_requirements": matched_requirements
                 })
 
-        # Sort by score
-        matches.sort(key=lambda x: x["score"], reverse=True)
+        # Sort by score (cast to int since we know score is always int)
+        matches.sort(key=lambda x: int(x["score"]), reverse=True)  # type: ignore[arg-type]
 
         return matches
 
