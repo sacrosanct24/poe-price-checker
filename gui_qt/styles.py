@@ -11,6 +11,7 @@ Supports multiple themes including:
 from enum import Enum
 from typing import Dict, Callable, Optional
 import logging
+import threading
 
 logger = logging.getLogger(__name__)
 
@@ -565,6 +566,7 @@ class ThemeManager:
     """
 
     _instance: Optional['ThemeManager'] = None
+    _lock: threading.Lock = threading.Lock()
     _theme_change_callbacks: list[Callable[['Theme'], None]] = []
 
     # Instance attributes - declared here for type checking
@@ -574,14 +576,17 @@ class ThemeManager:
     _stylesheet_cache: Dict[tuple, str]
 
     def __new__(cls):
-        """Singleton pattern - only one theme manager."""
+        """Singleton pattern with thread-safe double-checked locking."""
         if cls._instance is None:
-            cls._instance = super().__new__(cls)
-            cls._instance._current_theme = Theme.DARK
-            cls._instance._accent_color = None  # None = use theme default
-            cls._instance._colors = {}
-            cls._instance._stylesheet_cache = {}  # Cache by (theme, accent)
-            cls._instance._update_colors()
+            with cls._lock:
+                # Double-check after acquiring lock
+                if cls._instance is None:
+                    cls._instance = super().__new__(cls)
+                    cls._instance._current_theme = Theme.DARK
+                    cls._instance._accent_color = None  # None = use theme default
+                    cls._instance._colors = {}
+                    cls._instance._stylesheet_cache = {}  # Cache by (theme, accent)
+                    cls._instance._update_colors()
         return cls._instance
 
     @property

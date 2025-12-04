@@ -116,8 +116,8 @@ class MetaAnalyzer:
 
         # Reset counters
         self.builds_analyzed = len(builds)
-        affix_counter = Counter()
-        affix_values = defaultdict(list)
+        affix_counter: Counter[str] = Counter()
+        affix_values: Dict[str, List[float]] = defaultdict(list)
         affix_classes = defaultdict(set)
 
         for build in builds:

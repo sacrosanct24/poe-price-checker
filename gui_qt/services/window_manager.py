@@ -18,6 +18,7 @@ Usage:
 from __future__ import annotations
 
 import logging
+import threading
 from typing import Any, Callable, Dict, Optional, Type, TYPE_CHECKING
 
 from PyQt6.QtWidgets import QWidget
@@ -59,6 +60,7 @@ class WindowManager:
     """
 
     _instance: Optional['WindowManager'] = None
+    _lock: threading.Lock = threading.Lock()
 
     # Instance attributes - declared for type checking
     _windows: Dict[str, QWidget]
@@ -66,12 +68,15 @@ class WindowManager:
     _main_window: Optional[QMainWindow]
 
     def __new__(cls) -> 'WindowManager':
-        """Singleton pattern - only one window manager per application."""
+        """Singleton pattern with thread-safe double-checked locking."""
         if cls._instance is None:
-            cls._instance = super().__new__(cls)
-            cls._instance._windows = {}
-            cls._instance._factories = {}
-            cls._instance._main_window = None
+            with cls._lock:
+                # Double-check after acquiring lock
+                if cls._instance is None:
+                    cls._instance = super().__new__(cls)
+                    cls._instance._windows = {}
+                    cls._instance._factories = {}
+                    cls._instance._main_window = None
         return cls._instance
 
     def set_main_window(self, window: 'QMainWindow') -> None:

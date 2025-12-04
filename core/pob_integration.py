@@ -581,7 +581,7 @@ class PoBDecoder:
 
         implicit_count = 0
         implicits_remaining = 0
-        _ = False  # parsing_explicits - intentionally unused
+        # NOTE: parsing_explicits state is implicit from implicits_remaining == 0
 
         for i, line in enumerate(lines):
             # Skip empty lines
@@ -632,8 +632,7 @@ class PoBDecoder:
                 if mod:
                     item.implicit_mods.append(mod)
                 implicits_remaining -= 1
-                if implicits_remaining == 0:
-                    _ = True  # parsing_explicits - intentionally unused
+                # Once implicits_remaining == 0, we've finished parsing implicits
                 continue
 
             # If we've parsed all implicits (or there were none), this is an explicit mod

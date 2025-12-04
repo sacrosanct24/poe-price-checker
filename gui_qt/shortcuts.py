@@ -11,6 +11,7 @@ Provides:
 from __future__ import annotations
 
 import logging
+import threading
 from dataclasses import dataclass
 from enum import Enum
 from typing import Callable, Dict, List, Optional, TYPE_CHECKING
@@ -97,6 +98,7 @@ class ShortcutManager:
     """
 
     _instance: Optional["ShortcutManager"] = None
+    _lock: threading.Lock = threading.Lock()
 
     def __init__(self):
         self._shortcuts: Dict[str, ShortcutDef] = {}
@@ -111,10 +113,33 @@ class ShortcutManager:
 
     @classmethod
     def instance(cls) -> "ShortcutManager":
-        """Get the singleton instance."""
+        """Get the singleton instance with thread-safe double-checked locking."""
         if cls._instance is None:
-            cls._instance = cls()
+            with cls._lock:
+                # Double-check after acquiring lock
+                if cls._instance is None:
+                    cls._instance = cls()
         return cls._instance
+
+    @classmethod
+    def reset_for_testing(cls) -> None:
+        """
+        Reset the singleton instance for test isolation.
+
+        Call this in test fixtures to ensure tests don't affect each other.
+        """
+        with cls._lock:
+            if cls._instance is not None:
+                # Clean up Qt shortcuts
+                for shortcut in cls._instance._qt_shortcuts.values():
+                    try:
+                        shortcut.setEnabled(False)
+                        shortcut.deleteLater()
+                    except RuntimeError:
+                        pass  # Qt object already destroyed
+                cls._instance._qt_shortcuts.clear()
+            cls._instance = None
+        logger.debug("ShortcutManager reset for testing")
 
     def set_window(self, window: QMainWindow) -> None:
         """Set the main window for shortcut registration."""

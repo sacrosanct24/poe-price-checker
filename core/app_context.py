@@ -89,13 +89,12 @@ def create_app_context() -> AppContext:
     try:
         set_active_policy_from_dict(config.display_policy)
     except Exception:
-        # Defensive: ignore invalid config; keep defaults
-        pass
+        pass  # Defensive: invalid display_policy config, use defaults
     # Apply API retry logging verbosity
     try:
         set_retry_logging_verbosity(config.api_retry_logging_verbosity)
     except Exception:
-        pass
+        pass  # Defensive: invalid retry logging config, use defaults
     parser = ItemParser()
     db = Database()  # Uses default ~/.poe_price_checker/data.db
 
@@ -115,7 +114,7 @@ def create_app_context() -> AppContext:
             poe_ninja.timeout = (connect_to, read_to)
             poe_ninja.endpoint_ttls = config.get_pricing_ttls()
         except Exception:
-            pass
+            pass  # Defensive: invalid timeout/TTL config, use API defaults
 
         # Optionally auto-detect the active temp league via poe.ninja
         if config.auto_detect_league:
@@ -152,7 +151,7 @@ def create_app_context() -> AppContext:
                 poe_watch.timeout = (connect_to, read_to)
                 poe_watch.endpoint_ttls = config.get_pricing_ttls()
             except Exception:
-                pass
+                pass  # Defensive: invalid timeout/TTL config, use API defaults
             logger.info("[OK] poe.watch API initialized successfully")
         except Exception as exc:
             logger.warning(
@@ -275,8 +274,7 @@ def create_app_context() -> AppContext:
             if hasattr(multi_price_service, "set_enabled_state"):
                 multi_price_service.set_enabled_state(enabled_map)  # type: ignore[attr-defined]
     except Exception:
-        # Defensive: ignore bad config
-        pass
+        pass  # Defensive: ignore invalid enabled_sources config
 
     return AppContext(
         config=config,

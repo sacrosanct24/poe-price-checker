@@ -9,7 +9,7 @@ Provides cascading dropdowns:
 from __future__ import annotations
 
 import logging
-from typing import Optional, List
+from typing import Any, Optional, List, cast
 
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import (
@@ -220,15 +220,18 @@ class BuildFilterWidget(QWidget):
 
     def get_game_version(self) -> Optional[GameVersion]:
         """Get selected game version or None for all."""
-        return self.game_combo.currentData()
+        data: Any = self.game_combo.currentData()
+        return cast(Optional[GameVersion], data)
 
     def get_class_name(self) -> Optional[str]:
         """Get selected class name or None for all."""
-        return self.class_combo.currentData()
+        data: Any = self.class_combo.currentData()
+        return cast(Optional[str], data)
 
     def get_ascendancy(self) -> Optional[str]:
         """Get selected ascendancy or None for all."""
-        return self.ascendancy_combo.currentData()
+        data: Any = self.ascendancy_combo.currentData()
+        return cast(Optional[str], data)
 
     def get_filter(self) -> dict:
         """
