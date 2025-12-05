@@ -644,7 +644,44 @@ class ThemeManager:
         }
 
     def _is_system_dark_mode(self) -> bool:
-        """Detect if system is in dark mode."""
+        """Detect if system is in dark mode.
+
+        Uses platform-specific APIs for accurate detection:
+        - Windows: Registry key for AppsUseLightTheme
+        - macOS: Aqua variation detection
+        - Linux/Other: QPalette window lightness fallback
+        """
+        import sys
+
+        # Windows: Check registry for dark mode setting
+        if sys.platform == "win32":
+            try:
+                import winreg
+                key = winreg.OpenKey(
+                    winreg.HKEY_CURRENT_USER,
+                    r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize"
+                )
+                value, _ = winreg.QueryValueEx(key, "AppsUseLightTheme")
+                winreg.CloseKey(key)
+                return value == 0  # 0 = dark mode, 1 = light mode
+            except (FileNotFoundError, OSError):
+                pass  # Registry key not found, fall through to QPalette
+
+        # macOS: Check Aqua variation
+        if sys.platform == "darwin":
+            try:
+                from PyQt6.QtWidgets import QApplication
+                app = QApplication.instance()
+                if app:
+                    # Qt6 approach - check style hints
+                    style_hints = app.styleHints()
+                    if hasattr(style_hints, 'colorScheme'):
+                        from PyQt6.QtCore import Qt
+                        return style_hints.colorScheme() == Qt.ColorScheme.Dark
+            except Exception:
+                pass
+
+        # Fallback: Use QPalette window background lightness
         try:
             from PyQt6.QtWidgets import QApplication
             from PyQt6.QtGui import QPalette
@@ -655,6 +692,7 @@ class ThemeManager:
                 return bg.lightness() < 128
         except Exception:
             pass  # No app instance, assume dark theme
+
         return True  # Default to dark
 
     def set_theme(self, theme: Theme) -> None:
