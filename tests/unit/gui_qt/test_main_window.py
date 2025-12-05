@@ -9,7 +9,16 @@ from PyQt6.QtCore import Qt
 
 from gui_qt.main_window import PriceCheckerWindow
 from gui_qt.styles import Theme
+from gui_qt.services.history_manager import HistoryManager
 from core.result import Ok, Err
+
+
+@pytest.fixture(autouse=True)
+def reset_history_manager():
+    """Reset HistoryManager singleton before and after each test."""
+    HistoryManager.reset_for_testing()
+    yield
+    HistoryManager.reset_for_testing()
 
 
 @pytest.fixture
@@ -79,9 +88,9 @@ class TestPriceCheckerWindowInit:
         assert window.ctx is mock_ctx
 
     def test_history_initialized(self, window):
-        """History deque is initialized."""
-        assert window._history is not None
-        assert len(window._history) == 0
+        """History manager is initialized."""
+        assert window._history_manager is not None
+        assert window._history_manager.is_empty()
 
     def test_check_not_in_progress(self, window):
         """Check flag is initially False."""
@@ -325,7 +334,7 @@ class TestPriceCheckerWindowMenuActions:
 
     def test_show_history_empty(self, window):
         """_show_history shows message when empty."""
-        window._history.clear()
+        window._history_manager.clear()
         with patch.object(QMessageBox, 'information') as mock_info:
             window._show_history()
             mock_info.assert_called_once()
@@ -334,7 +343,7 @@ class TestPriceCheckerWindowMenuActions:
     def test_show_history_with_items(self, window):
         """_show_history opens dialog with items."""
         from core.history import HistoryEntry
-        window._history.append(HistoryEntry(
+        window._history_manager.add_entry_direct(HistoryEntry(
             timestamp="2025-01-01T00:00:00",
             item_text="Test Item",
             item_name="Test",

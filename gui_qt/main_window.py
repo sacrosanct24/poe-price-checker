@@ -19,9 +19,8 @@ import logging
 import os
 import random
 import sys
-from collections import deque
 from pathlib import Path
-from typing import Any, Deque, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QAction, QKeySequence, QIcon
@@ -59,11 +58,9 @@ from gui_qt.widgets.toast_notification import ToastManager
 from gui_qt.widgets.pinned_items_widget import PinnedItemsWidget
 from gui_qt.widgets.session_tabs import SessionTabWidget, SessionPanel
 from gui_qt.workers import RankingsPopulationWorker
-from gui_qt.services import get_window_manager, SystemTrayManager
+from gui_qt.services import get_window_manager, SystemTrayManager, get_history_manager
 from gui_qt.controllers import PriceCheckController, ThemeController
 from core.build_stat_calculator import BuildStats
-from core.constants import HISTORY_MAX_ENTRIES
-from core.history import HistoryEntry
 
 if TYPE_CHECKING:
     from core.app_context import AppContext
@@ -80,8 +77,9 @@ class PriceCheckerWindow(QMainWindow):
 
         # State
         self._check_in_progress = False
-        # Bounded history to prevent unbounded memory growth
-        self._history: Deque[HistoryEntry] = deque(maxlen=HISTORY_MAX_ENTRIES)
+
+        # History manager for session history
+        self._history_manager = get_history_manager()
 
         # Window manager for child window lifecycle
         self._window_manager = get_window_manager()
@@ -725,9 +723,7 @@ class PriceCheckerWindow(QMainWindow):
                 panel.rare_eval_panel.setVisible(False)
 
             # Add to history
-            self._history.append(
-                HistoryEntry.from_price_check(item_text, data.parsed_item, data.results)
-            )
+            self._history_manager.add_entry(item_text, data.parsed_item, data.results)
 
             # Update status and show toast
             self._set_status(self._price_controller.get_price_summary(data))
@@ -1167,13 +1163,13 @@ class PriceCheckerWindow(QMainWindow):
 
     def _show_history(self) -> None:
         """Show session history dialog with re-check capability."""
-        if not self._history:
+        if self._history_manager.is_empty():
             QMessageBox.information(self, "Recent Items", "No items checked this session.")
             return
 
         from gui_qt.dialogs.recent_items_dialog import RecentItemsDialog
 
-        dialog = RecentItemsDialog(list(self._history), self)
+        dialog = RecentItemsDialog(self._history_manager.get_entries(), self)
         dialog.item_selected.connect(self._recheck_item_from_history)
         dialog.exec()
 
