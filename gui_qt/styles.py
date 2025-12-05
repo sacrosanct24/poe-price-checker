@@ -567,13 +567,13 @@ class ThemeManager:
 
     _instance: Optional['ThemeManager'] = None
     _lock: threading.Lock = threading.Lock()
-    _theme_change_callbacks: list[Callable[['Theme'], None]] = []
 
     # Instance attributes - declared here for type checking
     _current_theme: Theme
     _accent_color: Optional[str]
     _colors: Dict[str, str]
     _stylesheet_cache: Dict[tuple, str]
+    _theme_change_callbacks: list[Callable[['Theme'], None]]
 
     def __new__(cls):
         """Singleton pattern with thread-safe double-checked locking."""
@@ -586,6 +586,7 @@ class ThemeManager:
                     cls._instance._accent_color = None  # None = use theme default
                     cls._instance._colors = {}
                     cls._instance._stylesheet_cache = {}  # Cache by (theme, accent)
+                    cls._instance._theme_change_callbacks = []  # Instance variable, not class
                     cls._instance._update_colors()
         return cls._instance
 
@@ -690,14 +691,17 @@ class ThemeManager:
         Call this in test fixtures (e.g., pytest's autouse fixture) to ensure
         tests don't affect each other through shared ThemeManager state.
 
+        Note: Callbacks are now instance variables and are automatically cleaned
+        up when the instance is reset. No need to explicitly clear them.
+
         Example:
             @pytest.fixture(autouse=True)
             def reset_theme():
                 yield
                 ThemeManager.reset_for_testing()
         """
-        cls._instance = None
-        cls._theme_change_callbacks.clear()
+        with cls._lock:
+            cls._instance = None
         logger.debug("ThemeManager reset for testing")
 
     def toggle_theme(self) -> Theme:
@@ -778,12 +782,6 @@ class ThemeManager:
         """Clear the stylesheet cache. Useful when theme definitions change."""
         self._stylesheet_cache.clear()
         logger.debug("Stylesheet cache cleared")
-
-    @classmethod
-    def _reset_for_testing(cls) -> None:
-        """Reset singleton state for test isolation. Only use in tests."""
-        cls._instance = None
-        cls._theme_change_callbacks = []
 
     def get_stylesheet(self) -> str:
         """Generate the complete application stylesheet for current theme.

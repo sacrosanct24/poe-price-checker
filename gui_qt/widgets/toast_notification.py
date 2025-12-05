@@ -6,6 +6,7 @@ Non-blocking toast notifications for status updates.
 
 from __future__ import annotations
 
+import weakref
 from enum import Enum
 from typing import Optional, List
 
@@ -181,6 +182,10 @@ class ToastManager:
     Manages toast notifications for a parent widget.
 
     Toasts are stacked from bottom-right corner upward.
+
+    Uses a weak reference to parent to prevent the manager from keeping the
+    parent widget alive. When the parent is destroyed, all toasts are cleared
+    automatically via the destroyed signal connection.
     """
 
     # Spacing between toasts
@@ -190,15 +195,33 @@ class ToastManager:
     MAX_TOASTS = 5
 
     def __init__(self, parent: QWidget):
-        self._parent = parent
+        # Use weak reference to avoid preventing parent from being garbage collected
+        self._parent_ref: weakref.ref[QWidget] = weakref.ref(parent)
         self._toasts: List[ToastNotification] = []
+
+        # Connect to parent's destroyed signal to clean up all toasts
+        parent.destroyed.connect(self._on_parent_destroyed)
+
+    @property
+    def _parent(self) -> Optional[QWidget]:
+        """Get the parent widget if it still exists."""
+        return self._parent_ref()
+
+    def _on_parent_destroyed(self) -> None:
+        """Called when parent widget is destroyed. Clean up all toasts."""
+        # Clear toasts list without trying to fade them out (parent is already gone)
+        for toast in list(self._toasts):
+            # Just hide and delete, don't animate (animation needs parent)
+            toast.hide()
+            toast.deleteLater()
+        self._toasts.clear()
 
     def show_toast(
         self,
         message: str,
         toast_type: ToastType = ToastType.INFO,
         duration_ms: int = 3000,
-    ) -> ToastNotification:
+    ) -> Optional[ToastNotification]:
         """
         Show a toast notification.
 
@@ -208,14 +231,19 @@ class ToastManager:
             duration_ms: Auto-dismiss duration (0 = never auto-dismiss)
 
         Returns:
-            The created toast notification
+            The created toast notification, or None if parent was destroyed
         """
+        parent = self._parent
+        if parent is None:
+            # Parent was destroyed, can't show toasts
+            return None
+
         # Limit max toasts
         while len(self._toasts) >= self.MAX_TOASTS:
             oldest = self._toasts.pop(0)
             oldest._fade_out()
 
-        toast = ToastNotification(message, toast_type, duration_ms, self._parent)
+        toast = ToastNotification(message, toast_type, duration_ms, parent)
         toast.destroyed.connect(lambda: self._remove_toast(toast))
         self._toasts.append(toast)
 
@@ -233,14 +261,11 @@ class ToastManager:
 
     def _position_toasts(self) -> None:
         """Position all toasts from bottom-right corner."""
-        if not self._parent:
+        parent = self._parent
+        if parent is None:
             return
 
-        try:
-            parent_rect = self._parent.rect()
-        except RuntimeError:
-            # Parent widget has been deleted
-            return
+        parent_rect = parent.rect()
         y_offset = self.MARGIN_BOTTOM
 
         for toast in reversed(self._toasts):
@@ -253,19 +278,19 @@ class ToastManager:
             toast.move(x, y)
             y_offset += toast.height() + self.TOAST_SPACING
 
-    def info(self, message: str, duration_ms: int = 3000) -> ToastNotification:
+    def info(self, message: str, duration_ms: int = 3000) -> Optional[ToastNotification]:
         """Show an info toast."""
         return self.show_toast(message, ToastType.INFO, duration_ms)
 
-    def success(self, message: str, duration_ms: int = 3000) -> ToastNotification:
+    def success(self, message: str, duration_ms: int = 3000) -> Optional[ToastNotification]:
         """Show a success toast."""
         return self.show_toast(message, ToastType.SUCCESS, duration_ms)
 
-    def warning(self, message: str, duration_ms: int = 4000) -> ToastNotification:
+    def warning(self, message: str, duration_ms: int = 4000) -> Optional[ToastNotification]:
         """Show a warning toast."""
         return self.show_toast(message, ToastType.WARNING, duration_ms)
 
-    def error(self, message: str, duration_ms: int = 5000) -> ToastNotification:
+    def error(self, message: str, duration_ms: int = 5000) -> Optional[ToastNotification]:
         """Show an error toast."""
         return self.show_toast(message, ToastType.ERROR, duration_ms)
 

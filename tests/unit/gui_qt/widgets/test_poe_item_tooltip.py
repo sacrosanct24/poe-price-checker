@@ -38,13 +38,14 @@ class MockParsedItem:
 
 
 class TestPoEItemTooltip:
-    """Tests for PoEItemTooltip class."""
+    """Tests for PoEItemTooltip class.
+
+    Note: PoEItemTooltip is a singleton that is automatically reset after each
+    test by the autouse fixture in conftest.py. No manual _instance = None needed.
+    """
 
     def test_singleton_instance(self, qtbot):
         """Test that instance() returns the same object."""
-        # Reset singleton for clean test
-        PoEItemTooltip._instance = None
-
         tooltip1 = PoEItemTooltip.instance()
         tooltip2 = PoEItemTooltip.instance()
 
@@ -52,7 +53,6 @@ class TestPoEItemTooltip:
 
     def test_show_for_item_basic(self, qtbot):
         """Test showing tooltip for a basic item."""
-        PoEItemTooltip._instance = None
         tooltip = PoEItemTooltip.instance()
 
         item = MockParsedItem(
@@ -69,7 +69,6 @@ class TestPoEItemTooltip:
 
     def test_show_for_item_with_mods(self, qtbot):
         """Test showing tooltip for item with mods."""
-        PoEItemTooltip._instance = None
         tooltip = PoEItemTooltip.instance()
 
         item = MockParsedItem(
@@ -95,7 +94,6 @@ class TestPoEItemTooltip:
 
     def test_show_for_item_corrupted(self, qtbot):
         """Test tooltip shows corrupted status."""
-        PoEItemTooltip._instance = None
         tooltip = PoEItemTooltip.instance()
 
         item = MockParsedItem(
@@ -113,7 +111,6 @@ class TestPoEItemTooltip:
 
     def test_show_for_item_unique_with_flavour(self, qtbot):
         """Test tooltip shows flavour text for uniques."""
-        PoEItemTooltip._instance = None
         tooltip = PoEItemTooltip.instance()
 
         item = MockParsedItem(
@@ -131,7 +128,6 @@ class TestPoEItemTooltip:
 
     def test_show_for_none_item_hides(self, qtbot):
         """Test that showing None hides the tooltip."""
-        PoEItemTooltip._instance = None
         tooltip = PoEItemTooltip.instance()
 
         # First show an item
@@ -145,7 +141,6 @@ class TestPoEItemTooltip:
 
     def test_hide_after_delay(self, qtbot):
         """Test hide_after_delay method."""
-        PoEItemTooltip._instance = None
         tooltip = PoEItemTooltip.instance()
 
         item = MockParsedItem()
@@ -154,13 +149,12 @@ class TestPoEItemTooltip:
 
         tooltip.hide_after_delay(10)  # 10ms delay
 
-        # Wait for timer
-        qtbot.wait(50)
+        # Use waitUntil for more reliable timing in CI
+        qtbot.waitUntil(lambda: not tooltip.isVisible(), timeout=500)
         assert not tooltip.isVisible()
 
     def test_cancel_hide(self, qtbot):
         """Test cancel_hide prevents hiding."""
-        PoEItemTooltip._instance = None
         tooltip = PoEItemTooltip.instance()
 
         item = MockParsedItem()
@@ -243,7 +237,6 @@ class TestTooltipHTMLGeneration:
 
     def test_header_includes_rarity_color(self, qtbot):
         """Test that header uses rarity color."""
-        PoEItemTooltip._instance = None
         tooltip = PoEItemTooltip.instance()
 
         item = MockParsedItem(rarity="Unique")
@@ -256,7 +249,6 @@ class TestTooltipHTMLGeneration:
 
     def test_requirements_displayed(self, qtbot):
         """Test that requirements are displayed."""
-        PoEItemTooltip._instance = None
         tooltip = PoEItemTooltip.instance()
 
         item = MockParsedItem(
@@ -271,7 +263,6 @@ class TestTooltipHTMLGeneration:
 
     def test_influences_displayed(self, qtbot):
         """Test that influences are displayed."""
-        PoEItemTooltip._instance = None
         tooltip = PoEItemTooltip.instance()
 
         item = MockParsedItem(
@@ -287,7 +278,6 @@ class TestTooltipHTMLGeneration:
 
     def test_quality_displayed(self, qtbot):
         """Test that quality is displayed."""
-        PoEItemTooltip._instance = None
         tooltip = PoEItemTooltip.instance()
 
         item = MockParsedItem(quality=20)

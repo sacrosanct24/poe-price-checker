@@ -65,8 +65,9 @@ jobs:
 
     - name: Type check with mypy
       run: |
-        # Run mypy on core modules with strict type hints
-        mypy core --config-file=mypy.ini || echo "::warning::mypy found type errors (non-blocking)"
+        # Run mypy using config file settings (files specified in mypy.ini)
+        # This is blocking - mypy errors will fail the build
+        mypy --config-file=mypy.ini
 
     - name: Test with pytest (with xvfb for Qt)
       id: pytest
@@ -74,7 +75,6 @@ jobs:
         QT_QPA_PLATFORM: offscreen
       run: |
         xvfb-run --auto-servernum pytest tests/ --ignore=tests/integration \
-          --ignore=tests/unit/gui_qt/workers \
           --cov=core --cov=gui_qt --cov-report=term-missing \
           --cov-report=xml \
           --junitxml=test-results-ubuntu-${{ matrix.python-version }}.xml \
@@ -134,13 +134,12 @@ jobs:
         python -m pip install pytest pytest-qt pytest-xdist
         pip install -r requirements.txt
 
-    - name: Test with pytest (parallel, non-GUI)
+    - name: Test with pytest (parallel)
       id: pytest
       env:
         QT_QPA_PLATFORM: offscreen
       run: |
         pytest tests/ --ignore=tests/integration `
-          --ignore=tests/unit/gui_qt `
           --junitxml=test-results-windows.xml `
           -n auto `
           -v
@@ -180,13 +179,12 @@ jobs:
         python -m pip install pytest pytest-qt pytest-xdist
         pip install -r requirements.txt
 
-    - name: Test with pytest (parallel, non-GUI)
+    - name: Test with pytest (parallel)
       id: pytest
       env:
         QT_QPA_PLATFORM: offscreen
       run: |
         pytest tests/ --ignore=tests/integration \
-          --ignore=tests/unit/gui_qt \
           --junitxml=test-results-macos.xml \
           -n auto \
           -v

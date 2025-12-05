@@ -77,6 +77,23 @@ class PoEItemTooltip(QFrame):
             cls._instance = cls()
         return cls._instance
 
+    @classmethod
+    def reset_for_testing(cls) -> None:
+        """
+        Reset the singleton instance for test isolation.
+
+        Properly cleans up the Qt widget before resetting, stopping timers
+        and calling deleteLater() to prevent memory leaks.
+        """
+        if cls._instance is not None:
+            try:
+                cls._instance._hide_timer.stop()
+                cls._instance.hide()
+                cls._instance.deleteLater()
+            except RuntimeError:
+                pass  # Widget already deleted
+        cls._instance = None
+
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
 

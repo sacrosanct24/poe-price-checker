@@ -7,6 +7,60 @@ from core.database import Database
 from core.item_parser import ItemParser
 
 
+# =============================================================================
+# Global singleton reset fixture for test isolation
+# =============================================================================
+
+@pytest.fixture(autouse=True)
+def reset_qt_singletons():
+    """
+    Reset all Qt/GUI singletons after each test for proper isolation.
+
+    This autouse fixture ensures no test can leak state to another test through
+    singleton instances. The reset happens after yield (during teardown).
+
+    Singletons reset:
+    - ThemeManager: Theme state and callbacks
+    - WindowManager: Window cache and factories
+    - ShortcutManager: Keyboard shortcut registrations
+    - HistoryManager: Price check history
+    """
+    # Run the test
+    yield
+
+    # Teardown: reset all singletons
+    # Import here to avoid circular imports and only when tests use GUI code
+    try:
+        from gui_qt.styles import ThemeManager
+        ThemeManager.reset_for_testing()
+    except ImportError:
+        pass
+
+    try:
+        from gui_qt.services.window_manager import WindowManager
+        WindowManager.reset_for_testing()
+    except ImportError:
+        pass
+
+    try:
+        from gui_qt.shortcuts import ShortcutManager
+        ShortcutManager.reset_for_testing()
+    except ImportError:
+        pass
+
+    try:
+        from gui_qt.services.history_manager import HistoryManager
+        HistoryManager.reset_for_testing()
+    except ImportError:
+        pass
+
+    try:
+        from gui_qt.widgets.poe_item_tooltip import PoEItemTooltip
+        PoEItemTooltip.reset_for_testing()
+    except ImportError:
+        pass
+
+
 @pytest.fixture
 def temp_config(tmp_path):
     """
