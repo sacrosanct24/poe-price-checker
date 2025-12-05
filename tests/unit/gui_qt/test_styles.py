@@ -251,20 +251,20 @@ class TestThemeManager:
     @pytest.fixture
     def fresh_manager(self):
         """Create a fresh ThemeManager (bypass singleton)."""
-        # Reset singleton
-        ThemeManager._instance = None
+        # Reset singleton and clear callbacks
+        ThemeManager.reset_for_testing()
         manager = ThemeManager()
         yield manager
         # Reset again for cleanup
-        ThemeManager._instance = None
+        ThemeManager.reset_for_testing()
 
     def test_singleton_pattern(self):
         """Should return same instance."""
-        ThemeManager._instance = None
+        ThemeManager.reset_for_testing()
         m1 = ThemeManager()
         m2 = ThemeManager()
         assert m1 is m2
-        ThemeManager._instance = None
+        ThemeManager.reset_for_testing()
 
     def test_default_theme_is_dark(self, fresh_manager):
         """Default theme should be dark."""
@@ -391,18 +391,18 @@ class TestGetThemeManager:
 
     def test_returns_manager(self):
         """Should return ThemeManager instance."""
-        ThemeManager._instance = None
+        ThemeManager.reset_for_testing()
         manager = get_theme_manager()
         assert isinstance(manager, ThemeManager)
-        ThemeManager._instance = None
+        ThemeManager.reset_for_testing()
 
     def test_returns_same_instance(self):
         """Should return same instance on repeated calls."""
-        ThemeManager._instance = None
+        ThemeManager.reset_for_testing()
         m1 = get_theme_manager()
         m2 = get_theme_manager()
         assert m1 is m2
-        ThemeManager._instance = None
+        ThemeManager.reset_for_testing()
 
 
 class TestColorsProxy:
@@ -410,12 +410,12 @@ class TestColorsProxy:
 
     def test_getitem(self):
         """Should get color from theme manager."""
-        ThemeManager._instance = None
+        ThemeManager.reset_for_testing()
         proxy = _ColorsProxy()
         color = proxy["background"]
         assert isinstance(color, str)
         assert color.startswith("#")
-        ThemeManager._instance = None
+        ThemeManager.reset_for_testing()
 
     def test_get_with_default(self):
         """Should return default for missing key."""
@@ -457,11 +457,11 @@ class TestGetRarityColor:
 
     def test_returns_color_for_rarity(self):
         """Should return color for known rarity."""
-        ThemeManager._instance = None
+        ThemeManager.reset_for_testing()
         color = get_rarity_color("unique")
         assert isinstance(color, str)
         assert color.startswith("#")
-        ThemeManager._instance = None
+        ThemeManager.reset_for_testing()
 
     def test_case_insensitive(self):
         """Should handle different cases."""
@@ -482,10 +482,10 @@ class TestGetValueColor:
 
     def test_high_value(self):
         """Should return high value color for >= 100."""
-        ThemeManager._instance = None
+        ThemeManager.reset_for_testing()
         color = get_value_color(150)
         assert isinstance(color, str)
-        ThemeManager._instance = None
+        ThemeManager.reset_for_testing()
 
     def test_medium_value(self):
         """Should return medium value color for >= 10."""
