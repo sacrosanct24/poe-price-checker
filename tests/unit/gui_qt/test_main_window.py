@@ -572,10 +572,10 @@ class TestPriceCheckerWindowPinning:
     def test_on_pinned_item_inspected_with_item(self, window_with_mock_panel):
         """_on_pinned_item_inspected updates inspector."""
         mock_item = MagicMock()
-        # Mock _current_build_stats which is used in the method
-        window_with_mock_panel._current_build_stats = None
-        window_with_mock_panel._on_pinned_item_inspected({"_item": mock_item})
-        window_with_mock_panel._mock_panel.item_inspector.set_item.assert_called()
+        # Patch the _current_build_stats property to return None
+        with patch.object(type(window_with_mock_panel), '_current_build_stats', new_callable=lambda: property(lambda self: None)):
+            window_with_mock_panel._on_pinned_item_inspected({"_item": mock_item})
+            window_with_mock_panel._mock_panel.item_inspector.set_item.assert_called()
 
     def test_on_pinned_item_inspected_without_item(self, window):
         """_on_pinned_item_inspected shows status without item."""
@@ -609,17 +609,17 @@ class TestPriceCheckerWindowComparison:
     def test_on_compare_items_valid(self, window):
         """_on_compare_items_requested opens dialog with valid items."""
         window._toast_manager = MagicMock()
-        # Mock _current_build_stats which is used in the method
-        window._current_build_stats = None
         items = [
             {"_item": MagicMock()},
             {"_item": MagicMock()},
         ]
 
-        with patch('gui_qt.dialogs.item_comparison_dialog.ItemComparisonDialog') as mock_dialog:
-            mock_dialog.return_value.exec.return_value = None
-            window._on_compare_items_requested(items)
-            mock_dialog.assert_called_once()
+        # Patch the _current_build_stats property to return None
+        with patch.object(type(window), '_current_build_stats', new_callable=lambda: property(lambda self: None)):
+            with patch('gui_qt.dialogs.item_comparison_dialog.ItemComparisonDialog') as mock_dialog:
+                mock_dialog.return_value.exec.return_value = None
+                window._on_compare_items_requested(items)
+                mock_dialog.assert_called_once()
 
 
 class TestPriceCheckerWindowResultsContextMenu:
