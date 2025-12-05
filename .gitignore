@@ -80,3 +80,6 @@ tests/acceptance/latest_report.md
 tests/acceptance/latest_report.json
 nul
 assets/temp/
+
+# Archived docs (code reviews, old plans, etc.)
+docs_archived/
