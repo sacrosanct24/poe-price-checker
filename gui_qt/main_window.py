@@ -948,8 +948,8 @@ class PriceCheckerWindow(QMainWindow):
     def _on_ranking_price_check(self, item_name: str) -> None:
         """Handle price check request from rankings window."""
         # Set the item text in the input field and trigger price check
-        self._input_text.setText(item_name)
-        self._on_price_check()
+        self.input_text.setPlainText(item_name)
+        self._on_check_price()
 
     def _show_build_comparison(self) -> None:
         """Show build comparison dialog."""
