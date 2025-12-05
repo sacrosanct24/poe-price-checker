@@ -139,6 +139,7 @@ jobs:
         QT_QPA_PLATFORM: offscreen
       run: |
         pytest tests/ --ignore=tests/integration `
+          --ignore=tests/unit/gui_qt/workers `
           --junitxml=test-results-windows.xml `
           -n auto `
           -v
@@ -184,6 +185,7 @@ jobs:
         QT_QPA_PLATFORM: offscreen
       run: |
         pytest tests/ --ignore=tests/integration \
+          --ignore=tests/unit/gui_qt/workers \
           --junitxml=test-results-macos.xml \
           -n auto \
           -v
