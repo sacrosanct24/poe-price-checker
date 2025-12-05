@@ -7,9 +7,9 @@ PyQt6 window for displaying recent sales.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
 
-from PyQt6.QtCore import Qt, QAbstractTableModel, QModelIndex
+from PyQt6.QtCore import Qt, QAbstractTableModel, QModelIndex, pyqtSignal
 from PyQt6.QtWidgets import (
     QWidget,
     QDialog,
@@ -22,9 +22,11 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QTableView,
     QAbstractItemView,
+    QMenu,
 )
 
 from gui_qt.styles import apply_window_icon
+from gui_qt.widgets.item_context_menu import ItemContext, ItemContextMenuManager
 
 if TYPE_CHECKING:
     from core.app_context import AppContext
@@ -108,10 +110,25 @@ class SalesTableModel(QAbstractTableModel):
 class RecentSalesWindow(QDialog):
     """Window for displaying recent sales."""
 
+    # Signals for item actions
+    ai_analysis_requested = pyqtSignal(str, list)  # item_text, price_results
+    price_check_requested = pyqtSignal(str)  # item_text
+
     def __init__(self, ctx: "AppContext", parent: Optional[QWidget] = None):
         super().__init__(parent)
 
         self.ctx = ctx
+
+        # Context menu manager
+        self._context_menu_manager = ItemContextMenuManager(self)
+        self._context_menu_manager.set_options(
+            show_inspect=False,  # Sales items are just records
+            show_price_check=True,
+            show_ai=True,
+            show_copy=True,
+        )
+        self._context_menu_manager.ai_analysis_requested.connect(self.ai_analysis_requested.emit)
+        self._context_menu_manager.price_check_requested.connect(self.price_check_requested.emit)
 
         self.setWindowTitle("Recent Sales")
         self.setMinimumSize(500, 400)
@@ -123,6 +140,14 @@ class RecentSalesWindow(QDialog):
 
         self._create_widgets()
         self._load_sales()
+
+    def set_ai_configured_callback(self, callback: Callable[[], bool]) -> None:
+        """Set callback to check if AI is configured.
+
+        Args:
+            callback: Function returning True if AI is ready to use.
+        """
+        self._context_menu_manager.set_ai_configured_callback(callback)
 
     def _create_widgets(self) -> None:
         """Create all UI elements."""
@@ -171,6 +196,10 @@ class RecentSalesWindow(QDialog):
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.table.setAlternatingRowColors(True)
         self.table.setSortingEnabled(True)
+
+        # Context menu
+        self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.table.customContextMenuRequested.connect(self._show_context_menu)
 
         # Column widths
         header = self.table.horizontalHeader()
@@ -229,4 +258,38 @@ class RecentSalesWindow(QDialog):
         total_chaos = sum(s.get("chaos_value", 0) or 0 for s in filtered)
         self.summary_label.setText(
             f"{len(filtered)} sales | Total: {total_chaos:.1f}c"
+        )
+
+    def _show_context_menu(self, position) -> None:
+        """Show context menu for sales items."""
+        index = self.table.indexAt(position)
+        if not index.isValid():
+            return
+
+        row = index.row()
+        if row < 0 or row >= len(self._model._data):
+            return
+
+        sale_data = self._model._data[row]
+        item_name = sale_data.get("item_name", "")
+        if not item_name:
+            return
+
+        chaos_value = sale_data.get("chaos_value", 0) or 0
+        source = sale_data.get("source", "")
+
+        # Build item context
+        item_context = ItemContext(
+            item_name=item_name,
+            item_text=item_name,  # Use name as item text
+            chaos_value=float(chaos_value) if chaos_value else 0,
+            divine_value=0,
+            source=source,
+        )
+
+        # Show context menu
+        self._context_menu_manager.show_menu(
+            self.table.viewport().mapToGlobal(position),
+            item_context,
+            self.table,
         )

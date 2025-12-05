@@ -8,7 +8,7 @@ Shows characters and equipment in a compact sidebar format.
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -24,9 +24,11 @@ from PyQt6.QtWidgets import (
     QTreeWidgetItem,
     QPushButton,
     QHeaderView,
+    QMenu,
 )
 
 from gui_qt.styles import COLORS, get_rarity_color
+from gui_qt.widgets.item_context_menu import ItemContext, ItemContextMenuManager
 
 
 class PoBPanel(QWidget):
@@ -35,6 +37,7 @@ class PoBPanel(QWidget):
     # Signals
     item_selected = pyqtSignal(str, dict)  # Emits (item_text, item_data)
     price_check_requested = pyqtSignal(str)  # Emits item text
+    ai_analysis_requested = pyqtSignal(str, list)  # item_text, price_results
 
     def __init__(
         self,
@@ -47,8 +50,27 @@ class PoBPanel(QWidget):
         self._profiles_cache: Dict[str, Dict[str, Any]] = {}
         self._selected_profile: Optional[str] = None
 
+        # Context menu manager
+        self._context_menu_manager = ItemContextMenuManager(self)
+        self._context_menu_manager.set_options(
+            show_inspect=False,  # PoB items don't have an inspect dialog
+            show_price_check=True,
+            show_ai=True,
+            show_copy=True,
+        )
+        self._context_menu_manager.ai_analysis_requested.connect(self.ai_analysis_requested.emit)
+        self._context_menu_manager.price_check_requested.connect(self.price_check_requested.emit)
+
         self._create_widgets()
         self._load_profiles()
+
+    def set_ai_configured_callback(self, callback: Callable[[], bool]) -> None:
+        """Set callback to check if AI is configured.
+
+        Args:
+            callback: Function returning True if AI is ready to use.
+        """
+        self._context_menu_manager.set_ai_configured_callback(callback)
 
     def _create_widgets(self) -> None:
         """Create the panel UI."""
@@ -89,6 +111,11 @@ class PoBPanel(QWidget):
 
         self.equipment_tree.itemClicked.connect(self._on_item_clicked)
         self.equipment_tree.itemDoubleClicked.connect(self._on_item_double_clicked)
+
+        # Context menu
+        self.equipment_tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.equipment_tree.customContextMenuRequested.connect(self._show_context_menu)
+
         layout.addWidget(self.equipment_tree, stretch=1)
 
         # Action buttons
@@ -233,6 +260,36 @@ class PoBPanel(QWidget):
         if item_data:
             item_text = self._generate_item_text(item_data)
             self.price_check_requested.emit(item_text)
+
+    def _show_context_menu(self, position) -> None:
+        """Show context menu for equipment items."""
+        tree_item = self.equipment_tree.itemAt(position)
+        if not tree_item:
+            return
+
+        item_data = tree_item.data(0, Qt.ItemDataRole.UserRole)
+        if not item_data:
+            return
+
+        # Get item text and name
+        item_text = self._generate_item_text(item_data)
+        item_name = getattr(item_data, "name", "Unknown") or "Unknown"
+
+        # Build item context
+        item_context = ItemContext(
+            item_name=item_name,
+            item_text=item_text,
+            chaos_value=0,  # PoB items don't have prices yet
+            divine_value=0,
+            source="",
+        )
+
+        # Show the menu
+        self._context_menu_manager.show_menu(
+            self.equipment_tree.viewport().mapToGlobal(position),
+            item_context,
+            self.equipment_tree,
+        )
 
     def _on_check_selected(self) -> None:
         """Check price of selected item."""

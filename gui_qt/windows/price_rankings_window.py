@@ -9,7 +9,7 @@ from __future__ import annotations
 import hashlib
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
 
 from PyQt6.QtCore import Qt, QAbstractTableModel, QModelIndex, QThread, pyqtSignal, QUrl, QSize
 from PyQt6.QtGui import QColor, QBrush, QPixmap, QImage
@@ -32,6 +32,7 @@ from PyQt6.QtWidgets import (
 )
 
 from gui_qt.styles import COLORS, RARITY_COLORS, apply_window_icon
+from gui_qt.widgets.item_context_menu import ItemContext, ItemContextMenuManager
 
 if TYPE_CHECKING:
     from core.app_context import AppContext
@@ -411,12 +412,24 @@ class PriceRankingsWindow(QDialog):
 
     # Signal emitted when user wants to price check an item from rankings
     priceCheckRequested = pyqtSignal(str)  # Emits item name
+    ai_analysis_requested = pyqtSignal(str, list)  # item_text, price_results
 
     def __init__(self, ctx: "AppContext", parent: Optional[QWidget] = None):
         super().__init__(parent)
         self.ctx = ctx
         self._worker: Optional[FetchWorker] = None
         self._rankings: Dict[str, Any] = {}
+
+        # Context menu manager
+        self._context_menu_manager = ItemContextMenuManager(self)
+        self._context_menu_manager.set_options(
+            show_inspect=False,  # Rankings items are just names
+            show_price_check=True,
+            show_ai=True,
+            show_copy=True,
+        )
+        self._context_menu_manager.ai_analysis_requested.connect(self.ai_analysis_requested.emit)
+        self._context_menu_manager.price_check_requested.connect(self.priceCheckRequested.emit)
 
         self.setWindowTitle("Price Rankings - Top 20")
         self.setMinimumSize(700, 500)
@@ -425,6 +438,14 @@ class PriceRankingsWindow(QDialog):
 
         self._setup_ui()
         self._load_initial_data()
+
+    def set_ai_configured_callback(self, callback: Callable[[], bool]) -> None:
+        """Set callback to check if AI is configured.
+
+        Args:
+            callback: Function returning True if AI is ready to use.
+        """
+        self._context_menu_manager.set_ai_configured_callback(callback)
 
     def _setup_ui(self) -> None:
         """Create the UI components."""
@@ -721,25 +742,25 @@ class PriceRankingsWindow(QDialog):
         if not item_name:
             return
 
-        # Create context menu
-        menu = QMenu(table)
+        # Get price data
+        chaos_value = item_data.get("chaos_value", 0) or 0
+        divine_value = item_data.get("divine_value", 0) or 0
 
-        # Price check action
-        price_check_action = menu.addAction(f"Price Check: {item_name}")
-        price_check_action.triggered.connect(
-            lambda: self._on_price_check_item(item_name)
+        # Build item context
+        item_context = ItemContext(
+            item_name=item_name,
+            item_text=item_name,  # Use name as item text for rankings
+            chaos_value=float(chaos_value) if chaos_value else 0,
+            divine_value=float(divine_value) if divine_value else 0,
+            source="poe.ninja",
         )
 
-        menu.addSeparator()
-
-        # Copy name action
-        copy_name_action = menu.addAction("Copy Name")
-        copy_name_action.triggered.connect(
-            lambda: self._copy_to_clipboard(item_name)
+        # Show context menu
+        self._context_menu_manager.show_menu(
+            table.viewport().mapToGlobal(pos),
+            item_context,
+            table,
         )
-
-        # Show at cursor position
-        menu.exec(table.viewport().mapToGlobal(pos))
 
     def _on_price_check_item(self, item_name: str) -> None:
         """Handle price check request from context menu."""

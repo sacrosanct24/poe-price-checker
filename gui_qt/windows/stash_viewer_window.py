@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
-from typing import Any, List, Optional, TYPE_CHECKING
+from typing import Any, Callable, List, Optional, TYPE_CHECKING
 
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QAbstractTableModel, QModelIndex
 from PyQt6.QtGui import QColor
@@ -39,9 +39,11 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QTextBrowser,
     QApplication,
+    QMenu,
 )
 
 from gui_qt.styles import COLORS, apply_window_icon, get_rarity_color
+from gui_qt.widgets.item_context_menu import ItemContext, ItemContextMenuManager
 from core.stash_valuator import (
     StashValuator,
     ValuationResult,
@@ -376,12 +378,28 @@ class StashItemDetailsDialog(QDialog):
 class StashViewerWindow(QDialog):
     """Window for viewing and valuating stash tabs."""
 
+    # Signals for item actions
+    ai_analysis_requested = pyqtSignal(str, list)  # item_text, price_results
+    price_check_requested = pyqtSignal(str)  # item_text
+
     def __init__(self, ctx: "AppContext", parent: Optional[QWidget] = None):
         super().__init__(parent)
 
         self.ctx = ctx
         self._worker: Optional[FetchWorker] = None
         self._result: Optional[ValuationResult] = None
+        self._ai_configured_callback: Optional[Callable[[], bool]] = None
+
+        # Context menu manager for item actions
+        self._context_menu_manager = ItemContextMenuManager(self)
+        self._context_menu_manager.set_options(
+            show_inspect=True,
+            show_price_check=False,  # Stash items don't have item text for price check
+            show_ai=True,
+            show_copy=True,
+        )
+        self._context_menu_manager.ai_analysis_requested.connect(self.ai_analysis_requested.emit)
+        self._context_menu_manager.inspect_requested.connect(self._on_inspect_item_context)
 
         self.setWindowTitle("Stash Viewer")
         self.setMinimumSize(900, 600)
@@ -391,6 +409,15 @@ class StashViewerWindow(QDialog):
 
         self._create_widgets()
         self._load_settings()
+
+    def set_ai_configured_callback(self, callback: Callable[[], bool]) -> None:
+        """Set callback to check if AI is configured.
+
+        Args:
+            callback: Function returning True if AI is ready to use.
+        """
+        self._ai_configured_callback = callback
+        self._context_menu_manager.set_ai_configured_callback(callback)
 
     def _create_widgets(self) -> None:
         """Create all UI elements."""
@@ -519,6 +546,10 @@ class StashViewerWindow(QDialog):
         self.item_table.setAlternatingRowColors(True)
         self.item_table.setSortingEnabled(True)
         self.item_table.doubleClicked.connect(self._on_item_double_click)
+
+        # Context menu for items
+        self.item_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.item_table.customContextMenuRequested.connect(self._show_item_context_menu)
 
         # Column widths
         header = self.item_table.horizontalHeader()
@@ -816,6 +847,49 @@ class StashViewerWindow(QDialog):
         if item:
             dialog = StashItemDetailsDialog(item, self)
             dialog.exec()
+
+    def _show_item_context_menu(self, position) -> None:
+        """Show context menu for stash items."""
+        index = self.item_table.indexAt(position)
+        if not index.isValid():
+            return
+
+        item = self._item_model.get_item(index.row())
+        if not item:
+            return
+
+        # Build item context from PricedItem
+        item_context = ItemContext(
+            item_name=item.display_name,
+            item_text="",  # Stash items don't have raw text
+            chaos_value=float(item.total_price),
+            divine_value=0,  # Convert if needed
+            source="poe.ninja" if item.price_source == PriceSource.POE_NINJA else "poeprices",
+            extra_data={"priced_item": item},
+        )
+
+        # Build and show menu with custom actions
+        menu = self._context_menu_manager.build_menu(item_context, self.item_table)
+
+        # Add stash-specific actions
+        menu.addSeparator()
+        details_action = menu.addAction("View Details...")
+        details_action.triggered.connect(
+            lambda: self._show_item_details(item)
+        )
+
+        menu.exec(self.item_table.viewport().mapToGlobal(position))
+
+    def _show_item_details(self, item: PricedItem) -> None:
+        """Show details dialog for a stash item."""
+        dialog = StashItemDetailsDialog(item, self)
+        dialog.exec()
+
+    def _on_inspect_item_context(self, context: ItemContext) -> None:
+        """Handle inspect request from context menu."""
+        priced_item = context.extra_data.get("priced_item")
+        if priced_item:
+            self._show_item_details(priced_item)
 
     def closeEvent(self, event) -> None:
         """Handle window close."""

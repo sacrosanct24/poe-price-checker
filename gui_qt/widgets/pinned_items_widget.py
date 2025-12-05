@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QMouseEvent
@@ -26,6 +26,7 @@ from PyQt6.QtWidgets import (
 
 from gui_qt.styles import COLORS
 from gui_qt.widgets.poe_item_tooltip import PoEItemTooltip
+from gui_qt.widgets.item_context_menu import ItemContext, ItemContextMenuManager
 
 logger = logging.getLogger(__name__)
 
@@ -35,10 +36,18 @@ class PinnedItemWidget(QFrame):
 
     unpin_requested = pyqtSignal(dict)  # Request to unpin this item
     inspect_requested = pyqtSignal(dict)  # Request to inspect this item
+    ai_analysis_requested = pyqtSignal(str, list)  # item_text, price_results
+    price_check_requested = pyqtSignal(str)  # item_text
 
-    def __init__(self, item_data: Dict[str, Any], parent: Optional[QWidget] = None):
+    def __init__(
+        self,
+        item_data: Dict[str, Any],
+        parent: Optional[QWidget] = None,
+        context_menu_manager: Optional[ItemContextMenuManager] = None,
+    ):
         super().__init__(parent)
         self._item_data = item_data
+        self._context_menu_manager = context_menu_manager
 
         self.setFrameStyle(QFrame.Shape.StyledPanel | QFrame.Shadow.Raised)
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -103,27 +112,66 @@ class PinnedItemWidget(QFrame):
         """)
 
     def _show_context_menu(self, position) -> None:
-        """Show context menu."""
-        menu = QMenu(self)
+        """Show context menu with AI, inspect, price check options."""
+        if self._context_menu_manager:
+            # Use the universal context menu manager
+            item_context = self._build_item_context()
+            menu = self._context_menu_manager.build_menu(item_context, self)
 
-        inspect_action = menu.addAction("Inspect")
-        inspect_action.triggered.connect(
-            lambda: self.inspect_requested.emit(self._item_data)
+            # Add pinned item specific actions
+            menu.addSeparator()
+            unpin_action = menu.addAction("Unpin")
+            unpin_action.triggered.connect(
+                lambda: self.unpin_requested.emit(self._item_data)
+            )
+
+            menu.exec(self.mapToGlobal(position))
+        else:
+            # Fallback to basic menu
+            menu = QMenu(self)
+
+            inspect_action = menu.addAction("Inspect")
+            inspect_action.triggered.connect(
+                lambda: self.inspect_requested.emit(self._item_data)
+            )
+
+            copy_action = menu.addAction("Copy Name")
+            copy_action.triggered.connect(
+                lambda: QApplication.clipboard().setText(self._item_data.get("item_name", ""))
+            )
+
+            menu.addSeparator()
+
+            unpin_action = menu.addAction("Unpin")
+            unpin_action.triggered.connect(
+                lambda: self.unpin_requested.emit(self._item_data)
+            )
+
+            menu.exec(self.mapToGlobal(position))
+
+    def _build_item_context(self) -> ItemContext:
+        """Build ItemContext from the stored item data."""
+        item_name = self._item_data.get("item_name", "Unknown")
+        chaos_value = self._item_data.get("chaos_value", 0)
+        divine_value = self._item_data.get("divine_value", 0)
+        source = self._item_data.get("source", "")
+        parsed_item = self._item_data.get("_item")
+
+        # Try to get item text from parsed item
+        item_text = ""
+        if parsed_item and hasattr(parsed_item, "raw_text"):
+            item_text = parsed_item.raw_text
+        elif parsed_item and hasattr(parsed_item, "to_clipboard_text"):
+            item_text = parsed_item.to_clipboard_text()
+
+        return ItemContext(
+            item_name=item_name,
+            item_text=item_text,
+            chaos_value=float(chaos_value) if chaos_value else 0,
+            divine_value=float(divine_value) if divine_value else 0,
+            source=source,
+            parsed_item=parsed_item,
         )
-
-        copy_action = menu.addAction("Copy Name")
-        copy_action.triggered.connect(
-            lambda: QApplication.clipboard().setText(self._item_data.get("item_name", ""))
-        )
-
-        menu.addSeparator()
-
-        unpin_action = menu.addAction("Unpin")
-        unpin_action.triggered.connect(
-            lambda: self.unpin_requested.emit(self._item_data)
-        )
-
-        menu.exec(self.mapToGlobal(position))
 
     def mouseDoubleClickEvent(self, event) -> None:
         """Handle double-click to inspect."""
@@ -171,6 +219,8 @@ class PinnedItemsWidget(QWidget):
 
     item_inspected = pyqtSignal(dict)  # Request to inspect an item
     items_changed = pyqtSignal(list)  # Pinned items list changed
+    ai_analysis_requested = pyqtSignal(str, list)  # item_text, price_results
+    price_check_requested = pyqtSignal(str)  # item_text
 
     # Storage file for pinned items
     STORAGE_FILE = "pinned_items.json"
@@ -180,9 +230,24 @@ class PinnedItemsWidget(QWidget):
         super().__init__(parent)
         self._pinned_items: List[Dict[str, Any]] = []
         self._item_widgets: List[PinnedItemWidget] = []
+        self._context_menu_manager: Optional[ItemContextMenuManager] = None
 
         self._setup_ui()
         self._load_pinned_items()
+
+    def set_context_menu_manager(self, manager: ItemContextMenuManager) -> None:
+        """Set the context menu manager for AI/inspect/price check actions.
+
+        Args:
+            manager: The ItemContextMenuManager to use.
+        """
+        self._context_menu_manager = manager
+        # Connect signals from the manager
+        manager.ai_analysis_requested.connect(self.ai_analysis_requested.emit)
+        manager.price_check_requested.connect(self.price_check_requested.emit)
+        manager.inspect_requested.connect(
+            lambda ctx: self.item_inspected.emit(ctx.extra_data if ctx.extra_data else {"item_name": ctx.item_name})
+        )
 
     def _setup_ui(self) -> None:
         """Setup the widget UI."""
@@ -339,7 +404,11 @@ class PinnedItemsWidget(QWidget):
 
     def _add_item_widget(self, item_data: Dict[str, Any]) -> None:
         """Add a widget for a pinned item."""
-        widget = PinnedItemWidget(item_data, self)
+        widget = PinnedItemWidget(
+            item_data,
+            self,
+            context_menu_manager=self._context_menu_manager,
+        )
         widget.unpin_requested.connect(self.unpin_item)
         widget.inspect_requested.connect(self.item_inspected.emit)
 
