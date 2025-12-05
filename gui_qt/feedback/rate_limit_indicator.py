@@ -28,6 +28,7 @@ from PyQt6.QtGui import QColor, QPainter, QPen, QBrush
 from PyQt6.QtWidgets import (
     QWidget,
     QHBoxLayout,
+    QVBoxLayout,
     QLabel,
     QFrame,
     QSizePolicy,

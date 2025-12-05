@@ -304,8 +304,10 @@ def get_spacing_helper(scale: float = 1.0) -> SpacingHelper:
         SpacingHelper instance
     """
     global _default_helper
-    if _default_helper is None or scale != 1.0:
+    if scale != 1.0:
         return SpacingHelper(scale)
+    if _default_helper is None:
+        _default_helper = SpacingHelper(scale)
     return _default_helper
 
 
