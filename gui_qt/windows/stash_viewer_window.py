@@ -62,6 +62,7 @@ class FetchWorker(QThread):
     progress = pyqtSignal(int, int, str)  # current, total, message
     finished = pyqtSignal(object)  # ValuationResult or Exception
     error = pyqtSignal(str)
+    rate_limited = pyqtSignal(int, int)  # wait_seconds, attempt
 
     def __init__(
         self,
@@ -91,7 +92,15 @@ class FetchWorker(QThread):
 
             # Connect to PoE
             self.progress.emit(0, 0, "Connecting to Path of Exile...")
-            client = PoEStashClient(self.poesessid)
+
+            def rate_limit_callback(wait_seconds: int, attempt: int):
+                """Called when rate limited - emit signal to update UI."""
+                self.rate_limited.emit(wait_seconds, attempt)
+
+            client = PoEStashClient(
+                self.poesessid,
+                rate_limit_callback=rate_limit_callback,
+            )
 
             if not client.verify_session():
                 self.error.emit("Invalid POESESSID - session verification failed")
@@ -711,6 +720,7 @@ class StashViewerWindow(QDialog):
         self._worker.progress.connect(self._on_progress)
         self._worker.finished.connect(self._on_fetch_complete)
         self._worker.error.connect(self._on_fetch_error)
+        self._worker.rate_limited.connect(self._on_rate_limited)
         self._worker.start()
 
     def _on_progress(self, current: int, total: int, message: str) -> None:
@@ -721,6 +731,14 @@ class StashViewerWindow(QDialog):
         else:
             self.progress_bar.setMaximum(0)  # Indeterminate
         self.status_label.setText(message)
+
+    def _on_rate_limited(self, wait_seconds: int, attempt: int) -> None:
+        """Handle rate limit notification - update UI to show wait status."""
+        self.progress_bar.setMaximum(0)  # Indeterminate mode during wait
+        self.status_label.setText(
+            f"Rate limited by GGG. Waiting {wait_seconds}s before retry "
+            f"(attempt {attempt}/3)..."
+        )
 
     def _on_fetch_complete(self, result: ValuationResult) -> None:
         """Handle fetch completion."""

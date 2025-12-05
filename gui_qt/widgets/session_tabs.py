@@ -84,6 +84,7 @@ class SessionPanel(QWidget):
     row_selected: pyqtSignal = pyqtSignal(dict)
     pin_requested: pyqtSignal = pyqtSignal(list)
     compare_requested: pyqtSignal = pyqtSignal(list)
+    ai_analysis_requested: pyqtSignal = pyqtSignal(str, list)  # item_text, price_results
 
     def __init__(self, session_name: str = "Session 1", parent: Optional[QWidget] = None):
         super().__init__(parent)
@@ -169,6 +170,7 @@ class SessionPanel(QWidget):
         self.results_table.row_selected.connect(self._on_row_selected)
         self.results_table.pin_requested.connect(lambda items: self.pin_requested.emit(items))
         self.results_table.compare_requested.connect(lambda items: self.compare_requested.emit(items))
+        self.results_table.ai_analysis_requested.connect(self.ai_analysis_requested.emit)
         results_layout.addWidget(self.results_table)
 
         layout.addWidget(results_group, stretch=1)
@@ -307,6 +309,7 @@ class SessionTabWidget(QTabWidget):
     row_selected: pyqtSignal = pyqtSignal(dict)
     pin_requested: pyqtSignal = pyqtSignal(list)
     compare_requested: pyqtSignal = pyqtSignal(list)
+    ai_analysis_requested: pyqtSignal = pyqtSignal(str, list)  # item_text, price_results
 
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
@@ -347,29 +350,6 @@ class SessionTabWidget(QTabWidget):
             }}
         """)
         return btn
-
-    def _add_session(self, name: Optional[str] = None) -> SessionPanel:
-        """Add a new session tab."""
-        if self.count() >= self.MAX_SESSIONS:
-            logger.warning(f"Maximum sessions ({self.MAX_SESSIONS}) reached")
-            return None
-
-        self._session_counter += 1
-        session_name = name or f"Session {self._session_counter}"
-
-        panel = SessionPanel(session_name)
-        panel.check_price_requested.connect(
-            lambda text, idx=self.count(): self.check_price_requested.emit(text, idx)
-        )
-        panel.row_selected.connect(self.row_selected.emit)
-        panel.pin_requested.connect(self.pin_requested.emit)
-        panel.compare_requested.connect(self.compare_requested.emit)
-
-        idx = self.addTab(panel, session_name)
-        self.setCurrentIndex(idx)
-
-        logger.info(f"Added session: {session_name}")
-        return panel
 
     def _on_tab_close_requested(self, index: int) -> None:
         """Handle tab close request."""
@@ -461,3 +441,44 @@ class SessionTabWidget(QTabWidget):
         panel = self.get_panel(index)
         if panel:
             panel.set_results(results)
+
+    def set_ai_configured_callback(self, callback: Optional[callable]) -> None:
+        """Set the AI configured callback on all session panels' results tables.
+
+        Args:
+            callback: Function that returns True if AI is configured.
+        """
+        for i in range(self.count()):
+            panel = self.get_panel(i)
+            if panel:
+                panel.results_table.set_ai_configured_callback(callback)
+        # Store for future sessions
+        self._ai_configured_callback = callback
+
+    def _add_session(self, name: Optional[str] = None) -> SessionPanel:
+        """Add a new session tab."""
+        if self.count() >= self.MAX_SESSIONS:
+            logger.warning(f"Maximum sessions ({self.MAX_SESSIONS}) reached")
+            return None
+
+        self._session_counter += 1
+        session_name = name or f"Session {self._session_counter}"
+
+        panel = SessionPanel(session_name)
+        panel.check_price_requested.connect(
+            lambda text, idx=self.count(): self.check_price_requested.emit(text, idx)
+        )
+        panel.row_selected.connect(self.row_selected.emit)
+        panel.pin_requested.connect(self.pin_requested.emit)
+        panel.compare_requested.connect(self.compare_requested.emit)
+        panel.ai_analysis_requested.connect(self.ai_analysis_requested.emit)
+
+        # Set AI callback if we have one
+        if hasattr(self, '_ai_configured_callback') and self._ai_configured_callback:
+            panel.results_table.set_ai_configured_callback(self._ai_configured_callback)
+
+        idx = self.addTab(panel, session_name)
+        self.setCurrentIndex(idx)
+
+        logger.info(f"Added session: {session_name}")
+        return panel

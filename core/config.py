@@ -852,6 +852,35 @@ class Config:
             return False
         return bool(self.get_ai_api_key(provider))
 
+    @property
+    def ai_custom_prompt(self) -> str:
+        """Get the custom AI prompt template.
+
+        Returns empty string if using default prompt.
+        Supports placeholders: {item_text}, {price_context}, {league}, {build_name}
+        """
+        return self.data.get("ai", {}).get("custom_prompt", "")
+
+    @ai_custom_prompt.setter
+    def ai_custom_prompt(self, value: str) -> None:
+        """Set a custom AI prompt template."""
+        self.data.setdefault("ai", {})["custom_prompt"] = value.strip()
+        self.save()
+
+    @property
+    def ai_build_name(self) -> str:
+        """Get the player's current build name for AI context.
+
+        Examples: 'Lightning Arrow Deadeye', 'RF Chieftain', 'Tornado Shot MF'
+        """
+        return self.data.get("ai", {}).get("build_name", "")
+
+    @ai_build_name.setter
+    def ai_build_name(self, value: str) -> None:
+        """Set the player's build name."""
+        self.data.setdefault("ai", {})["build_name"] = value.strip()
+        self.save()
+
     # ------------------------------------------------------------------
     # Utility
     # ------------------------------------------------------------------

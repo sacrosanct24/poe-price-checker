@@ -18,6 +18,7 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QPlainTextEdit,
     QPushButton,
     QSlider,
     QSpinBox,
@@ -486,6 +487,31 @@ class SettingsDialog(QDialog):
 
         layout.addWidget(keys_group)
 
+        # Build Context group
+        context_group = QGroupBox("Context")
+        context_layout = QVBoxLayout(context_group)
+        context_layout.setSpacing(8)
+
+        # Build name
+        build_row = QHBoxLayout()
+        build_row.addWidget(QLabel("My build:"))
+        self._ai_build_edit = QLineEdit()
+        self._ai_build_edit.setPlaceholderText("e.g., Lightning Arrow Deadeye, RF Chieftain")
+        self._ai_build_edit.setToolTip(
+            "Your current build name. This helps AI give relevant advice.\n"
+            "Examples: 'Tornado Shot MF', 'Righteous Fire Juggernaut'"
+        )
+        build_row.addWidget(self._ai_build_edit)
+        context_layout.addLayout(build_row)
+
+        context_note = QLabel(
+            "The current league is automatically included from your settings."
+        )
+        context_note.setStyleSheet("color: gray; font-size: 10px;")
+        context_layout.addWidget(context_note)
+
+        layout.addWidget(context_group)
+
         # Settings group
         settings_group = QGroupBox("Response Settings")
         settings_layout = QVBoxLayout(settings_group)
@@ -521,6 +547,40 @@ class SettingsDialog(QDialog):
 
         layout.addWidget(settings_group)
 
+        # Custom Prompt group
+        prompt_group = QGroupBox("Custom Prompt (Advanced)")
+        prompt_layout = QVBoxLayout(prompt_group)
+        prompt_layout.setSpacing(8)
+
+        prompt_info = QLabel(
+            "Customize the prompt sent to AI. Leave empty to use the default.\n"
+            "Placeholders: {item_text}, {price_context}, {league}, {build_name}"
+        )
+        prompt_info.setStyleSheet("color: gray; font-size: 10px;")
+        prompt_layout.addWidget(prompt_info)
+
+        self._ai_prompt_edit = QPlainTextEdit()
+        self._ai_prompt_edit.setPlaceholderText(
+            "Leave empty to use the default prompt.\n\n"
+            "Example custom prompt:\n"
+            "I'm playing {build_name} in {league} league.\n\n"
+            "Analyze this item:\n{item_text}\n\n"
+            "Price info: {price_context}\n\n"
+            "Is this item good for my build? What's it worth?"
+        )
+        self._ai_prompt_edit.setMinimumHeight(120)
+        self._ai_prompt_edit.setMaximumHeight(200)
+        prompt_layout.addWidget(self._ai_prompt_edit)
+
+        # Reset button
+        reset_btn = QPushButton("Reset to Default")
+        reset_btn.setToolTip("Clear custom prompt and use the default")
+        reset_btn.clicked.connect(lambda: self._ai_prompt_edit.clear())
+        reset_btn.setMaximumWidth(120)
+        prompt_layout.addWidget(reset_btn)
+
+        layout.addWidget(prompt_group)
+
         # Usage note
         usage_label = QLabel(
             "Usage: Right-click an item in the results table and select\n"
@@ -529,7 +589,6 @@ class SettingsDialog(QDialog):
         usage_label.setStyleSheet("color: gray; font-size: 11px;")
         layout.addWidget(usage_label)
 
-        layout.addStretch()
         return tab
 
     def _on_ai_provider_changed(self, index: int) -> None:
@@ -604,6 +663,8 @@ class SettingsDialog(QDialog):
 
         self._ai_max_tokens_spin.setValue(self._config.ai_max_tokens)
         self._ai_timeout_spin.setValue(self._config.ai_timeout)
+        self._ai_build_edit.setText(self._config.ai_build_name)
+        self._ai_prompt_edit.setPlainText(self._config.ai_custom_prompt)
 
         # Update dependent states
         self._on_font_scale_changed(self._font_scale_slider.value())
@@ -634,6 +695,8 @@ class SettingsDialog(QDialog):
             self._ai_provider_combo.setCurrentIndex(0)  # None
             self._ai_max_tokens_spin.setValue(500)
             self._ai_timeout_spin.setValue(30)
+            self._ai_build_edit.clear()
+            self._ai_prompt_edit.clear()
 
     def _save_and_accept(self) -> None:
         """Save settings and close the dialog."""
@@ -673,5 +736,7 @@ class SettingsDialog(QDialog):
 
         self._config.ai_max_tokens = self._ai_max_tokens_spin.value()
         self._config.ai_timeout = self._ai_timeout_spin.value()
+        self._config.ai_build_name = self._ai_build_edit.text()
+        self._config.ai_custom_prompt = self._ai_prompt_edit.toPlainText()
 
         self.accept()

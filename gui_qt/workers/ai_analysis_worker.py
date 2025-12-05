@@ -45,6 +45,9 @@ class AIAnalysisWorker(BaseThreadWorker):
         price_results: List[Dict[str, Any]],
         timeout: int = 30,
         max_tokens: int = 500,
+        league: str = "",
+        build_name: str = "",
+        custom_prompt: str = "",
         parent: Optional[Any] = None,
     ):
         """Initialize the AI analysis worker.
@@ -56,6 +59,9 @@ class AIAnalysisWorker(BaseThreadWorker):
             price_results: List of price check results for context.
             timeout: Request timeout in seconds.
             max_tokens: Maximum tokens in response.
+            league: Current league name for context.
+            build_name: Player's build name for context.
+            custom_prompt: Optional custom prompt template.
             parent: Optional parent QObject.
         """
         super().__init__(parent)
@@ -65,6 +71,9 @@ class AIAnalysisWorker(BaseThreadWorker):
         self._price_results = price_results
         self._timeout = timeout
         self._max_tokens = max_tokens
+        self._league = league
+        self._build_name = build_name
+        self._custom_prompt = custom_prompt
         self._prompt_builder = AIPromptBuilder()
 
     def _execute(self) -> AIResponse:
@@ -106,9 +115,14 @@ class AIAnalysisWorker(BaseThreadWorker):
             context = PromptContext(
                 item_text=self._item_text,
                 price_results=self._price_results,
+                league=self._league,
+                build_name=self._build_name,
             )
 
-            prompt = self._prompt_builder.build_item_analysis_prompt(context)
+            prompt = self._prompt_builder.build_item_analysis_prompt(
+                context,
+                custom_template=self._custom_prompt if self._custom_prompt else None,
+            )
             system_prompt = self._prompt_builder.get_system_prompt()
 
             # Send to AI

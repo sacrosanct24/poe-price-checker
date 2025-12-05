@@ -266,6 +266,34 @@ class TestPoEStashClient:
         assert result == {"success": True}
         assert mock_get.call_count == 2
 
+    @patch('data_sources.poe_stash_api.requests.Session.get')
+    def test_get_429_calls_rate_limit_callback(self, mock_get):
+        """Should call rate_limit_callback when rate limited."""
+        callback_calls = []
+
+        def rate_limit_callback(wait_seconds, attempt):
+            callback_calls.append((wait_seconds, attempt))
+
+        client = PoEStashClient("test_session", rate_limit_callback=rate_limit_callback)
+
+        mock_429_response = MagicMock()
+        mock_429_response.status_code = 429
+        import requests
+        mock_429_response.raise_for_status.side_effect = requests.exceptions.HTTPError("429")
+
+        mock_success_response = MagicMock()
+        mock_success_response.status_code = 200
+        mock_success_response.json.return_value = {"success": True}
+
+        mock_get.side_effect = [mock_429_response, mock_success_response]
+
+        with patch('data_sources.poe_stash_api.time.sleep'):
+            result = client._get("/test-endpoint")
+
+        assert result == {"success": True}
+        assert len(callback_calls) == 1
+        assert callback_calls[0] == (60, 1)  # 60 seconds wait, attempt 1
+
     @patch.object(PoEStashClient, '_get')
     def test_verify_session_valid(self, mock_get, client):
         """Should return True for valid session."""

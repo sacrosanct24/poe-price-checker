@@ -412,12 +412,16 @@ class ResultsTableWidget(QTableView, ItemTooltipMixin):
     pin_requested = pyqtSignal(list)  # Request to pin selected items
     export_selected_requested = pyqtSignal(list)  # Request to export selected items
     column_order_changed = pyqtSignal(list)  # Emits new column order (list of keys)
+    ai_analysis_requested = pyqtSignal(str, list)  # Request AI analysis (item_text, price_results)
 
     # Storage file for column settings
     COLUMN_CONFIG_FILE = "column_config.json"
 
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
+
+        # AI analysis callback - set via set_ai_configured_callback
+        self._ai_configured_callback: Optional[callable] = None
 
         # Setup model
         self._model = ResultsTableModel(self)
@@ -472,6 +476,14 @@ class ResultsTableWidget(QTableView, ItemTooltipMixin):
     def set_league(self, league: str) -> None:
         """Set the current league for trend calculations."""
         self._model.set_league(league)
+
+    def set_ai_configured_callback(self, callback: Optional[callable]) -> None:
+        """Set callback to check if AI is configured.
+
+        Args:
+            callback: Function that returns True if AI is configured, False otherwise.
+        """
+        self._ai_configured_callback = callback
 
     def set_data(self, data: List[Dict[str, Any]], calculate_trends: bool = True) -> None:
         """Set the table data."""
@@ -571,6 +583,18 @@ class ResultsTableWidget(QTableView, ItemTooltipMixin):
                 lambda: self.row_selected.emit(selected_rows[0])
             )
 
+            # AI Analysis option (single item only)
+            ai_configured = (
+                self._ai_configured_callback() if self._ai_configured_callback else False
+            )
+            ai_action = menu.addAction("Ask AI About This Item")
+            ai_action.setEnabled(ai_configured)
+            if not ai_configured:
+                ai_action.setToolTip("Configure AI in Settings > AI")
+            ai_action.triggered.connect(
+                lambda: self._trigger_ai_analysis(selected_rows[0])
+            )
+
         # Multi-item actions
         if count >= 2:
             compare_action = menu.addAction(f"Compare {count} Items")
@@ -579,7 +603,7 @@ class ResultsTableWidget(QTableView, ItemTooltipMixin):
             )
             if count > 3:
                 compare_action.setEnabled(False)
-                compare_action.setText(f"Compare Items (max 3)")
+                compare_action.setText("Compare Items (max 3)")
 
         menu.addSeparator()
 
@@ -618,6 +642,23 @@ class ResultsTableWidget(QTableView, ItemTooltipMixin):
         select_all_action.triggered.connect(self.select_all)
 
         menu.exec(self.viewport().mapToGlobal(position))
+
+    def _trigger_ai_analysis(self, row: Dict[str, Any]) -> None:
+        """Trigger AI analysis for a selected item row."""
+        item_name = row.get("item_name", "Unknown Item")
+        source = row.get("source", "")
+        chaos_value = row.get("chaos_value", 0)
+        divine_value = row.get("divine_value", 0)
+
+        # Build price results list
+        price_results = [{
+            "item_name": item_name,
+            "chaos_value": chaos_value,
+            "divine_value": divine_value,
+            "source": source,
+        }]
+
+        self.ai_analysis_requested.emit(item_name, price_results)
 
     def _copy_to_clipboard(self, items: List[str]) -> None:
         """Copy items to clipboard, one per line."""

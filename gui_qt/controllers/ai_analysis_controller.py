@@ -119,6 +119,9 @@ class AIAnalysisController:
         api_key = self._config.get_ai_api_key(provider)
         timeout = self._config.ai_timeout
         max_tokens = self._config.ai_max_tokens
+        league = self._config.league
+        build_name = self._config.ai_build_name
+        custom_prompt = self._config.ai_custom_prompt
 
         # Show loading state
         self._panel.show_loading(provider)
@@ -134,6 +137,9 @@ class AIAnalysisController:
             price_results=price_results,
             timeout=timeout,
             max_tokens=max_tokens,
+            league=league,
+            build_name=build_name,
+            custom_prompt=custom_prompt,
         )
 
         # Connect signals

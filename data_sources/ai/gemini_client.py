@@ -18,13 +18,13 @@ logger = logging.getLogger(__name__)
 
 # Gemini API endpoint
 GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta"
-DEFAULT_MODEL = "gemini-1.5-flash"
+DEFAULT_MODEL = "gemini-2.0-flash"
 
 
 class GeminiClient(BaseAIClient):
     """Google Gemini API client.
 
-    Uses Gemini 1.5 Flash by default (free tier available).
+    Uses Gemini 2.0 Flash by default (free tier available).
 
     Example:
         >>> client = GeminiClient(api_key="your-api-key")
@@ -46,7 +46,7 @@ class GeminiClient(BaseAIClient):
             api_key: Google AI Studio API key.
             timeout: Request timeout in seconds.
             max_tokens: Maximum tokens in response.
-            model: Model to use (default: gemini-1.5-flash).
+            model: Model to use (default: gemini-2.0-flash).
         """
         super().__init__(api_key, timeout, max_tokens)
         self._model = model

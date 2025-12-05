@@ -432,6 +432,10 @@ class PriceCheckerWindow(QMainWindow):
         self.session_tabs.row_selected.connect(self._on_result_selected)
         self.session_tabs.pin_requested.connect(self._on_pin_items_requested)
         self.session_tabs.compare_requested.connect(self._on_compare_items_requested)
+        self.session_tabs.ai_analysis_requested.connect(self._on_ai_analysis_requested)
+
+        # Set AI configured callback for all results tables
+        self.session_tabs.set_ai_configured_callback(self._is_ai_configured)
 
         # Connect context menu for results table in each session
         self.session_tabs.currentChanged.connect(self._on_session_changed)

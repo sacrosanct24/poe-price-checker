@@ -23,6 +23,10 @@ DEFAULT_TEMPLATE = "item_analysis.txt"
 # Fallback prompt if template file is missing
 FALLBACK_PROMPT = """Analyze this Path of Exile item and provide a brief assessment:
 
+PLAYER CONTEXT:
+- League: {league}
+- Current build: {build_name}
+
 ITEM:
 {item_text}
 
@@ -31,8 +35,9 @@ PRICE CONTEXT:
 
 Provide a concise analysis (3-5 paragraphs) covering:
 - Item type and key properties
-- Suitable builds/classes
-- Price fairness assessment
+- Whether this is useful for the player's build ({build_name})
+- Other suitable builds/classes
+- Price fairness in {league} league
 - Notable strengths or weaknesses"""
 
 
@@ -44,11 +49,15 @@ class PromptContext:
         item_text: The raw item text (from clipboard or game).
         price_results: List of price check results from various sources.
         parsed_item: Optional parsed item data for additional context.
+        league: Current league name (e.g., "Settlers", "Standard").
+        build_name: Player's current build name for context.
     """
 
     item_text: str
     price_results: List[Dict[str, Any]]
     parsed_item: Optional[Any] = None
+    league: str = ""
+    build_name: str = ""
 
 
 class AIPromptBuilder:
@@ -142,26 +151,45 @@ class AIPromptBuilder:
         self,
         context: PromptContext,
         template_name: str = DEFAULT_TEMPLATE,
+        custom_template: Optional[str] = None,
     ) -> str:
         """Build a complete prompt for item analysis.
 
         Args:
             context: The prompt context containing item and price data.
-            template_name: Name of the template file to use.
+            template_name: Name of the template file to use (if no custom_template).
+            custom_template: Optional custom template string to use instead of file.
 
         Returns:
             Fully formatted prompt ready to send to AI.
         """
-        template = self._load_template(template_name)
+        # Use custom template if provided, otherwise load from file
+        if custom_template:
+            template = custom_template
+        else:
+            template = self._load_template(template_name)
 
         # Format price context
         price_context = self._format_price_context(context.price_results)
 
+        # Build substitution dict with all placeholders
+        substitutions = {
+            "item_text": context.item_text.strip(),
+            "price_context": price_context,
+            "league": context.league or "unknown league",
+            "build_name": context.build_name or "unspecified build",
+        }
+
         # Substitute placeholders
-        prompt = template.format(
-            item_text=context.item_text.strip(),
-            price_context=price_context,
-        )
+        try:
+            prompt = template.format(**substitutions)
+        except KeyError as e:
+            logger.warning(f"Unknown placeholder in template: {e}")
+            # Fall back to basic substitution
+            prompt = template.format(
+                item_text=substitutions["item_text"],
+                price_context=substitutions["price_context"],
+            )
 
         return prompt
 

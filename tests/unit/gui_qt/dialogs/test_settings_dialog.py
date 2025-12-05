@@ -56,6 +56,8 @@ class TestSettingsDialogInit:
         mock_config.ai_provider = ""
         mock_config.ai_max_tokens = 500
         mock_config.ai_timeout = 30
+        mock_config.ai_build_name = ""
+        mock_config.ai_custom_prompt = ""
         mock_config.get_ai_api_key = MagicMock(return_value="")
         return mock_config
 
@@ -82,6 +84,8 @@ class TestAccessibilityTab:
         mock_config.ai_provider = ""
         mock_config.ai_max_tokens = 500
         mock_config.ai_timeout = 30
+        mock_config.ai_build_name = ""
+        mock_config.ai_custom_prompt = ""
         mock_config.get_ai_api_key = MagicMock(return_value="")
         return mock_config
 
@@ -149,6 +153,13 @@ class TestPerformanceTab:
         mock_config.start_minimized = False
         mock_config.show_tray_notifications = True
         mock_config.tray_alert_threshold = 50.0
+        # AI
+        mock_config.ai_provider = ""
+        mock_config.ai_max_tokens = 500
+        mock_config.ai_timeout = 30
+        mock_config.ai_build_name = ""
+        mock_config.ai_custom_prompt = ""
+        mock_config.get_ai_api_key = MagicMock(return_value="")
         return mock_config
 
     def test_rankings_cache_range(self, qtbot):
@@ -234,6 +245,13 @@ class TestSystemTrayTab:
         mock_config.start_minimized = False
         mock_config.show_tray_notifications = True
         mock_config.tray_alert_threshold = 50.0
+        # AI
+        mock_config.ai_provider = ""
+        mock_config.ai_max_tokens = 500
+        mock_config.ai_timeout = 30
+        mock_config.ai_build_name = ""
+        mock_config.ai_custom_prompt = ""
+        mock_config.get_ai_api_key = MagicMock(return_value="")
         return mock_config
 
     def test_loads_settings_from_config(self, qtbot):
@@ -288,6 +306,13 @@ class TestSettingsDialogSave:
         mock_config.start_minimized = False
         mock_config.show_tray_notifications = True
         mock_config.tray_alert_threshold = 50.0
+        # AI
+        mock_config.ai_provider = ""
+        mock_config.ai_max_tokens = 500
+        mock_config.ai_timeout = 30
+        mock_config.ai_build_name = ""
+        mock_config.ai_custom_prompt = ""
+        mock_config.get_ai_api_key = MagicMock(return_value="")
         return mock_config
 
     def test_save_updates_all_config_values(self, qtbot):
@@ -342,6 +367,13 @@ class TestSettingsDialogReset:
         mock_config.start_minimized = True
         mock_config.show_tray_notifications = False
         mock_config.tray_alert_threshold = 999.0
+        # AI
+        mock_config.ai_provider = ""
+        mock_config.ai_max_tokens = 500
+        mock_config.ai_timeout = 30
+        mock_config.ai_build_name = ""
+        mock_config.ai_custom_prompt = ""
+        mock_config.get_ai_api_key = MagicMock(return_value="")
         return mock_config
 
     def test_reset_accessibility_tab(self, qtbot):

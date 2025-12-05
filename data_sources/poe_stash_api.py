@@ -76,14 +76,21 @@ class PoEStashClient:
 
     # Rate limiting - GGG rate limits are strict, need 1.5s+ between requests
     REQUEST_DELAY = 1.5  # seconds between requests (be nice to GGG servers)
+    RATE_LIMIT_WAIT = 60  # seconds to wait when rate limited (429 response)
 
-    def __init__(self, poesessid: str, user_agent: str = "PoEPriceChecker/1.0"):
+    def __init__(
+        self,
+        poesessid: str,
+        user_agent: str = "PoEPriceChecker/1.0",
+        rate_limit_callback: Optional[callable] = None,
+    ):
         """
         Initialize the client.
 
         Args:
             poesessid: Your POESESSID cookie value from pathofexile.com
             user_agent: User-Agent header (required by GGG)
+            rate_limit_callback: Optional callback(wait_seconds, attempt) called when rate limited
         """
         self.session = requests.Session()
         self.session.cookies.set("POESESSID", poesessid, domain=".pathofexile.com")
@@ -92,6 +99,7 @@ class PoEStashClient:
             "Accept": "application/json",
         })
         self._last_request_time = 0.0
+        self._rate_limit_callback = rate_limit_callback
 
     def _rate_limit(self) -> None:
         """Ensure we don't exceed rate limits."""
@@ -107,7 +115,11 @@ class PoEStashClient:
         max_retries: int = 3,
     ) -> Dict[str, Any]:
         """
-        Make a GET request to the API with exponential backoff on rate limits.
+        Make a GET request to the API with rate limit handling.
+
+        When a 429 rate limit response is received, waits RATE_LIMIT_WAIT seconds
+        (default 60s) before retrying. This allows large stash pulls to complete
+        even when rate limited.
 
         Args:
             endpoint: API endpoint path
@@ -126,24 +138,27 @@ class PoEStashClient:
                 response = self.session.get(url, params=params, timeout=30)
                 response.raise_for_status()
                 return response.json()
-            except requests.exceptions.HTTPError as e:
+            except requests.exceptions.HTTPError:
                 if response.status_code == 403:
                     logger.error("Access denied - POESESSID may be invalid or expired")
                     raise
                 elif response.status_code == 429:
                     if attempt < max_retries:
-                        # Exponential backoff: 2, 4, 8 seconds
-                        wait_time = 2 ** (attempt + 1)
+                        # Wait fixed duration on rate limit
+                        wait_time = self.RATE_LIMIT_WAIT
                         logger.warning(
-                            f"Rate limited (429). Retrying in {wait_time}s "
+                            f"Rate limited (429). Waiting {wait_time}s before retry "
                             f"(attempt {attempt + 1}/{max_retries})"
                         )
+                        # Notify caller about rate limit wait
+                        if self._rate_limit_callback:
+                            self._rate_limit_callback(wait_time, attempt + 1)
                         time.sleep(wait_time)
                         continue
                     else:
                         logger.error(
-                            "Rate limited - max retries exceeded. "
-                            "Consider increasing REQUEST_DELAY."
+                            "Rate limited - max retries exceeded after "
+                            f"{max_retries} attempts with {self.RATE_LIMIT_WAIT}s waits."
                         )
                         raise
                 else:
