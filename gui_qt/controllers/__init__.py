@@ -23,6 +23,10 @@ from gui_qt.controllers.tray_controller import (
     TrayController,
     get_tray_controller,
 )
+from gui_qt.controllers.pob_controller import (
+    PoBController,
+    get_pob_controller,
+)
 
 __all__ = [
     "PriceCheckController",
@@ -33,4 +37,6 @@ __all__ = [
     "get_results_context_controller",
     "TrayController",
     "get_tray_controller",
+    "PoBController",
+    "get_pob_controller",
 ]

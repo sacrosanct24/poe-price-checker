@@ -64,6 +64,7 @@ from gui_qt.controllers import (
     NavigationController,
     ResultsContextController,
     TrayController,
+    PoBController,
 )
 from core.build_stat_calculator import BuildStats
 
@@ -90,23 +91,24 @@ class PriceCheckerWindow(QMainWindow):
         self._window_manager = get_window_manager()
         self._window_manager.set_main_window(self)
 
-        # PoB integration
-        self._character_manager = None
-        self._upgrade_checker = None
-
         # Rare item evaluator
         self._rare_evaluator = None
         self._init_rare_evaluator()
 
-        # Initialize PoB character manager
-        self._init_character_manager()
+        # PoB integration controller
+        self._pob_controller = PoBController(
+            ctx=ctx,
+            logger=self.logger,
+            on_status=self._set_status,
+        )
+        self._pob_controller.initialize()
 
         # Price check controller
         self._price_controller = PriceCheckController(
             parser=ctx.parser,
             price_service=ctx.price_service,
             rare_evaluator=self._rare_evaluator,
-            upgrade_checker=self._upgrade_checker,
+            upgrade_checker=self._pob_controller.upgrade_checker,
         )
 
         # Theme controller (initialized after menu bar creation)
@@ -123,7 +125,7 @@ class PriceCheckerWindow(QMainWindow):
             window_manager=self._window_manager,
             ctx=ctx,
             main_window=self,
-            character_manager=self._character_manager,
+            character_manager=self._pob_controller.character_manager,
             callbacks={
                 "on_pob_profile_selected": self._on_pob_profile_selected,
                 "on_pob_price_check": self._on_pob_price_check,
@@ -158,7 +160,7 @@ class PriceCheckerWindow(QMainWindow):
         self._start_rankings_population()
 
         # Initialize build stats for item inspector from active PoB profile
-        self._update_build_stats_for_inspector()
+        self._pob_controller.update_inspector_stats(self.item_inspector)
 
     def _start_rankings_population(self) -> None:
         """Start background task to populate price rankings if needed."""
@@ -196,49 +198,6 @@ class PriceCheckerWindow(QMainWindow):
         except Exception as e:
             self.logger.warning(f"Failed to initialize rare evaluator: {e}")
 
-    def _init_character_manager(self) -> None:
-        """Initialize the PoB character manager."""
-        try:
-            from core.pob_integration import CharacterManager
-            storage_path = Path(__file__).parent.parent / "data" / "characters.json"
-            self._character_manager = CharacterManager(storage_path=storage_path)
-        except Exception as e:
-            self.logger.warning(f"Failed to initialize character manager: {e}")
-
-    def _update_build_stats_for_inspector(self) -> None:
-        """Update the item inspector with build stats from the active PoB profile."""
-        from core.dps_impact_calculator import DPSStats
-
-        self.logger.info("Updating build stats for item inspector")
-        if not self._character_manager:
-            self.logger.info("No character manager available")
-            return
-
-        try:
-            profile = self._character_manager.get_active_profile()
-            self.logger.info(f"Active profile: {profile.name if profile else None}")
-            if profile and profile.build and profile.build.stats:
-                self.logger.info(f"Profile has {len(profile.build.stats)} build stats")
-                build_stats = BuildStats.from_pob_stats(profile.build.stats)
-                self.item_inspector.set_build_stats(build_stats)
-                self.logger.info(
-                    f"Set build stats: life={build_stats.total_life}, life_inc={build_stats.life_inc}%"
-                )
-
-                # Also set DPS stats for damage impact calculations
-                dps_stats = DPSStats.from_pob_stats(profile.build.stats)
-                self.item_inspector.set_dps_stats(dps_stats)
-                if dps_stats.combined_dps > 0:
-                    self.logger.info(
-                        f"Set DPS stats: {dps_stats.combined_dps:.0f} DPS, "
-                        f"type={dps_stats.primary_damage_type.value}"
-                    )
-            else:
-                self.logger.info(f"No build stats available")
-                self.item_inspector.set_build_stats(None)
-                self.item_inspector.set_dps_stats(None)
-        except Exception as e:
-            self.logger.warning(f"Failed to update build stats: {e}")
 
     # -------------------------------------------------------------------------
     # Session Tab Widget Delegation
@@ -281,34 +240,13 @@ class PriceCheckerWindow(QMainWindow):
                 self._show_results_context_menu
             )
             # Update build stats for the new session's inspector
-            self._update_build_stats_for_session(panel)
+            self._pob_controller.update_inspector_stats(panel.item_inspector)
 
     def _on_session_check_price(self, item_text: str, session_index: int) -> None:
         """Handle check price request from a session tab."""
         if self._check_in_progress:
             return
         self._do_price_check(item_text, session_index)
-
-    def _update_build_stats_for_session(self, panel: SessionPanel) -> None:
-        """Update build stats for a specific session panel's inspector."""
-        from core.dps_impact_calculator import DPSStats
-
-        if not self._character_manager:
-            return
-
-        try:
-            profile = self._character_manager.get_active_profile()
-            if profile and profile.build and profile.build.stats:
-                build_stats = BuildStats.from_pob_stats(profile.build.stats)
-                panel.item_inspector.set_build_stats(build_stats)
-
-                dps_stats = DPSStats.from_pob_stats(profile.build.stats)
-                panel.item_inspector.set_dps_stats(dps_stats)
-            else:
-                panel.item_inspector.set_build_stats(None)
-                panel.item_inspector.set_dps_stats(None)
-        except Exception as e:
-            self.logger.warning(f"Failed to update build stats for session: {e}")
 
     # -------------------------------------------------------------------------
     # Menu Bar
@@ -506,7 +444,7 @@ class PriceCheckerWindow(QMainWindow):
 
         # Create embedded PoB panel
         from gui_qt.widgets.pob_panel import PoBPanel
-        self.pob_panel = PoBPanel(self._character_manager, parent=self)
+        self.pob_panel = PoBPanel(self._pob_controller.character_manager, parent=self)
         self.pob_panel.price_check_requested.connect(self._on_pob_price_check)
         # Update build stats when profile changes
         self.pob_panel.profile_combo.currentTextChanged.connect(
@@ -1025,76 +963,20 @@ class PriceCheckerWindow(QMainWindow):
 
     def _on_pob_profile_selected(self, profile_name: str) -> None:
         """Handle PoB profile selection."""
-        try:
-            from core.pob_integration import UpgradeChecker
-            profile = self._character_manager.get_profile(profile_name)
-            if profile and profile.build:
-                self._upgrade_checker = UpgradeChecker(profile.build)
-                # Update the controller with new upgrade checker
-                self._price_controller.set_upgrade_checker(self._upgrade_checker)
-                self._set_status(f"Upgrade checking enabled for: {profile_name}")
-        except Exception as e:
-            self.logger.warning(f"Failed to setup upgrade checker: {e}")
+        self._pob_controller.on_profile_selected(profile_name, self._price_controller)
 
     def _on_pob_price_check(self, item_text: str) -> None:
         """Handle price check request from PoB window."""
-        # Populate the input text
-        self.input_text.setPlainText(item_text)
-
-        # Bring main window to front (Windows requires extra steps)
-        self._bring_to_front()
-
-        # Auto-run the price check after a brief delay to let UI update
-        QTimer.singleShot(100, self._on_check_price)
+        self._pob_controller.handle_pob_price_check(
+            item_text=item_text,
+            input_text_widget=self.input_text,
+            main_window=self,
+            check_callback=self._on_check_price,
+        )
 
     def _on_pob_profile_changed(self, profile_name: str) -> None:
         """Handle PoB profile selection change - update build stats for inspector."""
-        if not profile_name or profile_name.startswith("("):
-            # Invalid selection (empty or placeholder like "(No profiles)")
-            self.item_inspector.set_build_stats(None)
-            return
-
-        # Set the active profile in the character manager
-        if self._character_manager:
-            self._character_manager.set_active_profile(profile_name)
-
-        # Update build stats for the item inspector
-        self._update_build_stats_for_inspector()
-
-    def _bring_to_front(self) -> None:
-        """Aggressively bring this window to front on Windows."""
-        # Save current state
-        old_state = self.windowState()
-
-        # Method 1: Show normal first
-        self.showNormal()
-
-        # Method 2: Temporarily set always on top, then remove it
-        from PyQt6.QtCore import Qt
-        self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
-        self.show()
-        self.setWindowFlags(self.windowFlags() & ~Qt.WindowType.WindowStaysOnTopHint)
-        self.show()
-
-        # Method 3: Standard Qt activation
-        self.raise_()
-        self.activateWindow()
-
-        # Method 4: Try Windows API if available
-        try:
-            import ctypes
-            hwnd = int(self.winId())
-            # SW_RESTORE = 9, brings window to foreground
-            ctypes.windll.user32.ShowWindow(hwnd, 9)
-            ctypes.windll.user32.SetForegroundWindow(hwnd)
-        except (AttributeError, OSError) as e:
-            # AttributeError: ctypes.windll not available on non-Windows
-            # OSError: Windows API call failed
-            self.logger.debug(f"Windows API bring_to_front failed (expected on non-Windows): {e}")
-
-        # Restore maximized state if needed
-        if old_state & Qt.WindowState.WindowMaximized:
-            self.showMaximized()
+        self._pob_controller.on_profile_changed(profile_name, self.item_inspector)
 
     def _show_rare_eval_config(self) -> None:
         """Show rare evaluation config window."""

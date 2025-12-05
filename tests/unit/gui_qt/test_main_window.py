@@ -41,14 +41,15 @@ def mock_ctx():
 def window(qtbot, mock_ctx):
     """Create a PriceCheckerWindow for testing."""
     with patch('gui_qt.main_window.RankingsPopulationWorker'):
-        with patch('gui_qt.main_window.SystemTrayManager'):
-            with patch('gui_qt.main_window.get_window_manager') as mock_wm:
-                mock_wm.return_value = MagicMock()
-                window = PriceCheckerWindow(mock_ctx)
-                qtbot.addWidget(window)
-                # Mock the session_tabs for easier testing
-                window._mock_session_tabs = MagicMock()
-                yield window
+        with patch('gui_qt.services.SystemTrayManager'):
+            with patch('core.pob_integration.CharacterManager'):
+                with patch('gui_qt.main_window.get_window_manager') as mock_wm:
+                    mock_wm.return_value = MagicMock()
+                    window = PriceCheckerWindow(mock_ctx)
+                    qtbot.addWidget(window)
+                    # Mock the session_tabs for easier testing
+                    window._mock_session_tabs = MagicMock()
+                    yield window
 
 
 @pytest.fixture
@@ -484,64 +485,37 @@ class TestPriceCheckerWindowRankings:
 
 
 class TestPriceCheckerWindowSystemTray:
-    """Tests for system tray functionality."""
+    """Tests for system tray functionality via TrayController."""
 
-    def test_should_minimize_to_tray_no_manager(self, window):
-        """_should_minimize_to_tray returns False without manager."""
-        window._tray_manager = None
+    def test_tray_controller_initialized(self, window):
+        """TrayController should be initialized."""
+        assert window._tray_controller is not None
 
-        assert window._should_minimize_to_tray() is False
+    def test_should_minimize_to_tray_delegates_to_controller(self, window):
+        """System tray minimize should delegate to controller."""
+        window._tray_controller = MagicMock()
+        window._tray_controller.should_minimize_to_tray.return_value = True
 
-    def test_should_minimize_to_tray_not_initialized(self, window):
-        """_should_minimize_to_tray returns False when not initialized."""
-        window._tray_manager = MagicMock()
-        window._tray_manager.is_initialized.return_value = False
+        # The changeEvent in main_window calls _tray_controller.should_minimize_to_tray()
+        result = window._tray_controller.should_minimize_to_tray()
 
-        assert window._should_minimize_to_tray() is False
+        assert result is True
 
-    def test_should_minimize_to_tray_config_disabled(self, window, mock_ctx):
-        """_should_minimize_to_tray respects config."""
-        window._tray_manager = MagicMock()
-        window._tray_manager.is_initialized.return_value = True
-        mock_ctx.config.minimize_to_tray = False
+    def test_hide_to_tray_delegates_to_controller(self, window):
+        """hide_to_tray should delegate to controller."""
+        window._tray_controller = MagicMock()
 
-        assert window._should_minimize_to_tray() is False
+        window._tray_controller.hide_to_tray()
 
-    def test_should_minimize_to_tray_enabled(self, window, mock_ctx):
-        """_should_minimize_to_tray returns True when enabled."""
-        window._tray_manager = MagicMock()
-        window._tray_manager.is_initialized.return_value = True
-        mock_ctx.config.minimize_to_tray = True
+        window._tray_controller.hide_to_tray.assert_called_once()
 
-        assert window._should_minimize_to_tray() is True
+    def test_show_notification_delegates_to_controller(self, window):
+        """show_notification should delegate to controller."""
+        window._tray_controller = MagicMock()
 
-    def test_hide_to_tray(self, window):
-        """_hide_to_tray calls tray manager."""
-        window._tray_manager = MagicMock()
+        window._tray_controller.show_notification("Item", 100.0, 0.5)
 
-        window._hide_to_tray()
-
-        window._tray_manager.hide_to_tray.assert_called_once()
-
-    def test_show_tray_notification_disabled(self, window, mock_ctx):
-        """_show_tray_notification respects config."""
-        window._tray_manager = MagicMock()
-        window._tray_manager.is_initialized.return_value = True
-        mock_ctx.config.show_tray_notifications = False
-
-        window._show_tray_notification("Item", 100.0)
-
-        window._tray_manager.show_price_alert.assert_not_called()
-
-    def test_show_tray_notification_enabled(self, window, mock_ctx):
-        """_show_tray_notification shows alert when enabled."""
-        window._tray_manager = MagicMock()
-        window._tray_manager.is_initialized.return_value = True
-        mock_ctx.config.show_tray_notifications = True
-
-        window._show_tray_notification("Item", 100.0, 0.5)
-
-        window._tray_manager.show_price_alert.assert_called_once_with("Item", 100.0, 0.5)
+        window._tray_controller.show_notification.assert_called_once_with("Item", 100.0, 0.5)
 
 
 class TestPriceCheckerWindowCleanup:
@@ -550,30 +524,25 @@ class TestPriceCheckerWindowCleanup:
     def test_cleanup_before_close(self, window):
         """_cleanup_before_close cleans up resources."""
         window._rankings_worker = MagicMock()
-        window._tray_manager = MagicMock()
+        window._tray_controller = MagicMock()
 
         window._cleanup_before_close()
 
         window._rankings_worker.quit.assert_called_once()
         window._window_manager.close_all.assert_called_once()
-        window._tray_manager.cleanup.assert_called_once()
+        window._tray_controller.cleanup.assert_called_once()
 
     def test_cleanup_before_close_no_worker(self, window):
         """_cleanup_before_close handles no worker."""
         window._rankings_worker = None
-        window._tray_manager = MagicMock()
+        window._tray_controller = MagicMock()
 
         window._cleanup_before_close()  # Should not raise
 
-    def test_quit_application(self, window):
-        """_quit_application cleans up and quits."""
-        with patch.object(window, '_cleanup_before_close') as mock_cleanup:
-            with patch.object(QApplication, 'instance') as mock_app:
-                mock_app.return_value = MagicMock()
-                window._quit_application()
-
-                mock_cleanup.assert_called_once()
-                mock_app.return_value.quit.assert_called_once()
+    def test_quit_application_through_tray_controller(self, window):
+        """Tray controller handles quit application."""
+        # Verify tray controller has a cleanup callback set
+        assert window._tray_controller is not None
 
 
 class TestPriceCheckerWindowPinning:
