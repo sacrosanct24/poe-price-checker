@@ -64,6 +64,7 @@ from gui_qt.controllers import (
     PoBController,
     ViewMenuController,
 )
+from gui_qt.controllers.ai_analysis_controller import AIAnalysisController
 from core.build_stat_calculator import BuildStats
 
 if TYPE_CHECKING:
@@ -135,6 +136,9 @@ class PriceCheckerWindow(QMainWindow):
 
         # Results context menu controller (initialized after toast manager is created)
         self._results_context_controller: Optional[ResultsContextController] = None
+
+        # AI analysis controller (initialized after UI is created)
+        self._ai_controller: Optional[AIAnalysisController] = None
 
         # View menu controller
         self._view_menu_controller: Optional[ViewMenuController] = None
@@ -218,7 +222,7 @@ class PriceCheckerWindow(QMainWindow):
 
     _DELEGATED_ATTRS: frozenset = frozenset({
         'input_text', 'item_inspector', 'results_table',
-        'filter_input', 'source_filter', 'rare_eval_panel', 'check_btn'
+        'filter_input', 'source_filter', 'rare_eval_panel', 'ai_panel', 'check_btn'
     })
 
     @property
@@ -250,6 +254,8 @@ class PriceCheckerWindow(QMainWindow):
             )
             # Update build stats for the new session's inspector
             self._pob_controller.update_inspector_stats(panel.item_inspector)
+            # Update AI controller with the new session's panel
+            self._update_ai_controller_panel()
 
     def _on_session_check_price(self, item_text: str, session_index: int) -> None:
         """Handle check price request from a session tab."""
@@ -455,6 +461,10 @@ class PriceCheckerWindow(QMainWindow):
         # Toast notification manager
         self._toast_manager = ToastManager(self)
 
+        # Initialize AI analysis controller (needs panel from current session)
+        # Note: AI controller will be updated for each session on tab change
+        self._init_ai_controller()
+
         # Initialize results context controller now that toast manager exists
         self._results_context_controller = ResultsContextController(
             ctx=self.ctx,
@@ -462,6 +472,8 @@ class PriceCheckerWindow(QMainWindow):
             on_status=self._set_status,
             on_toast_success=self._toast_manager.success,
             on_toast_error=self._toast_manager.error,
+            on_ai_analysis=self._on_ai_analysis_requested,
+            ai_configured=self._is_ai_configured,
         )
 
     def _set_status(self, message: str) -> None:
@@ -488,6 +500,49 @@ class PriceCheckerWindow(QMainWindow):
                 except (ValueError, TypeError):
                     pass  # Skip non-numeric values
             self.summary_label.setText(f"{count} items | {total_chaos:.1f}c total")
+
+    # -------------------------------------------------------------------------
+    # AI Analysis
+    # -------------------------------------------------------------------------
+
+    def _init_ai_controller(self) -> None:
+        """Initialize the AI analysis controller for the current session panel."""
+        panel = self.session_tabs.get_current_panel()
+        if panel:
+            self._ai_controller = AIAnalysisController(
+                config=self.ctx.config,
+                panel=panel.ai_panel,
+                on_status=self._set_status,
+                on_toast_success=self._toast_manager.success,
+                on_toast_error=self._toast_manager.error,
+            )
+
+    def _update_ai_controller_panel(self) -> None:
+        """Update AI controller with the current session's panel."""
+        panel = self.session_tabs.get_current_panel()
+        if panel and self._ai_controller:
+            # Create a new controller with the new panel
+            self._ai_controller = AIAnalysisController(
+                config=self.ctx.config,
+                panel=panel.ai_panel,
+                on_status=self._set_status,
+                on_toast_success=self._toast_manager.success,
+                on_toast_error=self._toast_manager.error,
+            )
+
+    def _is_ai_configured(self) -> bool:
+        """Check if AI is configured."""
+        if self._ai_controller:
+            return self._ai_controller.is_configured()
+        return self.ctx.config.has_ai_configured()
+
+    def _on_ai_analysis_requested(self, item_text: str, price_results: List[Dict[str, Any]]) -> None:
+        """Handle AI analysis request from context menu."""
+        if not self._ai_controller:
+            self._init_ai_controller()
+
+        if self._ai_controller:
+            self._ai_controller.analyze_item(item_text, price_results)
 
     # -------------------------------------------------------------------------
     # Shortcuts

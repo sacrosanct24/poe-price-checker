@@ -128,7 +128,7 @@ class TestPriceCheckerWindowDelegation:
     def test_all_delegated_attrs(self, window):
         """All expected attrs are in delegated set."""
         expected = {'input_text', 'item_inspector', 'results_table',
-                    'filter_input', 'source_filter', 'rare_eval_panel', 'check_btn'}
+                    'filter_input', 'source_filter', 'rare_eval_panel', 'ai_panel', 'check_btn'}
         assert PriceCheckerWindow._DELEGATED_ATTRS == expected
 
 

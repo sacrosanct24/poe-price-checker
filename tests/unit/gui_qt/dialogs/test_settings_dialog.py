@@ -19,8 +19,8 @@ class TestSettingsDialogInit:
         assert dialog.windowTitle() == "Settings"
         assert dialog._config is mock_config
 
-    def test_has_three_tabs(self, qtbot):
-        """Dialog has three tabs: Accessibility, Performance, System Tray."""
+    def test_has_four_tabs(self, qtbot):
+        """Dialog has four tabs: Accessibility, Performance, System Tray, AI."""
         from gui_qt.dialogs.settings_dialog import SettingsDialog
 
         mock_config = self._create_mock_config()
@@ -28,10 +28,11 @@ class TestSettingsDialogInit:
         dialog = SettingsDialog(mock_config)
         qtbot.addWidget(dialog)
 
-        assert dialog._tabs.count() == 3
+        assert dialog._tabs.count() == 4
         assert dialog._tabs.tabText(0) == "Accessibility"
         assert dialog._tabs.tabText(1) == "Performance"
         assert dialog._tabs.tabText(2) == "System Tray"
+        assert dialog._tabs.tabText(3) == "AI"
 
     def _create_mock_config(self):
         """Create a mock config with all required properties."""
@@ -51,6 +52,11 @@ class TestSettingsDialogInit:
         mock_config.start_minimized = False
         mock_config.show_tray_notifications = True
         mock_config.tray_alert_threshold = 50.0
+        # AI
+        mock_config.ai_provider = ""
+        mock_config.ai_max_tokens = 500
+        mock_config.ai_timeout = 30
+        mock_config.get_ai_api_key = MagicMock(return_value="")
         return mock_config
 
 
@@ -72,6 +78,11 @@ class TestAccessibilityTab:
         mock_config.start_minimized = False
         mock_config.show_tray_notifications = True
         mock_config.tray_alert_threshold = 50.0
+        # AI
+        mock_config.ai_provider = ""
+        mock_config.ai_max_tokens = 500
+        mock_config.ai_timeout = 30
+        mock_config.get_ai_api_key = MagicMock(return_value="")
         return mock_config
 
     def test_font_scale_slider_range(self, qtbot):

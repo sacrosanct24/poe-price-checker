@@ -6,6 +6,7 @@ Extracts the results context menu functionality from main_window.py:
 - Copy row / copy as TSV
 - Price explanation dialog
 - Record sale dialog
+- AI item analysis
 
 Usage:
     controller = ResultsContextController(ctx=app_context, parent=main_window)
@@ -15,7 +16,7 @@ Usage:
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable, Dict, Optional, TYPE_CHECKING
+from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
 
 from PyQt6.QtWidgets import (
     QApplication,
@@ -44,6 +45,7 @@ class ResultsContextController:
     - Row copying (plain text and TSV)
     - Price explanation dialogs
     - Sale recording
+    - AI item analysis
     """
 
     def __init__(
@@ -53,6 +55,8 @@ class ResultsContextController:
         on_status: Optional[Callable[[str], None]] = None,
         on_toast_success: Optional[Callable[[str], None]] = None,
         on_toast_error: Optional[Callable[[str], None]] = None,
+        on_ai_analysis: Optional[Callable[[str, List[Dict[str, Any]]], None]] = None,
+        ai_configured: Optional[Callable[[], bool]] = None,
     ):
         """
         Initialize the results context controller.
@@ -63,12 +67,16 @@ class ResultsContextController:
             on_status: Callback for status bar messages.
             on_toast_success: Callback for success toast notifications.
             on_toast_error: Callback for error toast notifications.
+            on_ai_analysis: Callback to trigger AI analysis (item_text, price_results).
+            ai_configured: Callback to check if AI is configured.
         """
         self._ctx = ctx
         self._parent = parent
         self._on_status = on_status or (lambda msg: None)
         self._on_toast_success = on_toast_success or (lambda msg: None)
         self._on_toast_error = on_toast_error or (lambda msg: None)
+        self._on_ai_analysis = on_ai_analysis
+        self._ai_configured = ai_configured or (lambda: False)
 
     def show_context_menu(
         self,
@@ -109,6 +117,17 @@ class ResultsContextController:
             record_sale_action.triggered.connect(
                 lambda: self._record_sale(results_table)
             )
+
+            # AI Analysis option
+            if self._on_ai_analysis is not None:
+                menu.addSeparator()
+                ai_action = menu.addAction("Ask AI About This Item")
+                ai_action.setEnabled(self._ai_configured())
+                if not self._ai_configured():
+                    ai_action.setToolTip("Configure AI in Settings > AI")
+                ai_action.triggered.connect(
+                    lambda: self._ask_ai_about_item(results_table)
+                )
 
         menu.exec(results_table.mapToGlobal(pos))
 
@@ -245,6 +264,36 @@ class ResultsContextController:
                     self._parent, "Error", f"Failed to record sale: {e}"
                 )
 
+    def _ask_ai_about_item(self, results_table: "ResultsTableWidget") -> None:
+        """Trigger AI analysis for the selected item."""
+        if self._on_ai_analysis is None:
+            return
+
+        row = results_table.get_selected_row()
+        if not row:
+            return
+
+        # Build item text from the row data
+        # We need to reconstruct something that looks like item text
+        item_name = row.get("item_name", "Unknown Item")
+        source = row.get("source", "")
+        chaos_value = row.get("chaos_value", 0)
+        divine_value = row.get("divine_value", 0)
+
+        # Build a simple item representation
+        item_text = f"{item_name}"
+
+        # Build price results list
+        price_results: List[Dict[str, Any]] = [{
+            "item_name": item_name,
+            "chaos_value": chaos_value,
+            "divine_value": divine_value,
+            "source": source,
+        }]
+
+        # Call the AI analysis callback
+        self._on_ai_analysis(item_text, price_results)
+
 
 def get_results_context_controller(
     ctx: "AppContext",
@@ -252,6 +301,8 @@ def get_results_context_controller(
     on_status: Optional[Callable[[str], None]] = None,
     on_toast_success: Optional[Callable[[str], None]] = None,
     on_toast_error: Optional[Callable[[str], None]] = None,
+    on_ai_analysis: Optional[Callable[[str, List[Dict[str, Any]]], None]] = None,
+    ai_configured: Optional[Callable[[], bool]] = None,
 ) -> ResultsContextController:
     """
     Factory function to create a ResultsContextController.
@@ -262,6 +313,8 @@ def get_results_context_controller(
         on_status: Status callback.
         on_toast_success: Success toast callback.
         on_toast_error: Error toast callback.
+        on_ai_analysis: Callback to trigger AI analysis.
+        ai_configured: Callback to check if AI is configured.
 
     Returns:
         Configured ResultsContextController instance.
@@ -272,4 +325,6 @@ def get_results_context_controller(
         on_status=on_status,
         on_toast_success=on_toast_success,
         on_toast_error=on_toast_error,
+        on_ai_analysis=on_ai_analysis,
+        ai_configured=ai_configured,
     )

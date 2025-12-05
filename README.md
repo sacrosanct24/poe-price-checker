@@ -73,6 +73,12 @@
 - Heatmap overlay showing item values
 - Click to inspect, double-click to price check
 
+### AI Item Analysis *(New in v1.5.0)*
+- **Ask AI about any item** via right-click context menu
+- Supports **Google Gemini** (free tier available), **Claude**, and **OpenAI**
+- Get detailed explanations of item value, mod synergies, and build recommendations
+- API keys encrypted and stored securely on your machine
+
 ### Modern Interface
 - Dark theme with PoE-style colors
 - **Rare Item Evaluator** - scores items 0-100 with tier badges
@@ -122,7 +128,8 @@ python build.py
 ### Pro Tips
 - Use the **PoB Panel** to import your build and check upgrades
 - Enable **Price Rankings** to see top items by category
-- Right-click results for additional options (copy, record sale, explain price)
+- Right-click results for additional options (copy, record sale, ask AI)
+- Configure AI in Settings → AI tab (Gemini offers a free tier)
 
 ---
 
@@ -145,7 +152,7 @@ poe-price-checker/
 ├── gui_qt/         # PyQt6 interface (default)
 ├── data_sources/   # PoE Ninja, poe.watch, and more
 ├── plugins/        # Custom pricing sources
-├── tests/          # 1400+ unit & integration tests
+├── tests/          # 3300+ unit & integration tests
 └── docs/           # Documentation
 ```
 

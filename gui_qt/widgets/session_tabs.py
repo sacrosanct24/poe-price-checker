@@ -36,6 +36,7 @@ from gui_qt.styles import COLORS
 from gui_qt.widgets.results_table import ResultsTableWidget
 from gui_qt.widgets.item_inspector import ItemInspectorWidget
 from gui_qt.widgets.rare_evaluation_panel import RareEvaluationPanelWidget
+from gui_qt.widgets.ai_analysis_panel import AIAnalysisPanelWidget
 
 if TYPE_CHECKING:
     pass
@@ -177,6 +178,11 @@ class SessionPanel(QWidget):
         self.rare_eval_panel.setVisible(False)
         layout.addWidget(self.rare_eval_panel)
 
+        # Bottom: AI analysis panel (hidden by default)
+        self.ai_panel = AIAnalysisPanelWidget()
+        self.ai_panel.setVisible(False)
+        layout.addWidget(self.ai_panel)
+
     def _on_check_price(self) -> None:
         """Handle check price button click."""
         text = self.input_text.toPlainText().strip()
@@ -190,6 +196,8 @@ class SessionPanel(QWidget):
         self.results_table.set_data([])
         self.item_inspector.clear()
         self.rare_eval_panel.setVisible(False)
+        self.ai_panel.clear()
+        self.ai_panel.setVisible(False)
 
     def _on_row_selected(self, row_data: Dict[str, Any]) -> None:
         """Handle row selection in results table."""

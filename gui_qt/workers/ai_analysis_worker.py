@@ -1,0 +1,137 @@
+"""
+AI Analysis Worker for background item analysis.
+
+Runs AI API calls in a background thread to avoid blocking the UI.
+"""
+
+from __future__ import annotations
+
+from typing import Any, Dict, List, Optional
+import logging
+
+from gui_qt.workers.base_worker import BaseThreadWorker
+from data_sources.ai import create_ai_client, AIResponse
+from core.ai_prompt_builder import AIPromptBuilder, PromptContext
+from core.result import Result
+
+logger = logging.getLogger(__name__)
+
+
+class AIAnalysisWorker(BaseThreadWorker):
+    """Worker that performs AI item analysis in a background thread.
+
+    Signals:
+        result: Emitted with AIResponse on success
+        error: Emitted with (message, traceback) on failure
+        status: Emitted with status message for progress updates
+
+    Example:
+        worker = AIAnalysisWorker(
+            provider="gemini",
+            api_key="...",
+            item_text="Rarity: Unique...",
+            price_results=[{"chaos_value": 100}],
+        )
+        worker.result.connect(self._on_ai_result)
+        worker.error.connect(self._on_ai_error)
+        worker.start()
+    """
+
+    def __init__(
+        self,
+        provider: str,
+        api_key: str,
+        item_text: str,
+        price_results: List[Dict[str, Any]],
+        timeout: int = 30,
+        max_tokens: int = 500,
+        parent: Optional[Any] = None,
+    ):
+        """Initialize the AI analysis worker.
+
+        Args:
+            provider: AI provider name (gemini, claude, openai).
+            api_key: API key for the provider.
+            item_text: The raw item text to analyze.
+            price_results: List of price check results for context.
+            timeout: Request timeout in seconds.
+            max_tokens: Maximum tokens in response.
+            parent: Optional parent QObject.
+        """
+        super().__init__(parent)
+        self._provider = provider
+        self._api_key = api_key
+        self._item_text = item_text
+        self._price_results = price_results
+        self._timeout = timeout
+        self._max_tokens = max_tokens
+        self._prompt_builder = AIPromptBuilder()
+
+    def _execute(self) -> AIResponse:
+        """Execute the AI analysis.
+
+        Returns:
+            AIResponse with the analysis result.
+
+        Raises:
+            ValueError: If analysis fails.
+        """
+        self.emit_status("Creating AI client...")
+
+        # Check cancellation
+        if self.is_cancelled:
+            raise InterruptedError("Analysis cancelled")
+
+        # Create client
+        client = create_ai_client(
+            provider=self._provider,
+            api_key=self._api_key,
+            timeout=self._timeout,
+            max_tokens=self._max_tokens,
+        )
+
+        if not client:
+            raise ValueError(f"Unknown AI provider: {self._provider}")
+
+        if not client.is_configured():
+            raise ValueError(f"AI provider {self._provider} is not configured")
+
+        try:
+            # Build prompt
+            self.emit_status("Building prompt...")
+
+            if self.is_cancelled:
+                raise InterruptedError("Analysis cancelled")
+
+            context = PromptContext(
+                item_text=self._item_text,
+                price_results=self._price_results,
+            )
+
+            prompt = self._prompt_builder.build_item_analysis_prompt(context)
+            system_prompt = self._prompt_builder.get_system_prompt()
+
+            # Send to AI
+            self.emit_status(f"Asking {self._provider.title()}...")
+
+            if self.is_cancelled:
+                raise InterruptedError("Analysis cancelled")
+
+            result: Result[AIResponse, str] = client.complete(
+                prompt=prompt,
+                system_prompt=system_prompt,
+            )
+
+            if self.is_cancelled:
+                raise InterruptedError("Analysis cancelled")
+
+            if result.is_err():
+                raise ValueError(result.error)
+
+            self.emit_status("Analysis complete")
+            return result.unwrap()
+
+        finally:
+            # Clean up client
+            if hasattr(client, 'close'):
+                client.close()

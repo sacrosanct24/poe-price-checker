@@ -17,6 +17,7 @@ from PyQt6.QtWidgets import (
     QGroupBox,
     QHBoxLayout,
     QLabel,
+    QLineEdit,
     QPushButton,
     QSlider,
     QSpinBox,
@@ -72,6 +73,10 @@ class SettingsDialog(QDialog):
         # System Tray tab
         tray_tab = self._create_tray_tab()
         self._tabs.addTab(tray_tab, "System Tray")
+
+        # AI tab
+        ai_tab = self._create_ai_tab()
+        self._tabs.addTab(ai_tab, "AI")
 
         # Buttons
         button_row = QHBoxLayout()
@@ -398,6 +403,140 @@ class SettingsDialog(QDialog):
         layout.addStretch()
         return tab
 
+    def _create_ai_tab(self) -> QWidget:
+        """Create the AI settings tab."""
+        from data_sources.ai import SUPPORTED_PROVIDERS, get_provider_display_name
+
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+        layout.setSpacing(16)
+
+        # Provider Selection group
+        provider_group = QGroupBox("AI Provider")
+        provider_layout = QVBoxLayout(provider_group)
+        provider_layout.setSpacing(12)
+
+        provider_row = QHBoxLayout()
+        provider_row.addWidget(QLabel("Provider:"))
+
+        self._ai_provider_combo = QComboBox()
+        self._ai_provider_combo.addItem("None (Disabled)", "")
+        for provider in SUPPORTED_PROVIDERS:
+            display_name = get_provider_display_name(provider)
+            self._ai_provider_combo.addItem(display_name, provider)
+
+        self._ai_provider_combo.setToolTip(
+            "Select the AI provider to use for item analysis.\n"
+            "You must provide your own API key."
+        )
+        self._ai_provider_combo.currentIndexChanged.connect(self._on_ai_provider_changed)
+        provider_row.addWidget(self._ai_provider_combo)
+        provider_row.addStretch()
+        provider_layout.addLayout(provider_row)
+
+        layout.addWidget(provider_group)
+
+        # API Keys group
+        keys_group = QGroupBox("API Keys")
+        keys_layout = QVBoxLayout(keys_group)
+        keys_layout.setSpacing(12)
+
+        info_label = QLabel(
+            "Enter your API key for the selected provider.\n"
+            "Keys are stored encrypted on your local machine."
+        )
+        info_label.setStyleSheet("color: gray; font-size: 11px;")
+        keys_layout.addWidget(info_label)
+
+        # Gemini API key
+        gemini_row = QHBoxLayout()
+        gemini_label = QLabel("Gemini:")
+        gemini_label.setMinimumWidth(70)
+        gemini_row.addWidget(gemini_label)
+        self._gemini_key_edit = QLineEdit()
+        self._gemini_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
+        self._gemini_key_edit.setPlaceholderText("Enter Gemini API key")
+        self._gemini_key_edit.setToolTip("Get a free key from Google AI Studio")
+        gemini_row.addWidget(self._gemini_key_edit)
+        keys_layout.addLayout(gemini_row)
+
+        # Claude API key
+        claude_row = QHBoxLayout()
+        claude_label = QLabel("Claude:")
+        claude_label.setMinimumWidth(70)
+        claude_row.addWidget(claude_label)
+        self._claude_key_edit = QLineEdit()
+        self._claude_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
+        self._claude_key_edit.setPlaceholderText("Enter Claude API key")
+        self._claude_key_edit.setToolTip("Get a key from console.anthropic.com")
+        claude_row.addWidget(self._claude_key_edit)
+        keys_layout.addLayout(claude_row)
+
+        # OpenAI API key
+        openai_row = QHBoxLayout()
+        openai_label = QLabel("OpenAI:")
+        openai_label.setMinimumWidth(70)
+        openai_row.addWidget(openai_label)
+        self._openai_key_edit = QLineEdit()
+        self._openai_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
+        self._openai_key_edit.setPlaceholderText("Enter OpenAI API key")
+        self._openai_key_edit.setToolTip("Get a key from platform.openai.com")
+        openai_row.addWidget(self._openai_key_edit)
+        keys_layout.addLayout(openai_row)
+
+        layout.addWidget(keys_group)
+
+        # Settings group
+        settings_group = QGroupBox("Response Settings")
+        settings_layout = QVBoxLayout(settings_group)
+        settings_layout.setSpacing(8)
+
+        # Max tokens
+        tokens_row = QHBoxLayout()
+        tokens_row.addWidget(QLabel("Max response tokens:"))
+        self._ai_max_tokens_spin = QSpinBox()
+        self._ai_max_tokens_spin.setRange(100, 2000)
+        self._ai_max_tokens_spin.setSingleStep(100)
+        self._ai_max_tokens_spin.setToolTip(
+            "Maximum tokens in AI response.\n"
+            "Higher = longer responses, more cost"
+        )
+        tokens_row.addWidget(self._ai_max_tokens_spin)
+        tokens_row.addStretch()
+        settings_layout.addLayout(tokens_row)
+
+        # Timeout
+        timeout_row = QHBoxLayout()
+        timeout_row.addWidget(QLabel("Request timeout:"))
+        self._ai_timeout_spin = QSpinBox()
+        self._ai_timeout_spin.setRange(10, 120)
+        self._ai_timeout_spin.setSuffix(" seconds")
+        self._ai_timeout_spin.setToolTip(
+            "How long to wait for AI response.\n"
+            "Increase for slower connections"
+        )
+        timeout_row.addWidget(self._ai_timeout_spin)
+        timeout_row.addStretch()
+        settings_layout.addLayout(timeout_row)
+
+        layout.addWidget(settings_group)
+
+        # Usage note
+        usage_label = QLabel(
+            "Usage: Right-click an item in the results table and select\n"
+            "'Ask AI About This Item' to get an AI-powered analysis."
+        )
+        usage_label.setStyleSheet("color: gray; font-size: 11px;")
+        layout.addWidget(usage_label)
+
+        layout.addStretch()
+        return tab
+
+    def _on_ai_provider_changed(self, index: int) -> None:
+        """Handle AI provider combo box change."""
+        # Could be used to highlight the relevant API key field
+        pass
+
     def _on_font_scale_changed(self, value: int) -> None:
         """Update font scale label when slider changes."""
         self._font_scale_label.setText(f"{value}%")
@@ -447,6 +586,25 @@ class SettingsDialog(QDialog):
         self._show_notifications_cb.setChecked(self._config.show_tray_notifications)
         self._threshold_spin.setValue(self._config.tray_alert_threshold)
 
+        # AI
+        # Find matching provider in combo
+        current_provider = self._config.ai_provider
+        for i in range(self._ai_provider_combo.count()):
+            if self._ai_provider_combo.itemData(i) == current_provider:
+                self._ai_provider_combo.setCurrentIndex(i)
+                break
+
+        # Load API keys - show placeholder if set (don't expose actual key)
+        if self._config.get_ai_api_key("gemini"):
+            self._gemini_key_edit.setText("••••••••••••••••")
+        if self._config.get_ai_api_key("claude"):
+            self._claude_key_edit.setText("••••••••••••••••")
+        if self._config.get_ai_api_key("openai"):
+            self._openai_key_edit.setText("••••••••••••••••")
+
+        self._ai_max_tokens_spin.setValue(self._config.ai_max_tokens)
+        self._ai_timeout_spin.setValue(self._config.ai_timeout)
+
         # Update dependent states
         self._on_font_scale_changed(self._font_scale_slider.value())
         self._on_rate_limit_changed(self._rate_limit_slider.value())
@@ -472,6 +630,10 @@ class SettingsDialog(QDialog):
             self._show_notifications_cb.setChecked(True)
             self._threshold_spin.setValue(50.0)
             self._on_notifications_toggled()
+        elif current_tab == 3:  # AI
+            self._ai_provider_combo.setCurrentIndex(0)  # None
+            self._ai_max_tokens_spin.setValue(500)
+            self._ai_timeout_spin.setValue(30)
 
     def _save_and_accept(self) -> None:
         """Save settings and close the dialog."""
@@ -492,5 +654,24 @@ class SettingsDialog(QDialog):
         self._config.start_minimized = self._start_minimized_cb.isChecked()
         self._config.show_tray_notifications = self._show_notifications_cb.isChecked()
         self._config.tray_alert_threshold = self._threshold_spin.value()
+
+        # AI
+        self._config.ai_provider = self._ai_provider_combo.currentData() or ""
+
+        # Only save API keys if they were changed (not placeholder text)
+        gemini_key = self._gemini_key_edit.text()
+        if gemini_key and gemini_key != "••••••••••••••••":
+            self._config.set_ai_api_key("gemini", gemini_key)
+
+        claude_key = self._claude_key_edit.text()
+        if claude_key and claude_key != "••••••••••••••••":
+            self._config.set_ai_api_key("claude", claude_key)
+
+        openai_key = self._openai_key_edit.text()
+        if openai_key and openai_key != "••••••••••••••••":
+            self._config.set_ai_api_key("openai", openai_key)
+
+        self._config.ai_max_tokens = self._ai_max_tokens_spin.value()
+        self._config.ai_timeout = self._ai_timeout_spin.value()
 
         self.accept()

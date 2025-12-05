@@ -136,6 +136,17 @@ class Config:
             # Example: {"poe.ninja": true, "poe.watch": false}
             "enabled_sources": {},
         },
+        "ai": {
+            # AI provider for item analysis: "gemini", "claude", "openai", or ""
+            "provider": "",
+            # API keys (encrypted) - user must provide their own
+            "gemini_api_key": "",
+            "claude_api_key": "",
+            "openai_api_key": "",
+            # Response settings
+            "max_response_tokens": 500,  # Max tokens in AI response
+            "timeout_seconds": 30,  # Request timeout
+        },
     }
 
     def __init__(self, config_file: Optional[Path] = None) -> None:
@@ -765,6 +776,81 @@ class Config:
     def has_stash_credentials(self) -> bool:
         """Check if stash credentials are configured."""
         return bool(self.poesessid and self.account_name)
+
+    # ------------------------------------------------------------------
+    # AI Settings
+    # ------------------------------------------------------------------
+
+    @property
+    def ai_provider(self) -> str:
+        """Get the configured AI provider (gemini, claude, openai, or empty)."""
+        return self.data.get("ai", {}).get("provider", "")
+
+    @ai_provider.setter
+    def ai_provider(self, value: str) -> None:
+        """Set the AI provider and persist."""
+        valid_providers = ("", "gemini", "claude", "openai")
+        if value.lower() not in valid_providers:
+            value = ""
+        self.data.setdefault("ai", {})["provider"] = value.lower()
+        self.save()
+
+    def get_ai_api_key(self, provider: str) -> str:
+        """Get the API key for an AI provider (decrypted).
+
+        Args:
+            provider: The provider name (gemini, claude, openai).
+
+        Returns:
+            The decrypted API key, or empty string if not set.
+        """
+        key_name = f"{provider.lower()}_api_key"
+        encrypted = self.data.get("ai", {}).get(key_name, "")
+        if not encrypted:
+            return ""
+        return decrypt_credential(encrypted)
+
+    def set_ai_api_key(self, provider: str, api_key: str) -> None:
+        """Set the API key for an AI provider (encrypted).
+
+        Args:
+            provider: The provider name (gemini, claude, openai).
+            api_key: The API key to store (will be encrypted).
+        """
+        key_name = f"{provider.lower()}_api_key"
+        self.data.setdefault("ai", {})[key_name] = (
+            encrypt_credential(api_key) if api_key else ""
+        )
+        self.save()
+
+    @property
+    def ai_max_tokens(self) -> int:
+        """Maximum tokens in AI response (100-2000)."""
+        return self.data.get("ai", {}).get("max_response_tokens", 500)
+
+    @ai_max_tokens.setter
+    def ai_max_tokens(self, value: int) -> None:
+        """Set max AI response tokens with guardrails."""
+        self.data.setdefault("ai", {})["max_response_tokens"] = max(100, min(2000, int(value)))
+        self.save()
+
+    @property
+    def ai_timeout(self) -> int:
+        """AI request timeout in seconds (10-120)."""
+        return self.data.get("ai", {}).get("timeout_seconds", 30)
+
+    @ai_timeout.setter
+    def ai_timeout(self, value: int) -> None:
+        """Set AI timeout with guardrails."""
+        self.data.setdefault("ai", {})["timeout_seconds"] = max(10, min(120, int(value)))
+        self.save()
+
+    def has_ai_configured(self) -> bool:
+        """Check if AI is configured (provider set and has API key)."""
+        provider = self.ai_provider
+        if not provider:
+            return False
+        return bool(self.get_ai_api_key(provider))
 
     # ------------------------------------------------------------------
     # Utility

@@ -1,0 +1,17 @@
+You are a Path of Exile expert helping a player understand an item they found.
+
+Analyze the following item and provide a brief, actionable assessment:
+
+ITEM:
+{item_text}
+
+PRICE CONTEXT:
+{price_context}
+
+Please provide:
+1. What type of item this is and its key properties
+2. Who would use this item (builds/classes)
+3. Whether the price seems fair based on the stats
+4. Any notable strengths or weaknesses
+
+Keep your response concise (3-5 short paragraphs). Focus on practical advice the player can use.
