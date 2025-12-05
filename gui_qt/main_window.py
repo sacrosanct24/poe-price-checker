@@ -1098,31 +1098,57 @@ class PriceCheckerWindow(QMainWindow):
 
 
 def run(ctx: "AppContext") -> None:
-    """Run the PyQt6 application."""
-    # Set Windows AppUserModelID for proper taskbar icon grouping
-    if sys.platform == "win32":
-        try:
-            import ctypes
-            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
-                "sacrosanct.poe-price-checker.1.0"
-            )
-        except Exception:
-            pass  # Not critical if this fails
+    """Run the PyQt6 application.
 
-    app = QApplication(sys.argv)
-    app.setStyle("Fusion")  # Consistent cross-platform look
+    Note: This function is kept for backward compatibility.
+    The preferred entry point is now main.py which handles
+    the loading screen and QApplication setup.
+    """
+    # Check if QApplication already exists
+    app = QApplication.instance()
+    if app is None:
+        # Set Windows AppUserModelID for proper taskbar icon grouping
+        if sys.platform == "win32":
+            try:
+                import ctypes
+                ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
+                    "sacrosanct.poe-price-checker.1.0"
+                )
+            except Exception:
+                pass  # Not critical if this fails
 
-    # Set application icon
-    icon_path = Path(__file__).parent.parent / "assets" / "icon.ico"
-    if icon_path.exists():
-        app.setWindowIcon(QIcon(str(icon_path)))
-    else:
-        # Fallback to PNG
-        png_path = Path(__file__).parent.parent / "assets" / "icon.png"
-        if png_path.exists():
-            app.setWindowIcon(QIcon(str(png_path)))
+        app = QApplication(sys.argv)
+        app.setStyle("Fusion")  # Consistent cross-platform look
 
+        # Set application icon
+        icon_path = Path(__file__).parent.parent / "assets" / "icon.ico"
+        if icon_path.exists():
+            app.setWindowIcon(QIcon(str(icon_path)))
+        else:
+            # Fallback to PNG
+            png_path = Path(__file__).parent.parent / "assets" / "icon.png"
+            if png_path.exists():
+                app.setWindowIcon(QIcon(str(png_path)))
+
+    # Show loading screen
+    from gui_qt.widgets.loading_screen import LoadingScreen
+    loading = LoadingScreen()
+    loading.set_version("1.5.0")
+    loading.show()
+    loading.set_status("Creating main window...")
+    loading.set_progress(85)
+    app.processEvents()
+
+    # Create main window (this does the heavy initialization)
     window = PriceCheckerWindow(ctx)
+
+    # Finish loading and show main window
+    loading.set_status("Ready!")
+    loading.set_progress(100)
+    app.processEvents()
+
+    # Close loading screen and show main window
+    loading.close()
     window.showMaximized()
 
     sys.exit(app.exec())
