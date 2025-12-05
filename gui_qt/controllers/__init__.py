@@ -7,6 +7,8 @@ Controllers coordinate between services and UI widgets:
 - NavigationController: Manages window/dialog navigation
 - ResultsContextController: Manages results table context menu
 - TrayController: Manages system tray functionality
+- PoBController: Manages Path of Building integration
+- ViewMenuController: Manages View menu creation
 """
 
 from gui_qt.controllers.price_check_controller import PriceCheckController
@@ -27,6 +29,10 @@ from gui_qt.controllers.pob_controller import (
     PoBController,
     get_pob_controller,
 )
+from gui_qt.controllers.view_menu_controller import (
+    ViewMenuController,
+    get_view_menu_controller,
+)
 
 __all__ = [
     "PriceCheckController",
@@ -39,4 +45,6 @@ __all__ = [
     "get_tray_controller",
     "PoBController",
     "get_pob_controller",
+    "ViewMenuController",
+    "get_view_menu_controller",
 ]

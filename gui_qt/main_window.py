@@ -41,10 +41,7 @@ from PyQt6.QtWidgets import (
     QDialog,
 )
 
-from gui_qt.styles import (
-    Theme,
-    THEME_CATEGORIES, THEME_DISPLAY_NAMES, POE_CURRENCY_COLORS
-)
+from gui_qt.styles import Theme
 from gui_qt.menus.menu_builder import (
     MenuBuilder, MenuConfig, MenuItem, MenuSection, create_resources_menu
 )
@@ -65,6 +62,7 @@ from gui_qt.controllers import (
     ResultsContextController,
     TrayController,
     PoBController,
+    ViewMenuController,
 )
 from core.build_stat_calculator import BuildStats
 
@@ -137,6 +135,9 @@ class PriceCheckerWindow(QMainWindow):
 
         # Results context menu controller (initialized after toast manager is created)
         self._results_context_controller: Optional[ResultsContextController] = None
+
+        # View menu controller
+        self._view_menu_controller: Optional[ViewMenuController] = None
 
         # Setup UI
         self.setWindowTitle("PoE Price Checker")
@@ -219,6 +220,14 @@ class PriceCheckerWindow(QMainWindow):
         'input_text', 'item_inspector', 'results_table',
         'filter_input', 'source_filter', 'rare_eval_panel', 'check_btn'
     })
+
+    @property
+    def _current_build_stats(self) -> Optional[BuildStats]:
+        """Get current build stats from the active PoB profile."""
+        stats = self._pob_controller.get_build_stats()
+        if stats:
+            return stats[0]  # (BuildStats, DPSStats) tuple
+        return None
 
     def __getattr__(self, name: str) -> Any:
         """Delegate widget access to the current session panel."""
@@ -330,75 +339,18 @@ class PriceCheckerWindow(QMainWindow):
 
     def _create_view_menu(self, menubar: QMenuBar) -> None:
         """Create View menu with dynamic theme/accent/column submenus."""
-        view_menu = menubar.addMenu("&View")
-
-        history_action = QAction("Session &History", self)
-        history_action.triggered.connect(self._show_history)
-        view_menu.addAction(history_action)
-
-        stash_action = QAction("&Stash Viewer", self)
-        stash_action.triggered.connect(self._show_stash_viewer)
-        view_menu.addAction(stash_action)
-
-        view_menu.addSeparator()
-
-        # Theme submenu with categories
-        self._theme_menu = view_menu.addMenu("&Theme")
-        self._theme_actions: Dict[Theme, QAction] = {}
-
-        for category, themes in THEME_CATEGORIES.items():
-            if category != "Standard":
-                self._theme_menu.addSeparator()
-                label_action = QAction(f"[ {category} ]", self)
-                label_action.setEnabled(False)
-                self._theme_menu.addAction(label_action)
-
-            for theme in themes:
-                display_name = THEME_DISPLAY_NAMES.get(theme, theme.value)
-                action = QAction(display_name, self)
-                action.setCheckable(True)
-                action.triggered.connect(lambda checked, t=theme: self._set_theme(t))
-                self._theme_menu.addAction(action)
-                self._theme_actions[theme] = action
-
-        view_menu.addSeparator()
-        toggle_theme_action = QAction("&Quick Toggle Dark/Light", self)
-        toggle_theme_action.setShortcut(QKeySequence("Ctrl+T"))
-        toggle_theme_action.triggered.connect(self._toggle_theme)
-        view_menu.addAction(toggle_theme_action)
-
-        # Accent Color submenu
-        self._accent_menu = view_menu.addMenu("&Accent Color")
-        self._accent_actions: Dict[Optional[str], QAction] = {}
-
-        default_action = QAction("Theme Default", self)
-        default_action.setCheckable(True)
-        default_action.triggered.connect(lambda: self._set_accent_color(None))
-        self._accent_menu.addAction(default_action)
-        self._accent_actions[None] = default_action
-
-        self._accent_menu.addSeparator()
-
-        for key, data in POE_CURRENCY_COLORS.items():
-            action = QAction(data["name"], self)
-            action.setCheckable(True)
-            action.triggered.connect(lambda checked, k=key: self._set_accent_color(k))
-            self._accent_menu.addAction(action)
-            self._accent_actions[key] = action
-
-        view_menu.addSeparator()
-
-        # Column visibility submenu
-        columns_menu = view_menu.addMenu("&Columns")
-        self._column_actions: Dict[str, QAction] = {}
-        for col in ["item_name", "variant", "links", "chaos_value", "divine_value",
-                    "listing_count", "source", "upgrade"]:
-            action = QAction(col.replace("_", " ").title(), self)
-            action.setCheckable(True)
-            action.setChecked(True)
-            action.triggered.connect(lambda checked, c=col: self._toggle_column(c, checked))
-            columns_menu.addAction(action)
-            self._column_actions[col] = action
+        self._view_menu_controller = ViewMenuController(
+            on_history=self._show_history,
+            on_stash_viewer=self._show_stash_viewer,
+            on_set_theme=self._set_theme,
+            on_toggle_theme=self._toggle_theme,
+            on_set_accent=self._set_accent_color,
+            on_toggle_column=self._toggle_column,
+            parent=self,
+            logger=self.logger,
+        )
+        self._theme_actions, self._accent_actions, self._column_actions = \
+            self._view_menu_controller.create_view_menu(menubar)
 
     def _create_dev_menu(self, menubar: QMenuBar) -> None:
         """Create Dev menu with dynamic sample items."""
