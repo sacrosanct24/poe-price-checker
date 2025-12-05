@@ -187,7 +187,11 @@ class TestRankingsWorkerExecution:
 
 
 class TestRankingsWorkerSignals:
-    """Tests for RankingsPopulationWorker signal emission."""
+    """Tests for RankingsPopulationWorker signal emission.
+
+    Tests call run() directly to test signal emission without starting real threads.
+    This avoids segfaults in headless CI environments.
+    """
 
     @patch(PATCH_PRICE_RANKING_HISTORY)
     @patch(PATCH_TOP20_CALCULATOR)
@@ -207,9 +211,8 @@ class TestRankingsWorkerSignals:
         mock_cache.get_cache_age_days.return_value = 0.5
         mock_cache_class.return_value = mock_cache
 
-        with qtbot.waitSignal(worker.result, timeout=2000) as blocker:
-            worker.start()
-            worker.wait()
+        with qtbot.waitSignal(worker.result, timeout=1000) as blocker:
+            worker.run()
 
         assert blocker.args[0] == 0
 
@@ -220,9 +223,8 @@ class TestRankingsWorkerSignals:
         mock_api.detect_current_league.side_effect = Exception("API error")
         mock_api_class.return_value = mock_api
 
-        with qtbot.waitSignal(worker.error, timeout=2000) as blocker:
-            worker.start()
-            worker.wait()
+        with qtbot.waitSignal(worker.error, timeout=1000) as blocker:
+            worker.run()
 
         error_msg, traceback = blocker.args
         assert "API error" in error_msg
@@ -245,9 +247,8 @@ class TestRankingsWorkerSignals:
         status_messages = []
         worker.status.connect(lambda msg: status_messages.append(msg))
 
-        with qtbot.waitSignal(worker.result, timeout=2000):
-            worker.start()
-            worker.wait()
+        with qtbot.waitSignal(worker.result, timeout=1000):
+            worker.run()
 
         # Should have status messages
         assert len(status_messages) > 0
@@ -464,7 +465,10 @@ class TestRankingsWorkerStatusUpdates:
 
 
 class TestRankingsWorkerErrorHandling:
-    """Tests for error handling."""
+    """Tests for error handling.
+
+    Tests call run() directly to test error signal emission without starting real threads.
+    """
 
     @patch(PATCH_POE_NINJA_API)
     def test_api_exception(self, mock_api_class, worker, qtbot):
@@ -473,9 +477,8 @@ class TestRankingsWorkerErrorHandling:
         mock_api.detect_current_league.side_effect = RuntimeError("Network error")
         mock_api_class.return_value = mock_api
 
-        with qtbot.waitSignal(worker.error, timeout=2000) as blocker:
-            worker.start()
-            worker.wait()
+        with qtbot.waitSignal(worker.error, timeout=1000) as blocker:
+            worker.run()
 
         error_msg, _ = blocker.args
         assert "Network error" in error_msg
@@ -490,9 +493,8 @@ class TestRankingsWorkerErrorHandling:
 
         mock_cache_class.side_effect = IOError("Cache file error")
 
-        with qtbot.waitSignal(worker.error, timeout=2000) as blocker:
-            worker.start()
-            worker.wait()
+        with qtbot.waitSignal(worker.error, timeout=1000) as blocker:
+            worker.run()
 
         error_msg, _ = blocker.args
         assert "Cache file error" in error_msg
@@ -516,9 +518,8 @@ class TestRankingsWorkerErrorHandling:
         mock_calculator.refresh_all.side_effect = ValueError("Calculation failed")
         mock_calc_class.return_value = mock_calculator
 
-        with qtbot.waitSignal(worker.error, timeout=2000) as blocker:
-            worker.start()
-            worker.wait()
+        with qtbot.waitSignal(worker.error, timeout=1000) as blocker:
+            worker.run()
 
         error_msg, _ = blocker.args
         assert "Calculation failed" in error_msg
