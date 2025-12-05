@@ -133,13 +133,13 @@ jobs:
         python -m pip install pytest pytest-qt pytest-xdist
         pip install -r requirements.txt
 
-    - name: Test with pytest (parallel)
+    - name: Test with pytest (parallel, non-GUI)
       id: pytest
       env:
         QT_QPA_PLATFORM: offscreen
       run: |
         pytest tests/ --ignore=tests/integration `
-          --ignore=tests/unit/gui_qt/workers `
+          --ignore=tests/unit/gui_qt `
           --junitxml=test-results-windows.xml `
           -n auto `
           -v
@@ -179,13 +179,13 @@ jobs:
         python -m pip install pytest pytest-qt pytest-xdist
         pip install -r requirements.txt
 
-    - name: Test with pytest (parallel)
+    - name: Test with pytest (parallel, non-GUI)
       id: pytest
       env:
         QT_QPA_PLATFORM: offscreen
       run: |
         pytest tests/ --ignore=tests/integration \
-          --ignore=tests/unit/gui_qt/workers \
+          --ignore=tests/unit/gui_qt \
           --junitxml=test-results-macos.xml \
           -n auto \
           -v
