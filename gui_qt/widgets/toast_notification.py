@@ -236,7 +236,11 @@ class ToastManager:
         if not self._parent:
             return
 
-        parent_rect = self._parent.rect()
+        try:
+            parent_rect = self._parent.rect()
+        except RuntimeError:
+            # Parent widget has been deleted
+            return
         y_offset = self.MARGIN_BOTTOM
 
         for toast in reversed(self._toasts):
