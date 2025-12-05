@@ -57,12 +57,13 @@ from gui_qt.widgets.toast_notification import ToastManager
 from gui_qt.widgets.pinned_items_widget import PinnedItemsWidget
 from gui_qt.widgets.session_tabs import SessionTabWidget, SessionPanel
 from gui_qt.workers import RankingsPopulationWorker
-from gui_qt.services import get_window_manager, SystemTrayManager, get_history_manager
+from gui_qt.services import get_window_manager, get_history_manager
 from gui_qt.controllers import (
     PriceCheckController,
     ThemeController,
     NavigationController,
     ResultsContextController,
+    TrayController,
 )
 from core.build_stat_calculator import BuildStats
 
@@ -114,8 +115,8 @@ class PriceCheckerWindow(QMainWindow):
         # Rankings population worker
         self._rankings_worker: Optional[RankingsPopulationWorker] = None
 
-        # System tray manager
-        self._tray_manager: Optional[SystemTrayManager] = None
+        # Tray controller for system tray functionality
+        self._tray_controller: Optional[TrayController] = None
 
         # Navigation controller for window/dialog management
         self._nav_controller = NavigationController(
@@ -766,7 +767,8 @@ class PriceCheckerWindow(QMainWindow):
                     self._toast_manager.info(message)
 
             # Show system tray notification for high-value items
-            self._maybe_show_tray_alert(data)
+            if self._tray_controller:
+                self._tray_controller.maybe_show_alert(data)
 
         except Exception as e:
             self.logger.exception("Price check failed")
@@ -887,20 +889,14 @@ class PriceCheckerWindow(QMainWindow):
     # -------------------------------------------------------------------------
 
     def _init_system_tray(self) -> None:
-        """Initialize the system tray icon and notifications."""
-        self._tray_manager = SystemTrayManager(
+        """Initialize the system tray controller."""
+        self._tray_controller = TrayController(
             parent=self,
-            app_name="PoE Price Checker",
-            icon=self.windowIcon(),
+            ctx=self.ctx,
+            on_settings=self._show_settings,
+            on_cleanup=self._cleanup_before_close,
         )
-
-        if self._tray_manager.initialize():
-            # Connect signals
-            self._tray_manager.quit_requested.connect(self._quit_application)
-            self._tray_manager.settings_requested.connect(self._show_settings)
-            self.logger.info("System tray initialized")
-        else:
-            self.logger.warning("System tray not available")
+        self._tray_controller.initialize()
 
     def changeEvent(self, event) -> None:
         """Handle window state changes (minimize to tray)."""
@@ -908,80 +904,11 @@ class PriceCheckerWindow(QMainWindow):
 
         if event.type() == QEvent.Type.WindowStateChange:
             # Check if window was minimized
-            if self.isMinimized() and self._should_minimize_to_tray():
-                # Hide window and show in tray instead
-                QTimer.singleShot(0, self._hide_to_tray)
+            if self.isMinimized() and self._tray_controller and self._tray_controller.handle_minimize():
                 event.ignore()
                 return
 
         super().changeEvent(event)
-
-    def _should_minimize_to_tray(self) -> bool:
-        """Check if we should minimize to tray based on config."""
-        if not self._tray_manager or not self._tray_manager.is_initialized():
-            return False
-
-        config = getattr(self.ctx, 'config', None)
-        if config:
-            return config.minimize_to_tray
-        return True
-
-    def _hide_to_tray(self) -> None:
-        """Hide the window to the system tray."""
-        if self._tray_manager:
-            self._tray_manager.hide_to_tray()
-
-    def _show_tray_notification(
-        self,
-        item_name: str,
-        price_chaos: float,
-        price_divine: Optional[float] = None,
-    ) -> None:
-        """Show a system tray notification for a high-value item."""
-        if not self._tray_manager or not self._tray_manager.is_initialized():
-            return
-
-        config = getattr(self.ctx, 'config', None)
-        if config and not config.show_tray_notifications:
-            return
-
-        self._tray_manager.show_price_alert(item_name, price_chaos, price_divine)
-
-    def _maybe_show_tray_alert(self, data: Any) -> None:
-        """Show tray notification if item exceeds alert threshold."""
-        if not self._tray_manager or not self._tray_manager.is_initialized():
-            return
-
-        config = getattr(self.ctx, 'config', None)
-        if not config or not config.show_tray_notifications:
-            return
-
-        # Get best price from results
-        best_price = data.best_price if hasattr(data, 'best_price') else None
-        if best_price is None:
-            return
-
-        # Check against threshold
-        threshold = config.tray_alert_threshold
-        if best_price >= threshold:
-            # Get item name
-            item_name = "Unknown Item"
-            if hasattr(data, 'parsed_item') and data.parsed_item:
-                item_name = data.parsed_item.name or item_name
-
-            # Get divine value if available
-            divine_value = None
-            divine_rate = getattr(config, 'divine_chaos_rate', 0)
-            if divine_rate and divine_rate > 0:
-                divine_value = best_price / divine_rate
-
-            self._show_tray_notification(item_name, best_price, divine_value)
-
-    def _quit_application(self) -> None:
-        """Quit the application (from tray menu)."""
-        # Ensure proper cleanup
-        self._cleanup_before_close()
-        QApplication.instance().quit()
 
     def _show_settings(self) -> None:
         """Show settings dialog."""
@@ -1002,8 +929,8 @@ class PriceCheckerWindow(QMainWindow):
         self._window_manager.close_all()
 
         # Cleanup tray
-        if self._tray_manager:
-            self._tray_manager.cleanup()
+        if self._tray_controller:
+            self._tray_controller.cleanup()
 
         # Close app context resources
         if hasattr(self.ctx, "close"):
