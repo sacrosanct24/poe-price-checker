@@ -654,26 +654,26 @@ class TestPriceCheckerWindowComparison:
 
 
 class TestPriceCheckerWindowResultsContextMenu:
-    """Tests for results context menu."""
+    """Tests for results context menu delegation to controller."""
 
-    def test_copy_selected_row(self, window_with_mock_panel):
-        """_copy_selected_row copies to clipboard."""
-        window_with_mock_panel._mock_panel.results_table.get_selected_row.return_value = {
-            "item_name": "Test",
-            "chaos_value": 100,
-        }
-        window_with_mock_panel._copy_selected_row()
-        clipboard_text = QApplication.clipboard().text()
-        assert "item_name: Test" in clipboard_text
-        assert "chaos_value: 100" in clipboard_text
+    def test_show_results_context_menu_delegates_to_controller(self, window_with_mock_panel):
+        """_show_results_context_menu should delegate to results context controller."""
+        # Verify the controller exists
+        assert window_with_mock_panel._results_context_controller is not None
 
-    def test_copy_row_as_tsv(self, window_with_mock_panel):
-        """_copy_row_as_tsv copies tab-separated values."""
-        window_with_mock_panel._mock_panel.results_table.get_selected_row.return_value = {
-            "item_name": "Test",
-            "chaos_value": 100,
-        }
-        window_with_mock_panel._mock_panel.results_table.columns = ["item_name", "chaos_value"]
-        window_with_mock_panel._copy_row_as_tsv()
-        clipboard_text = QApplication.clipboard().text()
-        assert "\t" in clipboard_text
+        # Mock the controller's show_context_menu method
+        window_with_mock_panel._results_context_controller.show_context_menu = MagicMock()
+
+        # Call the window method
+        mock_pos = MagicMock()
+        window_with_mock_panel._show_results_context_menu(mock_pos)
+
+        # Verify delegation
+        window_with_mock_panel._results_context_controller.show_context_menu.assert_called_once()
+
+    def test_results_context_controller_initialized(self, window_with_mock_panel):
+        """ResultsContextController should be properly initialized."""
+        controller = window_with_mock_panel._results_context_controller
+        assert controller is not None
+        assert controller._ctx is window_with_mock_panel.ctx
+        assert controller._parent is window_with_mock_panel

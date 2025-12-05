@@ -35,7 +35,6 @@ from PyQt6.QtWidgets import (
     QGroupBox,
     QLabel,
     QPushButton,
-    QMenu,
     QStatusBar,
     QMessageBox,
     QFileDialog,
@@ -43,7 +42,7 @@ from PyQt6.QtWidgets import (
 )
 
 from gui_qt.styles import (
-    COLORS, Theme,
+    Theme,
     THEME_CATEGORIES, THEME_DISPLAY_NAMES, POE_CURRENCY_COLORS
 )
 from gui_qt.menus.menu_builder import (
@@ -59,7 +58,12 @@ from gui_qt.widgets.pinned_items_widget import PinnedItemsWidget
 from gui_qt.widgets.session_tabs import SessionTabWidget, SessionPanel
 from gui_qt.workers import RankingsPopulationWorker
 from gui_qt.services import get_window_manager, SystemTrayManager, get_history_manager
-from gui_qt.controllers import PriceCheckController, ThemeController, NavigationController
+from gui_qt.controllers import (
+    PriceCheckController,
+    ThemeController,
+    NavigationController,
+    ResultsContextController,
+)
 from core.build_stat_calculator import BuildStats
 
 if TYPE_CHECKING:
@@ -127,6 +131,9 @@ class PriceCheckerWindow(QMainWindow):
                 "on_reload_rare_evaluator": self._reload_rare_evaluator,
             },
         )
+
+        # Results context menu controller (initialized after toast manager is created)
+        self._results_context_controller: Optional[ResultsContextController] = None
 
         # Setup UI
         self.setWindowTitle("PoE Price Checker")
@@ -557,6 +564,15 @@ class PriceCheckerWindow(QMainWindow):
         # Toast notification manager
         self._toast_manager = ToastManager(self)
 
+        # Initialize results context controller now that toast manager exists
+        self._results_context_controller = ResultsContextController(
+            ctx=self.ctx,
+            parent=self,
+            on_status=self._set_status,
+            on_toast_success=self._toast_manager.success,
+            on_toast_error=self._toast_manager.error,
+        )
+
     def _set_status(self, message: str) -> None:
         """Set the status bar message."""
         self.status_bar.showMessage(message)
@@ -779,27 +795,7 @@ class PriceCheckerWindow(QMainWindow):
 
     def _show_results_context_menu(self, pos) -> None:
         """Show context menu for results table."""
-        menu = QMenu(self)
-
-        selected = self.results_table.get_selected_row()
-        if selected:
-            copy_action = menu.addAction("Copy Row")
-            copy_action.triggered.connect(self._copy_selected_row)
-
-            copy_tsv_action = menu.addAction("Copy as TSV")
-            copy_tsv_action.triggered.connect(self._copy_row_as_tsv)
-
-            menu.addSeparator()
-
-            explain_action = menu.addAction("Why This Price?")
-            explain_action.triggered.connect(self._explain_price)
-
-            menu.addSeparator()
-
-            record_sale_action = menu.addAction("Record Sale...")
-            record_sale_action.triggered.connect(self._record_sale)
-
-        menu.exec(self.results_table.mapToGlobal(pos))
+        self._results_context_controller.show_context_menu(pos, self.results_table)
 
     def _on_result_selected(self, row_data: Dict[str, Any]) -> None:
         """Handle result row selection."""
@@ -850,125 +846,6 @@ class PriceCheckerWindow(QMainWindow):
                 self._toast_manager.error("Comparison dialog not available")
         else:
             self._toast_manager.warning("Not enough valid items to compare")
-
-    def _copy_selected_row(self) -> None:
-        """Copy selected row to clipboard."""
-        row = self.results_table.get_selected_row()
-        if row:
-            text = " | ".join(f"{k}: {v}" for k, v in row.items() if k != "price_explanation")
-            QApplication.clipboard().setText(text)
-            self._set_status("Row copied to clipboard")
-
-    def _copy_row_as_tsv(self) -> None:
-        """Copy selected row as TSV."""
-        row = self.results_table.get_selected_row()
-        if row:
-            values = [str(row.get(col, "")) for col in self.results_table.columns
-                     if col != "price_explanation"]
-            QApplication.clipboard().setText("\t".join(values))
-            self._set_status("Row copied as TSV")
-
-    def _explain_price(self) -> None:
-        """Show price explanation dialog."""
-        from core.price_service import PriceExplanation
-
-        row = self.results_table.get_selected_row()
-        if not row:
-            return
-
-        explanation_json = row.get("price_explanation", "")
-        if not explanation_json or explanation_json == "{}":
-            # Show basic info even without explanation
-            item_name = row.get("item_name", "Unknown")
-            source = row.get("source", "Unknown")
-            chaos = row.get("chaos_value", 0)
-            divine = row.get("divine_value", 0)
-
-            text = f"Item: {item_name}\n"
-            text += f"Source: {source}\n"
-            text += f"Price: {chaos:.1f}c"
-            if divine:
-                text += f" ({divine:.2f} divine)"
-            text += "\n\nNo detailed explanation available for this price."
-
-            QMessageBox.information(self, "Price Explanation", text)
-            return
-
-        try:
-            explanation = PriceExplanation.from_json(explanation_json)
-            lines = explanation.to_summary_lines()
-
-            if not lines:
-                lines = ["No explanation details available."]
-
-            # Build header
-            item_name = row.get("item_name", "Unknown")
-            chaos = row.get("chaos_value", 0)
-            divine = row.get("divine_value", 0)
-
-            header = f"Item: {item_name}\n"
-            header += f"Price: {chaos:.1f}c"
-            if divine:
-                header += f" ({divine:.2f} divine)"
-            header += "\n" + "─" * 40 + "\n"
-
-            text = header + "\n".join(lines)
-
-            # Use a dialog with more room for text
-            dialog = QDialog(self)
-            dialog.setWindowTitle("Price Explanation")
-            dialog.setMinimumSize(450, 350)
-
-            layout = QVBoxLayout(dialog)
-
-            # Text display
-            from PyQt6.QtWidgets import QTextEdit
-            text_widget = QTextEdit()
-            text_widget.setReadOnly(True)
-            text_widget.setPlainText(text)
-            text_widget.setStyleSheet(f"background-color: {COLORS['background']}; color: {COLORS['text']};")
-            layout.addWidget(text_widget)
-
-            # Close button
-            close_btn = QPushButton("Close")
-            close_btn.clicked.connect(dialog.accept)
-            layout.addWidget(close_btn)
-
-            dialog.exec()
-
-        except Exception as e:
-            QMessageBox.information(
-                self, "Price Explanation",
-                f"Could not parse price explanation: {e}"
-            )
-
-    def _record_sale(self) -> None:
-        """Record a sale for the selected item."""
-        row = self.results_table.get_selected_row()
-        if not row:
-            return
-
-        from gui_qt.dialogs.record_sale_dialog import RecordSaleDialog
-
-        dialog = RecordSaleDialog(
-            self,
-            item_name=row.get("item_name", ""),
-            suggested_price=row.get("chaos_value", 0),
-        )
-
-        if dialog.exec() == QDialog.DialogCode.Accepted:
-            price, notes = dialog.get_values()
-            try:
-                self.ctx.db.record_sale(
-                    item_name=row.get("item_name", ""),
-                    chaos_value=price,
-                    source=row.get("source", ""),
-                    notes=notes,
-                )
-                self._set_status(f"Sale recorded: {row.get('item_name', '')} for {price}c")
-                self._toast_manager.success(f"Sale recorded: {price:.0f}c")
-            except Exception as e:
-                QMessageBox.critical(self, "Error", f"Failed to record sale: {e}")
 
     # -------------------------------------------------------------------------
     # Column Visibility
