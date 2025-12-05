@@ -59,7 +59,7 @@ from gui_qt.widgets.pinned_items_widget import PinnedItemsWidget
 from gui_qt.widgets.session_tabs import SessionTabWidget, SessionPanel
 from gui_qt.workers import RankingsPopulationWorker
 from gui_qt.services import get_window_manager, SystemTrayManager, get_history_manager
-from gui_qt.controllers import PriceCheckController, ThemeController
+from gui_qt.controllers import PriceCheckController, ThemeController, NavigationController
 from core.build_stat_calculator import BuildStats
 
 if TYPE_CHECKING:
@@ -112,6 +112,21 @@ class PriceCheckerWindow(QMainWindow):
 
         # System tray manager
         self._tray_manager: Optional[SystemTrayManager] = None
+
+        # Navigation controller for window/dialog management
+        self._nav_controller = NavigationController(
+            window_manager=self._window_manager,
+            ctx=ctx,
+            main_window=self,
+            character_manager=self._character_manager,
+            callbacks={
+                "on_pob_profile_selected": self._on_pob_profile_selected,
+                "on_pob_price_check": self._on_pob_price_check,
+                "on_loadout_selected": self._on_loadout_selected,
+                "on_ranking_price_check": self._on_ranking_price_check,
+                "on_reload_rare_evaluator": self._reload_rare_evaluator,
+            },
+        )
 
         # Setup UI
         self.setWindowTitle("PoE Price Checker")
@@ -1190,45 +1205,19 @@ class PriceCheckerWindow(QMainWindow):
 
     def _show_recent_sales(self) -> None:
         """Show recent sales window."""
-        from gui_qt.windows.recent_sales_window import RecentSalesWindow
-        self._window_manager.show_window("recent_sales", RecentSalesWindow, ctx=self.ctx)
+        self._nav_controller.show_recent_sales()
 
     def _show_sales_dashboard(self) -> None:
         """Show sales dashboard window."""
-        from gui_qt.windows.sales_dashboard_window import SalesDashboardWindow
-        self._window_manager.show_window("sales_dashboard", SalesDashboardWindow, ctx=self.ctx)
+        self._nav_controller.show_sales_dashboard()
 
     def _show_stash_viewer(self) -> None:
         """Show stash viewer window."""
-        from gui_qt.windows.stash_viewer_window import StashViewerWindow
-        self._window_manager.show_window("stash_viewer", StashViewerWindow, ctx=self.ctx)
+        self._nav_controller.show_stash_viewer()
 
     def _show_pob_characters(self) -> None:
         """Show PoB character manager window."""
-        from gui_qt.windows.pob_character_window import PoBCharacterWindow
-
-        if self._character_manager is None:
-            QMessageBox.warning(
-                self, "PoB Characters",
-                "Character manager not initialized."
-            )
-            return
-
-        # Register factory for complex initialization
-        if "pob_characters" not in self._window_manager._factories:
-            self._window_manager.register_factory(
-                "pob_characters",
-                lambda: PoBCharacterWindow(
-                    self._character_manager,
-                    self,
-                    on_profile_selected=self._on_pob_profile_selected,
-                    on_price_check=self._on_pob_price_check,
-                )
-            )
-
-        window = self._window_manager.show_window("pob_characters")
-        if window:
-            window.activateWindow()
+        self._nav_controller.show_pob_characters()
 
     def _on_pob_profile_selected(self, profile_name: str) -> None:
         """Handle PoB profile selection."""
@@ -1305,22 +1294,7 @@ class PriceCheckerWindow(QMainWindow):
 
     def _show_rare_eval_config(self) -> None:
         """Show rare evaluation config window."""
-        from gui_qt.windows.rare_eval_config_window import RareEvalConfigWindow
-
-        data_dir = Path(__file__).parent.parent / "data"
-
-        # Register factory for complex initialization
-        if "rare_eval_config" not in self._window_manager._factories:
-            self._window_manager.register_factory(
-                "rare_eval_config",
-                lambda: RareEvalConfigWindow(
-                    data_dir,
-                    self,
-                    on_save=self._reload_rare_evaluator,
-                )
-            )
-
-        self._window_manager.show_window("rare_eval_config")
+        self._nav_controller.show_rare_eval_config()
 
     def _reload_rare_evaluator(self) -> None:
         """Reload the rare item evaluator."""
@@ -1331,18 +1305,7 @@ class PriceCheckerWindow(QMainWindow):
 
     def _show_price_rankings(self) -> None:
         """Show price rankings window."""
-        from gui_qt.windows.price_rankings_window import PriceRankingsWindow
-
-        # Register factory for signal connection
-        if "price_rankings" not in self._window_manager._factories:
-            def create_price_rankings():
-                window = PriceRankingsWindow(ctx=self.ctx, parent=self)
-                window.priceCheckRequested.connect(self._on_ranking_price_check)
-                return window
-
-            self._window_manager.register_factory("price_rankings", create_price_rankings)
-
-        self._window_manager.show_window("price_rankings")
+        self._nav_controller.show_price_rankings()
 
     def _on_ranking_price_check(self, item_name: str) -> None:
         """Handle price check request from rankings window."""
@@ -1352,34 +1315,11 @@ class PriceCheckerWindow(QMainWindow):
 
     def _show_build_comparison(self) -> None:
         """Show build comparison dialog."""
-        from gui_qt.dialogs.build_comparison_dialog import BuildComparisonDialog
-
-        # Register factory for complex initialization
-        if "build_comparison" not in self._window_manager._factories:
-            self._window_manager.register_factory(
-                "build_comparison",
-                lambda: BuildComparisonDialog(
-                    self,
-                    character_manager=self._character_manager,
-                )
-            )
-
-        self._window_manager.show_window("build_comparison")
+        self._nav_controller.show_build_comparison()
 
     def _show_loadout_selector(self) -> None:
         """Show loadout selector dialog for browsing PoB loadouts."""
-        from gui_qt.dialogs.loadout_selector_dialog import LoadoutSelectorDialog
-
-        # Register factory for signal connection
-        if "loadout_selector" not in self._window_manager._factories:
-            def create_loadout_selector():
-                dialog = LoadoutSelectorDialog(self)
-                dialog.loadout_selected.connect(self._on_loadout_selected)
-                return dialog
-
-            self._window_manager.register_factory("loadout_selector", create_loadout_selector)
-
-        self._window_manager.show_window("loadout_selector")
+        self._nav_controller.show_loadout_selector()
 
     def _on_loadout_selected(self, config: dict) -> None:
         """Handle loadout selection from the selector dialog."""
@@ -1401,56 +1341,19 @@ class PriceCheckerWindow(QMainWindow):
 
     def _show_bis_search(self) -> None:
         """Show BiS item search dialog."""
-        from gui_qt.dialogs.bis_search_dialog import BiSSearchDialog
-
-        # Register factory for complex initialization
-        if "bis_search" not in self._window_manager._factories:
-            self._window_manager.register_factory(
-                "bis_search",
-                lambda: BiSSearchDialog(
-                    self,
-                    character_manager=self._character_manager,
-                )
-            )
-
-        self._window_manager.show_window("bis_search")
+        self._nav_controller.show_bis_search()
 
     def _show_upgrade_finder(self) -> None:
         """Show upgrade finder dialog."""
-        from gui_qt.dialogs.upgrade_finder_dialog import UpgradeFinderDialog
-
-        # Register factory for complex initialization
-        if "upgrade_finder" not in self._window_manager._factories:
-            self._window_manager.register_factory(
-                "upgrade_finder",
-                lambda: UpgradeFinderDialog(
-                    self,
-                    character_manager=self._character_manager,
-                )
-            )
-
-        self._window_manager.show_window("upgrade_finder")
+        self._nav_controller.show_upgrade_finder()
 
     def _show_build_library(self) -> None:
         """Show build library dialog."""
-        from gui_qt.dialogs.build_library_dialog import BuildLibraryDialog
-
-        # Register factory for complex initialization
-        if "build_library" not in self._window_manager._factories:
-            self._window_manager.register_factory(
-                "build_library",
-                lambda: BuildLibraryDialog(
-                    self,
-                    character_manager=self._character_manager,
-                )
-            )
-
-        self._window_manager.show_window("build_library")
+        self._nav_controller.show_build_library()
 
     def _show_item_comparison(self) -> None:
         """Show item comparison dialog."""
-        from gui_qt.dialogs.item_comparison_dialog import ItemComparisonDialog
-        self._window_manager.show_window("item_comparison", ItemComparisonDialog, ctx=self.ctx)
+        self._nav_controller.show_item_comparison()
 
     def _paste_sample(self, item_type: str) -> None:
         """Paste a sample item of the given type."""
