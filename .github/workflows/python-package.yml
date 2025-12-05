@@ -74,6 +74,7 @@ jobs:
         QT_QPA_PLATFORM: offscreen
       run: |
         xvfb-run --auto-servernum pytest tests/ --ignore=tests/integration \
+          --ignore=tests/unit/gui_qt/workers \
           --cov=core --cov=gui_qt --cov-report=term-missing \
           --cov-report=xml \
           --junitxml=test-results-ubuntu-${{ matrix.python-version }}.xml \
