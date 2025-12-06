@@ -284,15 +284,18 @@ class TestFindBuildsDialogSearch:
         mock_thread.start.assert_called_once()
 
     @patch('gui_qt.dialogs.find_builds_dialog.SCRAPERS_AVAILABLE', True)
-    def test_on_search_disables_search_button(self, qtbot):
+    @patch('gui_qt.dialogs.find_builds_dialog.ScraperThread')
+    def test_on_search_disables_search_button(self, mock_thread_class, qtbot):
         """Search disables search button during operation."""
         from gui_qt.dialogs.find_builds_dialog import FindBuildsDialog
+
+        mock_thread = MagicMock()
+        mock_thread_class.return_value = mock_thread
 
         dialog = FindBuildsDialog()
         qtbot.addWidget(dialog)
 
-        with patch.object(dialog, '_scraper_thread', MagicMock(isRunning=lambda: False)):
-            dialog._on_search()
+        dialog._on_search()
 
         assert dialog.search_btn.isEnabled() is False
 
@@ -320,9 +323,13 @@ class TestFindBuildsDialogSearch:
         assert dialog.progress.isHidden() is False
 
     @patch('gui_qt.dialogs.find_builds_dialog.SCRAPERS_AVAILABLE', True)
-    def test_on_search_clears_previous_results(self, qtbot):
+    @patch('gui_qt.dialogs.find_builds_dialog.ScraperThread')
+    def test_on_search_clears_previous_results(self, mock_thread_class, qtbot):
         """Search clears previous results."""
         from gui_qt.dialogs.find_builds_dialog import FindBuildsDialog
+
+        mock_thread = MagicMock()
+        mock_thread_class.return_value = mock_thread
 
         dialog = FindBuildsDialog()
         qtbot.addWidget(dialog)
@@ -330,8 +337,7 @@ class TestFindBuildsDialogSearch:
         # Add some items
         dialog.results_list.addItem("Previous result")
 
-        with patch.object(dialog, '_scraper_thread', MagicMock(isRunning=lambda: False)):
-            dialog._on_search()
+        dialog._on_search()
 
         assert dialog.results_list.count() == 0
 
