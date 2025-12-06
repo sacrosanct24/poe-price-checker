@@ -8,7 +8,7 @@ import time
 import pytest
 from pathlib import Path
 
-from core.item_parser import ItemParser, ParsedItem
+from core.item_parser import ItemParser
 from core.rare_item_evaluator import RareItemEvaluator
 
 
