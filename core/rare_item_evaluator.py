@@ -178,7 +178,8 @@ class RareItemEvaluator:
             if patterns_list:
                 compiled[affix_type] = patterns_list
         
-        logger.info(f"Pre-compiled {sum(len(v) for v in compiled.values())} regex patterns")
+        total_patterns = sum(len(patterns_list) for patterns_list in compiled.values())
+        logger.info(f"Pre-compiled {total_patterns} regex patterns")
         return compiled
 
     def _precompile_influence_patterns(self) -> Dict[str, List[Tuple[Pattern, str, int]]]:
