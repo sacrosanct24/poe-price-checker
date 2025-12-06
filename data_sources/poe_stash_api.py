@@ -240,6 +240,46 @@ class PoEStashClient:
 
         return self._get(self.STASH_URL, params)
 
+    def get_stash_tab_by_id(
+        self,
+        account_name: str,
+        league: str,
+        stash_id: str,
+        substash_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Get items from a stash tab using its ID (for substash access).
+
+        This uses the newer stash endpoint format that supports substash_id
+        for accessing nested tabs like UniqueStash categories.
+
+        Args:
+            account_name: PoE account name
+            league: League name
+            stash_id: The stash tab's public ID
+            substash_id: Optional substash ID for nested tabs
+
+        Returns:
+            Dict with stash data including items
+        """
+        # Try the character-window endpoint with stashId parameter
+        # This is an alternative to the tabIndex approach
+        params = {
+            "accountName": account_name,
+            "league": league,
+            "tabs": 0,
+            "stashId": stash_id,
+        }
+
+        if substash_id:
+            params["substashId"] = substash_id
+
+        try:
+            return self._get(self.STASH_URL, params)
+        except Exception as e:
+            logger.debug(f"get_stash_tab_by_id failed for {stash_id}/{substash_id}: {e}")
+            return {"items": []}
+
     def fetch_all_stashes(
         self,
         account_name: str,
@@ -317,14 +357,62 @@ class PoEStashClient:
                 }
 
                 if tab_type in specialized_types:
-                    # For specialized tabs, keep all items in parent - don't create children
-                    # The children metadata is just category info, not separate data stores
-                    logger.debug(
-                        f"  Specialized tab ({tab_type}): keeping {len(items)} items in parent, "
-                        f"ignoring {len(children_meta)} category children"
-                    )
-                    # Don't create children - they would be empty or have incorrectly
-                    # distributed items. All items stay in the parent tab.
+                    # For specialized tabs, the parent tab fetch often returns items.
+                    # But for UniqueStash specifically, items may not be returned.
+                    # Try fetching substabs if parent has no items.
+
+                    if tab_type == "UniqueStash" and len(items) == 0:
+                        # UniqueStash returned no items - try fetching each substab
+                        logger.info(
+                            f"  UniqueStash '{tab_name}' returned 0 items, "
+                            f"attempting substab fetch for {len(children_meta)} categories..."
+                        )
+
+                        substab_items = []
+                        for child_meta in children_meta:
+                            child_id = child_meta.get("id")
+                            child_name = child_meta.get("n", "Unknown")
+
+                            if child_id:
+                                # Try fetching by substash ID
+                                try:
+                                    child_data = self.get_stash_tab_by_id(
+                                        account_name, league, tab_id, child_id
+                                    )
+                                    child_items = child_data.get("items", [])
+                                    if child_items:
+                                        logger.info(
+                                            f"    -> Substab '{child_name}' ({child_id}): "
+                                            f"{len(child_items)} items!"
+                                        )
+                                        substab_items.extend(child_items)
+                                    else:
+                                        logger.debug(
+                                            f"    -> Substab '{child_name}': no items"
+                                        )
+                                except Exception as e:
+                                    logger.debug(
+                                        f"    -> Substab '{child_name}' fetch failed: {e}"
+                                    )
+
+                        if substab_items:
+                            logger.info(
+                                f"  UniqueStash substab fetch succeeded! "
+                                f"Found {len(substab_items)} items total."
+                            )
+                            items = substab_items
+                        else:
+                            logger.warning(
+                                f"  UniqueStash '{tab_name}': substab fetch returned no items. "
+                                f"This is a known GGG API limitation."
+                            )
+                    else:
+                        logger.debug(
+                            f"  Specialized tab ({tab_type}): {len(items)} items in parent, "
+                            f"ignoring {len(children_meta)} category children"
+                        )
+
+                    # Don't create children - all items stay in the parent tab.
 
                 else:
                     # For FolderStash, children are separate fetchable tabs
@@ -413,42 +501,189 @@ def get_available_leagues(include_standard: bool = False) -> List[str]:
 if __name__ == "__main__":
     import sys
 
-    logging.basicConfig(level=logging.INFO)
+    # Configure logging to show our module's logs
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format="%(levelname)s: %(message)s"
+    )
+    # Also enable our module's logger
+    logger.setLevel(logging.DEBUG)
 
-    if len(sys.argv) < 3:
-        print("Usage: python poe_stash_api.py <POESESSID> <account_name> [league]")
+    def print_usage():
+        print("Usage: python poe_stash_api.py <POESESSID> <account_name> [league] [--unique-test]")
+        print("\nModes:")
+        print("  Default:       Fetch first 5 stash tabs")
+        print("  --unique-test: Test UniqueStash substab fetching specifically")
         print("\nTo get your POESESSID:")
         print("1. Log into pathofexile.com")
         print("2. Press F12 -> Application -> Cookies")
         print("3. Copy the POESESSID value")
+        print("\nRate Limiting:")
+        print("  - 1.5s delay between requests (GGG's servers)")
+        print("  - 60s wait on 429 rate limit errors")
+
+    if len(sys.argv) < 3:
+        print_usage()
         sys.exit(1)
 
     poesessid = sys.argv[1]
     account_name = sys.argv[2]
-    league = sys.argv[3] if len(sys.argv) > 3 else "Standard"
+    league = "Standard"
+    unique_test = False
 
-    print(f"\nConnecting to PoE API...")
-    client = PoEStashClient(poesessid)
+    # Parse optional args
+    for arg in sys.argv[3:]:
+        if arg == "--unique-test":
+            unique_test = True
+        else:
+            league = arg
 
-    print(f"Verifying session...")
+    # Rate limit callback for user feedback
+    def on_rate_limit(wait_seconds: int, attempt: int):
+        print(f"\n⚠️  Rate limited! Waiting {wait_seconds}s (attempt {attempt})...")
+        print("   This is normal - GGG limits API requests.")
+
+    print(f"\n{'='*60}")
+    print("PoE Stash API Test")
+    print(f"{'='*60}")
+    print(f"Account: {account_name}")
+    print(f"League:  {league}")
+    print(f"Mode:    {'UniqueStash Test' if unique_test else 'General Test'}")
+    print(f"{'='*60}\n")
+
+    print("Connecting to PoE API...")
+    client = PoEStashClient(poesessid, rate_limit_callback=on_rate_limit)
+
+    print("Verifying session (1 request)...")
     if not client.verify_session():
-        print("ERROR: Invalid POESESSID - session verification failed")
+        print("❌ ERROR: Invalid POESESSID - session verification failed")
         sys.exit(1)
 
-    print(f"Session valid! Fetching stashes...")
+    print("✅ Session valid!\n")
 
-    # Fetch first 5 tabs as a test
-    snapshot = client.fetch_all_stashes(
-        account_name,
-        league,
-        max_tabs=5,
-        progress_callback=lambda cur, tot: print(f"  Tab {cur}/{tot}...")
-    )
+    if unique_test:
+        # Dedicated UniqueStash test
+        print("="*60)
+        print("UNIQUE STASH TAB TEST")
+        print("="*60)
+        print("\nStep 1: Fetching tab list (1 request)...")
 
-    print(f"\n=== Stash Summary ===")
-    print(f"Account: {snapshot.account_name}")
-    print(f"League: {snapshot.league}")
-    print(f"Total Items: {snapshot.total_items}")
-    print(f"\nTabs:")
-    for tab in snapshot.tabs:
-        print(f"  [{tab.index}] {tab.name} ({tab.type}): {tab.item_count} items")
+        tabs_meta = client.get_stash_tabs(account_name, league)
+        print(f"Found {len(tabs_meta)} tabs total.\n")
+
+        # Find UniqueStash tabs
+        unique_tabs = [
+            (i, t) for i, t in enumerate(tabs_meta)
+            if t.get("type") == "UniqueStash"
+        ]
+
+        if not unique_tabs:
+            print("❌ No UniqueStash tab found in this league.")
+            print("\nAvailable tab types:")
+            for i, t in enumerate(tabs_meta[:10]):
+                print(f"  [{i}] {t.get('n', 'Unknown')} ({t.get('type', 'Unknown')})")
+            sys.exit(1)
+
+        print(f"Found {len(unique_tabs)} UniqueStash tab(s):\n")
+
+        for tab_index, tab_meta in unique_tabs:
+            tab_name = tab_meta.get("n", "Unique Collection")
+            tab_id = tab_meta.get("id", "unknown")
+            children = tab_meta.get("children", [])
+
+            print(f"Tab [{tab_index}]: {tab_name}")
+            print(f"  ID: {tab_id}")
+            print(f"  Children/Categories: {len(children)}")
+
+            # Step 2: Try normal fetch
+            print(f"\nStep 2: Normal fetch via tabIndex={tab_index} (1 request)...")
+            try:
+                tab_data = client.get_stash_tab_items(account_name, league, tab_index)
+                items = tab_data.get("items", [])
+                print(f"  Result: {len(items)} items")
+
+                if items:
+                    print("  ✅ Normal fetch WORKS! Sample items:")
+                    for item in items[:5]:
+                        name = item.get("name") or item.get("typeLine", "Unknown")
+                        print(f"      - {name}")
+                else:
+                    print("  ⚠️  Normal fetch returned 0 items")
+            except Exception as e:
+                print(f"  ❌ Normal fetch failed: {e}")
+                items = []
+
+            # Step 3: Try substash fetch if normal failed
+            if not items and children:
+                print(f"\nStep 3: Trying substash fetch ({len(children)} substabs)...")
+                print("  Note: Each substab = 1 API request with 1.5s delay\n")
+
+                total_substab_items = 0
+                for j, child in enumerate(children):
+                    child_id = child.get("id")
+                    child_name = child.get("n", f"Category {j}")
+
+                    print(f"  [{j+1}/{len(children)}] Fetching '{child_name}'...", end=" ", flush=True)
+
+                    if child_id:
+                        try:
+                            child_data = client.get_stash_tab_by_id(
+                                account_name, league, tab_id, child_id
+                            )
+                            child_items = child_data.get("items", [])
+                            total_substab_items += len(child_items)
+
+                            if child_items:
+                                print(f"✅ {len(child_items)} items!")
+                                for item in child_items[:2]:
+                                    name = item.get("name") or item.get("typeLine", "Unknown")
+                                    print(f"        - {name}")
+                            else:
+                                print("0 items")
+                        except Exception as e:
+                            print(f"❌ Error: {e}")
+                    else:
+                        print("⚠️  No child ID available")
+
+                print(f"\n  Substab fetch complete: {total_substab_items} items total")
+
+                if total_substab_items > 0:
+                    print("\n✅ SUCCESS! Substab fetching WORKS for UniqueStash!")
+                else:
+                    print("\n❌ Substab fetch returned 0 items.")
+                    print("   This confirms the GGG API limitation.")
+                    print("   Items in UniqueStash cannot be retrieved via API.")
+
+            elif items:
+                print("\n✅ UniqueStash items fetched successfully via normal method!")
+
+            print()
+
+    else:
+        # General test - fetch first 5 tabs
+        print("Fetching first 5 stash tabs...")
+        print("(This will make ~6 API requests with 1.5s delays)\n")
+
+        snapshot = client.fetch_all_stashes(
+            account_name,
+            league,
+            max_tabs=5,
+            progress_callback=lambda cur, tot: print(f"  Tab {cur}/{tot}...")
+        )
+
+        print(f"\n{'='*60}")
+        print("STASH SUMMARY")
+        print(f"{'='*60}")
+        print(f"Account:     {snapshot.account_name}")
+        print(f"League:      {snapshot.league}")
+        print(f"Total Items: {snapshot.total_items}")
+        print(f"\nTabs:")
+        for tab in snapshot.tabs:
+            status = ""
+            if tab.type == "UniqueStash" and tab.item_count == 0:
+                status = " ⚠️  (known API limitation)"
+            print(f"  [{tab.index}] {tab.name} ({tab.type}): {tab.item_count} items{status}")
+
+    print(f"\n{'='*60}")
+    print("Test complete!")
+    print(f"{'='*60}")

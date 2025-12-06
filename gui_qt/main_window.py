@@ -65,6 +65,7 @@ from gui_qt.controllers import (
     ViewMenuController,
 )
 from gui_qt.controllers.ai_analysis_controller import AIAnalysisController
+from gui_qt.controllers.loot_tracking_controller import LootTrackingController
 from core.build_stat_calculator import BuildStats
 
 if TYPE_CHECKING:
@@ -143,6 +144,9 @@ class PriceCheckerWindow(QMainWindow):
 
         # View menu controller
         self._view_menu_controller: Optional[ViewMenuController] = None
+
+        # Loot tracking controller
+        self._loot_controller: Optional[LootTrackingController] = None
 
         # Setup UI
         self.setWindowTitle("PoE Price Checker")
@@ -299,6 +303,9 @@ class PriceCheckerWindow(QMainWindow):
                 MenuItem("Browse &Loadouts...", handler=self._show_loadout_selector),
                 MenuItem("Build &Library...", handler=self._show_build_library,
                          shortcut="Ctrl+Alt+B"),
+                MenuSection([
+                    MenuItem("&Import Local PoB Build...", handler=self._show_local_builds_import),
+                ]),
                 MenuItem("Find &BiS Item...", handler=self._show_bis_search,
                          shortcut="Ctrl+I"),
                 MenuItem("&Upgrade Finder...", handler=self._show_upgrade_finder,
@@ -314,6 +321,9 @@ class PriceCheckerWindow(QMainWindow):
                 MenuSection([
                     MenuItem("&Recent Sales", handler=self._show_recent_sales),
                     MenuItem("Sales &Dashboard", handler=self._show_sales_dashboard),
+                ]),
+                MenuSection([
+                    MenuItem("&Loot Tracking...", handler=self._show_loot_dashboard),
                 ]),
                 MenuSection([
                     MenuItem("Data &Sources Info", handler=self._show_data_sources),
@@ -896,6 +906,10 @@ class PriceCheckerWindow(QMainWindow):
             self._rankings_worker.quit()
             self._rankings_worker.wait(1000)
 
+        # Stop loot tracking
+        if self._loot_controller:
+            self._loot_controller.cleanup()
+
         # Close all managed windows
         self._window_manager.close_all()
 
@@ -986,6 +1000,24 @@ class PriceCheckerWindow(QMainWindow):
         """Show sales dashboard window."""
         self._nav_controller.show_sales_dashboard()
 
+    def _show_loot_dashboard(self) -> None:
+        """Show loot tracking dashboard window."""
+        # Lazily initialize loot tracking controller
+        if not self._loot_controller:
+            self._loot_controller = LootTrackingController(self.ctx, parent=self)
+            # Auto-start monitoring if configured
+            if self.ctx.config.loot_tracking_enabled:
+                self._loot_controller.start_monitoring()
+
+        from gui_qt.windows.loot_dashboard_window import LootDashboardWindow
+
+        self._window_manager.show_window(
+            "loot_dashboard",
+            LootDashboardWindow,
+            ctx=self.ctx,
+            controller=self._loot_controller,
+        )
+
     def _show_stash_viewer(self) -> None:
         """Show stash viewer window."""
         self._nav_controller.show_stash_viewer()
@@ -1069,6 +1101,25 @@ class PriceCheckerWindow(QMainWindow):
     def _show_build_library(self) -> None:
         """Show build library dialog."""
         self._nav_controller.show_build_library()
+
+    def _show_local_builds_import(self) -> None:
+        """Show dialog to import local PoB builds."""
+        from gui_qt.dialogs.local_builds_dialog import LocalBuildsDialog
+
+        dialog = LocalBuildsDialog(self)
+        dialog.build_imported.connect(self._on_local_build_imported)
+        dialog.exec()
+
+    def _on_local_build_imported(self, name: str, build_data: dict) -> None:
+        """Handle local build import completion."""
+        self._set_status(f"Imported build: {name}")
+
+        # Refresh PoB panel if it exists
+        if hasattr(self, 'pob_panel') and self.pob_panel:
+            self.pob_panel.refresh()
+
+        # Update the active profile in the controller
+        self._pob_controller.on_profile_selected(name, self._price_controller)
 
     def _show_item_comparison(self) -> None:
         """Show item comparison dialog."""

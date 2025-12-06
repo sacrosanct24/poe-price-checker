@@ -147,6 +147,21 @@ class Config:
             "max_response_tokens": 500,  # Max tokens in AI response
             "timeout_seconds": 30,  # Request timeout
         },
+        "loot_tracking": {
+            # Path to Client.txt (empty = auto-detect)
+            "client_txt_path": "",
+            # Auto-start session when entering a map
+            "auto_start_enabled": False,
+            # Tabs to track for loot (empty list = all tabs)
+            "tracked_tabs": [],
+            # Minimum chaos value to count as loot
+            "min_loot_value": 1.0,
+            # Show notification on high-value drops
+            "notify_high_value": True,
+            "high_value_threshold": 50.0,
+            # Polling interval for Client.txt in seconds
+            "poll_interval": 1.0,
+        },
     }
 
     def __init__(self, config_file: Optional[Path] = None) -> None:
@@ -879,6 +894,88 @@ class Config:
     def ai_build_name(self, value: str) -> None:
         """Set the player's build name."""
         self.data.setdefault("ai", {})["build_name"] = value.strip()
+        self.save()
+
+    # ------------------------------------------------------------------
+    # Loot Tracking
+    # ------------------------------------------------------------------
+
+    @property
+    def loot_tracking_enabled(self) -> bool:
+        """Check if loot tracking auto-start is enabled."""
+        return self.data.get("loot_tracking", {}).get("auto_start_enabled", False)
+
+    @loot_tracking_enabled.setter
+    def loot_tracking_enabled(self, value: bool) -> None:
+        """Enable/disable loot tracking auto-start."""
+        self.data.setdefault("loot_tracking", {})["auto_start_enabled"] = bool(value)
+        self.save()
+
+    @property
+    def loot_client_txt_path(self) -> str:
+        """Get the path to Client.txt for zone detection."""
+        return self.data.get("loot_tracking", {}).get("client_txt_path", "")
+
+    @loot_client_txt_path.setter
+    def loot_client_txt_path(self, value: str) -> None:
+        """Set the path to Client.txt."""
+        self.data.setdefault("loot_tracking", {})["client_txt_path"] = str(value).strip()
+        self.save()
+
+    @property
+    def loot_tracked_tabs(self) -> list:
+        """Get the list of tabs to track for loot (empty = all tabs)."""
+        return self.data.get("loot_tracking", {}).get("tracked_tabs", [])
+
+    @loot_tracked_tabs.setter
+    def loot_tracked_tabs(self, value: list) -> None:
+        """Set the list of tabs to track."""
+        self.data.setdefault("loot_tracking", {})["tracked_tabs"] = list(value)
+        self.save()
+
+    @property
+    def loot_min_value(self) -> float:
+        """Get the minimum chaos value to count as loot."""
+        return self.data.get("loot_tracking", {}).get("min_loot_value", 1.0)
+
+    @loot_min_value.setter
+    def loot_min_value(self, value: float) -> None:
+        """Set the minimum loot value threshold."""
+        self.data.setdefault("loot_tracking", {})["min_loot_value"] = max(0.0, float(value))
+        self.save()
+
+    @property
+    def loot_notify_high_value(self) -> bool:
+        """Check if high-value loot notifications are enabled."""
+        return self.data.get("loot_tracking", {}).get("notify_high_value", True)
+
+    @loot_notify_high_value.setter
+    def loot_notify_high_value(self, value: bool) -> None:
+        """Enable/disable high-value loot notifications."""
+        self.data.setdefault("loot_tracking", {})["notify_high_value"] = bool(value)
+        self.save()
+
+    @property
+    def loot_high_value_threshold(self) -> float:
+        """Get the chaos value threshold for high-value loot notifications."""
+        return self.data.get("loot_tracking", {}).get("high_value_threshold", 50.0)
+
+    @loot_high_value_threshold.setter
+    def loot_high_value_threshold(self, value: float) -> None:
+        """Set the high-value loot threshold."""
+        self.data.setdefault("loot_tracking", {})["high_value_threshold"] = max(0.0, float(value))
+        self.save()
+
+    @property
+    def loot_poll_interval(self) -> float:
+        """Get the Client.txt polling interval in seconds."""
+        return self.data.get("loot_tracking", {}).get("poll_interval", 1.0)
+
+    @loot_poll_interval.setter
+    def loot_poll_interval(self, value: float) -> None:
+        """Set the Client.txt polling interval (min 0.5s, max 5.0s)."""
+        clamped = max(0.5, min(5.0, float(value)))
+        self.data.setdefault("loot_tracking", {})["poll_interval"] = clamped
         self.save()
 
     # ------------------------------------------------------------------

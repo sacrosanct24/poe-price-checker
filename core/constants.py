@@ -157,3 +157,26 @@ POOL_MAXSIZE = 20
 
 # Retry status codes for connection errors
 RETRY_STATUS_CODES = frozenset({500, 502, 503, 504})
+
+
+# =============================================================================
+# Loot Tracking
+# =============================================================================
+
+# Client.txt polling interval (seconds)
+CLIENT_TXT_POLL_INTERVAL = 1.0
+
+# Stash snapshot cooldown to prevent spam (seconds)
+STASH_SNAPSHOT_COOLDOWN = 5.0
+
+# Default high-value loot notification threshold (chaos)
+LOOT_HIGH_VALUE_THRESHOLD = 50.0
+
+# Session auto-end timeout after inactivity (minutes)
+SESSION_IDLE_TIMEOUT_MINUTES = 30
+
+# Maximum drops to keep in memory per session before DB flush
+LOOT_MAX_DROPS_IN_MEMORY = 500
+
+# Minimum value to track as loot (chaos)
+LOOT_MIN_VALUE = 1.0

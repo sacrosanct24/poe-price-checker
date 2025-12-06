@@ -46,7 +46,7 @@ class Database:
     """
 
     # Current schema version. Increment if schema structure changes.
-    SCHEMA_VERSION = 4
+    SCHEMA_VERSION = 5
 
     def __init__(self, db_path: Optional[Path] = None):
         """
@@ -275,6 +275,61 @@ class Database:
 
                 CREATE INDEX IF NOT EXISTS idx_currency_rates_league_time
                 ON currency_rates (league, recorded_at DESC);
+
+                -- v5: Loot tracking tables
+                CREATE TABLE IF NOT EXISTS loot_sessions (
+                    id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    league TEXT NOT NULL,
+                    game_version TEXT NOT NULL DEFAULT 'poe1',
+                    started_at TIMESTAMP NOT NULL,
+                    ended_at TIMESTAMP,
+                    state TEXT NOT NULL DEFAULT 'idle',
+                    auto_detected BOOLEAN DEFAULT 0,
+                    notes TEXT,
+                    total_maps INTEGER DEFAULT 0,
+                    total_drops INTEGER DEFAULT 0,
+                    total_chaos_value REAL DEFAULT 0.0
+                );
+
+                CREATE TABLE IF NOT EXISTS loot_map_runs (
+                    id TEXT PRIMARY KEY,
+                    session_id TEXT NOT NULL REFERENCES loot_sessions(id) ON DELETE CASCADE,
+                    map_name TEXT NOT NULL,
+                    area_level INTEGER,
+                    started_at TIMESTAMP NOT NULL,
+                    ended_at TIMESTAMP,
+                    drop_count INTEGER DEFAULT 0,
+                    total_chaos_value REAL DEFAULT 0.0
+                );
+
+                CREATE TABLE IF NOT EXISTS loot_drops (
+                    id TEXT PRIMARY KEY,
+                    map_run_id TEXT NOT NULL REFERENCES loot_map_runs(id) ON DELETE CASCADE,
+                    session_id TEXT NOT NULL REFERENCES loot_sessions(id) ON DELETE CASCADE,
+                    item_name TEXT NOT NULL,
+                    item_base_type TEXT,
+                    stack_size INTEGER DEFAULT 1,
+                    chaos_value REAL DEFAULT 0.0,
+                    divine_value REAL DEFAULT 0.0,
+                    rarity TEXT,
+                    item_class TEXT,
+                    detected_at TIMESTAMP NOT NULL,
+                    source_tab TEXT,
+                    item_data_json TEXT
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_loot_sessions_league
+                ON loot_sessions (league, started_at DESC);
+
+                CREATE INDEX IF NOT EXISTS idx_loot_map_runs_session
+                ON loot_map_runs (session_id, started_at);
+
+                CREATE INDEX IF NOT EXISTS idx_loot_drops_session
+                ON loot_drops (session_id, detected_at DESC);
+
+                CREATE INDEX IF NOT EXISTS idx_loot_drops_value
+                ON loot_drops (chaos_value DESC);
                 """
             )
 
@@ -290,6 +345,9 @@ class Database:
             - Add `league`, `rarity`, `game_version` columns to `sales`.
             - Add `rarity`, `item_mods_json`, `build_profile` to `checked_items`.
             - Add `currency_rates` table for divine:chaos tracking.
+        v4 -> v5:
+            - Add `loot_sessions`, `loot_map_runs`, `loot_drops` tables.
+            - Add indexes for efficient loot tracking queries.
         """
         logger.info(f"Starting schema migration v{old} → v{new}")
 
@@ -402,6 +460,68 @@ class Database:
                     """
                     CREATE INDEX IF NOT EXISTS idx_currency_rates_league_time
                     ON currency_rates (league, recorded_at DESC);
+                    """
+                )
+
+            if old < 5 <= new:
+                logger.info(
+                    "Applying v5 migration: creating loot tracking tables."
+                )
+                conn.executescript(
+                    """
+                    CREATE TABLE IF NOT EXISTS loot_sessions (
+                        id TEXT PRIMARY KEY,
+                        name TEXT NOT NULL,
+                        league TEXT NOT NULL,
+                        game_version TEXT NOT NULL DEFAULT 'poe1',
+                        started_at TIMESTAMP NOT NULL,
+                        ended_at TIMESTAMP,
+                        state TEXT NOT NULL DEFAULT 'idle',
+                        auto_detected BOOLEAN DEFAULT 0,
+                        notes TEXT,
+                        total_maps INTEGER DEFAULT 0,
+                        total_drops INTEGER DEFAULT 0,
+                        total_chaos_value REAL DEFAULT 0.0
+                    );
+
+                    CREATE TABLE IF NOT EXISTS loot_map_runs (
+                        id TEXT PRIMARY KEY,
+                        session_id TEXT NOT NULL REFERENCES loot_sessions(id) ON DELETE CASCADE,
+                        map_name TEXT NOT NULL,
+                        area_level INTEGER,
+                        started_at TIMESTAMP NOT NULL,
+                        ended_at TIMESTAMP,
+                        drop_count INTEGER DEFAULT 0,
+                        total_chaos_value REAL DEFAULT 0.0
+                    );
+
+                    CREATE TABLE IF NOT EXISTS loot_drops (
+                        id TEXT PRIMARY KEY,
+                        map_run_id TEXT NOT NULL REFERENCES loot_map_runs(id) ON DELETE CASCADE,
+                        session_id TEXT NOT NULL REFERENCES loot_sessions(id) ON DELETE CASCADE,
+                        item_name TEXT NOT NULL,
+                        item_base_type TEXT,
+                        stack_size INTEGER DEFAULT 1,
+                        chaos_value REAL DEFAULT 0.0,
+                        divine_value REAL DEFAULT 0.0,
+                        rarity TEXT,
+                        item_class TEXT,
+                        detected_at TIMESTAMP NOT NULL,
+                        source_tab TEXT,
+                        item_data_json TEXT
+                    );
+
+                    CREATE INDEX IF NOT EXISTS idx_loot_sessions_league
+                    ON loot_sessions (league, started_at DESC);
+
+                    CREATE INDEX IF NOT EXISTS idx_loot_map_runs_session
+                    ON loot_map_runs (session_id, started_at);
+
+                    CREATE INDEX IF NOT EXISTS idx_loot_drops_session
+                    ON loot_drops (session_id, detected_at DESC);
+
+                    CREATE INDEX IF NOT EXISTS idx_loot_drops_value
+                    ON loot_drops (chaos_value DESC);
                     """
                 )
 

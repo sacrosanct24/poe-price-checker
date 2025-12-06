@@ -3,14 +3,18 @@ AI prompt builder for item analysis.
 
 Constructs prompts for AI providers with item and price context.
 Supports template-based prompts that can be customized without code changes.
+Includes build context from PoB for upgrade evaluation.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, TYPE_CHECKING
 import logging
+
+if TYPE_CHECKING:
+    from core.build_summarizer import BuildSummary
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +30,7 @@ FALLBACK_PROMPT = """Analyze this Path of Exile item and provide a brief assessm
 PLAYER CONTEXT:
 - League: {league}
 - Current build: {build_name}
+{build_context}
 
 ITEM:
 {item_text}
@@ -40,6 +45,29 @@ Provide a concise analysis (3-5 paragraphs) covering:
 - Price fairness in {league} league
 - Notable strengths or weaknesses"""
 
+# Upgrade advisor prompt template
+UPGRADE_ADVISOR_PROMPT = """You are analyzing gear upgrades for a Path of Exile build.
+
+BUILD SUMMARY:
+{build_context}
+
+CURRENT EQUIPPED ITEM ({slot}):
+{current_item}
+
+CANDIDATE ITEM:
+{item_text}
+
+PRICE:
+{price_context}
+
+Analyze whether this item is an upgrade:
+1. Compare key stats (life, ES, resistances, damage mods)
+2. Identify what the player would gain and lose
+3. Evaluate if the price is worth the upgrade
+4. Provide a clear recommendation: UPGRADE, SIDEGRADE, or SKIP
+
+Be concise and practical. Focus on stats that matter for this build type."""
+
 
 @dataclass
 class PromptContext:
@@ -51,6 +79,9 @@ class PromptContext:
         parsed_item: Optional parsed item data for additional context.
         league: Current league name (e.g., "Settlers", "Standard").
         build_name: Player's current build name for context.
+        build_summary: Optional BuildSummary from PoB for detailed build context.
+        slot: Optional equipment slot for upgrade comparison.
+        current_item_text: Optional current equipped item text for comparison.
     """
 
     item_text: str
@@ -58,6 +89,9 @@ class PromptContext:
     parsed_item: Optional[Any] = None
     league: str = ""
     build_name: str = ""
+    build_summary: Optional["BuildSummary"] = None
+    slot: str = ""
+    current_item_text: str = ""
 
 
 class AIPromptBuilder:
@@ -147,6 +181,63 @@ class AIPromptBuilder:
 
         return "\n".join(lines)
 
+    def _format_build_context(
+        self,
+        build_summary: Optional["BuildSummary"],
+        compact: bool = False,
+    ) -> str:
+        """Format build summary into AI context.
+
+        Args:
+            build_summary: Optional BuildSummary from PoB.
+            compact: If True, use compact format; otherwise use full markdown.
+
+        Returns:
+            Formatted build context string.
+        """
+        if not build_summary:
+            return ""
+
+        if compact:
+            return f"\n- Build details: {build_summary.to_compact_context()}"
+
+        # Include relevant parts of the build summary
+        lines = []
+        lines.append(f"\n--- Build Details ---")
+        lines.append(f"Class: {build_summary.ascendancy or build_summary.class_name}")
+        lines.append(f"Level: {build_summary.level}")
+        lines.append(f"Main Skill: {build_summary.main_skill}")
+
+        if build_summary.playstyle or build_summary.damage_type:
+            lines.append(f"Type: {build_summary.playstyle} / {build_summary.damage_type}")
+
+        # Key defenses
+        defenses = []
+        if build_summary.life:
+            defenses.append(f"Life: {build_summary.life:,}")
+        if build_summary.energy_shield:
+            defenses.append(f"ES: {build_summary.energy_shield:,}")
+        if defenses:
+            lines.append(f"Defenses: {' | '.join(defenses)}")
+
+        # Resistances
+        lines.append(
+            f"Resistances: Fire {build_summary.fire_res}% / "
+            f"Cold {build_summary.cold_res}% / "
+            f"Lightning {build_summary.lightning_res}% / "
+            f"Chaos {build_summary.chaos_res}%"
+        )
+
+        # DPS if available
+        if build_summary.total_dps:
+            lines.append(f"DPS: {build_summary.total_dps:,.0f}")
+
+        # Upgrade priorities
+        if build_summary.upgrade_priorities:
+            lines.append(f"Upgrade priorities: {', '.join(build_summary.upgrade_priorities[:3])}")
+
+        return "\n".join(lines)
+
     def build_item_analysis_prompt(
         self,
         context: PromptContext,
@@ -172,12 +263,16 @@ class AIPromptBuilder:
         # Format price context
         price_context = self._format_price_context(context.price_results)
 
+        # Format build context
+        build_context = self._format_build_context(context.build_summary)
+
         # Build substitution dict with all placeholders
         substitutions = {
             "item_text": context.item_text.strip(),
             "price_context": price_context,
             "league": context.league or "unknown league",
             "build_name": context.build_name or "unspecified build",
+            "build_context": build_context,
         }
 
         # Substitute placeholders
@@ -189,9 +284,48 @@ class AIPromptBuilder:
             prompt = template.format(
                 item_text=substitutions["item_text"],
                 price_context=substitutions["price_context"],
+                build_context=substitutions.get("build_context", ""),
             )
 
         return prompt
+
+    def build_upgrade_prompt(
+        self,
+        context: PromptContext,
+        custom_template: Optional[str] = None,
+    ) -> str:
+        """Build a prompt for upgrade comparison analysis.
+
+        Args:
+            context: The prompt context with item, build summary, and current gear.
+            custom_template: Optional custom template string.
+
+        Returns:
+            Formatted upgrade advisor prompt.
+        """
+        template = custom_template or UPGRADE_ADVISOR_PROMPT
+
+        # Format contexts
+        price_context = self._format_price_context(context.price_results)
+
+        # For upgrade prompts, use full build markdown
+        build_context = ""
+        if context.build_summary:
+            build_context = context.build_summary.to_markdown()
+
+        substitutions = {
+            "item_text": context.item_text.strip(),
+            "price_context": price_context,
+            "build_context": build_context or "No build data available",
+            "slot": context.slot or "Unknown slot",
+            "current_item": context.current_item_text or "(No current item)",
+        }
+
+        try:
+            return template.format(**substitutions)
+        except KeyError as e:
+            logger.warning(f"Unknown placeholder in upgrade template: {e}")
+            return template
 
     def get_system_prompt(self) -> str:
         """Get the system prompt for AI context.
