@@ -73,6 +73,11 @@ claude.md
 data/characters.json
 data/repoe_cache/
 
+# Economy historical data (large CSV files)
+data/economy/
+*.currency.csv
+*.items.csv
+
 # Dev test files
 test_pob_workflow.py
 # Generated acceptance test reports

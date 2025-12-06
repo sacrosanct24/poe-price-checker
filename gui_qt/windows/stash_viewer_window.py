@@ -50,7 +50,9 @@ from core.stash_valuator import (
     PricedItem,
     PriceSource,
 )
-from data_sources.poe_stash_api import PoEStashClient, get_available_leagues
+from core.stash_storage import get_stash_storage, StashStorageService
+from core.stash_diff_engine import StashDiffEngine, StashDiff
+from data_sources.poe_stash_api import PoEStashClient, StashSnapshot, get_available_leagues
 
 if TYPE_CHECKING:
     from core.app_context import AppContext
@@ -62,7 +64,7 @@ class FetchWorker(QThread):
     """Background worker for fetching and valuating stash."""
 
     progress = pyqtSignal(int, int, str)  # current, total, message
-    finished = pyqtSignal(object)  # ValuationResult or Exception
+    finished = pyqtSignal(object, object)  # (ValuationResult, StashSnapshot)
     error = pyqtSignal(str)
     rate_limited = pyqtSignal(int, int)  # wait_seconds, attempt
 
@@ -125,7 +127,8 @@ class FetchWorker(QThread):
 
             result = valuator.valuate_snapshot(snapshot, progress_callback=val_progress)
 
-            self.finished.emit(result)
+            # Emit both result and snapshot for storage
+            self.finished.emit(result, snapshot)
 
         except Exception as e:
             logger.exception("Stash fetch failed")
@@ -388,7 +391,14 @@ class StashViewerWindow(QDialog):
         self.ctx = ctx
         self._worker: Optional[FetchWorker] = None
         self._result: Optional[ValuationResult] = None
+        self._current_snapshot: Optional[StashSnapshot] = None
         self._ai_configured_callback: Optional[Callable[[], bool]] = None
+
+        # Storage service for persistence
+        self._storage: StashStorageService = get_stash_storage(ctx.db)
+
+        # Diff engine for detecting changes
+        self._diff_engine = StashDiffEngine()
 
         # Context menu manager for item actions
         self._context_menu_manager = ItemContextMenuManager(self)
@@ -409,6 +419,7 @@ class StashViewerWindow(QDialog):
 
         self._create_widgets()
         self._load_settings()
+        self._load_cached_stash()
 
     def set_ai_configured_callback(self, callback: Callable[[], bool]) -> None:
         """Set callback to check if AI is configured.
@@ -589,6 +600,47 @@ class StashViewerWindow(QDialog):
         last_fetch = self.ctx.config.stash_last_fetch
         if last_fetch:
             self.last_fetch_label.setText(f"Last fetched: {last_fetch}")
+
+    def _load_cached_stash(self) -> None:
+        """Load the most recent cached stash snapshot on startup."""
+        if not self.ctx.config.account_name:
+            return
+
+        league = self.league_combo.currentText()
+        if not league:
+            return
+
+        try:
+            stored = self._storage.load_latest_snapshot(
+                self.ctx.config.account_name,
+                league,
+            )
+
+            if stored:
+                # Reconstruct valuation result
+                result = self._storage.reconstruct_valuation(stored)
+                if result:
+                    self._result = result
+                    self._display_valuation_result(result)
+
+                    # Also reconstruct snapshot for diff engine
+                    snapshot = self._storage.reconstruct_snapshot(stored)
+                    if snapshot:
+                        self._current_snapshot = snapshot
+                        self._diff_engine.set_before_snapshot(snapshot)
+
+                    # Update last fetch display
+                    fetch_time = stored.fetched_at.strftime("%Y-%m-%d %H:%M")
+                    self.last_fetch_label.setText(f"Last fetched: {fetch_time} (cached)")
+                    self.status_label.setText("Loaded from cache - click Refresh to update")
+
+                    logger.info(
+                        f"Loaded cached stash: {stored.total_items} items, "
+                        f"{stored.total_chaos_value:.0f}c"
+                    )
+
+        except Exception as e:
+            logger.warning(f"Failed to load cached stash: {e}")
 
     def _update_league_combo(self) -> None:
         """Update league combo based on include_standard checkbox."""
@@ -771,18 +823,57 @@ class StashViewerWindow(QDialog):
             f"(attempt {attempt}/3)..."
         )
 
-    def _on_fetch_complete(self, result: ValuationResult) -> None:
-        """Handle fetch completion."""
+    def _on_fetch_complete(
+        self,
+        result: ValuationResult,
+        snapshot: StashSnapshot,
+    ) -> None:
+        """Handle fetch completion - save to storage and display."""
         self._result = result
         self.refresh_btn.setEnabled(True)
         self.grid_view_btn.setEnabled(True)  # Enable grid view
         self.progress_bar.hide()
-        self.status_label.setText("")
+
+        # Compute diff if we have a previous snapshot
+        diff: Optional[StashDiff] = None
+        if self._diff_engine.has_before_snapshot:
+            diff = self._diff_engine.compute_diff(snapshot)
+            if diff.has_changes:
+                self.status_label.setText(f"Changes: {diff.get_summary()}")
+                logger.info(f"Stash diff: {diff.get_summary()}")
+            else:
+                self.status_label.setText("No changes since last fetch")
+        else:
+            self.status_label.setText("")
+
+        # Update current snapshot and diff engine
+        self._current_snapshot = snapshot
+        self._diff_engine.set_before_snapshot(snapshot)
+
+        # Save to storage
+        try:
+            self._storage.save_snapshot(snapshot, result)
+            # Clean up old snapshots (keep last 5)
+            self._storage.delete_old_snapshots(
+                snapshot.account_name,
+                snapshot.league,
+                keep_count=5,
+            )
+        except Exception as e:
+            logger.error(f"Failed to save stash snapshot: {e}")
 
         # Update last fetch time
         now = datetime.now().strftime("%Y-%m-%d %H:%M")
         self.ctx.config.stash_last_fetch = now
         self.last_fetch_label.setText(f"Last fetched: {now}")
+
+        # Display the result
+        self._display_valuation_result(result)
+
+    def _display_valuation_result(self, result: ValuationResult) -> None:
+        """Display a valuation result in the UI."""
+        # Enable grid view if we have data
+        self.grid_view_btn.setEnabled(True)
 
         # Update totals
         self.total_label.setText(f"Total: {result.display_total}")

@@ -363,6 +363,7 @@ class PriceCheckerWindow(QMainWindow):
             on_toggle_theme=self._toggle_theme,
             on_set_accent=self._set_accent_color,
             on_toggle_column=self._toggle_column,
+            on_collect_economy=self._collect_economy_snapshot,
             parent=self,
             logger=self.logger,
         )
@@ -1021,6 +1022,28 @@ class PriceCheckerWindow(QMainWindow):
     def _show_stash_viewer(self) -> None:
         """Show stash viewer window."""
         self._nav_controller.show_stash_viewer()
+
+    def _collect_economy_snapshot(self) -> None:
+        """Collect economy snapshot from poe.ninja for current league."""
+        from core.league_economy_history import LeagueEconomyService
+
+        league = self.ctx.config.get("league", "Keepers")
+        self._set_status(f"Collecting economy snapshot for {league}...")
+
+        try:
+            service = LeagueEconomyService(self.ctx.db)
+            snapshot = service.fetch_and_store_snapshot(league)
+
+            if snapshot:
+                self._set_status(
+                    f"Economy snapshot saved: {league} - "
+                    f"Divine={snapshot.divine_to_chaos:.0f}c"
+                )
+            else:
+                self._set_status(f"No economy data available for {league}")
+        except Exception as e:
+            self.logger.error(f"Failed to collect economy snapshot: {e}")
+            self._set_status(f"Error collecting snapshot: {e}")
 
     def _show_pob_characters(self) -> None:
         """Show PoB character manager window."""

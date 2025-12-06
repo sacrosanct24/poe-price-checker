@@ -46,7 +46,7 @@ class Database:
     """
 
     # Current schema version. Increment if schema structure changes.
-    SCHEMA_VERSION = 5
+    SCHEMA_VERSION = 7
 
     def __init__(self, db_path: Optional[Path] = None):
         """
@@ -330,6 +330,74 @@ class Database:
 
                 CREATE INDEX IF NOT EXISTS idx_loot_drops_value
                 ON loot_drops (chaos_value DESC);
+
+                -- v6: Stash snapshot storage for persistence
+                CREATE TABLE IF NOT EXISTS stash_snapshots (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    account_name TEXT NOT NULL,
+                    league TEXT NOT NULL,
+                    game_version TEXT NOT NULL DEFAULT 'poe1',
+                    total_items INTEGER DEFAULT 0,
+                    priced_items INTEGER DEFAULT 0,
+                    total_chaos_value REAL DEFAULT 0.0,
+                    snapshot_json TEXT,
+                    valuation_json TEXT,
+                    fetched_at TIMESTAMP NOT NULL
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_stash_snapshots_account_league
+                ON stash_snapshots (account_name, league, fetched_at DESC);
+
+                -- v7: League economy history tables
+                CREATE TABLE IF NOT EXISTS league_economy_rates (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    league TEXT NOT NULL,
+                    currency_name TEXT NOT NULL,
+                    rate_date TEXT NOT NULL,
+                    chaos_value REAL NOT NULL
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_league_economy_rates_lookup
+                ON league_economy_rates (league, currency_name, rate_date);
+
+                CREATE TABLE IF NOT EXISTS league_economy_items (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    league TEXT NOT NULL,
+                    item_name TEXT NOT NULL,
+                    base_type TEXT,
+                    item_type TEXT,
+                    rate_date TEXT NOT NULL,
+                    chaos_value REAL NOT NULL
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_league_economy_items_lookup
+                ON league_economy_items (league, rate_date, chaos_value DESC);
+
+                CREATE TABLE IF NOT EXISTS league_economy_snapshots (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    league TEXT NOT NULL,
+                    milestone TEXT NOT NULL,
+                    snapshot_date TEXT NOT NULL,
+                    divine_to_chaos REAL NOT NULL,
+                    exalt_to_chaos REAL
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_league_economy_snapshots_league
+                ON league_economy_snapshots (league, milestone);
+
+                CREATE TABLE IF NOT EXISTS league_economy_top_uniques (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    snapshot_id INTEGER NOT NULL
+                        REFERENCES league_economy_snapshots(id) ON DELETE CASCADE,
+                    item_name TEXT NOT NULL,
+                    base_type TEXT,
+                    chaos_value REAL NOT NULL,
+                    divine_value REAL,
+                    rank INTEGER NOT NULL
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_league_economy_top_uniques_snapshot
+                ON league_economy_top_uniques (snapshot_id, rank);
                 """
             )
 
@@ -348,6 +416,14 @@ class Database:
         v4 -> v5:
             - Add `loot_sessions`, `loot_map_runs`, `loot_drops` tables.
             - Add indexes for efficient loot tracking queries.
+        v5 -> v6:
+            - Add `stash_snapshots` table for persistent stash storage.
+            - Stores raw snapshots + valuation results as JSON.
+        v6 -> v7:
+            - Add `league_economy_rates` for historical currency rates.
+            - Add `league_economy_items` for historical item prices.
+            - Add `league_economy_snapshots` for milestone snapshots.
+            - Add `league_economy_top_uniques` for top uniques per snapshot.
         """
         logger.info(f"Starting schema migration v{old} → v{new}")
 
@@ -522,6 +598,88 @@ class Database:
 
                     CREATE INDEX IF NOT EXISTS idx_loot_drops_value
                     ON loot_drops (chaos_value DESC);
+                    """
+                )
+
+            if old < 6 <= new:
+                logger.info(
+                    "Applying v6 migration: creating stash_snapshots table."
+                )
+                conn.executescript(
+                    """
+                    CREATE TABLE IF NOT EXISTS stash_snapshots (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        account_name TEXT NOT NULL,
+                        league TEXT NOT NULL,
+                        game_version TEXT NOT NULL DEFAULT 'poe1',
+                        total_items INTEGER DEFAULT 0,
+                        priced_items INTEGER DEFAULT 0,
+                        total_chaos_value REAL DEFAULT 0.0,
+                        snapshot_json TEXT,
+                        valuation_json TEXT,
+                        fetched_at TIMESTAMP NOT NULL
+                    );
+
+                    CREATE INDEX IF NOT EXISTS idx_stash_snapshots_account_league
+                    ON stash_snapshots (account_name, league, fetched_at DESC);
+                    """
+                )
+
+            if old < 7 <= new:
+                logger.info(
+                    "Applying v7 migration: creating league economy history tables."
+                )
+                conn.executescript(
+                    """
+                    CREATE TABLE IF NOT EXISTS league_economy_rates (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        league TEXT NOT NULL,
+                        currency_name TEXT NOT NULL,
+                        rate_date TEXT NOT NULL,
+                        chaos_value REAL NOT NULL
+                    );
+
+                    CREATE INDEX IF NOT EXISTS idx_league_economy_rates_lookup
+                    ON league_economy_rates (league, currency_name, rate_date);
+
+                    CREATE TABLE IF NOT EXISTS league_economy_items (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        league TEXT NOT NULL,
+                        item_name TEXT NOT NULL,
+                        base_type TEXT,
+                        item_type TEXT,
+                        rate_date TEXT NOT NULL,
+                        chaos_value REAL NOT NULL
+                    );
+
+                    CREATE INDEX IF NOT EXISTS idx_league_economy_items_lookup
+                    ON league_economy_items (league, rate_date, chaos_value DESC);
+
+                    CREATE TABLE IF NOT EXISTS league_economy_snapshots (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        league TEXT NOT NULL,
+                        milestone TEXT NOT NULL,
+                        snapshot_date TEXT NOT NULL,
+                        divine_to_chaos REAL NOT NULL,
+                        exalt_to_chaos REAL
+                    );
+
+                    CREATE INDEX IF NOT EXISTS idx_league_economy_snapshots_league
+                    ON league_economy_snapshots (league, milestone);
+
+                    CREATE TABLE IF NOT EXISTS league_economy_top_uniques (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        snapshot_id INTEGER NOT NULL
+                            REFERENCES league_economy_snapshots(id) ON DELETE CASCADE,
+                        item_name TEXT NOT NULL,
+                        base_type TEXT,
+                        chaos_value REAL NOT NULL,
+                        divine_value REAL,
+                        rank INTEGER NOT NULL
+                    );
+
+                    CREATE INDEX IF NOT EXISTS idx_league_economy_top_uniques_snapshot
+                    ON league_economy_top_uniques (snapshot_id, rank);
                     """
                 )
 
