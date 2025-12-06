@@ -76,8 +76,20 @@
 ### AI Item Analysis *(New in v1.5.0)*
 - **Ask AI about any item** via right-click context menu
 - Supports **Google Gemini** (free tier available), **Claude**, and **OpenAI**
-- Get detailed explanations of item value, mod synergies, and build recommendations
+- **Build-aware analysis** - AI knows your PoB build context when evaluating items
+- Get detailed explanations of item value, mod synergies, and upgrade recommendations
 - API keys encrypted and stored securely on your machine
+
+### Local PoB Build Import *(New)*
+- **Import builds directly** from your local Path of Building installation
+- Auto-detects PoB Builds folder, or browse to custom location
+- Generate build summaries for AI context (stats, resistances, DPS, upgrade priorities)
+
+### Loot Tracking *(New)*
+- **Zone detection** from Client.txt (map entry/exit)
+- **Stash diffing** to detect new items between map runs
+- Session management with duration, drop counts, and chaos/hour stats
+- Loot Dashboard with live analytics
 
 ### Modern Interface
 - Dark theme with PoE-style colors

@@ -19,9 +19,6 @@ review_frequency: quarterly
 - [PoE API Reference](POE_API_REFERENCE.md) - Official trade API docs
 - [PoE.Watch API Reference](POEWATCH_API_REFERENCE.md) - Alternative pricing API
 
-### Project Planning
-- [Roadmap](roadmap.md) - Future features and plans
-
 ---
 
 ## 🎮 Features & User Guides
@@ -67,20 +64,15 @@ review_frequency: quarterly
 
 ### Setup & Architecture
 - **[Development Guide](development/DEVELOPMENT_GUIDE.md)** ⭐ - Core architecture and practices
-- [Context](development/Context.md) - Design decisions and rationale
-- [Code Review](development/code_review.md) - Code quality notes
 
 ### Data Integration
 - **[Cargo API Guide](development/CARGO_API_GUIDE.md)** - PoE Wiki Cargo API for mod/item data
 - **[Data Sources Guide](development/DATA_SOURCES_GUIDE.md)** - Authoritative data source reference
 
-### Roadmaps
-- **[PoB Build-Aware Integration](roadmap_pob_integration.md)** - 6-phase integration plan
-
 ### Plugin System
 - [Plugin Specification](development/PLUGIN_SPEC.md) - How to create plugins
 
-### Stash Scanner (Future)
+### Stash Scanner
 - [Stash Scanner Setup](development/STASH_SCANNER_SETUP.md) - Setup instructions
 - [Stash Scanner Checklist](development/STASH_SCANNER_CHECKLIST.md) - Implementation checklist
 
@@ -132,19 +124,18 @@ review_frequency: quarterly
 
 ```
 docs/
-├── INDEX.md (this file)
-├── DOCS_MANIFEST.md (documentation registry)
-├── RARE_ITEM_VALUATION.md ⭐⭐⭐ (Essential reference)
-├── POE_API_REFERENCE.md
-├── POEWATCH_API_REFERENCE.md
-├── roadmap.md
+├── INDEX.md                    # This file
+├── DOCS_MANIFEST.md            # Documentation registry
+├── RARE_ITEM_VALUATION.md      # Essential rare item reference ⭐
+├── POE_API_REFERENCE.md        # Official trade API
+├── POEWATCH_API_REFERENCE.md   # Alternative pricing API
 │
-├── development/       # Dev guides & architecture
-├── features/          # User guides
-├── integration/       # External service integrations
-├── mcp/              # AI assistant integration
-├── testing/          # Test documentation
-└── troubleshooting/  # Problem solving
+├── development/                # Dev guides & architecture
+├── features/                   # User guides
+├── integration/                # External service integrations
+├── mcp/                        # AI assistant integration
+├── testing/                    # Test documentation
+└── troubleshooting/            # Problem solving
 ```
 
 ---
