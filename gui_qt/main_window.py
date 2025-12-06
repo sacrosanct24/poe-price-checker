@@ -120,6 +120,7 @@ class PriceCheckerWindow(QMainWindow):
         self._tray_controller: Optional[TrayController] = None
 
         # Navigation controller for window/dialog management
+        # Note: AI callbacks added after UI is created via _register_ai_callbacks
         self._nav_controller = NavigationController(
             window_manager=self._window_manager,
             ctx=ctx,
@@ -404,6 +405,7 @@ class PriceCheckerWindow(QMainWindow):
         from gui_qt.widgets.pob_panel import PoBPanel
         self.pob_panel = PoBPanel(self._pob_controller.character_manager, parent=self)
         self.pob_panel.price_check_requested.connect(self._on_pob_price_check)
+        self.pob_panel.ai_analysis_requested.connect(self._on_ai_analysis_requested)
         # Update build stats when profile changes
         self.pob_panel.profile_combo.currentTextChanged.connect(
             self._on_pob_profile_changed
@@ -418,6 +420,8 @@ class PriceCheckerWindow(QMainWindow):
 
         self.pinned_items_widget = PinnedItemsWidget()
         self.pinned_items_widget.item_inspected.connect(self._on_pinned_item_inspected)
+        self.pinned_items_widget.ai_analysis_requested.connect(self._on_ai_analysis_requested)
+        self.pinned_items_widget.price_check_requested.connect(self._on_pob_price_check)
         pinned_layout.addWidget(self.pinned_items_widget)
         left_splitter.addWidget(pinned_group)
 
@@ -520,6 +524,24 @@ class PriceCheckerWindow(QMainWindow):
                 on_toast_success=self._toast_manager.success,
                 on_toast_error=self._toast_manager.error,
             )
+
+        # Register AI callbacks with navigation controller for child windows
+        self._nav_controller.set_callback("ai_configured", self._is_ai_configured)
+        self._nav_controller.set_callback("on_ai_analysis", self._on_ai_analysis_requested)
+        self._nav_controller.set_callback("on_price_check", self._on_pob_price_check)
+
+        # Set AI configured callback for PoB panel and pinned items
+        self.pob_panel.set_ai_configured_callback(self._is_ai_configured)
+        # Pinned items widget uses the context menu manager set during creation
+        from gui_qt.widgets.item_context_menu import ItemContextMenuManager
+        pinned_menu_manager = ItemContextMenuManager(self.pinned_items_widget)
+        pinned_menu_manager.set_ai_configured_callback(self._is_ai_configured)
+        pinned_menu_manager.ai_analysis_requested.connect(self._on_ai_analysis_requested)
+        pinned_menu_manager.price_check_requested.connect(self._on_pob_price_check)
+        pinned_menu_manager.inspect_requested.connect(
+            lambda ctx: self._on_pinned_item_inspected({"item_name": ctx.item_name, "_item": ctx.parsed_item})
+        )
+        self.pinned_items_widget.set_context_menu_manager(pinned_menu_manager)
 
     def _update_ai_controller_panel(self) -> None:
         """Update AI controller with the current session's panel."""

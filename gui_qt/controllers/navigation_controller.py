@@ -73,7 +73,22 @@ class NavigationController:
     def show_recent_sales(self) -> None:
         """Show recent sales window."""
         from gui_qt.windows.recent_sales_window import RecentSalesWindow
-        self._wm.show_window("recent_sales", RecentSalesWindow, ctx=self._ctx)
+
+        if "recent_sales" not in self._wm._factories:
+            def create_recent_sales():
+                window = RecentSalesWindow(ctx=self._ctx, parent=self._main_window)
+                # Wire up AI callbacks
+                if "ai_configured" in self._callbacks:
+                    window.set_ai_configured_callback(self._callbacks["ai_configured"])
+                if "on_ai_analysis" in self._callbacks:
+                    window.ai_analysis_requested.connect(self._callbacks["on_ai_analysis"])
+                if "on_price_check" in self._callbacks:
+                    window.price_check_requested.connect(self._callbacks["on_price_check"])
+                return window
+
+            self._wm.register_factory("recent_sales", create_recent_sales)
+
+        self._wm.show_window("recent_sales")
 
     def show_sales_dashboard(self) -> None:
         """Show sales dashboard window."""
@@ -91,6 +106,11 @@ class NavigationController:
                     window.priceCheckRequested.connect(
                         self._callbacks["on_ranking_price_check"]
                     )
+                # Wire up AI callbacks
+                if "ai_configured" in self._callbacks:
+                    window.set_ai_configured_callback(self._callbacks["ai_configured"])
+                if "on_ai_analysis" in self._callbacks:
+                    window.ai_analysis_requested.connect(self._callbacks["on_ai_analysis"])
                 return window
 
             self._wm.register_factory("price_rankings", create_price_rankings)
@@ -238,7 +258,20 @@ class NavigationController:
     def show_stash_viewer(self) -> None:
         """Show stash viewer window."""
         from gui_qt.windows.stash_viewer_window import StashViewerWindow
-        self._wm.show_window("stash_viewer", StashViewerWindow, ctx=self._ctx)
+
+        if "stash_viewer" not in self._wm._factories:
+            def create_stash_viewer():
+                window = StashViewerWindow(ctx=self._ctx, parent=self._main_window)
+                # Wire up AI callbacks
+                if "ai_configured" in self._callbacks:
+                    window.set_ai_configured_callback(self._callbacks["ai_configured"])
+                if "on_ai_analysis" in self._callbacks:
+                    window.ai_analysis_requested.connect(self._callbacks["on_ai_analysis"])
+                return window
+
+            self._wm.register_factory("stash_viewer", create_stash_viewer)
+
+        self._wm.show_window("stash_viewer")
 
 
 def get_navigation_controller(
