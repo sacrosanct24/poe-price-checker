@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
+from functools import lru_cache
 from typing import Dict, List, Optional, Tuple
 
 from core.item_parser import ParsedItem
@@ -445,15 +446,29 @@ class PriceIntegrator:
         "prismatic ring": "Ring", "unset ring": "Ring",
     }
 
-    def _get_item_class_from_base(self, base_type: str) -> str:
-        """Infer item class from base type name."""
+    @staticmethod
+    @lru_cache(maxsize=256)
+    def _get_item_class_from_base_cached(base_type: str, base_type_map_tuple: tuple) -> str:
+        """
+        Cached version of item class inference from base type.
+        
+        Args:
+            base_type: Base type name
+            base_type_map_tuple: Tuple of BASE_TYPE_TO_CLASS items for caching
+        
+        Returns:
+            Item class string
+        """
         if not base_type:
             return ""
+        
+        # Convert tuple back to dict for lookup
+        base_type_to_class = dict(base_type_map_tuple)
         base_lower = base_type.lower()
 
         # Try exact match first
-        if base_lower in self.BASE_TYPE_TO_CLASS:
-            return self.BASE_TYPE_TO_CLASS[base_lower]
+        if base_lower in base_type_to_class:
+            return base_type_to_class[base_lower]
 
         # Pattern-based inference
         if any(word in base_lower for word in ["regalia", "plate", "garb", "vest", "robe", "mail", "coat"]):
@@ -492,6 +507,12 @@ class PriceIntegrator:
             return "Staff"
 
         return ""
+
+    def _get_item_class_from_base(self, base_type: str) -> str:
+        """Infer item class from base type name (cached wrapper)."""
+        # Convert dict to tuple for hashability in lru_cache
+        base_type_map_tuple = tuple(self.BASE_TYPE_TO_CLASS.items())
+        return self._get_item_class_from_base_cached(base_type, base_type_map_tuple)
 
     def check_upgrade(
         self,

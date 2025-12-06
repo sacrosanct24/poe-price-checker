@@ -12,8 +12,9 @@ This module evaluates rare items by:
 import json
 import logging
 import re
+from functools import lru_cache
 from pathlib import Path
-from typing import List, Dict, Optional, Tuple, Any
+from typing import List, Dict, Optional, Tuple, Any, Pattern
 from dataclasses import dataclass, field
 from core.item_parser import ParsedItem
 from core.build_archetype import (
@@ -121,6 +122,100 @@ class RareItemEvaluator:
         # Phase 2: Build archetypes and meta integration
         self.build_archetypes = self._load_build_archetypes()
         self.meta_weights = self._load_meta_weights()
+        
+        # Performance optimization: Pre-compile all regex patterns
+        self._compiled_patterns = self._precompile_patterns()
+        self._compiled_influence_patterns = self._precompile_influence_patterns()
+
+    def _precompile_patterns(self) -> Dict[str, List[Tuple[Pattern, str, str, int]]]:
+        """
+        Pre-compile all regex patterns for affix matching.
+        
+        Returns:
+            Dict mapping affix_type to list of (compiled_pattern, original_pattern, tier, weight)
+        """
+        compiled = {}
+        
+        for affix_type, affix_data in self.valuable_affixes.items():
+            if affix_type.startswith("_"):
+                continue
+            
+            patterns_list = []
+            
+            # Pre-compile patterns for all tiers
+            for tier_name in ["tier1", "tier2", "tier3"]:
+                tier_patterns = affix_data.get(tier_name, [])
+                if not tier_patterns:
+                    continue
+                
+                weight = affix_data.get(
+                    f"{tier_name}_weight", 
+                    affix_data.get("weight", 5)
+                )
+                
+                for pattern in tier_patterns:
+                    # Convert pattern to regex (same logic as before)
+                    regex_pattern = pattern.replace("#", "__NUMBER__")
+                    regex_pattern = re.escape(regex_pattern)
+                    regex_pattern = regex_pattern.replace(
+                        "__NUMBER__", r"(\d+(?:\.\d+)?)"
+                    )
+                    
+                    # Compile once and store
+                    try:
+                        compiled_regex = re.compile(regex_pattern, re.IGNORECASE)
+                        patterns_list.append((
+                            compiled_regex,
+                            pattern,
+                            tier_name,
+                            weight
+                        ))
+                    except re.error as e:
+                        logger.warning(
+                            f"Failed to compile pattern '{pattern}' for {affix_type}: {e}"
+                        )
+            
+            if patterns_list:
+                compiled[affix_type] = patterns_list
+        
+        total_patterns = sum(len(patterns_list) for patterns_list in compiled.values())
+        logger.info(f"Pre-compiled {total_patterns} regex patterns")
+        return compiled
+
+    def _precompile_influence_patterns(self) -> Dict[str, List[Tuple[Pattern, str, int]]]:
+        """
+        Pre-compile regex patterns for influence mods.
+        
+        Returns:
+            Dict mapping influence name to list of (compiled_pattern, original_pattern, weight)
+        """
+        compiled = {}
+        
+        for influence, influence_data in self.influence_mods.items():
+            high_value_mods = influence_data.get("high_value", [])
+            weight = influence_data.get("weight", 10)
+            
+            patterns_list = []
+            for pattern in high_value_mods:
+                # Convert pattern to regex
+                regex_pattern = pattern.replace("#", "__NUMBER__")
+                regex_pattern = re.escape(regex_pattern)
+                regex_pattern = regex_pattern.replace(
+                    "__NUMBER__", r"(\d+(?:\.\d+)?)"
+                )
+                
+                try:
+                    compiled_regex = re.compile(regex_pattern, re.IGNORECASE)
+                    patterns_list.append((compiled_regex, pattern, weight))
+                except re.error as e:
+                    logger.warning(
+                        f"Failed to compile influence pattern '{pattern}' for {influence}: {e}"
+                    )
+            
+            if patterns_list:
+                compiled[influence] = patterns_list
+        
+        return compiled
 
     def _load_valuable_affixes(self) -> Dict:
         """Load valuable affixes configuration."""
@@ -385,65 +480,53 @@ class RareItemEvaluator:
             influence_matches = self._match_influence_mods(item)
             matches.extend(influence_matches)
 
-        # Then check regular affixes
+        # Then check regular affixes using pre-compiled patterns
         for mod_text in item.explicits:
-            for affix_type, affix_data in self.valuable_affixes.items():
-                if affix_type.startswith("_"):
-                    continue
+            matched_this_mod = False
+            
+            # Iterate through pre-compiled patterns
+            for affix_type, patterns_list in self._compiled_patterns.items():
+                if matched_this_mod:
+                    break
+                
+                affix_data = self.valuable_affixes.get(affix_type, {})
+                min_value = affix_data.get("min_value", 0)
+                
+                for compiled_regex, original_pattern, tier_name, base_weight in patterns_list:
+                    # Use pre-compiled regex - no compilation overhead
+                    match = compiled_regex.search(mod_text)
+                    if match:
+                        # Extract value
+                        value = None
+                        if match.groups():
+                            try:
+                                value = float(match.group(1))
+                            except (ValueError, IndexError):
+                                value = None
 
-                # Try each tier (T1, T2, T3)
-                for tier_name in ["tier1", "tier2", "tier3"]:
-                    tier_patterns = affix_data.get(tier_name, [])
-                    if not tier_patterns:
-                        continue
+                        # Determine actual tier based on value ranges
+                        actual_tier = self._determine_tier_from_value(
+                            affix_type, affix_data, value
+                        )
 
-                    weight = affix_data.get(
-                        f"{tier_name}_weight", affix_data.get(
-                            "weight", 5))
-                    min_value = affix_data.get("min_value", 0)
+                        # Get weight for actual tier
+                        tier_weight = affix_data.get(
+                            f"{actual_tier}_weight", base_weight
+                        )
 
-                    for pattern in tier_patterns:
-                        # Convert pattern to regex
-                        regex_pattern = pattern.replace("#", "__NUMBER__")
-                        regex_pattern = re.escape(regex_pattern)
-                        regex_pattern = regex_pattern.replace(
-                            "__NUMBER__", r"(\d+(?:\.\d+)?)")
-
-                        match = re.search(
-                            regex_pattern, mod_text, re.IGNORECASE)
-                        if match:
-                            # Extract value
-                            value = None
-                            if match.groups():
-                                try:
-                                    value = float(match.group(1))
-                                except (ValueError, IndexError):
-                                    value = None
-
-                            # Determine actual tier based on value ranges
-                            actual_tier = self._determine_tier_from_value(
-                                affix_type, affix_data, value
-                            )
-
-                            # Get weight for actual tier
-                            tier_weight = affix_data.get(
-                                f"{actual_tier}_weight", weight)
-
-                            # Check minimum value requirement
-                            if value and value >= min_value:
-                                matches.append(AffixMatch(
-                                    affix_type=affix_type,
-                                    pattern=pattern,
-                                    mod_text=mod_text,
-                                    value=value,
-                                    weight=tier_weight,
-                                    tier=actual_tier,
-                                    is_influence_mod=False
-                                ))
-                                break  # Only match once per mod
-
-                    if matches and matches[-1].mod_text == mod_text:
-                        break  # Already matched this mod, don't check lower tiers
+                        # Check minimum value requirement
+                        if value is None or value >= min_value:
+                            matches.append(AffixMatch(
+                                affix_type=affix_type,
+                                pattern=original_pattern,
+                                mod_text=mod_text,
+                                value=value,
+                                weight=tier_weight,
+                                tier=actual_tier,
+                                is_influence_mod=False
+                            ))
+                            matched_this_mod = True
+                            break  # Only match once per mod
 
         return matches
 
@@ -480,7 +563,7 @@ class RareItemEvaluator:
 
     def _match_influence_mods(self, item: ParsedItem) -> List[AffixMatch]:
         """
-        Match influence-specific high-value mods.
+        Match influence-specific high-value mods using pre-compiled patterns.
 
         Returns:
             List of AffixMatch objects for influence mods
@@ -489,29 +572,24 @@ class RareItemEvaluator:
 
         for influence in item.influences:
             influence_lower = influence.lower()
-            influence_data = self.influence_mods.get(influence_lower, {})
-            high_value_mods = influence_data.get("high_value", [])
-            weight = influence_data.get("weight", 10)
-
+            
+            # Use pre-compiled patterns
+            patterns_list = self._compiled_influence_patterns.get(influence_lower, [])
+            
             for mod_text in item.explicits:
-                for pattern in high_value_mods:
-                    # Convert pattern to regex
-                    regex_pattern = pattern.replace("#", "__NUMBER__")
-                    regex_pattern = re.escape(regex_pattern)
-                    regex_pattern = regex_pattern.replace(
-                        "__NUMBER__", r"(\d+(?:\.\d+)?)")
-
-                    if re.search(regex_pattern, mod_text, re.IGNORECASE):
+                for compiled_regex, original_pattern, weight in patterns_list:
+                    # Use pre-compiled regex - no compilation overhead
+                    if compiled_regex.search(mod_text):
                         matches.append(AffixMatch(
                             affix_type=f"{influence_lower}_mod",
-                            pattern=pattern,
+                            pattern=original_pattern,
                             mod_text=mod_text,
                             value=None,
                             weight=weight,
                             tier="influence",
                             is_influence_mod=True
                         ))
-                        break
+                        break  # Only match once per mod
 
         return matches
 
@@ -614,17 +692,15 @@ class RareItemEvaluator:
 
         return found_flags, total_penalty
 
-    def _determine_item_slot(self, item: ParsedItem) -> Optional[str]:
+    @lru_cache(maxsize=256)
+    def _determine_slot_from_base_type(self, base_type: str) -> Optional[str]:
         """
-        Determine what slot the item goes in based on base type.
-
+        Determine item slot from base type string (cached for performance).
+        
         Returns:
             "boots", "helmet", "gloves", "body_armour", "belt", "ring", "amulet", or None
         """
-        if not item.base_type:
-            return None
-
-        base_lower = item.base_type.lower()
+        base_lower = base_type.lower()
 
         # Check common patterns
         if "boots" in base_lower or "greaves" in base_lower:
@@ -643,6 +719,18 @@ class RareItemEvaluator:
             return "amulet"
 
         return None
+
+    def _determine_item_slot(self, item: ParsedItem) -> Optional[str]:
+        """
+        Determine what slot the item goes in based on base type.
+
+        Returns:
+            "boots", "helmet", "gloves", "body_armour", "belt", "ring", "amulet", or None
+        """
+        if not item.base_type:
+            return None
+
+        return self._determine_slot_from_base_type(item.base_type)
 
     def _check_slot_rules(
         self, item: ParsedItem, matches: List[AffixMatch]
