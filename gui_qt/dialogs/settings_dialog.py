@@ -9,6 +9,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Optional
 
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QGuiApplication
 from PyQt6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -20,6 +21,7 @@ from PyQt6.QtWidgets import (
     QLineEdit,
     QPlainTextEdit,
     QPushButton,
+    QScrollArea,
     QSlider,
     QSpinBox,
     QTabWidget,
@@ -46,13 +48,14 @@ class SettingsDialog(QDialog):
 
         self.setWindowTitle("Settings")
         self.setMinimumWidth(500)
-        self.setMinimumHeight(500)
-        self.resize(550, 550)
+        self.setMinimumHeight(550)
+        self.resize(550, 700)
         self.setSizeGripEnabled(True)
         apply_window_icon(self)
 
         self._create_widgets()
         self._load_settings()
+        self._center_on_screen()
 
     def _create_widgets(self) -> None:
         """Create dialog widgets."""
@@ -600,11 +603,12 @@ class SettingsDialog(QDialog):
         timeout_row = QHBoxLayout()
         timeout_row.addWidget(QLabel("Request timeout:"))
         self._ai_timeout_spin = QSpinBox()
-        self._ai_timeout_spin.setRange(10, 120)
+        self._ai_timeout_spin.setRange(10, 300)
         self._ai_timeout_spin.setSuffix(" seconds")
         self._ai_timeout_spin.setToolTip(
             "How long to wait for AI response.\n"
-            "Increase for slower connections"
+            "Local models (Ollama) need 120-300s for large models.\n"
+            "Cloud APIs typically respond in 10-30s."
         )
         timeout_row.addWidget(self._ai_timeout_spin)
         timeout_row.addStretch()
@@ -825,3 +829,13 @@ class SettingsDialog(QDialog):
         self._config.ai_custom_prompt = self._ai_prompt_edit.toPlainText()
 
         self.accept()
+
+    def _center_on_screen(self) -> None:
+        """Center the dialog on the screen."""
+        screen = QGuiApplication.primaryScreen()
+        if screen:
+            screen_geometry = screen.availableGeometry()
+            dialog_geometry = self.frameGeometry()
+            center_point = screen_geometry.center()
+            dialog_geometry.moveCenter(center_point)
+            self.move(dialog_geometry.topLeft())

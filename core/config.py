@@ -851,13 +851,18 @@ class Config:
 
     @property
     def ai_timeout(self) -> int:
-        """AI request timeout in seconds (10-120)."""
-        return self.data.get("ai", {}).get("timeout_seconds", 30)
+        """AI request timeout in seconds (10-300).
+
+        Default is 30s for cloud providers, but Ollama (local) uses 180s
+        since large models like deepseek-r1:70b need time to load and generate.
+        """
+        default = 180 if self.ai_provider == "ollama" else 30
+        return self.data.get("ai", {}).get("timeout_seconds", default)
 
     @ai_timeout.setter
     def ai_timeout(self, value: int) -> None:
-        """Set AI timeout with guardrails."""
-        self.data.setdefault("ai", {})["timeout_seconds"] = max(10, min(120, int(value)))
+        """Set AI timeout with guardrails (10-300s, higher for local models)."""
+        self.data.setdefault("ai", {})["timeout_seconds"] = max(10, min(300, int(value)))
         self.save()
 
     def has_ai_configured(self) -> bool:
