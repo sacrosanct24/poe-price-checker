@@ -54,13 +54,15 @@ class AIAnalysisWorker(BaseThreadWorker):
         custom_prompt: str = "",
         build_summary: Optional["BuildSummary"] = None,
         raw_prompt: bool = False,
+        ollama_host: str = "",
+        ollama_model: str = "",
         parent: Optional[Any] = None,
     ):
         """Initialize the AI analysis worker.
 
         Args:
-            provider: AI provider name (gemini, claude, openai).
-            api_key: API key for the provider.
+            provider: AI provider name (gemini, claude, openai, groq, ollama).
+            api_key: API key for the provider (not needed for ollama).
             item_text: The raw item text to analyze (or complete prompt if raw_prompt=True).
             price_results: List of price check results for context.
             timeout: Request timeout in seconds.
@@ -70,6 +72,8 @@ class AIAnalysisWorker(BaseThreadWorker):
             custom_prompt: Optional custom prompt template.
             build_summary: Optional BuildSummary for detailed build context.
             raw_prompt: If True, use item_text directly as the prompt without wrapping.
+            ollama_host: Ollama server URL (for ollama provider).
+            ollama_model: Ollama model name (for ollama provider).
             parent: Optional parent QObject.
         """
         super().__init__(parent)
@@ -84,6 +88,8 @@ class AIAnalysisWorker(BaseThreadWorker):
         self._custom_prompt = custom_prompt
         self._build_summary = build_summary
         self._raw_prompt = raw_prompt
+        self._ollama_host = ollama_host
+        self._ollama_model = ollama_model
         self._prompt_builder = AIPromptBuilder()
 
     def _execute(self) -> AIResponse:
@@ -107,6 +113,8 @@ class AIAnalysisWorker(BaseThreadWorker):
             api_key=self._api_key,
             timeout=self._timeout,
             max_tokens=self._max_tokens,
+            ollama_host=self._ollama_host,
+            ollama_model=self._ollama_model,
         )
 
         if not client:

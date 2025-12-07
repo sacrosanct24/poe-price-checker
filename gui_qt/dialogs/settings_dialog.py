@@ -428,7 +428,7 @@ class SettingsDialog(QDialog):
 
         self._ai_provider_combo.setToolTip(
             "Select the AI provider to use for item analysis.\n"
-            "You must provide your own API key."
+            "Cloud providers require API keys. Ollama runs locally."
         )
         self._ai_provider_combo.currentIndexChanged.connect(self._on_ai_provider_changed)
         provider_row.addWidget(self._ai_provider_combo)
@@ -439,6 +439,7 @@ class SettingsDialog(QDialog):
 
         # API Keys group
         keys_group = QGroupBox("API Keys")
+        self._keys_group = keys_group
         keys_layout = QVBoxLayout(keys_group)
         keys_layout.setSpacing(12)
 
@@ -457,7 +458,7 @@ class SettingsDialog(QDialog):
         self._gemini_key_edit = QLineEdit()
         self._gemini_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
         self._gemini_key_edit.setPlaceholderText("Enter Gemini API key")
-        self._gemini_key_edit.setToolTip("Get a free key from Google AI Studio")
+        self._gemini_key_edit.setToolTip("Get a free key from ai.google.dev")
         gemini_row.addWidget(self._gemini_key_edit)
         keys_layout.addLayout(gemini_row)
 
@@ -485,7 +486,67 @@ class SettingsDialog(QDialog):
         openai_row.addWidget(self._openai_key_edit)
         keys_layout.addLayout(openai_row)
 
+        # Groq API key
+        groq_row = QHBoxLayout()
+        groq_label = QLabel("Groq:")
+        groq_label.setMinimumWidth(70)
+        groq_row.addWidget(groq_label)
+        self._groq_key_edit = QLineEdit()
+        self._groq_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
+        self._groq_key_edit.setPlaceholderText("Enter Groq API key (free tier available)")
+        self._groq_key_edit.setToolTip("Get a free key from console.groq.com")
+        groq_row.addWidget(self._groq_key_edit)
+        keys_layout.addLayout(groq_row)
+
         layout.addWidget(keys_group)
+
+        # Ollama Settings group (local LLM)
+        ollama_group = QGroupBox("Ollama Settings (Local LLM)")
+        self._ollama_group = ollama_group
+        ollama_layout = QVBoxLayout(ollama_group)
+        ollama_layout.setSpacing(8)
+
+        ollama_info = QLabel(
+            "Ollama runs LLMs locally - no API key needed.\n"
+            "Install from ollama.ai, then: ollama pull llama3.1:8b"
+        )
+        ollama_info.setStyleSheet("color: gray; font-size: 11px;")
+        ollama_layout.addWidget(ollama_info)
+
+        # Ollama host
+        host_row = QHBoxLayout()
+        host_label = QLabel("Host:")
+        host_label.setMinimumWidth(70)
+        host_row.addWidget(host_label)
+        self._ollama_host_edit = QLineEdit()
+        self._ollama_host_edit.setPlaceholderText("http://localhost:11434")
+        self._ollama_host_edit.setToolTip("Ollama server URL (default: http://localhost:11434)")
+        host_row.addWidget(self._ollama_host_edit)
+        ollama_layout.addLayout(host_row)
+
+        # Ollama model
+        model_row = QHBoxLayout()
+        model_label = QLabel("Model:")
+        model_label.setMinimumWidth(70)
+        model_row.addWidget(model_label)
+        self._ollama_model_combo = QComboBox()
+        self._ollama_model_combo.setEditable(True)
+        self._ollama_model_combo.addItems([
+            "llama3.1:8b",
+            "llama3.1:70b",
+            "mistral:7b",
+            "phi3:medium",
+            "qwen2.5:14b",
+            "gemma2:9b",
+        ])
+        self._ollama_model_combo.setToolTip(
+            "Select or type an Ollama model name.\n"
+            "Ensure the model is pulled: ollama pull <model>"
+        )
+        model_row.addWidget(self._ollama_model_combo)
+        ollama_layout.addLayout(model_row)
+
+        layout.addWidget(ollama_group)
 
         # Build Context group
         context_group = QGroupBox("Context")
@@ -660,6 +721,18 @@ class SettingsDialog(QDialog):
             self._claude_key_edit.setText("••••••••••••••••")
         if self._config.get_ai_api_key("openai"):
             self._openai_key_edit.setText("••••••••••••••••")
+        if self._config.get_ai_api_key("groq"):
+            self._groq_key_edit.setText("••••••••••••••••")
+
+        # Ollama settings
+        ollama_host = getattr(self._config, "ollama_host", "")
+        self._ollama_host_edit.setText(ollama_host)
+        ollama_model = getattr(self._config, "ollama_model", "llama3.1:8b")
+        idx = self._ollama_model_combo.findText(ollama_model)
+        if idx >= 0:
+            self._ollama_model_combo.setCurrentIndex(idx)
+        else:
+            self._ollama_model_combo.setCurrentText(ollama_model)
 
         self._ai_max_tokens_spin.setValue(self._config.ai_max_tokens)
         self._ai_timeout_spin.setValue(self._config.ai_timeout)
@@ -733,6 +806,14 @@ class SettingsDialog(QDialog):
         openai_key = self._openai_key_edit.text()
         if openai_key and openai_key != "••••••••••••••••":
             self._config.set_ai_api_key("openai", openai_key)
+
+        groq_key = self._groq_key_edit.text()
+        if groq_key and groq_key != "••••••••••••••••":
+            self._config.set_ai_api_key("groq", groq_key)
+
+        # Ollama settings
+        self._config.ollama_host = self._ollama_host_edit.text().strip()
+        self._config.ollama_model = self._ollama_model_combo.currentText().strip()
 
         self._config.ai_max_tokens = self._ai_max_tokens_spin.value()
         self._config.ai_timeout = self._ai_timeout_spin.value()

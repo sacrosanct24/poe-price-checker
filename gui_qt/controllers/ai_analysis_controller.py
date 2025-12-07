@@ -186,6 +186,8 @@ class AIAnalysisController:
         league = self._config.league
         build_name = self._config.ai_build_name
         custom_prompt = self._config.ai_custom_prompt
+        ollama_host = self._config.ollama_host
+        ollama_model = self._config.ollama_model
 
         # Show loading state
         self._panel.show_loading(provider)
@@ -204,6 +206,8 @@ class AIAnalysisController:
             league=league,
             build_name=build_name,
             custom_prompt=custom_prompt,
+            ollama_host=ollama_host,
+            ollama_model=ollama_model,
         )
 
         # Connect signals
@@ -266,6 +270,8 @@ class AIAnalysisController:
         timeout = self._config.ai_timeout
         max_tokens = self._config.ai_max_tokens
         league = self._config.league
+        ollama_host = self._config.ollama_host
+        ollama_model = self._config.ollama_model
 
         # Show loading state
         self._panel.show_loading(provider)
@@ -321,6 +327,8 @@ class AIAnalysisController:
                 build_name=profile.name,
                 custom_prompt="",
                 raw_prompt=True,  # Use the upgrade prompt directly without wrapping
+                ollama_host=ollama_host,
+                ollama_model=ollama_model,
             )
 
             # Connect signals

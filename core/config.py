@@ -804,7 +804,7 @@ class Config:
     @ai_provider.setter
     def ai_provider(self, value: str) -> None:
         """Set the AI provider and persist."""
-        valid_providers = ("", "gemini", "claude", "openai")
+        valid_providers = ("", "gemini", "claude", "openai", "groq", "ollama")
         if value.lower() not in valid_providers:
             value = ""
         self.data.setdefault("ai", {})["provider"] = value.lower()
@@ -861,11 +861,36 @@ class Config:
         self.save()
 
     def has_ai_configured(self) -> bool:
-        """Check if AI is configured (provider set and has API key)."""
+        """Check if AI is configured (provider set and has API key or is local)."""
         provider = self.ai_provider
         if not provider:
             return False
+        # Ollama is local - no API key needed
+        if provider == "ollama":
+            return True
         return bool(self.get_ai_api_key(provider))
+
+    @property
+    def ollama_host(self) -> str:
+        """Get the Ollama server host URL."""
+        return self.data.get("ai", {}).get("ollama_host", "http://localhost:11434")
+
+    @ollama_host.setter
+    def ollama_host(self, value: str) -> None:
+        """Set the Ollama server host URL."""
+        self.data.setdefault("ai", {})["ollama_host"] = value.strip() or "http://localhost:11434"
+        self.save()
+
+    @property
+    def ollama_model(self) -> str:
+        """Get the Ollama model to use."""
+        return self.data.get("ai", {}).get("ollama_model", "llama3.1:8b")
+
+    @ollama_model.setter
+    def ollama_model(self, value: str) -> None:
+        """Set the Ollama model to use."""
+        self.data.setdefault("ai", {})["ollama_model"] = value.strip() or "llama3.1:8b"
+        self.save()
 
     @property
     def ai_custom_prompt(self) -> str:

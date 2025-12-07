@@ -23,17 +23,21 @@ from data_sources.ai.base_ai_client import BaseAIClient, AIResponse
 from data_sources.ai.gemini_client import GeminiClient
 from data_sources.ai.claude_client import ClaudeClient
 from data_sources.ai.openai_client import OpenAIClient
+from data_sources.ai.groq_client import GroqClient
+from data_sources.ai.ollama_client import OllamaClient
 
 logger = logging.getLogger(__name__)
 
 # Supported provider names
-AIProvider = Literal["gemini", "claude", "openai"]
+AIProvider = Literal["gemini", "claude", "openai", "groq", "ollama"]
 
 # Provider name to client class mapping
 _PROVIDER_CLASSES: dict[str, type[BaseAIClient]] = {
     "gemini": GeminiClient,
     "claude": ClaudeClient,
     "openai": OpenAIClient,
+    "groq": GroqClient,
+    "ollama": OllamaClient,
 }
 
 # List of supported providers for UI display
@@ -42,17 +46,21 @@ SUPPORTED_PROVIDERS: list[str] = list(_PROVIDER_CLASSES.keys())
 
 def create_ai_client(
     provider: str,
-    api_key: str,
+    api_key: str = "",
     timeout: int = 30,
     max_tokens: int = 500,
+    ollama_host: str = "",
+    ollama_model: str = "",
 ) -> Optional[BaseAIClient]:
     """Create an AI client for the specified provider.
 
     Args:
-        provider: Provider name ("gemini", "claude", or "openai").
-        api_key: API key for the provider.
+        provider: Provider name ("gemini", "claude", "openai", "groq", "ollama").
+        api_key: API key for the provider (not needed for ollama).
         timeout: Request timeout in seconds.
         max_tokens: Maximum tokens in response.
+        ollama_host: Ollama server URL (optional, for ollama provider).
+        ollama_model: Ollama model name (optional, for ollama provider).
 
     Returns:
         An AI client instance, or None if provider is invalid/empty.
@@ -74,6 +82,19 @@ def create_ai_client(
         return None
 
     logger.info(f"Creating AI client for provider: {provider_lower}")
+
+    # Special handling for Ollama
+    if provider_lower == "ollama":
+        kwargs = {
+            "timeout": timeout,
+            "max_tokens": max_tokens,
+        }
+        if ollama_host:
+            kwargs["host"] = ollama_host
+        if ollama_model:
+            kwargs["model"] = ollama_model
+        return OllamaClient(**kwargs)
+
     return client_class(
         api_key=api_key,
         timeout=timeout,
@@ -94,8 +115,22 @@ def get_provider_display_name(provider: str) -> str:
         "gemini": "Google Gemini",
         "claude": "Anthropic Claude",
         "openai": "OpenAI",
+        "groq": "Groq (Fast)",
+        "ollama": "Ollama (Local)",
     }
     return names.get(provider.lower(), provider.title())
+
+
+def is_local_provider(provider: str) -> bool:
+    """Check if a provider runs locally (no API key required).
+
+    Args:
+        provider: Provider identifier.
+
+    Returns:
+        True if provider runs locally.
+    """
+    return provider.lower() in ("ollama",)
 
 
 __all__ = [
@@ -104,8 +139,11 @@ __all__ = [
     "BaseAIClient",
     "ClaudeClient",
     "GeminiClient",
+    "GroqClient",
+    "OllamaClient",
     "OpenAIClient",
     "SUPPORTED_PROVIDERS",
     "create_ai_client",
     "get_provider_display_name",
+    "is_local_provider",
 ]
