@@ -339,3 +339,342 @@ class TestGetAIAnalysisController:
         on_status.assert_called_once_with("test")
         on_toast_success.assert_called_once_with("test")
         on_toast_error.assert_called_once_with("test")
+
+
+# =============================================================================
+# Upgrade Analysis Tests
+# =============================================================================
+
+
+class MockCharacterProfile:
+    """Mock character profile for upgrade analysis."""
+
+    def __init__(self, name="Test Character"):
+        self.name = name
+        self.build = MagicMock()
+        self.build.class_name = "Marauder"
+        self.build.ascendancy = "Juggernaut"
+        self.build.main_skill = "Cyclone"
+        self.build.level = 90
+        self.build.items = {"Helmet": MagicMock()}
+        self.build.stats = {
+            "Life": 5000,
+            "FireResist": 75,
+            "ColdResist": 60,
+            "LightningResist": 75,
+        }
+
+
+class MockCharacterManager:
+    """Mock character manager."""
+
+    def __init__(self, profile=None):
+        self._active_profile_name = "Test Character" if profile else None
+        self._profiles = {"Test Character": profile} if profile else {}
+
+    def get_profile(self, name):
+        return self._profiles.get(name)
+
+    def get_active_profile(self):
+        if self._active_profile_name:
+            return self._profiles.get(self._active_profile_name)
+        return None
+
+
+class MockConfigWithStash(MockConfig):
+    """Mock config with stash settings."""
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.data = {"stash": {"account_name": "TestAccount"}}
+        self.current_game = MagicMock()
+        self.current_game.value = "poe1"
+        self.current_game.display_name.return_value = "Path of Exile 1"
+
+
+class TestAIAnalysisControllerUpgradeAnalysis:
+    """Tests for analyze_upgrade method."""
+
+    @pytest.fixture
+    def config_with_stash(self):
+        """Config with stash settings."""
+        return MockConfigWithStash()
+
+    @pytest.fixture
+    def mock_profile(self):
+        """Create mock profile."""
+        return MockCharacterProfile()
+
+    @pytest.fixture
+    def mock_manager(self, mock_profile):
+        """Create mock character manager with profile."""
+        return MockCharacterManager(mock_profile)
+
+    @pytest.fixture
+    def mock_db(self):
+        """Create mock database."""
+        return MagicMock()
+
+    @pytest.fixture
+    def upgrade_controller(self, config_with_stash, mock_panel, status_messages, error_messages):
+        """Create controller for upgrade testing."""
+        return AIAnalysisController(
+            config=config_with_stash,
+            panel=mock_panel,
+            on_status=lambda msg: status_messages.append(msg),
+            on_toast_error=lambda msg: error_messages.append(msg),
+        )
+
+    def test_analyze_upgrade_not_configured(
+        self, mock_config_not_configured, mock_panel, status_messages
+    ):
+        """analyze_upgrade returns False when AI not configured."""
+        controller = AIAnalysisController(
+            config=mock_config_not_configured,
+            panel=mock_panel,
+            on_status=lambda msg: status_messages.append(msg),
+        )
+        result = controller.analyze_upgrade(slot="Helmet")
+
+        assert result is False
+        assert any("not configured" in msg for msg in status_messages)
+
+    def test_analyze_upgrade_no_profile(
+        self, upgrade_controller, status_messages, error_messages
+    ):
+        """analyze_upgrade returns False when no active profile."""
+        # No character manager set = no profile
+        result = upgrade_controller.analyze_upgrade(slot="Helmet")
+
+        assert result is False
+        assert any("No active build" in msg or "profile" in msg.lower() for msg in status_messages)
+
+    def test_analyze_upgrade_no_account_for_stash(
+        self, config_with_stash, mock_panel, mock_profile, status_messages, error_messages
+    ):
+        """analyze_upgrade returns False when stash requested but no account."""
+        config_with_stash.data = {"stash": {}}  # No account_name
+        controller = AIAnalysisController(
+            config=config_with_stash,
+            panel=mock_panel,
+            on_status=lambda msg: status_messages.append(msg),
+            on_toast_error=lambda msg: error_messages.append(msg),
+        )
+        controller.set_character_manager(MockCharacterManager(mock_profile))
+
+        result = controller.analyze_upgrade(slot="Helmet", include_stash=True)
+
+        assert result is False
+        assert any("account" in msg.lower() for msg in status_messages)
+
+    def test_analyze_upgrade_sets_database(
+        self, upgrade_controller, mock_db, mock_manager
+    ):
+        """analyze_upgrade uses provided database."""
+        upgrade_controller.set_database(mock_db)
+        upgrade_controller.set_character_manager(mock_manager)
+
+        assert upgrade_controller._db is mock_db
+
+    def test_analyze_upgrade_sets_character_manager(
+        self, upgrade_controller, mock_manager
+    ):
+        """analyze_upgrade uses provided character manager."""
+        upgrade_controller.set_character_manager(mock_manager)
+
+        assert upgrade_controller._character_manager is mock_manager
+
+    def test_analyze_upgrade_gets_active_profile(
+        self, upgrade_controller, mock_db, mock_manager
+    ):
+        """get_active_profile returns profile from manager."""
+        upgrade_controller.set_database(mock_db)
+        upgrade_controller.set_character_manager(mock_manager)
+
+        profile = upgrade_controller.get_active_profile()
+
+        assert profile is not None
+        assert profile.name == "Test Character"
+
+    def test_analyze_upgrade_no_manager_returns_none_profile(self, upgrade_controller):
+        """get_active_profile returns None when no manager."""
+        profile = upgrade_controller.get_active_profile()
+        assert profile is None
+
+    def test_analyze_upgrade_shows_loading(
+        self, upgrade_controller, mock_panel, mock_db, mock_manager
+    ):
+        """analyze_upgrade shows loading state on panel."""
+        upgrade_controller.set_database(mock_db)
+        upgrade_controller.set_character_manager(mock_manager)
+
+        with patch('core.ai_upgrade_advisor.get_ai_upgrade_advisor') as mock_advisor:
+            mock_advisor_instance = MagicMock()
+            mock_advisor_instance.get_stash_candidates_for_slot.return_value = []
+            mock_advisor_instance.generate_trade_suggestions.return_value = []
+            mock_advisor_instance.get_upgrade_prompt.return_value = "Test prompt"
+            mock_advisor.return_value = mock_advisor_instance
+
+            with patch('gui_qt.workers.ai_analysis_worker.AIAnalysisWorker'):
+                upgrade_controller.analyze_upgrade(slot="Helmet")
+
+        mock_panel.show_loading.assert_called()
+
+    def test_analyze_upgrade_with_stash_scans_candidates(
+        self, upgrade_controller, mock_panel, mock_db, mock_manager, config_with_stash
+    ):
+        """analyze_upgrade with stash scans for candidates."""
+        upgrade_controller.set_database(mock_db)
+        upgrade_controller.set_character_manager(mock_manager)
+
+        with patch('core.ai_upgrade_advisor.get_ai_upgrade_advisor') as mock_advisor:
+            mock_advisor_instance = MagicMock()
+            mock_advisor_instance.get_stash_candidates_for_slot.return_value = []
+            mock_advisor_instance.generate_trade_suggestions.return_value = []
+            mock_advisor_instance.get_upgrade_prompt.return_value = "Test prompt"
+            mock_advisor.return_value = mock_advisor_instance
+
+            with patch('gui_qt.workers.ai_analysis_worker.AIAnalysisWorker'):
+                upgrade_controller.analyze_upgrade(
+                    slot="Helmet",
+                    include_stash=True,
+                    account_name="TestAccount",
+                )
+
+        mock_advisor_instance.get_stash_candidates_for_slot.assert_called_once_with(
+            slot="Helmet",
+            account_name="TestAccount",
+            league="Settlers",
+        )
+
+    def test_analyze_upgrade_without_stash_skips_scan(
+        self, upgrade_controller, mock_panel, mock_db, mock_manager
+    ):
+        """analyze_upgrade without stash skips candidate scan."""
+        upgrade_controller.set_database(mock_db)
+        upgrade_controller.set_character_manager(mock_manager)
+
+        with patch('core.ai_upgrade_advisor.get_ai_upgrade_advisor') as mock_advisor:
+            mock_advisor_instance = MagicMock()
+            mock_advisor_instance.get_stash_candidates_for_slot.return_value = []
+            mock_advisor_instance.generate_trade_suggestions.return_value = []
+            mock_advisor_instance.get_upgrade_prompt.return_value = "Test prompt"
+            mock_advisor.return_value = mock_advisor_instance
+
+            with patch('gui_qt.workers.ai_analysis_worker.AIAnalysisWorker'):
+                upgrade_controller.analyze_upgrade(slot="Helmet", include_stash=False)
+
+        # Should not call stash scan when include_stash=False
+        mock_advisor_instance.get_stash_candidates_for_slot.assert_not_called()
+
+    def test_analyze_upgrade_generates_trade_suggestions(
+        self, upgrade_controller, mock_panel, mock_db, mock_manager
+    ):
+        """analyze_upgrade generates trade suggestions."""
+        upgrade_controller.set_database(mock_db)
+        upgrade_controller.set_character_manager(mock_manager)
+
+        with patch('core.ai_upgrade_advisor.get_ai_upgrade_advisor') as mock_advisor:
+            mock_advisor_instance = MagicMock()
+            mock_advisor_instance.get_stash_candidates_for_slot.return_value = []
+            mock_advisor_instance.generate_trade_suggestions.return_value = []
+            mock_advisor_instance.get_upgrade_prompt.return_value = "Test prompt"
+            mock_advisor.return_value = mock_advisor_instance
+
+            with patch('gui_qt.workers.ai_analysis_worker.AIAnalysisWorker'):
+                upgrade_controller.analyze_upgrade(slot="Helmet")
+
+        mock_advisor_instance.generate_trade_suggestions.assert_called_once()
+
+    def test_analyze_upgrade_builds_prompt(
+        self, upgrade_controller, mock_panel, mock_db, mock_manager
+    ):
+        """analyze_upgrade builds upgrade prompt."""
+        upgrade_controller.set_database(mock_db)
+        upgrade_controller.set_character_manager(mock_manager)
+
+        with patch('core.ai_upgrade_advisor.get_ai_upgrade_advisor') as mock_advisor:
+            mock_advisor_instance = MagicMock()
+            mock_advisor_instance.get_stash_candidates_for_slot.return_value = []
+            mock_advisor_instance.generate_trade_suggestions.return_value = []
+            mock_advisor_instance.get_upgrade_prompt.return_value = "Test prompt"
+            mock_advisor.return_value = mock_advisor_instance
+
+            with patch('gui_qt.workers.ai_analysis_worker.AIAnalysisWorker'):
+                upgrade_controller.analyze_upgrade(slot="Helmet")
+
+        mock_advisor_instance.get_upgrade_prompt.assert_called_once()
+
+    def test_analyze_upgrade_returns_true_on_success(
+        self, upgrade_controller, mock_db, mock_manager
+    ):
+        """analyze_upgrade returns True on success."""
+        upgrade_controller.set_database(mock_db)
+        upgrade_controller.set_character_manager(mock_manager)
+
+        with patch('core.ai_upgrade_advisor.get_ai_upgrade_advisor') as mock_advisor:
+            mock_advisor_instance = MagicMock()
+            mock_advisor_instance.get_stash_candidates_for_slot.return_value = []
+            mock_advisor_instance.generate_trade_suggestions.return_value = []
+            mock_advisor_instance.get_upgrade_prompt.return_value = "Test prompt"
+            mock_advisor.return_value = mock_advisor_instance
+
+            with patch('gui_qt.workers.ai_analysis_worker.AIAnalysisWorker'):
+                result = upgrade_controller.analyze_upgrade(slot="Helmet")
+
+        assert result is True
+
+    def test_analyze_upgrade_handles_exception(
+        self, upgrade_controller, mock_db, mock_manager, status_messages
+    ):
+        """analyze_upgrade handles exceptions gracefully."""
+        upgrade_controller.set_database(mock_db)
+        upgrade_controller.set_character_manager(mock_manager)
+
+        with patch('core.ai_upgrade_advisor.get_ai_upgrade_advisor') as mock_advisor:
+            mock_advisor.side_effect = Exception("Test error")
+
+            result = upgrade_controller.analyze_upgrade(slot="Helmet")
+
+        assert result is False
+        assert any("failed" in msg.lower() or "error" in msg.lower() for msg in status_messages)
+
+
+class TestAIAnalysisControllerBuildSummary:
+    """Tests for build summary functionality."""
+
+    @pytest.fixture
+    def controller_with_manager(self, mock_config, mock_panel):
+        """Controller with character manager."""
+        controller = AIAnalysisController(config=mock_config, panel=mock_panel)
+        profile = MockCharacterProfile()
+        manager = MockCharacterManager(profile)
+        controller.set_character_manager(manager)
+        return controller
+
+    def test_get_build_summary_returns_summary(self, controller_with_manager):
+        """get_build_summary returns BuildSummary when profile exists."""
+        with patch('core.build_summarizer.BuildSummarizer') as MockSummarizer:
+            mock_summary = MagicMock()
+            MockSummarizer.return_value.summarize_profile.return_value = mock_summary
+
+            result = controller_with_manager.get_build_summary()
+
+        assert result is mock_summary
+
+    def test_get_build_summary_no_profile_returns_none(self, mock_config, mock_panel):
+        """get_build_summary returns None when no profile."""
+        controller = AIAnalysisController(config=mock_config, panel=mock_panel)
+
+        result = controller.get_build_summary()
+
+        assert result is None
+
+    def test_get_build_summary_handles_error(self, controller_with_manager):
+        """get_build_summary returns None on error."""
+        with patch('core.build_summarizer.BuildSummarizer') as MockSummarizer:
+            MockSummarizer.side_effect = Exception("Summarizer error")
+
+            result = controller_with_manager.get_build_summary()
+
+        assert result is None
