@@ -48,6 +48,9 @@ class GeminiClient(BaseAIClient):
             max_tokens: Maximum tokens in response.
             model: Model to use (default: gemini-2.0-flash).
         """
+        # Strip whitespace from API key (common copy-paste issue)
+        api_key = api_key.strip() if api_key else ""
+
         super().__init__(api_key, timeout, max_tokens)
         self._model = model
         self._session = requests.Session()
