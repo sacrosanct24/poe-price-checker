@@ -46,7 +46,7 @@ class Database:
     """
 
     # Current schema version. Increment if schema structure changes.
-    SCHEMA_VERSION = 8
+    SCHEMA_VERSION = 9
 
     def __init__(self, db_path: Optional[Path] = None):
         """
@@ -437,6 +437,21 @@ class Database:
 
                 CREATE INDEX IF NOT EXISTS idx_league_top_items_rank
                 ON league_top_items_summary (league, rank);
+
+                -- v9: Upgrade advice cache for AI recommendations
+                CREATE TABLE IF NOT EXISTS upgrade_advice_cache (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    profile_name TEXT NOT NULL,
+                    slot TEXT NOT NULL,
+                    item_hash TEXT NOT NULL,
+                    advice_text TEXT NOT NULL,
+                    ai_model TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(profile_name, slot)
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_upgrade_advice_profile_slot
+                ON upgrade_advice_cache (profile_name, slot);
                 """
             )
 
@@ -467,6 +482,9 @@ class Database:
             - Add `league_economy_summary` for pre-aggregated league stats.
             - Add `league_currency_summary` for currency min/max/avg per league.
             - Add `league_top_items_summary` for pre-computed top items.
+        v8 -> v9:
+            - Add `upgrade_advice_cache` for AI upgrade recommendations.
+            - Persists advice between sessions, keyed by profile + slot + item hash.
         """
         logger.info(f"Starting schema migration v{old} → v{new}")
 
@@ -769,6 +787,28 @@ class Database:
 
                     CREATE INDEX IF NOT EXISTS idx_league_top_items_rank
                     ON league_top_items_summary (league, rank);
+                    """
+                )
+
+            if old < 9 <= new:
+                logger.info(
+                    "Applying v9 migration: creating upgrade_advice_cache table."
+                )
+                conn.executescript(
+                    """
+                    CREATE TABLE IF NOT EXISTS upgrade_advice_cache (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        profile_name TEXT NOT NULL,
+                        slot TEXT NOT NULL,
+                        item_hash TEXT NOT NULL,
+                        advice_text TEXT NOT NULL,
+                        ai_model TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        UNIQUE(profile_name, slot)
+                    );
+
+                    CREATE INDEX IF NOT EXISTS idx_upgrade_advice_profile_slot
+                    ON upgrade_advice_cache (profile_name, slot);
                     """
                 )
 
@@ -1738,6 +1778,153 @@ class Database:
         """Perform SQLite VACUUM for file-size maintenance."""
         self.conn.execute("VACUUM")
         self.conn.commit()
+
+    # ----------------------------------------------------------------------
+    # Upgrade Advice Cache
+    # ----------------------------------------------------------------------
+
+    def save_upgrade_advice(
+        self,
+        profile_name: str,
+        slot: str,
+        item_hash: str,
+        advice_text: str,
+        ai_model: Optional[str] = None,
+    ) -> None:
+        """
+        Save or update upgrade advice for a profile/slot.
+
+        Uses UPSERT to replace existing advice for the same profile+slot.
+
+        Args:
+            profile_name: Character profile name.
+            slot: Equipment slot (e.g., "Helmet", "Body Armour").
+            item_hash: Hash of current item to detect changes.
+            advice_text: AI-generated advice (markdown).
+            ai_model: AI model used (e.g., "gemini", "claude").
+        """
+        self._execute(
+            """
+            INSERT INTO upgrade_advice_cache
+                (profile_name, slot, item_hash, advice_text, ai_model, created_at)
+            VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(profile_name, slot) DO UPDATE SET
+                item_hash = excluded.item_hash,
+                advice_text = excluded.advice_text,
+                ai_model = excluded.ai_model,
+                created_at = CURRENT_TIMESTAMP
+            """,
+            (profile_name, slot, item_hash, advice_text, ai_model),
+        )
+
+    def get_upgrade_advice(
+        self,
+        profile_name: str,
+        slot: str,
+        item_hash: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Get cached upgrade advice for a profile/slot.
+
+        Args:
+            profile_name: Character profile name.
+            slot: Equipment slot.
+            item_hash: If provided, only return if hash matches (item unchanged).
+
+        Returns:
+            Dict with advice_text, ai_model, created_at, item_hash if found.
+            None if not found or item_hash doesn't match.
+        """
+        if item_hash:
+            cursor = self._execute(
+                """
+                SELECT advice_text, ai_model, created_at, item_hash
+                FROM upgrade_advice_cache
+                WHERE profile_name = ? AND slot = ? AND item_hash = ?
+                """,
+                (profile_name, slot, item_hash),
+            )
+        else:
+            cursor = self._execute(
+                """
+                SELECT advice_text, ai_model, created_at, item_hash
+                FROM upgrade_advice_cache
+                WHERE profile_name = ? AND slot = ?
+                """,
+                (profile_name, slot),
+            )
+
+        row = cursor.fetchone()
+        if row:
+            return {
+                "advice_text": row["advice_text"],
+                "ai_model": row["ai_model"],
+                "created_at": row["created_at"],
+                "item_hash": row["item_hash"],
+            }
+        return None
+
+    def get_all_upgrade_advice(
+        self,
+        profile_name: str,
+    ) -> Dict[str, Dict[str, Any]]:
+        """
+        Get all cached upgrade advice for a profile.
+
+        Args:
+            profile_name: Character profile name.
+
+        Returns:
+            Dict mapping slot -> advice data.
+        """
+        cursor = self._execute(
+            """
+            SELECT slot, advice_text, ai_model, created_at, item_hash
+            FROM upgrade_advice_cache
+            WHERE profile_name = ?
+            """,
+            (profile_name,),
+        )
+
+        result = {}
+        for row in cursor.fetchall():
+            result[row["slot"]] = {
+                "advice_text": row["advice_text"],
+                "ai_model": row["ai_model"],
+                "created_at": row["created_at"],
+                "item_hash": row["item_hash"],
+            }
+        return result
+
+    def clear_upgrade_advice(
+        self,
+        profile_name: Optional[str] = None,
+        slot: Optional[str] = None,
+    ) -> int:
+        """
+        Clear cached upgrade advice.
+
+        Args:
+            profile_name: If provided, only clear for this profile.
+            slot: If provided with profile_name, only clear this slot.
+
+        Returns:
+            Number of rows deleted.
+        """
+        if profile_name and slot:
+            cursor = self._execute(
+                "DELETE FROM upgrade_advice_cache WHERE profile_name = ? AND slot = ?",
+                (profile_name, slot),
+            )
+        elif profile_name:
+            cursor = self._execute(
+                "DELETE FROM upgrade_advice_cache WHERE profile_name = ?",
+                (profile_name,),
+            )
+        else:
+            cursor = self._execute("DELETE FROM upgrade_advice_cache")
+
+        return cursor.rowcount
 
     def close(self) -> None:
         """Close the underlying SQLite connection."""

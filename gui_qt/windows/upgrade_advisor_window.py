@@ -11,6 +11,7 @@ Analyzes each equipment slot and recommends:
 
 from __future__ import annotations
 
+import hashlib
 import logging
 from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
 
@@ -107,6 +108,15 @@ class UpgradeAdvisorWindow(QDialog):
         # AI configured callback
         self._ai_configured_callback: Optional[Callable[[], bool]] = None
 
+        # Database for caching (set via set_database)
+        self._db: Optional["Database"] = None
+
+        # Track item hashes for cache invalidation
+        self._item_hashes: Dict[str, str] = {}
+
+        # Track which results are from cache
+        self._cached_slots: set = set()
+
         self.setWindowTitle("Upgrade Advisor")
         self.setMinimumSize(800, 600)
         self.resize(1000, 700)
@@ -121,11 +131,44 @@ class UpgradeAdvisorWindow(QDialog):
         self._ai_configured_callback = callback
         self._update_button_states()
 
+    def set_database(self, db: "Database") -> None:
+        """Set database for caching upgrade advice."""
+        self._db = db
+
     def _is_ai_configured(self) -> bool:
         """Check if AI is configured."""
         if self._ai_configured_callback:
             return self._ai_configured_callback()
         return False
+
+    def _compute_item_hash(self, item_data: Any) -> str:
+        """Compute a hash of item data to detect changes.
+
+        Args:
+            item_data: Item data from PoB.
+
+        Returns:
+            MD5 hash string of key item properties.
+        """
+        if not item_data:
+            return "empty"
+
+        # Build a string of key properties
+        parts = [
+            getattr(item_data, "name", "") or "",
+            getattr(item_data, "base_type", "") or "",
+            getattr(item_data, "rarity", "") or "",
+            str(getattr(item_data, "item_level", 0)),
+        ]
+
+        # Add mods
+        for mod in getattr(item_data, "implicit_mods", []) or []:
+            parts.append(mod)
+        for mod in getattr(item_data, "explicit_mods", []) or []:
+            parts.append(mod)
+
+        content = "|".join(parts)
+        return hashlib.md5(content.encode()).hexdigest()[:16]
 
     def _create_widgets(self) -> None:
         """Create all UI elements."""
@@ -261,9 +304,12 @@ class UpgradeAdvisorWindow(QDialog):
         return layout
 
     def _load_profile(self) -> None:
-        """Load the active character profile."""
+        """Load the active character profile and cached advice."""
         self.equipment_tree.clear()
         self._equipment_items.clear()
+        self._item_hashes.clear()
+        self._cached_slots.clear()
+        self._analysis_results.clear()
 
         # Get active profile
         profile = self._character_manager.get_active_profile()
@@ -298,12 +344,43 @@ class UpgradeAdvisorWindow(QDialog):
         items = getattr(build, "items", {}) or {} if build else {}
         self._equipment_items = items
 
+        # Compute item hashes
+        for slot in EQUIPMENT_SLOTS:
+            item_data = items.get(slot)
+            self._item_hashes[slot] = self._compute_item_hash(item_data)
+
+        # Load cached advice from database
+        self._load_cached_advice()
+
         # Populate tree
         for slot in EQUIPMENT_SLOTS:
             item_data = items.get(slot)
             self._add_slot_row(slot, item_data)
 
         self._update_button_states()
+
+    def _load_cached_advice(self) -> None:
+        """Load cached advice from database for current profile."""
+        if not self._db or not self._current_profile:
+            return
+
+        try:
+            cached = self._db.get_all_upgrade_advice(self._current_profile.name)
+
+            for slot, data in cached.items():
+                cached_hash = data.get("item_hash", "")
+                current_hash = self._item_hashes.get(slot, "")
+
+                # Only use cache if item hasn't changed
+                if cached_hash == current_hash:
+                    self._analysis_results[slot] = data["advice_text"]
+                    self._cached_slots.add(slot)
+                    logger.debug(f"Loaded cached advice for {slot}")
+                else:
+                    logger.debug(f"Cache invalidated for {slot} (item changed)")
+
+        except Exception as e:
+            logger.warning(f"Failed to load cached advice: {e}")
 
     def _add_slot_row(self, slot: str, item_data: Any) -> None:
         """Add an equipment slot row to the tree."""
@@ -315,10 +392,13 @@ class UpgradeAdvisorWindow(QDialog):
             rarity = "NORMAL"
 
         # Check if we have analysis results
-        status = self._analysis_results.get(slot, "")
-        if status:
-            status_text = "Analyzed"
-            status_color = COLORS.get("success", "#4CAF50")
+        if slot in self._analysis_results:
+            if slot in self._cached_slots:
+                status_text = "Cached"
+                status_color = COLORS.get("accent", "#2196F3")
+            else:
+                status_text = "Analyzed"
+                status_color = COLORS.get("success", "#4CAF50")
         else:
             status_text = "-"
             status_color = COLORS.get("text_secondary", "#888888")
@@ -366,7 +446,10 @@ class UpgradeAdvisorWindow(QDialog):
 
         # Show previous results if available
         if slot in self._analysis_results:
-            self.result_slot_label.setText(f"Results for: {slot}")
+            if slot in self._cached_slots:
+                self.result_slot_label.setText(f"Results for: {slot} (Cached)")
+            else:
+                self.result_slot_label.setText(f"Results for: {slot}")
             self.results_text.setMarkdown(self._analysis_results[slot])
         else:
             self.result_slot_label.setText(f"Selected: {slot}")
@@ -439,15 +522,27 @@ class UpgradeAdvisorWindow(QDialog):
 
         self._on_status(f"Analyzing upgrades for {slot}...")
 
-    def show_analysis_result(self, slot: str, result: str) -> None:
+    def show_analysis_result(
+        self,
+        slot: str,
+        result: str,
+        ai_model: Optional[str] = None,
+    ) -> None:
         """Display analysis result for a slot.
 
         Args:
             slot: Equipment slot that was analyzed.
             result: Markdown-formatted result text.
+            ai_model: AI model used (for cache metadata).
         """
         self._analyzing_slot = None
         self._analysis_results[slot] = result
+
+        # Remove from cached slots since this is fresh
+        self._cached_slots.discard(slot)
+
+        # Save to cache
+        self._save_to_cache(slot, result, ai_model)
 
         # Update UI
         self.progress_bar.setVisible(False)
@@ -463,6 +558,29 @@ class UpgradeAdvisorWindow(QDialog):
 
         self.analysis_complete.emit(slot, result)
         self._on_status(f"Upgrade analysis complete for {slot}")
+
+    def _save_to_cache(
+        self,
+        slot: str,
+        result: str,
+        ai_model: Optional[str] = None,
+    ) -> None:
+        """Save analysis result to database cache."""
+        if not self._db or not self._current_profile:
+            return
+
+        try:
+            item_hash = self._item_hashes.get(slot, "unknown")
+            self._db.save_upgrade_advice(
+                profile_name=self._current_profile.name,
+                slot=slot,
+                item_hash=item_hash,
+                advice_text=result,
+                ai_model=ai_model,
+            )
+            logger.debug(f"Saved advice for {slot} to cache")
+        except Exception as e:
+            logger.warning(f"Failed to save advice to cache: {e}")
 
     def show_analysis_error(self, slot: str, error: str) -> None:
         """Display analysis error for a slot.

@@ -294,6 +294,9 @@ class NavigationController:
                     parent=self._main_window,
                     on_status=self._callbacks.get("on_status"),
                 )
+                # Set database for caching
+                if hasattr(self._ctx, 'db') and self._ctx.db:
+                    window.set_database(self._ctx.db)
                 # Wire up AI configured callback
                 if "ai_configured" in self._callbacks:
                     window.set_ai_configured_callback(self._callbacks["ai_configured"])

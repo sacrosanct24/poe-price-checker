@@ -333,3 +333,205 @@ class TestNoProfile:
 
         assert "No active profile" in window.profile_label.text()
         assert window.equipment_tree.topLevelItemCount() == 0
+
+
+# =============================================================================
+# Cache Tests
+# =============================================================================
+
+
+class TestItemHash:
+    """Tests for item hash computation."""
+
+    def test_compute_hash_with_item(self, window):
+        """Hash is computed for items with data."""
+        item_data = MagicMock()
+        item_data.name = "Test Helmet"
+        item_data.base_type = "Royal Burgonet"
+        item_data.rarity = "RARE"
+        item_data.item_level = 85
+        item_data.implicit_mods = ["+30 to Maximum Life"]
+        item_data.explicit_mods = ["+80 to Maximum Life"]
+
+        hash1 = window._compute_item_hash(item_data)
+
+        assert len(hash1) == 16  # MD5 truncated
+        assert hash1 != "empty"
+
+    def test_compute_hash_empty_item(self, window):
+        """Hash is 'empty' for None items."""
+        assert window._compute_item_hash(None) == "empty"
+
+    def test_same_item_same_hash(self, window):
+        """Same item produces same hash."""
+        item_data = MagicMock()
+        item_data.name = "Test"
+        item_data.base_type = "Base"
+        item_data.rarity = "RARE"
+        item_data.item_level = 80
+        item_data.implicit_mods = []
+        item_data.explicit_mods = ["+50 Life"]
+
+        hash1 = window._compute_item_hash(item_data)
+        hash2 = window._compute_item_hash(item_data)
+
+        assert hash1 == hash2
+
+    def test_different_mods_different_hash(self, window):
+        """Different mods produce different hash."""
+        item1 = MagicMock()
+        item1.name = "Test"
+        item1.base_type = "Base"
+        item1.rarity = "RARE"
+        item1.item_level = 80
+        item1.implicit_mods = []
+        item1.explicit_mods = ["+50 Life"]
+
+        item2 = MagicMock()
+        item2.name = "Test"
+        item2.base_type = "Base"
+        item2.rarity = "RARE"
+        item2.item_level = 80
+        item2.implicit_mods = []
+        item2.explicit_mods = ["+100 Life"]  # Different mod
+
+        hash1 = window._compute_item_hash(item1)
+        hash2 = window._compute_item_hash(item2)
+
+        assert hash1 != hash2
+
+
+class TestCaching:
+    """Tests for advice caching."""
+
+    def test_set_database(self, window):
+        """Database can be set."""
+        mock_db = MagicMock()
+        window.set_database(mock_db)
+        assert window._db == mock_db
+
+    def test_save_to_cache(self, window):
+        """Advice is saved to database."""
+        mock_db = MagicMock()
+        window.set_database(mock_db)
+        window._item_hashes["Helmet"] = "abc123"
+
+        window._save_to_cache("Helmet", "Test advice", "gemini")
+
+        mock_db.save_upgrade_advice.assert_called_once_with(
+            profile_name="Test Character",
+            slot="Helmet",
+            item_hash="abc123",
+            advice_text="Test advice",
+            ai_model="gemini",
+        )
+
+    def test_show_result_saves_to_cache(self, window):
+        """show_analysis_result saves to cache."""
+        mock_db = MagicMock()
+        window.set_database(mock_db)
+        window._item_hashes["Helmet"] = "abc123"
+
+        window.show_analysis_result("Helmet", "Test result", "claude")
+
+        mock_db.save_upgrade_advice.assert_called_once()
+
+    def test_load_cached_advice(self, qtbot, mock_config, mock_character_manager):
+        """Cached advice is loaded on window creation."""
+        mock_db = MagicMock()
+
+        # Pre-configure cache data
+        mock_db.get_all_upgrade_advice.return_value = {
+            "Helmet": {
+                "advice_text": "Cached advice for helmet",
+                "ai_model": "gemini",
+                "created_at": "2025-01-01 00:00:00",
+                "item_hash": "test_hash",
+            }
+        }
+
+        window = UpgradeAdvisorWindow(
+            config=mock_config,
+            character_manager=mock_character_manager,
+        )
+        qtbot.addWidget(window)
+
+        # Set database and compute matching hash
+        window.set_database(mock_db)
+
+        # Force the hash to match
+        window._item_hashes["Helmet"] = "test_hash"
+        window._load_cached_advice()
+
+        # Should have loaded cached advice
+        assert "Helmet" in window._analysis_results
+        assert window._analysis_results["Helmet"] == "Cached advice for helmet"
+        assert "Helmet" in window._cached_slots
+
+    def test_cache_invalidated_on_item_change(self, qtbot, mock_config, mock_character_manager):
+        """Cache is invalidated when item hash changes."""
+        mock_db = MagicMock()
+        mock_db.get_all_upgrade_advice.return_value = {
+            "Helmet": {
+                "advice_text": "Old cached advice",
+                "ai_model": "gemini",
+                "created_at": "2025-01-01 00:00:00",
+                "item_hash": "old_hash",  # Different from current
+            }
+        }
+
+        window = UpgradeAdvisorWindow(
+            config=mock_config,
+            character_manager=mock_character_manager,
+        )
+        qtbot.addWidget(window)
+        window.set_database(mock_db)
+
+        # Current item has different hash
+        window._item_hashes["Helmet"] = "new_hash"
+        window._load_cached_advice()
+
+        # Should NOT have loaded stale cache
+        assert "Helmet" not in window._analysis_results
+        assert "Helmet" not in window._cached_slots
+
+    def test_cached_status_shows_in_tree(self, qtbot, mock_config, mock_character_manager):
+        """Cached slots show 'Cached' status on load from DB."""
+        mock_db = MagicMock()
+
+        # Return cached data that matches the item hash
+        mock_db.get_all_upgrade_advice.return_value = {
+            "Helmet": {
+                "advice_text": "Cached advice",
+                "ai_model": "gemini",
+                "created_at": "2025-01-01 00:00:00",
+                "item_hash": "placeholder",  # Will be replaced
+            }
+        }
+
+        window = UpgradeAdvisorWindow(
+            config=mock_config,
+            character_manager=mock_character_manager,
+        )
+        qtbot.addWidget(window)
+
+        # Get the actual hash that was computed for Helmet
+        actual_hash = window._item_hashes.get("Helmet", "")
+        mock_db.get_all_upgrade_advice.return_value["Helmet"]["item_hash"] = actual_hash
+
+        # Now set database and reload
+        window.set_database(mock_db)
+        window._load_cached_advice()
+
+        # Refresh tree to show cached status
+        window.equipment_tree.clear()
+        items = getattr(mock_character_manager.get_active_profile().build, "items", {})
+        for slot in EQUIPMENT_SLOTS:
+            window._add_slot_row(slot, items.get(slot))
+
+        # Find helmet row and check status
+        for i in range(window.equipment_tree.topLevelItemCount()):
+            item = window.equipment_tree.topLevelItem(i)
+            if item.text(0) == "Helmet":
+                assert item.text(2) == "Cached"
+                break
