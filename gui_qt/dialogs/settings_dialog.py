@@ -831,8 +831,14 @@ class SettingsDialog(QDialog):
         self.accept()
 
     def _center_on_screen(self) -> None:
-        """Center the dialog on the screen."""
-        screen = QGuiApplication.primaryScreen()
+        """Center the dialog on the same screen as the parent window."""
+        # Use parent window's screen if available, otherwise primary screen
+        parent = self.parent()
+        if parent and hasattr(parent, 'screen') and parent.screen():
+            screen = parent.screen()
+        else:
+            screen = QGuiApplication.primaryScreen()
+
         if screen:
             screen_geometry = screen.availableGeometry()
             dialog_geometry = self.frameGeometry()
