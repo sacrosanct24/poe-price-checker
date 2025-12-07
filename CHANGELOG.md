@@ -7,7 +7,96 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [1.6.0] - 2025-12-07
+
 ### Added
+
+#### 3-Screen Architecture
+- **Item Evaluator** (Ctrl+1) - Price checking and item analysis with:
+  - Session tabs for multiple workflows
+  - Pinned items sidebar
+  - Integrated Price Rankings panel
+- **AI Advisor** (Ctrl+2) - Build optimization with:
+  - BuildActionsPanel for quick actions (Compare Builds, Find BiS, Upgrade Finder)
+  - UpgradeAdvisorView with equipment tree and AI analysis
+  - Build profile management
+- **Daytrader** (Ctrl+3) - Economy and trading hub with:
+  - QuickStatsPanel showing revenue and sales metrics
+  - QuickActionsPanel for common operations
+  - Sub-tabs: Sales, Loot, Market, Stash
+
+#### Navigation
+- **MainNavigationBar** - Pill button design for screen switching
+- **Navigate menu** - Menu-based screen access
+- **Ctrl+1/2/3** - Keyboard shortcuts for screen switching
+- **ScreenController** - Screen lifecycle management (on_enter, on_leave, refresh)
+
+#### Widgets
+- **PriceRankingsPanel** - Compact sidebar version of Top 20 rankings
+- **BuildActionsPanel** - Quick access to build operations
+- **QuickStatsPanel** - Economy metrics summary
+- **QuickActionsPanel** - Economy operation shortcuts
+
+### Changed
+- Price Rankings moved from separate window to Item Evaluator sidebar
+- PoB panel functionality consolidated into AI Advisor's UpgradeAdvisorView
+- Build and Economy menus simplified with screen navigation links
+- main_window.py refactored to use screen-based architecture
+
+### Removed
+- Redundant PoB panel in AI Advisor (functionality preserved in UpgradeAdvisorView)
+- Orphaned `_show_loadout_selector` method
+- Unused `ItemEvaluatorScreen` placeholder class
+- Unused `QKeySequence` import
+
+---
+
+## [1.5.0] - 2025-12-05
+
+### Added
+
+#### AI Item Analysis
+- **Right-click "Ask AI About This Item"** - AI-powered item evaluation
+- **Custom prompt editor** in Settings > AI tab
+- **Build name field** for player context
+- **League and build context** included in AI prompts
+- Supports **Gemini**, **Claude**, and **OpenAI** providers
+
+#### Stash Tab Improvements
+- **60-second rate limit wait** on 429 errors (was 2-8 seconds)
+- **UI notification** during rate limit waits
+
+#### UX Improvements (10 Phases)
+- Comprehensive spacing, alignment, and visual consistency
+- Improved rate limit indicator styling
+- Better overall UI polish
+
+### Changed
+- Updated from deprecated `gemini-1.5-flash` to `gemini-2.0-flash`
+
+### Fixed
+- Gemini API compatibility with model update
+- ToastManager crash when parent widget is deleted
+- ThemeManager test isolation issues
+- Worker tests rewritten to avoid QThread segfaults
+
+### Technical
+- DevOps-quality CI overhaul with proper test isolation
+- Extracted ViewMenuController, PoBController, TrayController
+- Extracted ResultsContextController, NavigationController
+- Extracted HistoryManager service
+- Completed code review remediation phases 1-3
+- Test suite expanded to 3300+ tests (~60% coverage)
+
+---
+
+## [1.4.0] - 2025-11-30
+
+### Added
+
+#### Concurrency/Resiliency Tests
 - Deterministic concurrency/resiliency tests:
   - `tests/unit/data_sources/test_rate_limiter.py` and `test_rate_limiter_concurrency.py` validate spacing under contention without real sleeps.
   - `tests/unit/data_sources/test_retry_with_backoff.py` and `test_retry_env_cap.py` cover retry success/failure and sleep capping via `RETRY_MAX_SLEEP` or pytest default.
@@ -217,7 +306,9 @@ This is the initial public release (v1.0.0). The project was developed privately
 
 ---
 
-[Unreleased]: https://github.com/sacrosanct24/poe-price-checker/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/sacrosanct24/poe-price-checker/compare/v1.6.0...HEAD
+[1.6.0]: https://github.com/sacrosanct24/poe-price-checker/compare/v1.5.0...v1.6.0
+[1.5.0]: https://github.com/sacrosanct24/poe-price-checker/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/sacrosanct24/poe-price-checker/compare/v1.1.0...v1.4.0
 [1.1.0]: https://github.com/sacrosanct24/poe-price-checker/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/sacrosanct24/poe-price-checker/releases/tag/v1.0.0

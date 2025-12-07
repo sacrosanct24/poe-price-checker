@@ -22,6 +22,9 @@ Quick reference for all keyboard shortcuts in PoE Price Checker.
 | Ctrl+B | PoB Characters | Build & PoB |
 | Ctrl+Shift+B | BiS Search | Build & PoB |
 | Ctrl+Shift+I | Compare Items | Build & PoB |
+| Ctrl+1 | Item Evaluator | Screen Navigation |
+| Ctrl+2 | AI Advisor | Screen Navigation |
+| Ctrl+3 | Daytrader | Screen Navigation |
 | Ctrl+H | History | Navigation |
 | Ctrl+Shift+S | Stash Viewer | Navigation |
 | Ctrl+Shift+T | Toggle Theme | View & Theme |
@@ -51,6 +54,14 @@ Quick reference for all keyboard shortcuts in PoE Price Checker.
 | Ctrl+B | PoB Characters | Open PoB character/build management window |
 | Ctrl+Shift+B | BiS Search | Open Best-in-Slot search dialog |
 | Ctrl+Shift+I | Compare Items | Open side-by-side item comparison dialog |
+
+### Screen Navigation
+
+| Shortcut | Action | Description |
+|----------|--------|-------------|
+| Ctrl+1 | Item Evaluator | Switch to Item Evaluator screen (price checking) |
+| Ctrl+2 | AI Advisor | Switch to AI Advisor screen (build optimization) |
+| Ctrl+3 | Daytrader | Switch to Daytrader screen (economy/trading) |
 
 ### Navigation
 

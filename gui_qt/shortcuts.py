@@ -70,6 +70,9 @@ DEFAULT_SHORTCUTS: List[ShortcutDef] = [
     ShortcutDef("show_rare_eval_config", "Rare Item Settings", "Configure rare item evaluation", "Ctrl+Shift+R", ShortcutCategory.BUILD),
 
     # Navigation
+    ShortcutDef("switch_to_evaluator", "Item Evaluator", "Switch to Item Evaluator screen", "Ctrl+1", ShortcutCategory.NAVIGATION),
+    ShortcutDef("switch_to_advisor", "AI Advisor", "Switch to AI Advisor screen", "Ctrl+2", ShortcutCategory.NAVIGATION),
+    ShortcutDef("switch_to_daytrader", "Daytrader", "Switch to Daytrader screen", "Ctrl+3", ShortcutCategory.NAVIGATION),
     ShortcutDef("show_history", "Session History", "Show items checked this session", "Ctrl+H", ShortcutCategory.NAVIGATION),
     ShortcutDef("show_stash_viewer", "Stash Viewer", "Open stash tab viewer", "Ctrl+Shift+S", ShortcutCategory.NAVIGATION),
     ShortcutDef("show_recent_sales", "Recent Sales", "View recent sale records", "Ctrl+Alt+S", ShortcutCategory.NAVIGATION),

@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QAction, QKeySequence, QIcon
+from PyQt6.QtGui import QAction, QIcon
 from PyQt6.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -53,6 +53,7 @@ from gui_qt.dialogs.help_dialogs import (
 )
 from gui_qt.widgets.toast_notification import ToastManager
 from gui_qt.widgets.pinned_items_widget import PinnedItemsWidget
+from gui_qt.widgets.price_rankings_panel import PriceRankingsPanel
 from gui_qt.widgets.session_tabs import SessionTabWidget, SessionPanel
 from gui_qt.workers import RankingsPopulationWorker
 from gui_qt.services import get_window_manager, get_history_manager
@@ -67,6 +68,8 @@ from gui_qt.controllers import (
 )
 from gui_qt.controllers.ai_analysis_controller import AIAnalysisController
 from gui_qt.controllers.loot_tracking_controller import LootTrackingController
+from gui_qt.widgets.main_navigation_bar import MainNavigationBar
+from gui_qt.screens import ScreenController, ScreenType, AIAdvisorScreen, DaytraderScreen
 from core.build_stat_calculator import BuildStats
 
 if TYPE_CHECKING:
@@ -85,6 +88,11 @@ class PriceCheckerWindow(QMainWindow):
         # State
         self._check_in_progress = False
         self._upgrade_advisor_view = None  # Lazy-loaded full-screen advisor
+
+        # Screen navigation
+        self._nav_bar: Optional[MainNavigationBar] = None
+        self._screen_controller: Optional[ScreenController] = None
+        self._ai_advisor_screen = None  # AI Advisor screen reference
 
         # History manager for session history
         self._history_manager = get_history_manager()
@@ -298,29 +306,39 @@ class PriceCheckerWindow(QMainWindow):
                     MenuItem("E&xit", handler=self.close, shortcut="Alt+F4"),
                 ]),
             ]),
+            MenuConfig("&Navigate", [
+                MenuItem("&Item Evaluator", handler=self._switch_to_evaluator,
+                         shortcut="Ctrl+1"),
+                MenuItem("&AI Advisor", handler=self._switch_to_advisor,
+                         shortcut="Ctrl+2"),
+                MenuItem("&Daytrader", handler=self._switch_to_daytrader,
+                         shortcut="Ctrl+3"),
+            ]),
             MenuConfig("&Build", [
+                MenuSection([
+                    MenuItem("Go to &AI Advisor Screen", handler=self._switch_to_advisor),
+                ]),
                 MenuItem("&PoB Characters", handler=self._show_pob_characters,
                          shortcut="Ctrl+B"),
                 MenuItem("&Compare Build Trees...", handler=self._show_build_comparison),
-                MenuItem("Browse &Loadouts...", handler=self._show_loadout_selector),
                 MenuItem("Build &Library...", handler=self._show_build_library,
                          shortcut="Ctrl+Alt+B"),
                 MenuSection([
-                    MenuItem("&Import Local PoB Build...", handler=self._show_local_builds_import),
+                    MenuItem("Find &BiS Item...", handler=self._show_bis_search,
+                             shortcut="Ctrl+I"),
+                    MenuItem("&Upgrade Finder...", handler=self._show_upgrade_finder,
+                             shortcut="Ctrl+U"),
+                    MenuItem("Compare &Items...", handler=self._show_item_comparison,
+                             shortcut="Ctrl+Shift+I"),
                 ]),
-                MenuItem("Find &BiS Item...", handler=self._show_bis_search,
-                         shortcut="Ctrl+I"),
-                MenuItem("&Upgrade Finder...", handler=self._show_upgrade_finder,
-                         shortcut="Ctrl+U"),
-                MenuItem("AI Upgrade &Advisor...", handler=self._show_upgrade_advisor,
-                         shortcut="Ctrl+Shift+U"),
-                MenuItem("Compare &Items...", handler=self._show_item_comparison,
-                         shortcut="Ctrl+Shift+I"),
                 MenuSection([
                     MenuItem("Rare Item &Settings...", handler=self._show_rare_eval_config),
                 ]),
             ]),
             MenuConfig("&Economy", [
+                MenuSection([
+                    MenuItem("Go to &Daytrader Screen", handler=self._switch_to_daytrader),
+                ]),
                 MenuSection([
                     MenuItem("&Top 20 Rankings", handler=self._show_price_rankings),
                     MenuItem("Data &Sources Info", handler=self._show_data_sources),
@@ -396,14 +414,31 @@ class PriceCheckerWindow(QMainWindow):
     # -------------------------------------------------------------------------
 
     def _create_central_widget(self) -> None:
-        """Create the main content area with integrated PoB panel."""
-        # Use QStackedWidget to switch between main view and full-screen advisor
-        self._stacked_widget = QStackedWidget()
-        self.setCentralWidget(self._stacked_widget)
+        """Create the main content area with navigation bar and screens."""
+        # Container for navigation bar + stacked screens
+        container = QWidget()
+        container_layout = QVBoxLayout(container)
+        container_layout.setContentsMargins(0, 0, 0, 0)
+        container_layout.setSpacing(0)
 
-        # Index 0: Normal main view
+        # Top navigation bar (large pill buttons)
+        self._nav_bar = MainNavigationBar()
+        self._nav_bar.screen_selected.connect(self._on_screen_selected)
+        container_layout.addWidget(self._nav_bar)
+
+        # QStackedWidget for screens
+        self._stacked_widget = QStackedWidget()
+        container_layout.addWidget(self._stacked_widget)
+
+        self.setCentralWidget(container)
+
+        # Index 0: Item Evaluator (current main view)
         main_view = QWidget()
         self._stacked_widget.addWidget(main_view)
+
+        # Initialize screen controller (placeholder screens added after main view setup)
+        self._screen_controller = ScreenController(self._stacked_widget, parent=self)
+        self._screen_controller.set_status_callback(self._set_status)
 
         # Main horizontal splitter: PoB panel (left) | Price check (right)
         main_layout = QHBoxLayout(main_view)
@@ -412,28 +447,20 @@ class PriceCheckerWindow(QMainWindow):
 
         main_splitter = QSplitter(Qt.Orientation.Horizontal)
 
-        # ========== LEFT SIDE: PoB Panel + Pinned Items ==========
+        # ========== LEFT SIDE: Price Rankings + Pinned Items ==========
         left_splitter = QSplitter(Qt.Orientation.Vertical)
         left_splitter.setMinimumWidth(250)
         left_splitter.setMaximumWidth(400)
 
-        # PoB Equipment panel
-        pob_group = QGroupBox("PoB Equipment")
-        pob_layout = QVBoxLayout(pob_group)
-        pob_layout.setContentsMargins(4, 4, 4, 4)
+        # Price Rankings panel (collapsible)
+        rankings_group = QGroupBox("Price Rankings")
+        rankings_layout = QVBoxLayout(rankings_group)
+        rankings_layout.setContentsMargins(4, 4, 4, 4)
 
-        # Create embedded PoB panel
-        from gui_qt.widgets.pob_panel import PoBPanel
-        self.pob_panel = PoBPanel(self._pob_controller.character_manager, parent=self)
-        self.pob_panel.price_check_requested.connect(self._on_pob_price_check)
-        self.pob_panel.ai_analysis_requested.connect(self._on_ai_analysis_requested)
-        self.pob_panel.upgrade_analysis_requested.connect(self._on_upgrade_analysis_requested)
-        # Update build stats when profile changes
-        self.pob_panel.profile_combo.currentTextChanged.connect(
-            self._on_pob_profile_changed
-        )
-        pob_layout.addWidget(self.pob_panel)
-        left_splitter.addWidget(pob_group)
+        self._rankings_panel = PriceRankingsPanel(ctx=self.ctx, parent=self)
+        self._rankings_panel.price_check_requested.connect(self._on_ranking_price_check)
+        rankings_layout.addWidget(self._rankings_panel)
+        left_splitter.addWidget(rankings_group)
 
         # Pinned Items panel
         pinned_group = QGroupBox("Pinned Items")
@@ -447,8 +474,18 @@ class PriceCheckerWindow(QMainWindow):
         pinned_layout.addWidget(self.pinned_items_widget)
         left_splitter.addWidget(pinned_group)
 
-        # Set initial splitter sizes (PoB: 60%, Pinned: 40%)
+        # Set initial splitter sizes (Rankings: 60%, Pinned: 40%)
         left_splitter.setSizes([400, 250])
+
+        # Create PoB panel (hidden - will be moved to AI Advisor in Phase 3)
+        # For now, keep it initialized but not visible for backward compatibility
+        from gui_qt.widgets.pob_panel import PoBPanel
+        self.pob_panel = PoBPanel(self._pob_controller.character_manager, parent=self)
+        self.pob_panel.price_check_requested.connect(self._on_pob_price_check)
+        self.pob_panel.ai_analysis_requested.connect(self._on_ai_analysis_requested)
+        self.pob_panel.upgrade_analysis_requested.connect(self._on_upgrade_analysis_requested)
+        self.pob_panel.profile_combo.currentTextChanged.connect(self._on_pob_profile_changed)
+        self.pob_panel.hide()  # Hidden - will be added to AI Advisor screen
 
         main_splitter.addWidget(left_splitter)
 
@@ -474,6 +511,70 @@ class PriceCheckerWindow(QMainWindow):
 
         # Add main splitter to central layout
         main_layout.addWidget(main_splitter)
+
+        # Create and register screens for other tabs
+        # Note: Item Evaluator (index 0) is the main_view we just created
+
+        # AI Advisor screen with PoB panel and upgrade advisor
+        ai_advisor_screen = AIAdvisorScreen(
+            ctx=self.ctx,
+            character_manager=self._pob_controller.character_manager,
+            on_status=self._set_status,
+        )
+        # Connect AI Advisor signals
+        ai_advisor_screen.upgrade_analysis_requested.connect(
+            self._on_ai_advisor_upgrade_requested
+        )
+        ai_advisor_screen.compare_builds_requested.connect(self._show_build_comparison)
+        ai_advisor_screen.bis_search_requested.connect(self._show_bis_search)
+        ai_advisor_screen.library_requested.connect(self._show_build_library)
+        ai_advisor_screen.upgrade_finder_requested.connect(self._show_upgrade_finder)
+        ai_advisor_screen.item_compare_requested.connect(self._show_item_comparison)
+        ai_advisor_screen.price_check_requested.connect(self._on_pob_price_check)
+        self._ai_advisor_screen = ai_advisor_screen
+
+        # Daytrader screen with economy/trading features
+        daytrader_screen = DaytraderScreen(ctx=self.ctx, on_status=self._set_status)
+        daytrader_screen.record_sale_requested.connect(self._show_recent_sales)
+        daytrader_screen.economy_snapshot_requested.connect(self._collect_economy_snapshot)
+        daytrader_screen.refresh_stash_requested.connect(self._show_stash_viewer)
+
+        self._screen_controller.register_screen(ScreenType.AI_ADVISOR, ai_advisor_screen)
+        self._screen_controller.register_screen(ScreenType.DAYTRADER, daytrader_screen)
+
+    def _on_screen_selected(self, screen_type_value: int) -> None:
+        """Handle screen selection from navigation bar.
+
+        Args:
+            screen_type_value: The ScreenType value (0, 1, or 2).
+        """
+        screen_type = ScreenType(screen_type_value)
+
+        # Special handling for Item Evaluator - it's the main view at index 0
+        if screen_type == ScreenType.ITEM_EVALUATOR:
+            # Switch to main view (index 0)
+            self._stacked_widget.setCurrentIndex(0)
+            self._set_status("Item Evaluator - Ready")
+            return
+
+        # For other screens, use the screen controller
+        if self._screen_controller:
+            self._screen_controller.switch_to(screen_type)
+
+    def _switch_to_evaluator(self) -> None:
+        """Switch to Item Evaluator screen (Ctrl+1)."""
+        self._on_screen_selected(ScreenType.ITEM_EVALUATOR.value)
+        self._nav_bar.set_active_screen(ScreenType.ITEM_EVALUATOR)
+
+    def _switch_to_advisor(self) -> None:
+        """Switch to AI Advisor screen (Ctrl+2)."""
+        self._on_screen_selected(ScreenType.AI_ADVISOR.value)
+        self._nav_bar.set_active_screen(ScreenType.AI_ADVISOR)
+
+    def _switch_to_daytrader(self) -> None:
+        """Switch to Daytrader screen (Ctrl+3)."""
+        self._on_screen_selected(ScreenType.DAYTRADER.value)
+        self._nav_bar.set_active_screen(ScreenType.DAYTRADER)
 
     # -------------------------------------------------------------------------
     # Status Bar
@@ -720,6 +821,78 @@ class PriceCheckerWindow(QMainWindow):
         self._stacked_widget.setCurrentIndex(0)
         self._set_status("Ready")
 
+    def _on_ai_advisor_upgrade_requested(self, slot: str, include_stash: bool) -> None:
+        """Handle upgrade analysis request from the AI Advisor screen.
+
+        Routes the request through the existing upgrade analysis flow.
+        """
+        if not self._ai_advisor_screen:
+            return
+
+        # Get the screen's upgrade advisor to check provider
+        upgrade_advisor = self._ai_advisor_screen.get_upgrade_advisor()
+        if not upgrade_advisor:
+            return
+
+        selected_provider = upgrade_advisor.get_selected_provider()
+        if not selected_provider:
+            self._set_status("No AI provider selected")
+            self._ai_advisor_screen.show_analysis_error(slot, "No AI provider selected")
+            return
+
+        # Check API key for non-local providers
+        from data_sources.ai import is_local_provider
+        if not is_local_provider(selected_provider):
+            api_key = self.ctx.config.get_ai_api_key(selected_provider)
+            if not api_key:
+                self._set_status(f"No API key configured for {selected_provider}")
+                self._ai_advisor_screen.show_analysis_error(
+                    slot,
+                    f"No API key configured for {selected_provider}.\n"
+                    f"Add your API key in Settings > AI."
+                )
+                return
+
+        # Temporarily set provider and perform analysis
+        original_provider = self.ctx.config.ai_provider
+        self.ctx.config.ai_provider = selected_provider
+
+        if not self._ai_controller:
+            self._init_ai_controller()
+
+        self._ai_controller.set_database(self.ctx.db)
+        self._ai_controller.set_character_manager(self._pob_controller.character_manager)
+
+        account_name = None
+        if include_stash:
+            account_name = self.ctx.config.data.get("stash", {}).get("account_name", "")
+
+        try:
+            success = self._ai_controller.analyze_upgrade(
+                slot=slot,
+                account_name=account_name,
+                include_stash=include_stash,
+            )
+        finally:
+            self.ctx.config.ai_provider = original_provider
+
+        if success:
+            def on_result(response):
+                if self._ai_advisor_screen:
+                    self._ai_advisor_screen.show_analysis_result(
+                        slot, response.content, selected_provider
+                    )
+
+            def on_error(error_msg, traceback):
+                if self._ai_advisor_screen:
+                    self._ai_advisor_screen.show_analysis_error(slot, error_msg)
+
+            if self._ai_controller._worker:
+                self._ai_controller._worker.result.connect(on_result)
+                self._ai_controller._worker.error.connect(on_error)
+        else:
+            self._ai_advisor_screen.show_analysis_error(slot, "Failed to start analysis")
+
     def _on_upgrade_analysis_from_advisor(self, slot: str, include_stash: bool) -> None:
         """Handle upgrade analysis request from the full-screen advisor view.
 
@@ -827,7 +1000,10 @@ class PriceCheckerWindow(QMainWindow):
         manager.register("show_item_comparison", self._show_item_comparison)
         manager.register("show_rare_eval_config", self._show_rare_eval_config)
 
-        # Navigation
+        # Navigation - Screen switching
+        manager.register("switch_to_evaluator", self._switch_to_evaluator)
+        manager.register("switch_to_advisor", self._switch_to_advisor)
+        manager.register("switch_to_daytrader", self._switch_to_daytrader)
         manager.register("show_history", self._show_history)
         manager.register("show_stash_viewer", self._show_stash_viewer)
         manager.register("show_recent_sales", self._show_recent_sales)
@@ -1311,10 +1487,6 @@ class PriceCheckerWindow(QMainWindow):
     def _show_build_comparison(self) -> None:
         """Show build comparison dialog."""
         self._nav_controller.show_build_comparison()
-
-    def _show_loadout_selector(self) -> None:
-        """Show loadout selector dialog for browsing PoB loadouts."""
-        self._nav_controller.show_loadout_selector()
 
     def _on_loadout_selected(self, config: dict) -> None:
         """Handle loadout selection from the selector dialog."""

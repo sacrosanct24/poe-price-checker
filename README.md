@@ -99,6 +99,17 @@
 - Right-click menus for quick actions
 - Session tabs for multiple price-checking workflows
 
+### 3-Screen Architecture *(New in v1.6.0)*
+The application is organized into three focused screens:
+
+| Screen | Shortcut | Purpose |
+|--------|----------|---------|
+| **Item Evaluator** | Ctrl+1 | Price checking, session tabs, pinned items, price rankings |
+| **AI Advisor** | Ctrl+2 | Build optimization, upgrade analysis, PoB integration |
+| **Daytrader** | Ctrl+3 | Sales tracking, loot tracking, market analysis, stash viewer |
+
+Switch screens via the top navigation bar or keyboard shortcuts.
+
 ---
 
 ## Quick Start
