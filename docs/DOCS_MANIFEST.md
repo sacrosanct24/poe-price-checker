@@ -103,11 +103,12 @@ related_code:
 | SETUP_GUIDE.md | current | stable | 2025-11-28 | 2026-02-28 | Detailed setup |
 | WHY_MCP.md | current | stable | 2025-11-28 | 2026-02-28 | Decision guide |
 
-### Testing (3 files)
+### Testing (4 files)
 
 | File | Status | Stability | Last Reviewed | Next Review | Notes |
 |------|--------|-----------|---------------|-------------|-------|
 | COVERAGE_GAPS.md | outdated | volatile | 2025-11-28 | 2025-12-05 | Metrics need update |
+| FUNCTIONAL_TEST_PLAN.md | current | volatile | 2025-12-06 | Per-release | Manual E2E testing checklist |
 | TESTING_GUIDE.md | current | stable | 2025-11-28 | 2026-02-28 | |
 | TEST_SUITE_GUIDE.md | current | stable | 2025-11-28 | 2026-02-28 | |
 
@@ -125,15 +126,15 @@ related_code:
 
 | Metric | Count |
 |--------|-------|
-| Total Documents | 29 |
+| Total Documents | 30 |
 | Current | 29 |
-| Outdated | 0 |
+| Outdated | 1 |
 | Deprecated | 0 |
 
 | Stability | Count |
 |-----------|-------|
 | Stable | 18 |
-| Volatile | 11 |
+| Volatile | 12 |
 
 ---
 
@@ -147,5 +148,6 @@ related_code:
 
 | Date | Changes |
 |------|---------|
+| 2025-12-06 | Added FUNCTIONAL_TEST_PLAN.md for E2E manual testing |
 | 2025-12-06 | Cleaned up manifest: removed planning docs, updated statistics |
 | 2025-11-28 | Initial manifest created from documentation audit |

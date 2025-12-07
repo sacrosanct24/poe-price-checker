@@ -260,6 +260,202 @@ class LeagueEconomyService:
         logger.info(f"Imported {rows_imported} item prices for {league}")
         return rows_imported
 
+    def import_item_csv_file(
+        self,
+        file_path: Path,
+        league: str,
+        item_type: str = "UniqueItem",
+        delimiter: str = ";",
+        batch_size: int = 10000,
+        progress_callback: Optional[callable] = None,
+    ) -> int:
+        """
+        Import item prices from a large CSV file using streaming.
+
+        Optimized for large files (100MB+):
+        - Reads file line-by-line (no full load into memory)
+        - Uses batch inserts for efficiency
+        - Reports progress via callback
+
+        Args:
+            file_path: Path to CSV file
+            league: League name to import
+            item_type: Item type category
+            delimiter: CSV delimiter
+            batch_size: Rows per batch commit
+            progress_callback: Optional callback(rows_imported, total_lines)
+
+        Returns:
+            Number of rows imported
+        """
+        rows_imported = 0
+        batch = []
+
+        with open(file_path, "r", encoding="utf-8") as f:
+            reader = csv.DictReader(f, delimiter=delimiter)
+
+            for row in reader:
+                try:
+                    row_league = row.get("League", "").strip()
+                    if row_league != league:
+                        continue
+
+                    date_str = row.get("Date", "").strip()
+                    item_name = row.get("Name", "").strip()
+                    base_type = row.get("BaseType", "").strip()
+                    value_str = row.get("Value", "").strip()
+
+                    if not all([date_str, item_name, value_str]):
+                        continue
+
+                    # Parse date
+                    try:
+                        date = datetime.strptime(date_str, "%Y-%m-%d")
+                    except ValueError:
+                        continue
+
+                    # Parse value
+                    try:
+                        value = float(value_str)
+                    except ValueError:
+                        continue
+
+                    # Add to batch
+                    batch.append((
+                        league, item_name, base_type, item_type,
+                        date.isoformat(), value
+                    ))
+                    rows_imported += 1
+
+                    # Commit batch
+                    if len(batch) >= batch_size:
+                        self._db.conn.executemany(
+                            """
+                            INSERT INTO league_economy_items
+                                (league, item_name, base_type, item_type, rate_date, chaos_value)
+                            VALUES (?, ?, ?, ?, ?, ?)
+                            """,
+                            batch,
+                        )
+                        self._db.conn.commit()
+                        batch = []
+                        if progress_callback:
+                            progress_callback(rows_imported)
+
+                except Exception as e:
+                    logger.warning(f"Failed to import item row: {e}")
+                    continue
+
+            # Commit remaining batch
+            if batch:
+                self._db.conn.executemany(
+                    """
+                    INSERT INTO league_economy_items
+                        (league, item_name, base_type, item_type, rate_date, chaos_value)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    batch,
+                )
+                self._db.conn.commit()
+
+        logger.info(f"Imported {rows_imported} item prices for {league} from {file_path.name}")
+        return rows_imported
+
+    def import_currency_csv_file(
+        self,
+        file_path: Path,
+        league: str,
+        delimiter: str = ";",
+        batch_size: int = 10000,
+        progress_callback: Optional[callable] = None,
+    ) -> int:
+        """
+        Import currency rates from a large CSV file using streaming.
+
+        Args:
+            file_path: Path to CSV file
+            league: League name to import
+            delimiter: CSV delimiter
+            batch_size: Rows per batch commit
+            progress_callback: Optional callback(rows_imported)
+
+        Returns:
+            Number of rows imported
+        """
+        rows_imported = 0
+        batch = []
+
+        with open(file_path, "r", encoding="utf-8") as f:
+            reader = csv.DictReader(f, delimiter=delimiter)
+
+            for row in reader:
+                try:
+                    row_league = row.get("League", "").strip()
+                    if row_league != league:
+                        continue
+
+                    date_str = row.get("Date", "").strip()
+                    get_currency = row.get("Get", "").strip()
+                    pay_currency = row.get("Pay", "").strip()
+                    value_str = row.get("Value", "").strip()
+
+                    if not all([date_str, get_currency, pay_currency, value_str]):
+                        continue
+
+                    # Only import rates where Pay is Chaos Orb
+                    if pay_currency != "Chaos Orb":
+                        continue
+
+                    # Parse date
+                    try:
+                        date = datetime.strptime(date_str, "%Y-%m-%d")
+                    except ValueError:
+                        continue
+
+                    # Parse value
+                    try:
+                        value = float(value_str)
+                    except ValueError:
+                        continue
+
+                    # Add to batch
+                    batch.append((league, get_currency, date.isoformat(), value))
+                    rows_imported += 1
+
+                    # Commit batch
+                    if len(batch) >= batch_size:
+                        self._db.conn.executemany(
+                            """
+                            INSERT INTO league_economy_rates
+                                (league, currency_name, rate_date, chaos_value)
+                            VALUES (?, ?, ?, ?)
+                            """,
+                            batch,
+                        )
+                        self._db.conn.commit()
+                        batch = []
+                        if progress_callback:
+                            progress_callback(rows_imported)
+
+                except Exception as e:
+                    logger.warning(f"Failed to import row: {e}")
+                    continue
+
+            # Commit remaining batch
+            if batch:
+                self._db.conn.executemany(
+                    """
+                    INSERT INTO league_economy_rates
+                        (league, currency_name, rate_date, chaos_value)
+                    VALUES (?, ?, ?, ?)
+                    """,
+                    batch,
+                )
+                self._db.conn.commit()
+
+        logger.info(f"Imported {rows_imported} currency rates for {league} from {file_path.name}")
+        return rows_imported
+
     # ------------------------------------------------------------------
     # Milestone Snapshots
     # ------------------------------------------------------------------
@@ -682,6 +878,349 @@ class LeagueEconomyService:
         except Exception as e:
             logger.error(f"Failed to fetch current rates: {e}")
             return {}
+
+    # ------------------------------------------------------------------
+    # Aggregation Methods (Pre-compute summaries)
+    # ------------------------------------------------------------------
+
+    def aggregate_league(
+        self,
+        league: str,
+        is_finalized: bool = True,
+        top_items_limit: int = 100,
+    ) -> bool:
+        """
+        Pre-aggregate all economy data for a league into summary tables.
+
+        This computes currency stats, top items, and overall league summary
+        and stores them for fast retrieval. Call this once per league after
+        importing historical data.
+
+        Args:
+            league: League name to aggregate
+            is_finalized: True if league is over (data won't change)
+            top_items_limit: Number of top items to store (default 100)
+
+        Returns:
+            True if aggregation succeeded
+        """
+        try:
+            logger.info(f"Aggregating economy data for {league}...")
+
+            # Aggregate currency data
+            self._aggregate_currency_summary(league)
+
+            # Aggregate top items
+            self._aggregate_top_items(league, limit=top_items_limit)
+
+            # Create league summary
+            self._aggregate_league_summary(league, is_finalized)
+
+            logger.info(f"Aggregation complete for {league}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to aggregate {league}: {e}")
+            return False
+
+    def _aggregate_currency_summary(self, league: str) -> int:
+        """Aggregate currency statistics for a league."""
+        # Delete existing summary for this league
+        self._db._execute(
+            "DELETE FROM league_currency_summary WHERE league = ?",
+            (league,),
+        )
+
+        # Get distinct currencies for this league
+        currencies = self._db._execute_fetchall(
+            """
+            SELECT DISTINCT currency_name FROM league_economy_rates
+            WHERE league = ?
+            """,
+            (league,),
+        )
+
+        count = 0
+        for row in currencies:
+            currency = row["currency_name"]
+
+            # Get aggregated stats
+            stats = self._db._execute_fetchone(
+                """
+                SELECT
+                    MIN(chaos_value) as min_val,
+                    MAX(chaos_value) as max_val,
+                    AVG(chaos_value) as avg_val,
+                    COUNT(*) as data_points
+                FROM league_economy_rates
+                WHERE league = ? AND currency_name = ?
+                """,
+                (league, currency),
+            )
+
+            # Get start value (first date)
+            start = self._db._execute_fetchone(
+                """
+                SELECT chaos_value FROM league_economy_rates
+                WHERE league = ? AND currency_name = ?
+                ORDER BY rate_date ASC LIMIT 1
+                """,
+                (league, currency),
+            )
+
+            # Get end value (last date)
+            end = self._db._execute_fetchone(
+                """
+                SELECT chaos_value FROM league_economy_rates
+                WHERE league = ? AND currency_name = ?
+                ORDER BY rate_date DESC LIMIT 1
+                """,
+                (league, currency),
+            )
+
+            # Get peak date (date of max value)
+            peak = self._db._execute_fetchone(
+                """
+                SELECT rate_date FROM league_economy_rates
+                WHERE league = ? AND currency_name = ?
+                ORDER BY chaos_value DESC LIMIT 1
+                """,
+                (league, currency),
+            )
+
+            # Insert summary
+            self._db._execute(
+                """
+                INSERT INTO league_currency_summary
+                    (league, currency_name, min_value, max_value, avg_value,
+                     start_value, end_value, peak_date, data_points)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    league,
+                    currency,
+                    stats["min_val"],
+                    stats["max_val"],
+                    stats["avg_val"],
+                    start["chaos_value"] if start else None,
+                    end["chaos_value"] if end else None,
+                    peak["rate_date"] if peak else None,
+                    stats["data_points"],
+                ),
+            )
+            count += 1
+
+        logger.info(f"Aggregated {count} currency summaries for {league}")
+        return count
+
+    def _aggregate_top_items(self, league: str, limit: int = 100) -> int:
+        """Aggregate top unique items for a league."""
+        # Delete existing summary for this league
+        self._db._execute(
+            "DELETE FROM league_top_items_summary WHERE league = ?",
+            (league,),
+        )
+
+        # Get top items by average value (with minimum 10 data points)
+        items = self._db._execute_fetchall(
+            """
+            SELECT
+                item_name,
+                base_type,
+                AVG(chaos_value) as avg_val,
+                MIN(chaos_value) as min_val,
+                MAX(chaos_value) as max_val,
+                COUNT(*) as data_points
+            FROM league_economy_items
+            WHERE league = ?
+            GROUP BY item_name
+            HAVING COUNT(*) >= 10
+            ORDER BY avg_val DESC
+            LIMIT ?
+            """,
+            (league, limit),
+        )
+
+        count = 0
+        for idx, row in enumerate(items):
+            self._db._execute(
+                """
+                INSERT INTO league_top_items_summary
+                    (league, item_name, base_type, avg_value, min_value,
+                     max_value, data_points, rank)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    league,
+                    row["item_name"],
+                    row["base_type"],
+                    row["avg_val"],
+                    row["min_val"],
+                    row["max_val"],
+                    row["data_points"],
+                    idx + 1,
+                ),
+            )
+            count += 1
+
+        logger.info(f"Aggregated {count} top items for {league}")
+        return count
+
+    def _aggregate_league_summary(self, league: str, is_finalized: bool) -> None:
+        """Create or update league summary."""
+        # Delete existing summary
+        self._db._execute(
+            "DELETE FROM league_economy_summary WHERE league = ?",
+            (league,),
+        )
+
+        # Get date range and counts from currency data
+        currency_stats = self._db._execute_fetchone(
+            """
+            SELECT
+                MIN(rate_date) as first_date,
+                MAX(rate_date) as last_date,
+                COUNT(*) as total_snapshots
+            FROM league_economy_rates
+            WHERE league = ?
+            """,
+            (league,),
+        )
+
+        # Get item count
+        item_stats = self._db._execute_fetchone(
+            """
+            SELECT COUNT(*) as total_items
+            FROM league_economy_items
+            WHERE league = ?
+            """,
+            (league,),
+        )
+
+        if currency_stats and currency_stats["first_date"]:
+            self._db._execute(
+                """
+                INSERT INTO league_economy_summary
+                    (league, first_date, last_date, total_currency_snapshots,
+                     total_item_snapshots, is_finalized, computed_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    league,
+                    currency_stats["first_date"],
+                    currency_stats["last_date"],
+                    currency_stats["total_snapshots"],
+                    item_stats["total_items"] if item_stats else 0,
+                    1 if is_finalized else 0,
+                    datetime.now().isoformat(),
+                ),
+            )
+
+        logger.info(f"Created league summary for {league}")
+
+    # ------------------------------------------------------------------
+    # Fast Query Methods (from summary tables)
+    # ------------------------------------------------------------------
+
+    def get_currency_summary(
+        self,
+        league: str,
+        currencies: Optional[List[str]] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Get pre-aggregated currency statistics for a league.
+
+        Args:
+            league: League name
+            currencies: Optional list of currencies to filter
+
+        Returns:
+            List of currency summary dictionaries
+        """
+        if currencies:
+            placeholders = ",".join("?" * len(currencies))
+            rows = self._db._execute_fetchall(
+                f"""
+                SELECT * FROM league_currency_summary
+                WHERE league = ? AND currency_name IN ({placeholders})
+                ORDER BY avg_value DESC
+                """,
+                (league, *currencies),
+            )
+        else:
+            rows = self._db._execute_fetchall(
+                """
+                SELECT * FROM league_currency_summary
+                WHERE league = ?
+                ORDER BY avg_value DESC
+                """,
+                (league,),
+            )
+
+        return [dict(row) for row in rows]
+
+    def get_top_items_summary(
+        self,
+        league: str,
+        limit: int = 10,
+    ) -> List[Dict[str, Any]]:
+        """
+        Get pre-aggregated top items for a league.
+
+        Args:
+            league: League name
+            limit: Number of items to return
+
+        Returns:
+            List of top item dictionaries ordered by rank
+        """
+        rows = self._db._execute_fetchall(
+            """
+            SELECT * FROM league_top_items_summary
+            WHERE league = ?
+            ORDER BY rank ASC
+            LIMIT ?
+            """,
+            (league, limit),
+        )
+
+        return [dict(row) for row in rows]
+
+    def get_league_summary(self, league: str) -> Optional[Dict[str, Any]]:
+        """
+        Get pre-aggregated league summary.
+
+        Args:
+            league: League name
+
+        Returns:
+            League summary dictionary or None
+        """
+        row = self._db._execute_fetchone(
+            """
+            SELECT * FROM league_economy_summary
+            WHERE league = ?
+            """,
+            (league,),
+        )
+
+        return dict(row) if row else None
+
+    def is_league_aggregated(self, league: str) -> bool:
+        """Check if a league has been aggregated."""
+        row = self._db._execute_fetchone(
+            "SELECT 1 FROM league_economy_summary WHERE league = ?",
+            (league,),
+        )
+        return row is not None
+
+    def get_aggregated_leagues(self) -> List[str]:
+        """Get list of leagues with pre-aggregated data."""
+        rows = self._db._execute_fetchall(
+            "SELECT league FROM league_economy_summary ORDER BY league DESC",
+            (),
+        )
+        return [row["league"] for row in rows]
 
 
 # Singleton instance

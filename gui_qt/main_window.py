@@ -316,18 +316,20 @@ class PriceCheckerWindow(QMainWindow):
                     MenuItem("Rare Item &Settings...", handler=self._show_rare_eval_config),
                 ]),
             ]),
-            MenuConfig("&Prices", [
-                MenuItem("&Top 20 Rankings", handler=self._show_price_rankings),
+            MenuConfig("&Economy", [
+                MenuSection([
+                    MenuItem("&Top 20 Rankings", handler=self._show_price_rankings),
+                    MenuItem("Data &Sources Info", handler=self._show_data_sources),
+                ], label="Pricing"),
                 MenuSection([
                     MenuItem("&Recent Sales", handler=self._show_recent_sales),
                     MenuItem("Sales &Dashboard", handler=self._show_sales_dashboard),
-                ]),
-                MenuSection([
                     MenuItem("&Loot Tracking...", handler=self._show_loot_dashboard),
-                ]),
+                ], label="Sales & Loot"),
                 MenuSection([
-                    MenuItem("Data &Sources Info", handler=self._show_data_sources),
-                ]),
+                    MenuItem("Price &History...", handler=self._show_price_history),
+                    MenuItem("Collect Economy &Snapshot", handler=self._collect_economy_snapshot),
+                ], label="Historical Data"),
             ]),
         ]
         builder.build(menubar, static_menus)
@@ -363,7 +365,6 @@ class PriceCheckerWindow(QMainWindow):
             on_toggle_theme=self._toggle_theme,
             on_set_accent=self._set_accent_color,
             on_toggle_column=self._toggle_column,
-            on_collect_economy=self._collect_economy_snapshot,
             parent=self,
             logger=self.logger,
         )
@@ -1027,7 +1028,7 @@ class PriceCheckerWindow(QMainWindow):
         """Collect economy snapshot from poe.ninja for current league."""
         from core.league_economy_history import LeagueEconomyService
 
-        league = self.ctx.config.get("league", "Keepers")
+        league = self.ctx.config.league or "Keepers"
         self._set_status(f"Collecting economy snapshot for {league}...")
 
         try:
@@ -1044,6 +1045,13 @@ class PriceCheckerWindow(QMainWindow):
         except Exception as e:
             self.logger.error(f"Failed to collect economy snapshot: {e}")
             self._set_status(f"Error collecting snapshot: {e}")
+
+    def _show_price_history(self) -> None:
+        """Show price history analytics window."""
+        from gui_qt.windows.price_history_window import PriceHistoryWindow
+
+        window = PriceHistoryWindow(ctx=self.ctx, parent=self)
+        window.exec()
 
     def _show_pob_characters(self) -> None:
         """Show PoB character manager window."""

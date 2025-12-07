@@ -46,7 +46,7 @@ class Database:
     """
 
     # Current schema version. Increment if schema structure changes.
-    SCHEMA_VERSION = 7
+    SCHEMA_VERSION = 8
 
     def __init__(self, db_path: Optional[Path] = None):
         """
@@ -398,6 +398,45 @@ class Database:
 
                 CREATE INDEX IF NOT EXISTS idx_league_economy_top_uniques_snapshot
                 ON league_economy_top_uniques (snapshot_id, rank);
+
+                -- v8: Pre-aggregated summary tables for historical leagues
+                CREATE TABLE IF NOT EXISTS league_economy_summary (
+                    league TEXT PRIMARY KEY,
+                    first_date TEXT NOT NULL,
+                    last_date TEXT NOT NULL,
+                    total_currency_snapshots INTEGER NOT NULL DEFAULT 0,
+                    total_item_snapshots INTEGER NOT NULL DEFAULT 0,
+                    is_finalized INTEGER NOT NULL DEFAULT 0,
+                    computed_at TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS league_currency_summary (
+                    league TEXT NOT NULL,
+                    currency_name TEXT NOT NULL,
+                    min_value REAL NOT NULL,
+                    max_value REAL NOT NULL,
+                    avg_value REAL NOT NULL,
+                    start_value REAL,
+                    end_value REAL,
+                    peak_date TEXT,
+                    data_points INTEGER NOT NULL,
+                    PRIMARY KEY (league, currency_name)
+                );
+
+                CREATE TABLE IF NOT EXISTS league_top_items_summary (
+                    league TEXT NOT NULL,
+                    item_name TEXT NOT NULL,
+                    base_type TEXT,
+                    avg_value REAL NOT NULL,
+                    min_value REAL NOT NULL,
+                    max_value REAL NOT NULL,
+                    data_points INTEGER NOT NULL,
+                    rank INTEGER NOT NULL,
+                    PRIMARY KEY (league, item_name)
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_league_top_items_rank
+                ON league_top_items_summary (league, rank);
                 """
             )
 
@@ -424,6 +463,10 @@ class Database:
             - Add `league_economy_items` for historical item prices.
             - Add `league_economy_snapshots` for milestone snapshots.
             - Add `league_economy_top_uniques` for top uniques per snapshot.
+        v7 -> v8:
+            - Add `league_economy_summary` for pre-aggregated league stats.
+            - Add `league_currency_summary` for currency min/max/avg per league.
+            - Add `league_top_items_summary` for pre-computed top items.
         """
         logger.info(f"Starting schema migration v{old} → v{new}")
 
@@ -680,6 +723,52 @@ class Database:
 
                     CREATE INDEX IF NOT EXISTS idx_league_economy_top_uniques_snapshot
                     ON league_economy_top_uniques (snapshot_id, rank);
+                    """
+                )
+
+            if old < 8 <= new:
+                logger.info(
+                    "Applying v8 migration: creating economy summary tables."
+                )
+                conn.executescript(
+                    """
+                    CREATE TABLE IF NOT EXISTS league_economy_summary (
+                        league TEXT PRIMARY KEY,
+                        first_date TEXT NOT NULL,
+                        last_date TEXT NOT NULL,
+                        total_currency_snapshots INTEGER NOT NULL DEFAULT 0,
+                        total_item_snapshots INTEGER NOT NULL DEFAULT 0,
+                        is_finalized INTEGER NOT NULL DEFAULT 0,
+                        computed_at TEXT NOT NULL
+                    );
+
+                    CREATE TABLE IF NOT EXISTS league_currency_summary (
+                        league TEXT NOT NULL,
+                        currency_name TEXT NOT NULL,
+                        min_value REAL NOT NULL,
+                        max_value REAL NOT NULL,
+                        avg_value REAL NOT NULL,
+                        start_value REAL,
+                        end_value REAL,
+                        peak_date TEXT,
+                        data_points INTEGER NOT NULL,
+                        PRIMARY KEY (league, currency_name)
+                    );
+
+                    CREATE TABLE IF NOT EXISTS league_top_items_summary (
+                        league TEXT NOT NULL,
+                        item_name TEXT NOT NULL,
+                        base_type TEXT,
+                        avg_value REAL NOT NULL,
+                        min_value REAL NOT NULL,
+                        max_value REAL NOT NULL,
+                        data_points INTEGER NOT NULL,
+                        rank INTEGER NOT NULL,
+                        PRIMARY KEY (league, item_name)
+                    );
+
+                    CREATE INDEX IF NOT EXISTS idx_league_top_items_rank
+                    ON league_top_items_summary (league, rank);
                     """
                 )
 

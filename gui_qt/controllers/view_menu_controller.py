@@ -1,11 +1,14 @@
 """
 gui_qt.controllers.view_menu_controller - View menu management controller.
 
-Extracts View menu creation from main_window.py:
+Extracts View menu creation from main_window.py.
+Follows UX best practices: View menu contains display/appearance options only.
+
+Contents:
+- Session history and stash viewer windows
 - Theme submenu with categories
 - Accent color submenu
 - Column visibility submenu
-- Session history and stash viewer actions
 
 Usage:
     controller = ViewMenuController(
@@ -61,7 +64,6 @@ class ViewMenuController:
         on_toggle_theme: Callable[[], None],
         on_set_accent: Callable[[Optional[str]], None],
         on_toggle_column: Callable[[str, bool], None],
-        on_collect_economy: Optional[Callable[[], None]] = None,
         parent: Any = None,
         logger: Optional[logging.Logger] = None,
     ):
@@ -75,7 +77,6 @@ class ViewMenuController:
             on_toggle_theme: Callback to toggle dark/light theme.
             on_set_accent: Callback to set accent color.
             on_toggle_column: Callback to toggle column visibility.
-            on_collect_economy: Optional callback to collect economy snapshot.
             parent: Parent widget for actions.
             logger: Logger instance.
         """
@@ -85,7 +86,6 @@ class ViewMenuController:
         self._on_toggle_theme = on_toggle_theme
         self._on_set_accent = on_set_accent
         self._on_toggle_column = on_toggle_column
-        self._on_collect_economy = on_collect_economy
         self._parent = parent
         self._logger = logger or logging.getLogger(__name__)
 
@@ -124,22 +124,14 @@ class ViewMenuController:
         """
         view_menu = menubar.addMenu("&View")
 
-        # Session History action
+        # Window visibility section
         history_action = QAction("Session &History", self._parent)
         history_action.triggered.connect(self._on_history)
         view_menu.addAction(history_action)
 
-        # Stash Viewer action
         stash_action = QAction("&Stash Viewer", self._parent)
         stash_action.triggered.connect(self._on_stash_viewer)
         view_menu.addAction(stash_action)
-
-        # Economy Snapshot action (if callback provided)
-        if self._on_collect_economy:
-            economy_action = QAction("Collect &Economy Snapshot", self._parent)
-            economy_action.setToolTip("Fetch current economy data from poe.ninja")
-            economy_action.triggered.connect(self._on_collect_economy)
-            view_menu.addAction(economy_action)
 
         view_menu.addSeparator()
 
@@ -233,7 +225,6 @@ def get_view_menu_controller(
     on_toggle_theme: Callable[[], None],
     on_set_accent: Callable[[Optional[str]], None],
     on_toggle_column: Callable[[str, bool], None],
-    on_collect_economy: Optional[Callable[[], None]] = None,
     parent: Any = None,
     logger: Optional[logging.Logger] = None,
 ) -> ViewMenuController:
@@ -247,7 +238,6 @@ def get_view_menu_controller(
         on_toggle_theme: Callback to toggle dark/light theme.
         on_set_accent: Callback to set accent color.
         on_toggle_column: Callback to toggle column visibility.
-        on_collect_economy: Optional callback to collect economy snapshot.
         parent: Parent widget for actions.
         logger: Logger instance.
 
@@ -261,7 +251,6 @@ def get_view_menu_controller(
         on_toggle_theme=on_toggle_theme,
         on_set_accent=on_set_accent,
         on_toggle_column=on_toggle_column,
-        on_collect_economy=on_collect_economy,
         parent=parent,
         logger=logger,
     )
