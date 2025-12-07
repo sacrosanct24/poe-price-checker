@@ -798,13 +798,13 @@ class Config:
 
     @property
     def ai_provider(self) -> str:
-        """Get the configured AI provider (gemini, claude, openai, or empty)."""
+        """Get the configured AI provider (gemini, claude, openai, groq, xai, ollama, or empty)."""
         return self.data.get("ai", {}).get("provider", "")
 
     @ai_provider.setter
     def ai_provider(self, value: str) -> None:
         """Set the AI provider and persist."""
-        valid_providers = ("", "gemini", "claude", "openai", "groq", "ollama")
+        valid_providers = ("", "gemini", "claude", "openai", "groq", "xai", "ollama")
         if value.lower() not in valid_providers:
             value = ""
         self.data.setdefault("ai", {})["provider"] = value.lower()
