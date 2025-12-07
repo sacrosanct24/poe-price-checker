@@ -284,3 +284,204 @@ def test_get_stats_counts_are_consistent(temp_db):
     assert stats["sales"] == 1
     assert stats["completed_sales"] == 1
     assert stats["price_snapshots"] == 3
+
+
+# -------------------------
+# Upgrade Advice History
+# -------------------------
+
+def test_save_upgrade_advice_history_inserts_entry(temp_db):
+    """Test saving upgrade advice creates a new entry."""
+    temp_db.save_upgrade_advice_history(
+        profile_name="TestBuild",
+        slot="Helmet",
+        item_hash="abc123",
+        advice_text="# Analysis\n\nThis is the advice.",
+        ai_model="gemini-2.0-flash",
+        ai_provider="gemini",
+        include_stash=True,
+        stash_candidates_count=5,
+    )
+
+    history = temp_db.get_upgrade_advice_history("TestBuild", "Helmet")
+    assert len(history) == 1
+    # profile_name and slot are not in returned dict (they're query params)
+    assert history[0]["item_hash"] == "abc123"
+    assert history[0]["advice_text"] == "# Analysis\n\nThis is the advice."
+    assert history[0]["ai_provider"] == "gemini"
+    assert history[0]["include_stash"] == 1  # SQLite stores as 1/0
+    assert history[0]["stash_candidates_count"] == 5
+
+
+def test_upgrade_advice_history_returns_newest_first(temp_db):
+    """Test history is returned with newest entries first."""
+    for i in range(3):
+        time.sleep(0.01)  # Ensure different timestamps
+        temp_db.save_upgrade_advice_history(
+            profile_name="TestBuild",
+            slot="Helmet",
+            item_hash=f"hash{i}",
+            advice_text=f"Advice {i}",
+            ai_provider="gemini",
+            include_stash=False,
+        )
+
+    history = temp_db.get_upgrade_advice_history("TestBuild", "Helmet")
+    assert len(history) == 3
+    # Newest first (hash2, hash1, hash0)
+    assert history[0]["item_hash"] == "hash2"
+    assert history[1]["item_hash"] == "hash1"
+    assert history[2]["item_hash"] == "hash0"
+
+
+def test_upgrade_advice_history_limits_to_5_entries(temp_db):
+    """Test that only the last 5 entries are kept per slot."""
+    for i in range(7):
+        time.sleep(0.01)  # Ensure different timestamps
+        temp_db.save_upgrade_advice_history(
+            profile_name="TestBuild",
+            slot="Helmet",
+            item_hash=f"hash{i}",
+            advice_text=f"Advice {i}",
+            ai_provider="gemini",
+            include_stash=False,
+        )
+
+    history = temp_db.get_upgrade_advice_history("TestBuild", "Helmet")
+    assert len(history) == 5
+    # Should have hash6, hash5, hash4, hash3, hash2 (newest 5)
+    hashes = [h["item_hash"] for h in history]
+    assert "hash0" not in hashes
+    assert "hash1" not in hashes
+    assert "hash6" in hashes
+
+
+def test_upgrade_advice_history_separate_by_profile(temp_db):
+    """Test that history is separate per profile."""
+    temp_db.save_upgrade_advice_history(
+        profile_name="Build1",
+        slot="Helmet",
+        item_hash="hash1",
+        advice_text="Advice for Build1",
+        include_stash=False,
+    )
+    temp_db.save_upgrade_advice_history(
+        profile_name="Build2",
+        slot="Helmet",
+        item_hash="hash2",
+        advice_text="Advice for Build2",
+        include_stash=False,
+    )
+
+    history1 = temp_db.get_upgrade_advice_history("Build1", "Helmet")
+    history2 = temp_db.get_upgrade_advice_history("Build2", "Helmet")
+
+    assert len(history1) == 1
+    assert len(history2) == 1
+    assert history1[0]["advice_text"] == "Advice for Build1"
+    assert history2[0]["advice_text"] == "Advice for Build2"
+
+
+def test_upgrade_advice_history_separate_by_slot(temp_db):
+    """Test that history is separate per equipment slot."""
+    temp_db.save_upgrade_advice_history(
+        profile_name="TestBuild",
+        slot="Helmet",
+        item_hash="hash1",
+        advice_text="Helmet advice",
+        include_stash=False,
+    )
+    temp_db.save_upgrade_advice_history(
+        profile_name="TestBuild",
+        slot="Gloves",
+        item_hash="hash2",
+        advice_text="Gloves advice",
+        include_stash=False,
+    )
+
+    helmet_history = temp_db.get_upgrade_advice_history("TestBuild", "Helmet")
+    gloves_history = temp_db.get_upgrade_advice_history("TestBuild", "Gloves")
+
+    assert len(helmet_history) == 1
+    assert len(gloves_history) == 1
+    # Verify they are separate by checking the advice text (slot is query param)
+    assert helmet_history[0]["advice_text"] == "Helmet advice"
+    assert gloves_history[0]["advice_text"] == "Gloves advice"
+
+
+def test_get_latest_advice_from_history(temp_db):
+    """Test getting the most recent advice."""
+    temp_db.save_upgrade_advice_history(
+        profile_name="TestBuild",
+        slot="Helmet",
+        item_hash="old_hash",
+        advice_text="Old advice",
+        include_stash=False,
+    )
+    time.sleep(0.01)
+    temp_db.save_upgrade_advice_history(
+        profile_name="TestBuild",
+        slot="Helmet",
+        item_hash="new_hash",
+        advice_text="New advice",
+        include_stash=False,
+    )
+
+    latest = temp_db.get_latest_advice_from_history("TestBuild", "Helmet")
+    assert latest is not None
+    assert latest["item_hash"] == "new_hash"
+    assert latest["advice_text"] == "New advice"
+
+
+def test_get_latest_advice_from_history_nonexistent(temp_db):
+    """Test getting latest advice when none exists."""
+    latest = temp_db.get_latest_advice_from_history("NonExistent", "Helmet")
+    assert latest is None
+
+
+def test_get_all_slots_latest_history(temp_db):
+    """Test getting latest history for all slots at once."""
+    slots = ["Helmet", "Gloves", "Boots"]
+    for slot in slots:
+        temp_db.save_upgrade_advice_history(
+            profile_name="TestBuild",
+            slot=slot,
+            item_hash=f"hash_{slot}",
+            advice_text=f"Advice for {slot}",
+            include_stash=False,
+        )
+
+    all_latest = temp_db.get_all_slots_latest_history("TestBuild")
+
+    assert len(all_latest) == 3
+    assert "Helmet" in all_latest
+    assert "Gloves" in all_latest
+    assert "Boots" in all_latest
+    assert all_latest["Helmet"]["item_hash"] == "hash_Helmet"
+
+
+def test_clear_upgrade_advice_history(temp_db):
+    """Test clearing history for a profile/slot."""
+    temp_db.save_upgrade_advice_history(
+        profile_name="TestBuild",
+        slot="Helmet",
+        item_hash="hash1",
+        advice_text="Advice 1",
+        include_stash=False,
+    )
+    temp_db.save_upgrade_advice_history(
+        profile_name="TestBuild",
+        slot="Helmet",
+        item_hash="hash2",
+        advice_text="Advice 2",
+        include_stash=False,
+    )
+
+    # Should have 2 entries
+    assert len(temp_db.get_upgrade_advice_history("TestBuild", "Helmet")) == 2
+
+    # Clear them
+    temp_db.clear_upgrade_advice_history("TestBuild", "Helmet")
+
+    # Should have 0 entries
+    assert len(temp_db.get_upgrade_advice_history("TestBuild", "Helmet")) == 0

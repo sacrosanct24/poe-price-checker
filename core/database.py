@@ -46,7 +46,7 @@ class Database:
     """
 
     # Current schema version. Increment if schema structure changes.
-    SCHEMA_VERSION = 9
+    SCHEMA_VERSION = 10
 
     def __init__(self, db_path: Optional[Path] = None):
         """
@@ -452,6 +452,23 @@ class Database:
 
                 CREATE INDEX IF NOT EXISTS idx_upgrade_advice_profile_slot
                 ON upgrade_advice_cache (profile_name, slot);
+
+                -- v10: Upgrade advice history (keeps last 5 per profile+slot)
+                CREATE TABLE IF NOT EXISTS upgrade_advice_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    profile_name TEXT NOT NULL,
+                    slot TEXT NOT NULL,
+                    item_hash TEXT NOT NULL,
+                    advice_text TEXT NOT NULL,
+                    ai_model TEXT,
+                    ai_provider TEXT,
+                    include_stash INTEGER NOT NULL DEFAULT 0,
+                    stash_candidates_count INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_upgrade_advice_history_lookup
+                ON upgrade_advice_history (profile_name, slot, created_at DESC);
                 """
             )
 
@@ -485,6 +502,10 @@ class Database:
         v8 -> v9:
             - Add `upgrade_advice_cache` for AI upgrade recommendations.
             - Persists advice between sessions, keyed by profile + slot + item hash.
+        v9 -> v10:
+            - Add `upgrade_advice_history` for AI upgrade recommendation history.
+            - Stores last 5 analyses per profile + slot combo for comparison.
+            - Includes stash scan flag and candidate count.
         """
         logger.info(f"Starting schema migration v{old} → v{new}")
 
@@ -809,6 +830,30 @@ class Database:
 
                     CREATE INDEX IF NOT EXISTS idx_upgrade_advice_profile_slot
                     ON upgrade_advice_cache (profile_name, slot);
+                    """
+                )
+
+            if old < 10 <= new:
+                logger.info(
+                    "Applying v10 migration: creating upgrade_advice_history table."
+                )
+                conn.executescript(
+                    """
+                    CREATE TABLE IF NOT EXISTS upgrade_advice_history (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        profile_name TEXT NOT NULL,
+                        slot TEXT NOT NULL,
+                        item_hash TEXT NOT NULL,
+                        advice_text TEXT NOT NULL,
+                        ai_model TEXT,
+                        ai_provider TEXT,
+                        include_stash INTEGER NOT NULL DEFAULT 0,
+                        stash_candidates_count INTEGER DEFAULT 0,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    );
+
+                    CREATE INDEX IF NOT EXISTS idx_upgrade_advice_history_lookup
+                    ON upgrade_advice_history (profile_name, slot, created_at DESC);
                     """
                 )
 
@@ -1923,6 +1968,246 @@ class Database:
             )
         else:
             cursor = self._execute("DELETE FROM upgrade_advice_cache")
+
+        return cursor.rowcount
+
+    # ----------------------------------------------------------------------
+    # Upgrade Advice History (v10+)
+    # ----------------------------------------------------------------------
+
+    def save_upgrade_advice_history(
+        self,
+        profile_name: str,
+        slot: str,
+        item_hash: str,
+        advice_text: str,
+        ai_model: Optional[str] = None,
+        ai_provider: Optional[str] = None,
+        include_stash: bool = False,
+        stash_candidates_count: int = 0,
+    ) -> int:
+        """
+        Save upgrade advice to history, keeping last 5 per profile+slot.
+
+        Args:
+            profile_name: Character profile name.
+            slot: Equipment slot (e.g., "Helmet", "Body Armour").
+            item_hash: Hash of current item.
+            advice_text: AI-generated advice (markdown).
+            ai_model: AI model used (e.g., "grok-4-1-fast-reasoning").
+            ai_provider: AI provider (e.g., "xai", "gemini", "claude").
+            include_stash: Whether stash was scanned for this analysis.
+            stash_candidates_count: Number of stash candidates found.
+
+        Returns:
+            ID of the inserted record.
+        """
+        # Insert new record
+        cursor = self._execute(
+            """
+            INSERT INTO upgrade_advice_history
+                (profile_name, slot, item_hash, advice_text, ai_model,
+                 ai_provider, include_stash, stash_candidates_count, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            """,
+            (
+                profile_name,
+                slot,
+                item_hash,
+                advice_text,
+                ai_model,
+                ai_provider,
+                1 if include_stash else 0,
+                stash_candidates_count,
+            ),
+        )
+        row_id = cursor.lastrowid or 0
+
+        # Cleanup old records, keep last 5 per profile+slot
+        self._execute(
+            """
+            DELETE FROM upgrade_advice_history
+            WHERE profile_name = ? AND slot = ?
+            AND id NOT IN (
+                SELECT id FROM upgrade_advice_history
+                WHERE profile_name = ? AND slot = ?
+                ORDER BY created_at DESC, id DESC
+                LIMIT 5
+            )
+            """,
+            (profile_name, slot, profile_name, slot),
+        )
+
+        return row_id
+
+    def get_upgrade_advice_history(
+        self,
+        profile_name: str,
+        slot: str,
+        limit: int = 5,
+    ) -> List[Dict[str, Any]]:
+        """
+        Get upgrade advice history for a profile+slot.
+
+        Args:
+            profile_name: Character profile name.
+            slot: Equipment slot.
+            limit: Maximum entries to return (default 5).
+
+        Returns:
+            List of advice records, newest first.
+        """
+        cursor = self._execute(
+            """
+            SELECT id, item_hash, advice_text, ai_model, ai_provider,
+                   include_stash, stash_candidates_count, created_at
+            FROM upgrade_advice_history
+            WHERE profile_name = ? AND slot = ?
+            ORDER BY created_at DESC, id DESC
+            LIMIT ?
+            """,
+            (profile_name, slot, limit),
+        )
+
+        results = []
+        for row in cursor.fetchall():
+            results.append({
+                "id": row["id"],
+                "item_hash": row["item_hash"],
+                "advice_text": row["advice_text"],
+                "ai_model": row["ai_model"],
+                "ai_provider": row["ai_provider"],
+                "include_stash": bool(row["include_stash"]),
+                "stash_candidates_count": row["stash_candidates_count"],
+                "created_at": row["created_at"],
+            })
+        return results
+
+    def get_latest_advice_from_history(
+        self,
+        profile_name: str,
+        slot: str,
+        item_hash: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Get the most recent advice from history for a slot.
+
+        Args:
+            profile_name: Character profile name.
+            slot: Equipment slot.
+            item_hash: If provided, only return if hash matches (item unchanged).
+
+        Returns:
+            Most recent advice record, or None if not found.
+        """
+        if item_hash:
+            cursor = self._execute(
+                """
+                SELECT id, item_hash, advice_text, ai_model, ai_provider,
+                       include_stash, stash_candidates_count, created_at
+                FROM upgrade_advice_history
+                WHERE profile_name = ? AND slot = ? AND item_hash = ?
+                ORDER BY created_at DESC, id DESC
+                LIMIT 1
+                """,
+                (profile_name, slot, item_hash),
+            )
+        else:
+            cursor = self._execute(
+                """
+                SELECT id, item_hash, advice_text, ai_model, ai_provider,
+                       include_stash, stash_candidates_count, created_at
+                FROM upgrade_advice_history
+                WHERE profile_name = ? AND slot = ?
+                ORDER BY created_at DESC, id DESC
+                LIMIT 1
+                """,
+                (profile_name, slot),
+            )
+
+        row = cursor.fetchone()
+        if row:
+            return {
+                "id": row["id"],
+                "item_hash": row["item_hash"],
+                "advice_text": row["advice_text"],
+                "ai_model": row["ai_model"],
+                "ai_provider": row["ai_provider"],
+                "include_stash": bool(row["include_stash"]),
+                "stash_candidates_count": row["stash_candidates_count"],
+                "created_at": row["created_at"],
+            }
+        return None
+
+    def get_all_slots_latest_history(
+        self,
+        profile_name: str,
+    ) -> Dict[str, Dict[str, Any]]:
+        """
+        Get the latest history entry for all slots of a profile.
+
+        Args:
+            profile_name: Character profile name.
+
+        Returns:
+            Dict mapping slot -> latest advice data.
+        """
+        cursor = self._execute(
+            """
+            SELECT h1.*
+            FROM upgrade_advice_history h1
+            INNER JOIN (
+                SELECT slot, MAX(created_at) as max_created
+                FROM upgrade_advice_history
+                WHERE profile_name = ?
+                GROUP BY slot
+            ) h2 ON h1.slot = h2.slot AND h1.created_at = h2.max_created
+            WHERE h1.profile_name = ?
+            """,
+            (profile_name, profile_name),
+        )
+
+        result = {}
+        for row in cursor.fetchall():
+            result[row["slot"]] = {
+                "id": row["id"],
+                "item_hash": row["item_hash"],
+                "advice_text": row["advice_text"],
+                "ai_model": row["ai_model"],
+                "ai_provider": row["ai_provider"],
+                "include_stash": bool(row["include_stash"]),
+                "stash_candidates_count": row["stash_candidates_count"],
+                "created_at": row["created_at"],
+            }
+        return result
+
+    def clear_upgrade_advice_history(
+        self,
+        profile_name: Optional[str] = None,
+        slot: Optional[str] = None,
+    ) -> int:
+        """
+        Clear upgrade advice history.
+
+        Args:
+            profile_name: If provided, only clear for this profile.
+            slot: If provided with profile_name, only clear this slot.
+
+        Returns:
+            Number of rows deleted.
+        """
+        if profile_name and slot:
+            cursor = self._execute(
+                "DELETE FROM upgrade_advice_history WHERE profile_name = ? AND slot = ?",
+                (profile_name, slot),
+            )
+        elif profile_name:
+            cursor = self._execute(
+                "DELETE FROM upgrade_advice_history WHERE profile_name = ?",
+                (profile_name,),
+            )
+        else:
+            cursor = self._execute("DELETE FROM upgrade_advice_history")
 
         return cursor.rowcount
 

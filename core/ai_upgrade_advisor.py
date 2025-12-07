@@ -423,6 +423,7 @@ class AIUpgradeAdvisorService:
         slot: str,
         stash_candidates: List[StashUpgradeCandidate],
         build_research: Optional[BuildResearch] = None,
+        include_stash: bool = False,
     ) -> str:
         """
         Build comprehensive context string for AI upgrade analysis.
@@ -432,6 +433,7 @@ class AIUpgradeAdvisorService:
             slot: Equipment slot being analyzed.
             stash_candidates: Potential upgrades from stash.
             build_research: Optional research about the build.
+            include_stash: Whether stash section should be included.
 
         Returns:
             Formatted context string for AI prompt.
@@ -465,22 +467,23 @@ class AIUpgradeAdvisorService:
             lines.append("(Empty slot)")
         lines.append("")
 
-        # Stash candidates
-        lines.append(f"=== STASH OPTIONS ({len(stash_candidates)} found) ===")
-        for i, candidate in enumerate(stash_candidates[:10], 1):  # Limit to top 10
-            lines.append(f"\n--- Option {i}: {candidate.name} ---")
-            lines.append(f"Tab: {candidate.tab_name}")
-            lines.append(f"Rarity: {candidate.rarity}, iLvl: {candidate.item_level}")
-            if candidate.chaos_value > 0:
-                lines.append(f"Estimated value: {candidate.chaos_value:.0f}c")
-            if candidate.all_mods:
-                lines.append("Mods:")
-                for mod in candidate.all_mods[:8]:  # Limit mods shown
-                    lines.append(f"  - {mod}")
-
-        if not stash_candidates:
-            lines.append("(No matching items found in stash)")
-        lines.append("")
+        # Stash candidates (only if included)
+        if include_stash:
+            lines.append(f"=== STASH OPTIONS ({len(stash_candidates)} found) ===")
+            if stash_candidates:
+                for i, candidate in enumerate(stash_candidates[:10], 1):  # Limit to top 10
+                    lines.append(f"\n--- Option {i}: {candidate.name} ---")
+                    lines.append(f"Tab: {candidate.tab_name}")
+                    lines.append(f"Rarity: {candidate.rarity}, iLvl: {candidate.item_level}")
+                    if candidate.chaos_value > 0:
+                        lines.append(f"Estimated value: {candidate.chaos_value:.0f}c")
+                    if candidate.all_mods:
+                        lines.append("Mods:")
+                        for mod in candidate.all_mods[:8]:  # Limit mods shown
+                            lines.append(f"  - {mod}")
+            else:
+                lines.append("(No matching items found in stash)")
+            lines.append("")
 
         # Build research context
         if build_research:
@@ -666,17 +669,21 @@ class AIUpgradeAdvisorService:
         stash_candidates: List[StashUpgradeCandidate],
         trade_suggestions: List[TradeSearchSuggestion],
         build_research: Optional[BuildResearch] = None,
+        include_stash: bool = False,
     ) -> str:
         """
         Build the complete AI prompt for upgrade analysis.
 
         Returns a prompt that asks the AI to:
-        1. Evaluate stash items as Good/Better/Best
+        1. Evaluate stash items as Good/Better/Best (if include_stash)
         2. Recommend trade searches
         3. Provide reasoning for recommendations
+
+        Args:
+            include_stash: Whether stash candidates are included in context.
         """
         context = self.build_upgrade_context(
-            profile, slot, stash_candidates, build_research
+            profile, slot, stash_candidates, build_research, include_stash=include_stash
         )
 
         # Determine game version from config
@@ -701,15 +708,9 @@ IMPORTANT - PATH OF EXILE 1 ECONOMY:
 - Exalted Orbs are used for crafting, less valuable than Divines
 - Mirror of Kalandra exists but extremely rare"""
 
-        prompt = f"""You are analyzing gear upgrades for a {game_name} character.
-
-GAME: {game_name}
-LEAGUE: {league}
-{currency_context}
-
-{context}
-
-=== TASK ===
+        # Build task description based on whether stash is included
+        if include_stash:
+            task_section = f"""=== TASK ===
 Analyze the current {slot} and the stash options. Provide recommendations in this format:
 
 1. **BEST** (if any): The single best upgrade from stash that significantly improves the build.
@@ -728,7 +729,39 @@ Analyze the current {slot} and the stash options. Provide recommendations in thi
    - Budget range in chaos orbs (use {game_name} economy context)
    - Priority order
 
-5. **SUMMARY**: 2-3 sentences on the upgrade path for this slot.
+5. **SUMMARY**: 2-3 sentences on the upgrade path for this slot."""
+        else:
+            task_section = f"""=== TASK ===
+Analyze the current {slot} and provide upgrade recommendations. Focus on what to look for on trade.
+
+1. **CURRENT ITEM ANALYSIS**: Evaluate the current {slot}.
+   - Key strengths
+   - Weaknesses or missing stats
+   - How it fits the build
+
+2. **TRADE RECOMMENDATIONS**: What to search for to upgrade this slot.
+   - **Budget** (<50c): Basic upgrades, specific stat requirements
+   - **Mid-range** (50-200c): Solid upgrades with key stats
+   - **High-end** (200c+): Best-in-slot options for this build
+
+   For each tier, specify:
+   - Stat priorities (e.g., "+70 life, +30% fire res")
+   - Base type recommendations if relevant
+   - Unique items to consider
+
+3. **PRIORITY STATS**: Ranked list of stats to prioritize for this slot and build.
+
+4. **SUMMARY**: 2-3 sentences on the upgrade path for this slot."""
+
+        prompt = f"""You are analyzing gear upgrades for a {game_name} character.
+
+GAME: {game_name}
+LEAGUE: {league}
+{currency_context}
+
+{context}
+
+{task_section}
 
 Be practical and specific. Focus on stats that matter for this build type ({profile.build.ascendancy or profile.build.class_name} using {profile.build.main_skill}).
 Use appropriate currency references for {game_name}.

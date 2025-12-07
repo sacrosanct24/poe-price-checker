@@ -447,6 +447,7 @@ class TestAIUpgradeAdvisorContextBuilding:
             profile=mock_profile,
             slot="Helmet",
             stash_candidates=[candidate],
+            include_stash=True,  # Must be True to include stash section
         )
 
         assert "STASH OPTIONS" in context
@@ -476,13 +477,14 @@ class TestAIUpgradeAdvisorContextBuilding:
 class TestAIUpgradeAdvisorPromptGeneration:
     """Tests for AI prompt generation."""
 
-    def test_get_upgrade_prompt_includes_task(self, advisor, mock_profile):
-        """Prompt includes clear task instructions."""
+    def test_get_upgrade_prompt_includes_task_with_stash(self, advisor, mock_profile):
+        """Prompt includes stash-focused task when include_stash=True."""
         prompt = advisor.get_upgrade_prompt(
             profile=mock_profile,
             slot="Helmet",
             stash_candidates=[],
             trade_suggestions=[],
+            include_stash=True,
         )
 
         assert "TASK" in prompt
@@ -490,6 +492,22 @@ class TestAIUpgradeAdvisorPromptGeneration:
         assert "BETTER" in prompt
         assert "GOOD" in prompt
         assert "TRADE RECOMMENDATIONS" in prompt
+
+    def test_get_upgrade_prompt_includes_task_trade_only(self, advisor, mock_profile):
+        """Prompt includes trade-focused task when include_stash=False."""
+        prompt = advisor.get_upgrade_prompt(
+            profile=mock_profile,
+            slot="Helmet",
+            stash_candidates=[],
+            trade_suggestions=[],
+            include_stash=False,
+        )
+
+        assert "TASK" in prompt
+        assert "CURRENT ITEM ANALYSIS" in prompt
+        assert "TRADE RECOMMENDATIONS" in prompt
+        assert "PRIORITY STATS" in prompt
+        assert "Budget" in prompt
 
     def test_get_upgrade_prompt_mentions_build(self, advisor, mock_profile):
         """Prompt mentions the specific build type."""

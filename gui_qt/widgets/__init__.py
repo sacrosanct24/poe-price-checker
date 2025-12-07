@@ -9,6 +9,7 @@ from gui_qt.widgets.build_filter_widget import BuildFilterWidget
 from gui_qt.widgets.toast_notification import ToastManager, ToastNotification, ToastType
 from gui_qt.widgets.pinned_items_widget import PinnedItemsWidget, PinnedItemWidget
 from gui_qt.widgets.stash_grid_visualizer import StashGridVisualizerWidget
+from gui_qt.widgets.upgrade_history_panel import UpgradeHistoryPanel
 
 __all__ = [
     "ResultsTableWidget",
@@ -21,4 +22,5 @@ __all__ = [
     "PinnedItemsWidget",
     "PinnedItemWidget",
     "StashGridVisualizerWidget",
+    "UpgradeHistoryPanel",
 ]

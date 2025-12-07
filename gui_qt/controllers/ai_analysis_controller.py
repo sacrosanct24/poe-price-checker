@@ -226,16 +226,19 @@ class AIAnalysisController:
         self,
         slot: str,
         account_name: Optional[str] = None,
+        include_stash: bool = False,
     ) -> bool:
         """Analyze upgrade options for a specific equipment slot.
 
-        Scans stash cache for potential upgrades and provides
+        Optionally scans stash cache for potential upgrades and provides
         Good/Better/Best recommendations via AI.
 
         Args:
             slot: Equipment slot to analyze (e.g., "Helmet", "Body Armour").
             account_name: Optional PoE account name for stash lookup.
                          Uses config.stash.account_name if not provided.
+            include_stash: Whether to include stash candidates in analysis.
+                          Default False (trade-focused analysis).
 
         Returns:
             True if analysis was started, False if not configured or no profile.
@@ -252,14 +255,15 @@ class AIAnalysisController:
             self._on_toast_error("No build profile selected")
             return False
 
-        # Get stash account name
-        if not account_name:
-            account_name = self._config.data.get("stash", {}).get("account_name", "")
+        # Get stash account name (only needed if stash scan requested)
+        if include_stash:
+            if not account_name:
+                account_name = self._config.data.get("stash", {}).get("account_name", "")
 
-        if not account_name:
-            self._on_status("No PoE account configured - check Settings > Stash")
-            self._on_toast_error("No PoE account configured")
-            return False
+            if not account_name:
+                self._on_status("No PoE account configured - check Settings > Stash")
+                self._on_toast_error("No PoE account configured for stash scan")
+                return False
 
         # Cancel any existing analysis
         self._cancel_current()
@@ -275,24 +279,27 @@ class AIAnalysisController:
 
         # Show loading state
         self._panel.show_loading(provider)
-        self._on_status(f"Analyzing {slot} upgrade options...")
+        stash_msg = " (with stash scan)" if include_stash else ""
+        self._on_status(f"Analyzing {slot} upgrade options{stash_msg}...")
 
         try:
             # Get the upgrade advisor
             from core.ai_upgrade_advisor import get_ai_upgrade_advisor
 
             if not self._db:
-                self._on_status("Database not available for stash access")
+                self._on_status("Database not available")
                 return False
 
             advisor = get_ai_upgrade_advisor(self._db, self._config)
 
-            # Find stash candidates for this slot
-            stash_candidates = advisor.get_stash_candidates_for_slot(
-                slot=slot,
-                account_name=account_name,
-                league=league,
-            )
+            # Find stash candidates for this slot (only if requested)
+            stash_candidates = []
+            if include_stash and account_name:
+                stash_candidates = advisor.get_stash_candidates_for_slot(
+                    slot=slot,
+                    account_name=account_name,
+                    league=league,
+                )
 
             # Generate trade suggestions
             trade_suggestions = advisor.generate_trade_suggestions(
@@ -307,6 +314,7 @@ class AIAnalysisController:
                 slot=slot,
                 stash_candidates=stash_candidates,
                 trade_suggestions=trade_suggestions,
+                include_stash=include_stash,
             )
 
             # Store for retry
@@ -340,10 +348,13 @@ class AIAnalysisController:
             # Start worker
             self._worker.start()
 
-            logger.info(
-                f"Started upgrade analysis for {slot} with {len(stash_candidates)} "
-                f"stash candidates"
-            )
+            if include_stash:
+                logger.info(
+                    f"Started upgrade analysis for {slot} with {len(stash_candidates)} "
+                    f"stash candidates"
+                )
+            else:
+                logger.info(f"Started upgrade analysis for {slot} (trade-focused)")
             return True
 
         except Exception as e:

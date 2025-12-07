@@ -114,11 +114,13 @@ class TestSupportedProviders:
         assert "claude" in SUPPORTED_PROVIDERS
         assert "openai" in SUPPORTED_PROVIDERS
         assert "groq" in SUPPORTED_PROVIDERS
+        assert "xai" in SUPPORTED_PROVIDERS
         assert "ollama" in SUPPORTED_PROVIDERS
 
     def test_provider_count(self):
         """Test the number of supported providers."""
-        assert len(SUPPORTED_PROVIDERS) == 5
+        # gemini, claude, openai, groq, xai, ollama
+        assert len(SUPPORTED_PROVIDERS) == 6
 
 
 class TestBaseAIClient:

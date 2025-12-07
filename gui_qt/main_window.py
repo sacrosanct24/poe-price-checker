@@ -32,6 +32,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QHBoxLayout,
     QSplitter,
+    QStackedWidget,
     QGroupBox,
     QLabel,
     QPushButton,
@@ -83,6 +84,7 @@ class PriceCheckerWindow(QMainWindow):
 
         # State
         self._check_in_progress = False
+        self._upgrade_advisor_view = None  # Lazy-loaded full-screen advisor
 
         # History manager for session history
         self._history_manager = get_history_manager()
@@ -395,11 +397,16 @@ class PriceCheckerWindow(QMainWindow):
 
     def _create_central_widget(self) -> None:
         """Create the main content area with integrated PoB panel."""
-        central = QWidget()
-        self.setCentralWidget(central)
+        # Use QStackedWidget to switch between main view and full-screen advisor
+        self._stacked_widget = QStackedWidget()
+        self.setCentralWidget(self._stacked_widget)
+
+        # Index 0: Normal main view
+        main_view = QWidget()
+        self._stacked_widget.addWidget(main_view)
 
         # Main horizontal splitter: PoB panel (left) | Price check (right)
-        main_layout = QHBoxLayout(central)
+        main_layout = QHBoxLayout(main_view)
         main_layout.setContentsMargins(8, 8, 8, 8)
         main_layout.setSpacing(8)
 
@@ -590,9 +597,9 @@ class PriceCheckerWindow(QMainWindow):
     def _on_upgrade_analysis_requested(self, slot: str, item_text: str) -> None:
         """Handle upgrade analysis request from PoB panel context menu.
 
-        Opens the Upgrade Advisor window and starts analysis for the slot.
+        Opens the full-screen Upgrade Advisor view and selects the slot.
         """
-        self._nav_controller.show_upgrade_advisor(slot=slot)
+        self._show_upgrade_advisor_fullscreen(slot=slot)
 
     def _on_upgrade_analysis_from_window(self, slot: str, item_text: str) -> None:
         """Handle upgrade analysis request from the Upgrade Advisor window.
@@ -664,9 +671,128 @@ class PriceCheckerWindow(QMainWindow):
         else:
             window.show_analysis_error(slot, "Failed to start analysis")
 
-    def _show_upgrade_advisor(self) -> None:
-        """Show the AI Upgrade Advisor window."""
-        self._nav_controller.show_upgrade_advisor()
+    def _show_upgrade_advisor(self, slot: Optional[str] = None) -> None:
+        """Show the AI Upgrade Advisor in full-screen mode."""
+        self._show_upgrade_advisor_fullscreen(slot)
+
+    def _show_upgrade_advisor_fullscreen(self, slot: Optional[str] = None) -> None:
+        """
+        Switch to the full-screen upgrade advisor view.
+
+        Args:
+            slot: Optional equipment slot to pre-select.
+        """
+        # Lazy-load the upgrade advisor view
+        if self._upgrade_advisor_view is None:
+            from gui_qt.views.upgrade_advisor_view import UpgradeAdvisorView
+
+            self._upgrade_advisor_view = UpgradeAdvisorView(
+                ctx=self.ctx,
+                character_manager=self._pob_controller.character_manager,
+                on_close=self._close_upgrade_advisor,
+                on_status=self._set_status,
+                parent=None,
+            )
+            # Connect signals
+            self._upgrade_advisor_view.close_requested.connect(
+                self._close_upgrade_advisor
+            )
+            self._upgrade_advisor_view.upgrade_analysis_requested.connect(
+                self._on_upgrade_analysis_from_advisor
+            )
+
+            # Add to stacked widget (index 1)
+            self._stacked_widget.addWidget(self._upgrade_advisor_view)
+
+        # Refresh the view data
+        self._upgrade_advisor_view.refresh()
+
+        # Pre-select slot if specified
+        if slot:
+            self._upgrade_advisor_view.select_slot(slot)
+
+        # Switch to advisor view
+        self._stacked_widget.setCurrentIndex(1)
+        self._set_status("Upgrade Advisor - Select a slot to analyze")
+
+    def _close_upgrade_advisor(self) -> None:
+        """Return to the main view from the upgrade advisor."""
+        self._stacked_widget.setCurrentIndex(0)
+        self._set_status("Ready")
+
+    def _on_upgrade_analysis_from_advisor(self, slot: str, include_stash: bool) -> None:
+        """Handle upgrade analysis request from the full-screen advisor view.
+
+        Performs AI analysis and sends results back to the view.
+        """
+        if not self._upgrade_advisor_view:
+            return
+
+        # Get the view's selected provider
+        selected_provider = self._upgrade_advisor_view.get_selected_provider()
+        if not selected_provider:
+            self._set_status("No AI provider selected")
+            self._upgrade_advisor_view.show_analysis_error(slot, "No AI provider selected")
+            return
+
+        # Check if the provider has an API key (unless it's a local provider)
+        from data_sources.ai import is_local_provider
+        if not is_local_provider(selected_provider):
+            api_key = self.ctx.config.get_ai_api_key(selected_provider)
+            if not api_key:
+                self._set_status(f"No API key configured for {selected_provider}")
+                self._upgrade_advisor_view.show_analysis_error(
+                    slot,
+                    f"No API key configured for {selected_provider}.\n"
+                    f"Add your API key in Settings > AI."
+                )
+                return
+
+        # Temporarily set the config provider to the selected one
+        original_provider = self.ctx.config.ai_provider
+        self.ctx.config.ai_provider = selected_provider
+
+        if not self._ai_controller:
+            self._init_ai_controller()
+
+        # Set up the AI controller with database for stash access
+        self._ai_controller.set_database(self.ctx.db)
+        self._ai_controller.set_character_manager(self._pob_controller.character_manager)
+
+        # Get account name from config (only needed if include_stash is True)
+        account_name = None
+        if include_stash:
+            account_name = self.ctx.config.data.get("stash", {}).get("account_name", "")
+
+        # Perform analysis - the controller will handle the async work
+        try:
+            success = self._ai_controller.analyze_upgrade(
+                slot=slot,
+                account_name=account_name,
+                include_stash=include_stash,
+            )
+        finally:
+            # Restore original provider (worker has captured the selected one)
+            self.ctx.config.ai_provider = original_provider
+
+        if success:
+            # Connect to get results back (use a one-time connection)
+            def on_result(response):
+                if self._upgrade_advisor_view:
+                    self._upgrade_advisor_view.show_analysis_result(
+                        slot, response.content, selected_provider
+                    )
+
+            def on_error(error_msg, traceback):
+                if self._upgrade_advisor_view:
+                    self._upgrade_advisor_view.show_analysis_error(slot, error_msg)
+
+            # Reconnect signals for this specific request
+            if self._ai_controller._worker:
+                self._ai_controller._worker.result.connect(on_result)
+                self._ai_controller._worker.error.connect(on_error)
+        else:
+            self._upgrade_advisor_view.show_analysis_error(slot, "Failed to start analysis")
 
     # -------------------------------------------------------------------------
     # Shortcuts
