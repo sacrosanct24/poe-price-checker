@@ -22,7 +22,9 @@ def mock_config():
     """Create mock configuration."""
     config = MagicMock()
     config.league = "Settlers"
+    config.ai_provider = "gemini"
     config.has_ai_configured.return_value = True
+    config.get_ai_api_key.return_value = "test-api-key"  # Default: API key exists
     config.data = {"stash": {"account_name": "TestAccount"}}
     return config
 
@@ -165,9 +167,10 @@ class TestButtonStates:
         window._on_slot_clicked(first_item, 0)
         assert window.analyze_selected_btn.isEnabled()
 
-    def test_buttons_disabled_when_ai_not_configured(self, window):
+    def test_buttons_disabled_when_ai_not_configured(self, window, mock_config):
         """Buttons disabled when AI not configured."""
-        window.set_ai_configured_callback(lambda: False)
+        # Mock no API key for the selected provider
+        mock_config.get_ai_api_key.return_value = None
         window._update_button_states()
 
         assert not window.analyze_all_btn.isEnabled()

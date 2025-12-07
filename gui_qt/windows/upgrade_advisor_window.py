@@ -143,21 +143,18 @@ class UpgradeAdvisorWindow(QDialog):
     def _is_ai_configured(self) -> bool:
         """Check if the selected AI provider is configured.
 
-        First checks the callback (for external control/testing),
-        then falls back to checking the provider's API key.
+        Checks if the window's selected provider has an API key.
         """
-        # If callback is set and returns False, AI is not configured
-        if self._ai_configured_callback and not self._ai_configured_callback():
-            return False
-
         from data_sources.ai import is_local_provider
 
         provider = self.get_selected_provider()
         if not provider:
             return False
+
         # Ollama is local - no API key needed
         if is_local_provider(provider):
             return True
+
         # Check if API key is configured for this provider
         return bool(self._config.get_ai_api_key(provider))
 

@@ -419,8 +419,8 @@ class SettingsDialog(QDialog):
         # Content widget inside scroll area
         content = QWidget()
         layout = QVBoxLayout(content)
-        layout.setSpacing(12)
-        layout.setContentsMargins(0, 0, 8, 0)  # Right margin for scrollbar
+        layout.setSpacing(16)
+        layout.setContentsMargins(12, 12, 20, 12)  # Add padding, extra right for scrollbar
 
         # Provider Selection group
         provider_group = QGroupBox("AI Provider")
@@ -469,7 +469,9 @@ class SettingsDialog(QDialog):
         self._gemini_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
         self._gemini_key_edit.setPlaceholderText("Enter Gemini API key")
         self._gemini_key_edit.setToolTip("Get a free key from ai.google.dev")
+        self._gemini_key_edit.setMaximumWidth(400)
         gemini_row.addWidget(self._gemini_key_edit)
+        gemini_row.addStretch()
         keys_layout.addLayout(gemini_row)
 
         # Claude API key
@@ -481,7 +483,9 @@ class SettingsDialog(QDialog):
         self._claude_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
         self._claude_key_edit.setPlaceholderText("Enter Claude API key")
         self._claude_key_edit.setToolTip("Get a key from console.anthropic.com")
+        self._claude_key_edit.setMaximumWidth(400)
         claude_row.addWidget(self._claude_key_edit)
+        claude_row.addStretch()
         keys_layout.addLayout(claude_row)
 
         # OpenAI API key
@@ -493,7 +497,9 @@ class SettingsDialog(QDialog):
         self._openai_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
         self._openai_key_edit.setPlaceholderText("Enter OpenAI API key")
         self._openai_key_edit.setToolTip("Get a key from platform.openai.com")
+        self._openai_key_edit.setMaximumWidth(400)
         openai_row.addWidget(self._openai_key_edit)
+        openai_row.addStretch()
         keys_layout.addLayout(openai_row)
 
         # Groq API key
@@ -505,7 +511,9 @@ class SettingsDialog(QDialog):
         self._groq_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
         self._groq_key_edit.setPlaceholderText("Enter Groq API key (free tier available)")
         self._groq_key_edit.setToolTip("Get a free key from console.groq.com")
+        self._groq_key_edit.setMaximumWidth(400)
         groq_row.addWidget(self._groq_key_edit)
+        groq_row.addStretch()
         keys_layout.addLayout(groq_row)
 
         # xAI API key
@@ -517,7 +525,9 @@ class SettingsDialog(QDialog):
         self._xai_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
         self._xai_key_edit.setPlaceholderText("Enter xAI API key")
         self._xai_key_edit.setToolTip("Get a key from console.x.ai")
+        self._xai_key_edit.setMaximumWidth(400)
         xai_row.addWidget(self._xai_key_edit)
+        xai_row.addStretch()
         keys_layout.addLayout(xai_row)
 
         layout.addWidget(keys_group)
@@ -543,7 +553,9 @@ class SettingsDialog(QDialog):
         self._ollama_host_edit = QLineEdit()
         self._ollama_host_edit.setPlaceholderText("http://localhost:11434")
         self._ollama_host_edit.setToolTip("Ollama server URL (default: http://localhost:11434)")
+        self._ollama_host_edit.setMaximumWidth(300)
         host_row.addWidget(self._ollama_host_edit)
+        host_row.addStretch()
         ollama_layout.addLayout(host_row)
 
         # Ollama model
@@ -553,6 +565,7 @@ class SettingsDialog(QDialog):
         model_row.addWidget(model_label)
         self._ollama_model_combo = QComboBox()
         self._ollama_model_combo.setEditable(True)
+        self._ollama_model_combo.setMaximumWidth(250)
         self._ollama_model_combo.addItems([
             "deepseek-r1:70b",
             "deepseek-r1:32b",
@@ -570,6 +583,7 @@ class SettingsDialog(QDialog):
             "Ensure the model is pulled: ollama pull <model>"
         )
         model_row.addWidget(self._ollama_model_combo)
+        model_row.addStretch()
         ollama_layout.addLayout(model_row)
 
         layout.addWidget(ollama_group)
@@ -581,14 +595,18 @@ class SettingsDialog(QDialog):
 
         # Build name
         build_row = QHBoxLayout()
-        build_row.addWidget(QLabel("My build:"))
+        build_label = QLabel("My build:")
+        build_label.setMinimumWidth(70)
+        build_row.addWidget(build_label)
         self._ai_build_edit = QLineEdit()
         self._ai_build_edit.setPlaceholderText("e.g., Lightning Arrow Deadeye, RF Chieftain")
         self._ai_build_edit.setToolTip(
             "Your current build name. This helps AI give relevant advice.\n"
             "Examples: 'Tornado Shot MF', 'Righteous Fire Juggernaut'"
         )
+        self._ai_build_edit.setMaximumWidth(400)
         build_row.addWidget(self._ai_build_edit)
+        build_row.addStretch()
         context_layout.addLayout(build_row)
 
         context_note = QLabel(
@@ -676,6 +694,9 @@ class SettingsDialog(QDialog):
         )
         usage_label.setStyleSheet("color: gray; font-size: 11px;")
         layout.addWidget(usage_label)
+
+        # Push content to top when dialog is large
+        layout.addStretch()
 
         # Set content in scroll area and return
         scroll.setWidget(content)
