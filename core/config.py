@@ -884,12 +884,12 @@ class Config:
     @property
     def ollama_model(self) -> str:
         """Get the Ollama model to use."""
-        return self.data.get("ai", {}).get("ollama_model", "llama3.1:8b")
+        return self.data.get("ai", {}).get("ollama_model", "deepseek-r1:14b")
 
     @ollama_model.setter
     def ollama_model(self, value: str) -> None:
         """Set the Ollama model to use."""
-        self.data.setdefault("ai", {})["ollama_model"] = value.strip() or "llama3.1:8b"
+        self.data.setdefault("ai", {})["ollama_model"] = value.strip() or "deepseek-r1:14b"
         self.save()
 
     @property

@@ -47,7 +47,7 @@ class MockConfig:
         self.ai_build_name = "Test Build"
         self.ai_custom_prompt = ""
         self.ollama_host = "http://localhost:11434"
-        self.ollama_model = "llama3.1:8b"
+        self.ollama_model = "deepseek-r1:14b"
 
     def has_ai_configured(self) -> bool:
         return self._has_ai

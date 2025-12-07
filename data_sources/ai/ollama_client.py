@@ -25,18 +25,20 @@ logger = logging.getLogger(__name__)
 
 # Default Ollama endpoint (can be overridden)
 DEFAULT_OLLAMA_HOST = "http://localhost:11434"
-DEFAULT_MODEL = "llama3.1:8b"
+DEFAULT_MODEL = "deepseek-r1:14b"
 
 # Recommended models with descriptions
 OLLAMA_MODELS = {
-    "llama3.1:8b": "Llama 3.1 8B - Good balance, 8GB RAM",
-    "llama3.1:70b": "Llama 3.1 70B - Best quality, 48GB+ RAM",
-    "mistral:7b": "Mistral 7B - Fast and capable",
-    "phi3:medium": "Phi-3 Medium - Strong reasoning, 12GB RAM",
-    "qwen2.5:14b": "Qwen 2.5 14B - Excellent quality, 16GB RAM",
-    "gemma2:9b": "Gemma 2 9B - Google's compact model",
-    "codellama:13b": "Code Llama 13B - Code-focused",
-    "mixtral:8x7b": "Mixtral 8x7B - MoE architecture",
+    "deepseek-r1:8b": "DeepSeek R1 8B - Best reasoning, 8GB RAM",
+    "deepseek-r1:14b": "DeepSeek R1 14B - Excellent reasoning, 16GB RAM",
+    "deepseek-r1:32b": "DeepSeek R1 32B - Strong reasoning, 32GB RAM",
+    "deepseek-r1:70b": "DeepSeek R1 70B - Near GPT-4, 64GB+ RAM",
+    "qwen2.5:14b": "Qwen 2.5 14B - Fast & capable, 16GB RAM",
+    "qwen2.5:32b": "Qwen 2.5 32B - Great quality, 32GB RAM",
+    "qwen2.5:72b": "Qwen 2.5 72B - Excellent, 64GB+ RAM",
+    "llama3.3:70b": "Llama 3.3 70B - Meta's best, 64GB+ RAM",
+    "gemma3:27b": "Gemma 3 27B - Google's best local, 32GB RAM",
+    "mistral:7b": "Mistral 7B - Fast and capable, 8GB RAM",
 }
 
 

@@ -532,12 +532,16 @@ class SettingsDialog(QDialog):
         self._ollama_model_combo = QComboBox()
         self._ollama_model_combo.setEditable(True)
         self._ollama_model_combo.addItems([
-            "llama3.1:8b",
-            "llama3.1:70b",
-            "mistral:7b",
-            "phi3:medium",
+            "deepseek-r1:70b",
+            "deepseek-r1:32b",
+            "deepseek-r1:14b",
+            "deepseek-r1:8b",
+            "qwen2.5:72b",
+            "qwen2.5:32b",
             "qwen2.5:14b",
-            "gemma2:9b",
+            "llama3.3:70b",
+            "gemma3:27b",
+            "mistral:7b",
         ])
         self._ollama_model_combo.setToolTip(
             "Select or type an Ollama model name.\n"

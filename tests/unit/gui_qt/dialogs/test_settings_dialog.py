@@ -60,7 +60,7 @@ class TestSettingsDialogInit:
         mock_config.ai_custom_prompt = ""
         mock_config.get_ai_api_key = MagicMock(return_value="")
         mock_config.ollama_host = ""
-        mock_config.ollama_model = "llama3.1:8b"
+        mock_config.ollama_model = "deepseek-r1:14b"
         return mock_config
 
 
@@ -90,7 +90,7 @@ class TestAccessibilityTab:
         mock_config.ai_custom_prompt = ""
         mock_config.get_ai_api_key = MagicMock(return_value="")
         mock_config.ollama_host = ""
-        mock_config.ollama_model = "llama3.1:8b"
+        mock_config.ollama_model = "deepseek-r1:14b"
         return mock_config
 
     def test_font_scale_slider_range(self, qtbot):
@@ -165,7 +165,7 @@ class TestPerformanceTab:
         mock_config.ai_custom_prompt = ""
         mock_config.get_ai_api_key = MagicMock(return_value="")
         mock_config.ollama_host = ""
-        mock_config.ollama_model = "llama3.1:8b"
+        mock_config.ollama_model = "deepseek-r1:14b"
         return mock_config
 
     def test_rankings_cache_range(self, qtbot):
@@ -259,7 +259,7 @@ class TestSystemTrayTab:
         mock_config.ai_custom_prompt = ""
         mock_config.get_ai_api_key = MagicMock(return_value="")
         mock_config.ollama_host = ""
-        mock_config.ollama_model = "llama3.1:8b"
+        mock_config.ollama_model = "deepseek-r1:14b"
         return mock_config
 
     def test_loads_settings_from_config(self, qtbot):
@@ -322,7 +322,7 @@ class TestSettingsDialogSave:
         mock_config.ai_custom_prompt = ""
         mock_config.get_ai_api_key = MagicMock(return_value="")
         mock_config.ollama_host = ""
-        mock_config.ollama_model = "llama3.1:8b"
+        mock_config.ollama_model = "deepseek-r1:14b"
         return mock_config
 
     def test_save_updates_all_config_values(self, qtbot):
@@ -385,7 +385,7 @@ class TestSettingsDialogReset:
         mock_config.ai_custom_prompt = ""
         mock_config.get_ai_api_key = MagicMock(return_value="")
         mock_config.ollama_host = ""
-        mock_config.ollama_model = "llama3.1:8b"
+        mock_config.ollama_model = "deepseek-r1:14b"
         return mock_config
 
     def test_reset_accessibility_tab(self, qtbot):
