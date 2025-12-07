@@ -63,6 +63,9 @@ class GroqClient(BaseAIClient):
             max_tokens: Maximum tokens in response.
             model: Model to use (default: llama-3.3-70b-versatile).
         """
+        # Ensure the API key is clean of any whitespace/newlines from copy-pasting
+        api_key = api_key.strip()
+
         super().__init__(api_key, timeout, max_tokens)
         self._model = model
         self._session = requests.Session()
