@@ -508,6 +508,18 @@ class SettingsDialog(QDialog):
         groq_row.addWidget(self._groq_key_edit)
         keys_layout.addLayout(groq_row)
 
+        # xAI API key
+        xai_row = QHBoxLayout()
+        xai_label = QLabel("xAI Grok:")
+        xai_label.setMinimumWidth(70)
+        xai_row.addWidget(xai_label)
+        self._xai_key_edit = QLineEdit()
+        self._xai_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
+        self._xai_key_edit.setPlaceholderText("Enter xAI API key")
+        self._xai_key_edit.setToolTip("Get a key from console.x.ai")
+        xai_row.addWidget(self._xai_key_edit)
+        keys_layout.addLayout(xai_row)
+
         layout.addWidget(keys_group)
 
         # Ollama Settings group (local LLM)
@@ -740,6 +752,8 @@ class SettingsDialog(QDialog):
             self._openai_key_edit.setText("••••••••••••••••")
         if self._config.get_ai_api_key("groq"):
             self._groq_key_edit.setText("••••••••••••••••")
+        if self._config.get_ai_api_key("xai"):
+            self._xai_key_edit.setText("••••••••••••••••")
 
         # Ollama settings
         ollama_host = getattr(self._config, "ollama_host", "")
@@ -827,6 +841,10 @@ class SettingsDialog(QDialog):
         groq_key = self._groq_key_edit.text()
         if groq_key and groq_key != "••••••••••••••••":
             self._config.set_ai_api_key("groq", groq_key)
+
+        xai_key = self._xai_key_edit.text()
+        if xai_key and xai_key != "••••••••••••••••":
+            self._config.set_ai_api_key("xai", xai_key)
 
         # Ollama settings
         self._config.ollama_host = self._ollama_host_edit.text().strip()

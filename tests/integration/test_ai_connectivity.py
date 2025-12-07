@@ -107,6 +107,25 @@ class TestAIConnectivity:
         assert response.provider == "groq"
         print(f"\n[OK] Groq: '{response.content.strip()}' ({response.tokens_used} tokens)")
 
+    def test_xai_connectivity(self, config):
+        """Test xAI Grok API connectivity."""
+        api_key = config.get_ai_api_key("xai")
+        if not api_key:
+            pytest.skip("xAI API key not configured")
+
+        client = create_ai_client("xai", api_key)
+        assert client is not None
+        assert client.is_configured()
+
+        result = client.complete(TEST_PROMPT)
+        client.close()
+
+        assert result.is_ok(), f"xAI failed: {result.error if hasattr(result, 'error') else 'unknown'}"
+        response = result.unwrap()
+        assert response.content, "Empty response from xAI"
+        assert response.provider == "xai"
+        print(f"\n[OK] xAI: '{response.content.strip()}' ({response.tokens_used} tokens)")
+
     def test_ollama_connectivity(self, config):
         """Test Ollama local connectivity."""
         client = create_ai_client(

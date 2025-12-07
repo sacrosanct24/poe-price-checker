@@ -24,12 +24,13 @@ from data_sources.ai.gemini_client import GeminiClient
 from data_sources.ai.claude_client import ClaudeClient
 from data_sources.ai.openai_client import OpenAIClient
 from data_sources.ai.groq_client import GroqClient
+from data_sources.ai.xai_client import XAIClient
 from data_sources.ai.ollama_client import OllamaClient
 
 logger = logging.getLogger(__name__)
 
 # Supported provider names
-AIProvider = Literal["gemini", "claude", "openai", "groq", "ollama"]
+AIProvider = Literal["gemini", "claude", "openai", "groq", "xai", "ollama"]
 
 # Provider name to client class mapping
 _PROVIDER_CLASSES: dict[str, type[BaseAIClient]] = {
@@ -37,6 +38,7 @@ _PROVIDER_CLASSES: dict[str, type[BaseAIClient]] = {
     "claude": ClaudeClient,
     "openai": OpenAIClient,
     "groq": GroqClient,
+    "xai": XAIClient,
     "ollama": OllamaClient,
 }
 
@@ -116,6 +118,7 @@ def get_provider_display_name(provider: str) -> str:
         "claude": "Anthropic Claude",
         "openai": "OpenAI",
         "groq": "Groq (Fast)",
+        "xai": "xAI Grok",
         "ollama": "Ollama (Local)",
     }
     return names.get(provider.lower(), provider.title())
@@ -142,6 +145,7 @@ __all__ = [
     "GroqClient",
     "OllamaClient",
     "OpenAIClient",
+    "XAIClient",
     "SUPPORTED_PROVIDERS",
     "create_ai_client",
     "get_provider_display_name",
