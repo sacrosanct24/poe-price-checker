@@ -599,16 +599,37 @@ class PriceCheckerWindow(QMainWindow):
 
         Performs AI analysis and sends results back to the window.
         """
+        # Get the window to check its selected provider
+        window = self._window_manager.get_window("upgrade_advisor")
+        if not window:
+            return
+
+        # Check if the window's selected provider is configured
+        selected_provider = window.get_selected_provider()
+        if not selected_provider:
+            self._set_status("No AI provider selected")
+            window.show_analysis_error(slot, "No AI provider selected")
+            return
+
+        # Check if the provider has an API key (unless it's a local provider)
+        from data_sources.ai import is_local_provider
+        if not is_local_provider(selected_provider):
+            api_key = self.ctx.config.get_ai_api_key(selected_provider)
+            if not api_key:
+                self._set_status(f"No API key configured for {selected_provider}")
+                window.show_analysis_error(
+                    slot,
+                    f"No API key configured for {selected_provider}.\n"
+                    f"Add your API key in Settings > AI."
+                )
+                return
+
+        # Temporarily set the config provider to the selected one
+        original_provider = self.ctx.config.ai_provider
+        self.ctx.config.ai_provider = selected_provider
+
         if not self._ai_controller:
             self._init_ai_controller()
-
-        if not self._ai_controller or not self._ai_controller.is_configured():
-            self._set_status("AI not configured - check Settings > AI")
-            # Notify window of error
-            window = self._window_manager.get_window("upgrade_advisor")
-            if window:
-                window.show_analysis_error(slot, "AI not configured")
-            return
 
         # Set up the AI controller with database for stash access
         self._ai_controller.set_database(self.ctx.db)
@@ -618,16 +639,18 @@ class PriceCheckerWindow(QMainWindow):
         account_name = self.ctx.config.data.get("stash", {}).get("account_name", "")
 
         # Perform analysis - the controller will handle the async work
-        success = self._ai_controller.analyze_upgrade(slot=slot, account_name=account_name)
+        try:
+            success = self._ai_controller.analyze_upgrade(slot=slot, account_name=account_name)
+        finally:
+            # Restore original provider (worker has captured the selected one)
+            self.ctx.config.ai_provider = original_provider
 
         if success:
             # Connect to get results back (use a one-time connection)
-            from gui_qt.workers.ai_analysis_worker import AIAnalysisWorker
-
             def on_result(response):
                 window = self._window_manager.get_window("upgrade_advisor")
                 if window:
-                    window.show_analysis_result(slot, response.content)
+                    window.show_analysis_result(slot, response.content, selected_provider)
 
             def on_error(error_msg, traceback):
                 window = self._window_manager.get_window("upgrade_advisor")
@@ -638,6 +661,8 @@ class PriceCheckerWindow(QMainWindow):
             if self._ai_controller._worker:
                 self._ai_controller._worker.result.connect(on_result)
                 self._ai_controller._worker.error.connect(on_error)
+        else:
+            window.show_analysis_error(slot, "Failed to start analysis")
 
     def _show_upgrade_advisor(self) -> None:
         """Show the AI Upgrade Advisor window."""

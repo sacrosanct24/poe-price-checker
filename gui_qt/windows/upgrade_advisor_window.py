@@ -32,6 +32,7 @@ from PyQt6.QtWidgets import (
     QHeaderView,
     QProgressBar,
     QFrame,
+    QComboBox,
 )
 
 from gui_qt.styles import apply_window_icon, COLORS, get_rarity_color
@@ -135,11 +136,65 @@ class UpgradeAdvisorWindow(QDialog):
         """Set database for caching upgrade advice."""
         self._db = db
 
+    def get_selected_provider(self) -> str:
+        """Get the currently selected AI provider."""
+        return self.provider_combo.currentData() or ""
+
     def _is_ai_configured(self) -> bool:
-        """Check if AI is configured."""
-        if self._ai_configured_callback:
-            return self._ai_configured_callback()
-        return False
+        """Check if the selected AI provider is configured.
+
+        First checks the callback (for external control/testing),
+        then falls back to checking the provider's API key.
+        """
+        # If callback is set and returns False, AI is not configured
+        if self._ai_configured_callback and not self._ai_configured_callback():
+            return False
+
+        from data_sources.ai import is_local_provider
+
+        provider = self.get_selected_provider()
+        if not provider:
+            return False
+        # Ollama is local - no API key needed
+        if is_local_provider(provider):
+            return True
+        # Check if API key is configured for this provider
+        return bool(self._config.get_ai_api_key(provider))
+
+    def _on_provider_changed(self, index: int) -> None:
+        """Handle AI provider selection change."""
+        provider = self.get_selected_provider()
+        configured = self._is_ai_configured()
+
+        # Update button states
+        self._update_button_states()
+
+        # Update tooltip with configuration status
+        if not configured and provider:
+            from data_sources.ai import is_local_provider
+            if is_local_provider(provider):
+                self.provider_combo.setToolTip(
+                    f"{provider.title()} server not reachable.\n"
+                    "Start Ollama or check host in Settings > AI."
+                )
+            else:
+                self.provider_combo.setToolTip(
+                    f"No API key configured for {provider}.\n"
+                    "Add your API key in Settings > AI."
+                )
+        else:
+            self.provider_combo.setToolTip(
+                "Select AI provider for analysis.\n"
+                "API key must be configured in Settings > AI."
+            )
+
+    def _sync_provider_combo(self) -> None:
+        """Sync the provider combo box with the config setting."""
+        current_provider = self._config.ai_provider
+        for i in range(self.provider_combo.count()):
+            if self.provider_combo.itemData(i) == current_provider:
+                self.provider_combo.setCurrentIndex(i)
+                break
 
     def _compute_item_hash(self, item_data: Any) -> str:
         """Compute a hash of item data to detect changes.
@@ -197,7 +252,9 @@ class UpgradeAdvisorWindow(QDialog):
         layout.addLayout(action_bar)
 
     def _create_header(self) -> QWidget:
-        """Create the header with profile info."""
+        """Create the header with profile info and AI provider selector."""
+        from data_sources.ai import SUPPORTED_PROVIDERS, get_provider_display_name
+
         frame = QFrame()
         frame.setFrameShape(QFrame.Shape.StyledPanel)
         layout = QHBoxLayout(frame)
@@ -209,6 +266,22 @@ class UpgradeAdvisorWindow(QDialog):
         layout.addWidget(self.profile_label)
 
         layout.addStretch()
+
+        # AI Provider selector
+        layout.addWidget(QLabel("AI Provider:"))
+        self.provider_combo = QComboBox()
+        self.provider_combo.setMinimumWidth(150)
+        for provider in SUPPORTED_PROVIDERS:
+            display_name = get_provider_display_name(provider)
+            self.provider_combo.addItem(display_name, provider)
+        self.provider_combo.currentIndexChanged.connect(self._on_provider_changed)
+        self.provider_combo.setToolTip(
+            "Select AI provider for analysis.\n"
+            "API key must be configured in Settings > AI."
+        )
+        layout.addWidget(self.provider_combo)
+
+        layout.addSpacing(12)
 
         # Refresh button
         refresh_btn = QPushButton("Refresh")
@@ -357,6 +430,8 @@ class UpgradeAdvisorWindow(QDialog):
             item_data = items.get(slot)
             self._add_slot_row(slot, item_data)
 
+        # Sync provider combo with config
+        self._sync_provider_combo()
         self._update_button_states()
 
     def _load_cached_advice(self) -> None:

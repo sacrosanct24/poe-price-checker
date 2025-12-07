@@ -47,14 +47,14 @@ class SettingsDialog(QDialog):
         self._config = config
 
         self.setWindowTitle("Settings")
-        self.setMinimumWidth(500)
-        self.setMinimumHeight(550)
-        self.resize(550, 700)
+        self.setMinimumWidth(600)
+        self.setMinimumHeight(600)
         self.setSizeGripEnabled(True)
         apply_window_icon(self)
 
         self._create_widgets()
         self._load_settings()
+        self._size_to_screen_percent(0.75)
         self._center_on_screen()
 
     def _create_widgets(self) -> None:
@@ -856,6 +856,24 @@ class SettingsDialog(QDialog):
         self._config.ai_custom_prompt = self._ai_prompt_edit.toPlainText()
 
         self.accept()
+
+    def _size_to_screen_percent(self, percent: float = 0.75) -> None:
+        """Resize the dialog to a percentage of the screen size.
+
+        Args:
+            percent: Fraction of screen size (0.0-1.0). Default 0.75 (75%).
+        """
+        parent = self.parent()
+        if parent and hasattr(parent, 'screen') and parent.screen():
+            screen = parent.screen()
+        else:
+            screen = QGuiApplication.primaryScreen()
+
+        if screen:
+            screen_geometry = screen.availableGeometry()
+            width = int(screen_geometry.width() * percent)
+            height = int(screen_geometry.height() * percent)
+            self.resize(width, height)
 
     def _center_on_screen(self) -> None:
         """Center the dialog on the same screen as the parent window."""
