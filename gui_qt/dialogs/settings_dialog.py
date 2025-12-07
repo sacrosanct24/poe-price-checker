@@ -408,12 +408,19 @@ class SettingsDialog(QDialog):
         return tab
 
     def _create_ai_tab(self) -> QWidget:
-        """Create the AI settings tab."""
+        """Create the AI settings tab with scroll area for content."""
         from data_sources.ai import SUPPORTED_PROVIDERS, get_provider_display_name
 
-        tab = QWidget()
-        layout = QVBoxLayout(tab)
-        layout.setSpacing(16)
+        # Create scroll area as the main container
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+
+        # Content widget inside scroll area
+        content = QWidget()
+        layout = QVBoxLayout(content)
+        layout.setSpacing(12)
+        layout.setContentsMargins(0, 0, 8, 0)  # Right margin for scrollbar
 
         # Provider Selection group
         provider_group = QGroupBox("AI Provider")
@@ -658,7 +665,9 @@ class SettingsDialog(QDialog):
         usage_label.setStyleSheet("color: gray; font-size: 11px;")
         layout.addWidget(usage_label)
 
-        return tab
+        # Set content in scroll area and return
+        scroll.setWidget(content)
+        return scroll
 
     def _on_ai_provider_changed(self, index: int) -> None:
         """Handle AI provider combo box change."""
