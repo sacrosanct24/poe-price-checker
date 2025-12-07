@@ -60,6 +60,7 @@ class ItemContextMenuManager(QObject):
         ai_analysis_requested: Emitted with (item_text, price_results) for AI analysis.
         inspect_requested: Emitted with ItemContext for item inspection.
         price_check_requested: Emitted with item_text for price checking.
+        upgrade_analysis_requested: Emitted with (slot, item_text) for upgrade analysis.
 
     Example:
         menu_manager = ItemContextMenuManager()
@@ -74,6 +75,7 @@ class ItemContextMenuManager(QObject):
     ai_analysis_requested = pyqtSignal(str, list)  # item_text, price_results
     inspect_requested = pyqtSignal(object)  # ItemContext
     price_check_requested = pyqtSignal(str)  # item_text
+    upgrade_analysis_requested = pyqtSignal(str, str)  # slot, item_text
 
     def __init__(self, parent: Optional[QObject] = None):
         super().__init__(parent)
@@ -82,6 +84,7 @@ class ItemContextMenuManager(QObject):
         self._show_price_check: bool = True
         self._show_ai: bool = True
         self._show_copy: bool = True
+        self._show_upgrade_analysis: bool = False
 
     def set_ai_configured_callback(self, callback: Optional[Callable[[], bool]]) -> None:
         """Set callback to check if AI is configured.
@@ -97,6 +100,7 @@ class ItemContextMenuManager(QObject):
         show_price_check: bool = True,
         show_ai: bool = True,
         show_copy: bool = True,
+        show_upgrade_analysis: bool = False,
     ) -> None:
         """Configure which menu options to show.
 
@@ -105,17 +109,20 @@ class ItemContextMenuManager(QObject):
             show_price_check: Show "Price Check" option.
             show_ai: Show "Ask AI" option.
             show_copy: Show "Copy" submenu.
+            show_upgrade_analysis: Show "Analyze Upgrades" option (for PoB equipment).
         """
         self._show_inspect = show_inspect
         self._show_price_check = show_price_check
         self._show_ai = show_ai
         self._show_copy = show_copy
+        self._show_upgrade_analysis = show_upgrade_analysis
 
     def show_menu(
         self,
         global_pos,
         item: ItemContext,
         parent: QWidget,
+        slot: str = "",
     ) -> None:
         """Show the context menu at the given position.
 
@@ -123,16 +130,18 @@ class ItemContextMenuManager(QObject):
             global_pos: Global screen position for the menu.
             item: ItemContext with item data.
             parent: Parent widget for the menu.
+            slot: Equipment slot name (for upgrade analysis).
         """
-        menu = self.build_menu(item, parent)
+        menu = self.build_menu(item, parent, slot=slot)
         menu.exec(global_pos)
 
-    def build_menu(self, item: ItemContext, parent: QWidget) -> QMenu:
+    def build_menu(self, item: ItemContext, parent: QWidget, slot: str = "") -> QMenu:
         """Build and return the context menu without showing it.
 
         Args:
             item: ItemContext with item data.
             parent: Parent widget for the menu.
+            slot: Equipment slot name (for upgrade analysis).
 
         Returns:
             Configured QMenu ready to show.
@@ -164,6 +173,22 @@ class ItemContextMenuManager(QObject):
                 ai_action.setToolTip("Configure AI in Settings > AI")
             ai_action.triggered.connect(
                 lambda: self._trigger_ai_analysis(item)
+            )
+
+        # Analyze Upgrades (for PoB equipment slots)
+        if self._show_upgrade_analysis and slot:
+            ai_configured = (
+                self._ai_configured_callback() if self._ai_configured_callback else False
+            )
+            upgrade_action = menu.addAction(f"Analyze Upgrades for {slot}")
+            upgrade_action.setEnabled(ai_configured)
+            if not ai_configured:
+                upgrade_action.setToolTip("Configure AI in Settings > AI")
+            # Capture slot in closure
+            slot_name = slot
+            item_text = item.item_text
+            upgrade_action.triggered.connect(
+                lambda: self.upgrade_analysis_requested.emit(slot_name, item_text)
             )
 
         # Add separator before copy actions

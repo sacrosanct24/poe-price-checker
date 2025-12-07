@@ -38,6 +38,7 @@ class PoBPanel(QWidget):
     item_selected = pyqtSignal(str, dict)  # Emits (item_text, item_data)
     price_check_requested = pyqtSignal(str)  # Emits item text
     ai_analysis_requested = pyqtSignal(str, list)  # item_text, price_results
+    upgrade_analysis_requested = pyqtSignal(str, str)  # slot, item_text
 
     def __init__(
         self,
@@ -57,9 +58,11 @@ class PoBPanel(QWidget):
             show_price_check=True,
             show_ai=True,
             show_copy=True,
+            show_upgrade_analysis=True,  # Enable upgrade analysis for PoB equipment
         )
         self._context_menu_manager.ai_analysis_requested.connect(self.ai_analysis_requested.emit)
         self._context_menu_manager.price_check_requested.connect(self.price_check_requested.emit)
+        self._context_menu_manager.upgrade_analysis_requested.connect(self.upgrade_analysis_requested.emit)
 
         self._create_widgets()
         self._load_profiles()
@@ -271,6 +274,9 @@ class PoBPanel(QWidget):
         if not item_data:
             return
 
+        # Get slot name from UserRole
+        slot = tree_item.data(1, Qt.ItemDataRole.UserRole) or ""
+
         # Get item text and name
         item_text = self._generate_item_text(item_data)
         item_name = getattr(item_data, "name", "Unknown") or "Unknown"
@@ -284,11 +290,12 @@ class PoBPanel(QWidget):
             source="",
         )
 
-        # Show the menu
+        # Show the menu with slot for upgrade analysis
         self._context_menu_manager.show_menu(
             self.equipment_tree.viewport().mapToGlobal(position),
             item_context,
             self.equipment_tree,
+            slot=slot,
         )
 
     def _on_check_selected(self) -> None:

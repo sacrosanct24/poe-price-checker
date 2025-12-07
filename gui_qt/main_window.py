@@ -310,6 +310,8 @@ class PriceCheckerWindow(QMainWindow):
                          shortcut="Ctrl+I"),
                 MenuItem("&Upgrade Finder...", handler=self._show_upgrade_finder,
                          shortcut="Ctrl+U"),
+                MenuItem("AI Upgrade &Advisor...", handler=self._show_upgrade_advisor,
+                         shortcut="Ctrl+Shift+U"),
                 MenuItem("Compare &Items...", handler=self._show_item_comparison,
                          shortcut="Ctrl+Shift+I"),
                 MenuSection([
@@ -418,6 +420,7 @@ class PriceCheckerWindow(QMainWindow):
         self.pob_panel = PoBPanel(self._pob_controller.character_manager, parent=self)
         self.pob_panel.price_check_requested.connect(self._on_pob_price_check)
         self.pob_panel.ai_analysis_requested.connect(self._on_ai_analysis_requested)
+        self.pob_panel.upgrade_analysis_requested.connect(self._on_upgrade_analysis_requested)
         # Update build stats when profile changes
         self.pob_panel.profile_combo.currentTextChanged.connect(
             self._on_pob_profile_changed
@@ -541,6 +544,8 @@ class PriceCheckerWindow(QMainWindow):
         self._nav_controller.set_callback("ai_configured", self._is_ai_configured)
         self._nav_controller.set_callback("on_ai_analysis", self._on_ai_analysis_requested)
         self._nav_controller.set_callback("on_price_check", self._on_pob_price_check)
+        self._nav_controller.set_callback("on_upgrade_analysis", self._on_upgrade_analysis_from_window)
+        self._nav_controller.set_callback("on_status", self._set_status)
 
         # Set AI configured callback for PoB panel and pinned items
         self.pob_panel.set_ai_configured_callback(self._is_ai_configured)
@@ -582,6 +587,62 @@ class PriceCheckerWindow(QMainWindow):
         if self._ai_controller:
             self._ai_controller.analyze_item(item_text, price_results)
 
+    def _on_upgrade_analysis_requested(self, slot: str, item_text: str) -> None:
+        """Handle upgrade analysis request from PoB panel context menu.
+
+        Opens the Upgrade Advisor window and starts analysis for the slot.
+        """
+        self._nav_controller.show_upgrade_advisor(slot=slot)
+
+    def _on_upgrade_analysis_from_window(self, slot: str, item_text: str) -> None:
+        """Handle upgrade analysis request from the Upgrade Advisor window.
+
+        Performs AI analysis and sends results back to the window.
+        """
+        if not self._ai_controller:
+            self._init_ai_controller()
+
+        if not self._ai_controller or not self._ai_controller.is_configured():
+            self._set_status("AI not configured - check Settings > AI")
+            # Notify window of error
+            window = self._window_manager.get_window("upgrade_advisor")
+            if window:
+                window.show_analysis_error(slot, "AI not configured")
+            return
+
+        # Set up the AI controller with database for stash access
+        self._ai_controller.set_database(self.ctx.db)
+        self._ai_controller.set_character_manager(self._pob_controller.character_manager)
+
+        # Get account name from config
+        account_name = self.ctx.config.data.get("stash", {}).get("account_name", "")
+
+        # Perform analysis - the controller will handle the async work
+        success = self._ai_controller.analyze_upgrade(slot=slot, account_name=account_name)
+
+        if success:
+            # Connect to get results back (use a one-time connection)
+            from gui_qt.workers.ai_analysis_worker import AIAnalysisWorker
+
+            def on_result(response):
+                window = self._window_manager.get_window("upgrade_advisor")
+                if window:
+                    window.show_analysis_result(slot, response.content)
+
+            def on_error(error_msg, traceback):
+                window = self._window_manager.get_window("upgrade_advisor")
+                if window:
+                    window.show_analysis_error(slot, error_msg)
+
+            # Reconnect signals for this specific request
+            if self._ai_controller._worker:
+                self._ai_controller._worker.result.connect(on_result)
+                self._ai_controller._worker.error.connect(on_error)
+
+    def _show_upgrade_advisor(self) -> None:
+        """Show the AI Upgrade Advisor window."""
+        self._nav_controller.show_upgrade_advisor()
+
     # -------------------------------------------------------------------------
     # Shortcuts
     # -------------------------------------------------------------------------
@@ -609,6 +670,7 @@ class PriceCheckerWindow(QMainWindow):
         manager.register("show_pob_characters", self._show_pob_characters)
         manager.register("show_bis_search", self._show_bis_search)
         manager.register("show_upgrade_finder", self._show_upgrade_finder)
+        manager.register("show_upgrade_advisor", self._show_upgrade_advisor)
         manager.register("show_build_library", self._show_build_library)
         manager.register("show_build_comparison", self._show_build_comparison)
         manager.register("show_item_comparison", self._show_item_comparison)

@@ -273,6 +273,45 @@ class NavigationController:
 
         self._wm.show_window("stash_viewer")
 
+    def show_upgrade_advisor(
+        self,
+        slot: Optional[str] = None,
+        on_upgrade_analysis: Optional[Callable[[str, str], None]] = None,
+    ) -> None:
+        """Show AI upgrade advisor window.
+
+        Args:
+            slot: Optional slot to pre-select and analyze.
+            on_upgrade_analysis: Callback for handling upgrade analysis requests.
+        """
+        from gui_qt.windows.upgrade_advisor_window import UpgradeAdvisorWindow
+
+        if "upgrade_advisor" not in self._wm._factories:
+            def create_upgrade_advisor():
+                window = UpgradeAdvisorWindow(
+                    config=self._ctx.config,
+                    character_manager=self._character_manager,
+                    parent=self._main_window,
+                    on_status=self._callbacks.get("on_status"),
+                )
+                # Wire up AI configured callback
+                if "ai_configured" in self._callbacks:
+                    window.set_ai_configured_callback(self._callbacks["ai_configured"])
+                # Wire up upgrade analysis signal
+                if "on_upgrade_analysis" in self._callbacks:
+                    window.upgrade_analysis_requested.connect(
+                        self._callbacks["on_upgrade_analysis"]
+                    )
+                return window
+
+            self._wm.register_factory("upgrade_advisor", create_upgrade_advisor)
+
+        window = self._wm.show_window("upgrade_advisor")
+
+        # If a slot was specified, trigger analysis for it
+        if slot and window:
+            window.analyze_slot(slot)
+
 
 def get_navigation_controller(
     window_manager: "WindowManager",

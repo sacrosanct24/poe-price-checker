@@ -229,6 +229,67 @@ class TestItemContextMenuManager:
                 assert "Item Name" in action_names
                 break
 
+    def test_upgrade_analysis_option_disabled_by_default(self, manager, parent_widget, item_context):
+        """Test that upgrade analysis option is disabled by default."""
+        menu = manager.build_menu(item_context, parent_widget, slot="Helmet")
+        action_names = [a.text() for a in menu.actions()]
+        # Should not be present when show_upgrade_analysis is False (default)
+        assert not any("Analyze Upgrades" in name for name in action_names)
+
+    def test_upgrade_analysis_option_shown_when_enabled(self, manager, parent_widget, item_context):
+        """Test that upgrade analysis option is shown when enabled."""
+        manager.set_options(show_upgrade_analysis=True)
+        manager.set_ai_configured_callback(lambda: True)
+        menu = manager.build_menu(item_context, parent_widget, slot="Helmet")
+        action_names = [a.text() for a in menu.actions()]
+        assert any("Analyze Upgrades for Helmet" in name for name in action_names)
+
+    def test_upgrade_analysis_requires_slot(self, manager, parent_widget, item_context):
+        """Test that upgrade analysis requires a slot to be passed."""
+        manager.set_options(show_upgrade_analysis=True)
+        manager.set_ai_configured_callback(lambda: True)
+        # Without slot, should not show
+        menu = manager.build_menu(item_context, parent_widget, slot="")
+        action_names = [a.text() for a in menu.actions()]
+        assert not any("Analyze Upgrades" in name for name in action_names)
+
+    def test_upgrade_analysis_disabled_when_ai_not_configured(self, manager, parent_widget, item_context):
+        """Test upgrade analysis disabled when AI not configured."""
+        manager.set_options(show_upgrade_analysis=True)
+        manager.set_ai_configured_callback(lambda: False)
+        menu = manager.build_menu(item_context, parent_widget, slot="Helmet")
+
+        upgrade_action = None
+        for action in menu.actions():
+            if "Analyze Upgrades" in action.text():
+                upgrade_action = action
+                break
+
+        assert upgrade_action is not None
+        assert not upgrade_action.isEnabled()
+
+    def test_upgrade_analysis_signal_emitted(self, manager, parent_widget, item_context, qtbot):
+        """Test that upgrade analysis signal is emitted."""
+        manager.set_options(show_upgrade_analysis=True)
+        manager.set_ai_configured_callback(lambda: True)
+
+        received = []
+
+        def on_signal(slot, item_text):
+            received.append((slot, item_text))
+
+        manager.upgrade_analysis_requested.connect(on_signal)
+
+        menu = manager.build_menu(item_context, parent_widget, slot="Helmet")
+        for action in menu.actions():
+            if "Analyze Upgrades" in action.text():
+                action.trigger()
+                break
+
+        assert len(received) == 1
+        assert received[0][0] == "Helmet"
+        assert received[0][1] == item_context.item_text
+
 
 class TestModuleFunctions:
     """Tests for module-level functions."""

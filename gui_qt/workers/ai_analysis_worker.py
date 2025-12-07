@@ -2,17 +2,21 @@
 AI Analysis Worker for background item analysis.
 
 Runs AI API calls in a background thread to avoid blocking the UI.
+Supports both standard item analysis and upgrade analysis with build context.
 """
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
 import logging
 
 from gui_qt.workers.base_worker import BaseThreadWorker
 from data_sources.ai import create_ai_client, AIResponse
 from core.ai_prompt_builder import AIPromptBuilder, PromptContext
 from core.result import Result
+
+if TYPE_CHECKING:
+    from core.build_summarizer import BuildSummary
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +52,8 @@ class AIAnalysisWorker(BaseThreadWorker):
         league: str = "",
         build_name: str = "",
         custom_prompt: str = "",
+        build_summary: Optional["BuildSummary"] = None,
+        raw_prompt: bool = False,
         parent: Optional[Any] = None,
     ):
         """Initialize the AI analysis worker.
@@ -55,13 +61,15 @@ class AIAnalysisWorker(BaseThreadWorker):
         Args:
             provider: AI provider name (gemini, claude, openai).
             api_key: API key for the provider.
-            item_text: The raw item text to analyze.
+            item_text: The raw item text to analyze (or complete prompt if raw_prompt=True).
             price_results: List of price check results for context.
             timeout: Request timeout in seconds.
             max_tokens: Maximum tokens in response.
             league: Current league name for context.
             build_name: Player's build name for context.
             custom_prompt: Optional custom prompt template.
+            build_summary: Optional BuildSummary for detailed build context.
+            raw_prompt: If True, use item_text directly as the prompt without wrapping.
             parent: Optional parent QObject.
         """
         super().__init__(parent)
@@ -74,6 +82,8 @@ class AIAnalysisWorker(BaseThreadWorker):
         self._league = league
         self._build_name = build_name
         self._custom_prompt = custom_prompt
+        self._build_summary = build_summary
+        self._raw_prompt = raw_prompt
         self._prompt_builder = AIPromptBuilder()
 
     def _execute(self) -> AIResponse:
@@ -112,17 +122,24 @@ class AIAnalysisWorker(BaseThreadWorker):
             if self.is_cancelled:
                 raise InterruptedError("Analysis cancelled")
 
-            context = PromptContext(
-                item_text=self._item_text,
-                price_results=self._price_results,
-                league=self._league,
-                build_name=self._build_name,
-            )
+            # If raw_prompt is True, use the item_text directly as the prompt
+            # This is used for upgrade analysis where the complete prompt is pre-built
+            if self._raw_prompt:
+                prompt = self._item_text
+            else:
+                context = PromptContext(
+                    item_text=self._item_text,
+                    price_results=self._price_results,
+                    league=self._league,
+                    build_name=self._build_name,
+                    build_summary=self._build_summary,
+                )
 
-            prompt = self._prompt_builder.build_item_analysis_prompt(
-                context,
-                custom_template=self._custom_prompt if self._custom_prompt else None,
-            )
+                prompt = self._prompt_builder.build_item_analysis_prompt(
+                    context,
+                    custom_template=self._custom_prompt if self._custom_prompt else None,
+                )
+
             system_prompt = self._prompt_builder.get_system_prompt()
 
             # Send to AI
