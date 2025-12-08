@@ -234,8 +234,9 @@ class StashStorageService:
 
         # Delete all others - placeholders are constructed from list length, all values parameterized
         placeholders = ",".join("?" * len(keep_ids))
+        # nosec B608 - placeholders are constructed from list length, all values parameterized
         cursor = self._db._execute(
-            f"""  # nosec
+            f"""
             DELETE FROM stash_snapshots
             WHERE account_name = ? AND league = ?
               AND id NOT IN ({placeholders})
