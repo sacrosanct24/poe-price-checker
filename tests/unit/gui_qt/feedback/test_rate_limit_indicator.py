@@ -23,32 +23,41 @@ from gui_qt.feedback.rate_limit_indicator import (
 
 
 class TestRateLimitStatus:
-    """Tests for RateLimitStatus enum."""
+    """Tests for RateLimitStatus enum - behavioral tests."""
 
-    def test_ready_value(self):
-        """READY should have 'ready' value."""
-        assert RateLimitStatus.READY.value == "ready"
-
-    def test_active_value(self):
-        """ACTIVE should have 'active' value."""
-        assert RateLimitStatus.ACTIVE.value == "active"
-
-    def test_cooling_down_value(self):
-        """COOLING_DOWN should have 'cooling' value."""
-        assert RateLimitStatus.COOLING_DOWN.value == "cooling"
-
-    def test_rate_limited_value(self):
-        """RATE_LIMITED should have 'limited' value."""
-        assert RateLimitStatus.RATE_LIMITED.value == "limited"
-
-    def test_all_statuses_in_configs(self):
-        """All statuses should have configuration."""
+    def test_all_statuses_have_complete_config(self):
+        """Every status should have full configuration for display."""
+        required_keys = {"icon", "color", "label", "tooltip"}
         for status in RateLimitStatus:
-            assert status in STATUS_CONFIGS
-            assert "icon" in STATUS_CONFIGS[status]
-            assert "color" in STATUS_CONFIGS[status]
-            assert "label" in STATUS_CONFIGS[status]
-            assert "tooltip" in STATUS_CONFIGS[status]
+            assert status in STATUS_CONFIGS, f"Missing config for {status}"
+            config = STATUS_CONFIGS[status]
+            for key in required_keys:
+                assert key in config, f"Missing {key} in config for {status}"
+
+    def test_statuses_have_distinct_colors(self):
+        """Each status should have a distinct color for visual differentiation."""
+        colors = [STATUS_CONFIGS[s]["color"] for s in RateLimitStatus]
+        assert len(colors) == len(set(colors)), "Status colors should be unique"
+
+    def test_statuses_have_distinct_icons(self):
+        """Each status should have a distinct icon for accessibility."""
+        icons = [STATUS_CONFIGS[s]["icon"] for s in RateLimitStatus]
+        assert len(icons) == len(set(icons)), "Status icons should be unique"
+
+    def test_statuses_are_hashable_for_dict_keys(self):
+        """Statuses should be usable as dictionary keys."""
+        status_map = {s: f"handler_{s.value}" for s in RateLimitStatus}
+        assert RateLimitStatus.READY in status_map
+        assert status_map[RateLimitStatus.READY] == "handler_ready"
+
+    def test_can_iterate_all_statuses(self):
+        """Should be able to iterate through all statuses."""
+        statuses = list(RateLimitStatus)
+        assert len(statuses) == 4
+        assert RateLimitStatus.READY in statuses
+        assert RateLimitStatus.ACTIVE in statuses
+        assert RateLimitStatus.COOLING_DOWN in statuses
+        assert RateLimitStatus.RATE_LIMITED in statuses
 
 
 # =============================================================================

@@ -19,23 +19,34 @@ from gui_qt.widgets.toast_notification import (
 # ============================================================================
 
 class TestToastType:
-    """Tests for ToastType enum."""
+    """Tests for ToastType enum - behavioral tests."""
 
-    def test_info_value(self):
-        """INFO has correct value."""
-        assert ToastType.INFO.value == "info"
+    def test_all_types_have_color_definitions(self):
+        """Every toast type should have a color definition for styling."""
+        for toast_type in ToastType:
+            assert toast_type in TOAST_COLORS, f"Missing color for {toast_type}"
+            config = TOAST_COLORS[toast_type]
+            assert "bg" in config, f"Missing bg color for {toast_type}"
+            assert "border" in config, f"Missing border color for {toast_type}"
+            assert "icon" in config, f"Missing icon for {toast_type}"
 
-    def test_success_value(self):
-        """SUCCESS has correct value."""
-        assert ToastType.SUCCESS.value == "success"
+    def test_toast_types_are_distinct(self):
+        """Each toast type should be distinguishable from others."""
+        icons = [TOAST_COLORS[t]["icon"] for t in ToastType]
+        borders = [TOAST_COLORS[t]["border"] for t in ToastType]
+        # Icons should be unique for accessibility
+        assert len(icons) == len(set(icons)), "Toast icons should be unique"
+        # Borders should be unique for visual distinction
+        assert len(borders) == len(set(borders)), "Toast borders should be unique"
 
-    def test_warning_value(self):
-        """WARNING has correct value."""
-        assert ToastType.WARNING.value == "warning"
-
-    def test_error_value(self):
-        """ERROR has correct value."""
-        assert ToastType.ERROR.value == "error"
+    def test_can_iterate_all_types(self):
+        """Should be able to iterate through all toast types."""
+        types = list(ToastType)
+        assert len(types) == 4
+        assert ToastType.INFO in types
+        assert ToastType.SUCCESS in types
+        assert ToastType.WARNING in types
+        assert ToastType.ERROR in types
 
 
 # ============================================================================

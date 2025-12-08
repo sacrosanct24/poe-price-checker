@@ -50,11 +50,15 @@ class TestThemeEnum:
         assert Theme("light") == Theme.LIGHT
         assert Theme("dracula") == Theme.DRACULA
 
-    def test_theme_value_access(self):
-        """Should access theme value."""
-        assert Theme.DARK.value == "dark"
-        assert Theme.LIGHT.value == "light"
-        assert Theme.NORD.value == "nord"
+    def test_themes_have_unique_values(self):
+        """Each theme should have a unique string value for serialization."""
+        values = [t.value for t in Theme]
+        assert len(values) == len(set(values)), "Theme values should be unique"
+
+    def test_themes_are_hashable_for_dict_keys(self):
+        """Themes should be usable as dictionary keys."""
+        theme_handlers = {Theme.DARK: "dark_handler", Theme.LIGHT: "light_handler"}
+        assert theme_handlers[Theme.DARK] == "dark_handler"
 
 
 class TestThemeDisplayNames:

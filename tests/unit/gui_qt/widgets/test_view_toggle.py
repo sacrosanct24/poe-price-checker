@@ -20,22 +20,31 @@ from gui_qt.widgets.view_toggle import (
 
 
 class TestViewMode:
-    """Tests for ViewMode enum."""
+    """Tests for ViewMode enum - behavioral tests."""
 
-    def test_table_value(self):
-        """TABLE should have 'table' value."""
-        assert ViewMode.TABLE.value == "table"
+    def test_modes_are_comparable(self):
+        """ViewMode instances should support equality comparison."""
+        assert ViewMode.TABLE == ViewMode.TABLE
+        assert ViewMode.CARDS == ViewMode.CARDS
+        assert ViewMode.TABLE != ViewMode.CARDS
 
-    def test_cards_value(self):
-        """CARDS should have 'cards' value."""
-        assert ViewMode.CARDS.value == "cards"
+    def test_modes_are_hashable(self):
+        """ViewMode should be usable as dictionary keys."""
+        config = {ViewMode.TABLE: "table_config", ViewMode.CARDS: "cards_config"}
+        assert config[ViewMode.TABLE] == "table_config"
+        assert config[ViewMode.CARDS] == "cards_config"
 
-    def test_enum_members(self):
-        """ViewMode should have exactly two members."""
-        members = list(ViewMode)
-        assert len(members) == 2
-        assert ViewMode.TABLE in members
-        assert ViewMode.CARDS in members
+    def test_can_iterate_all_modes(self):
+        """Should be able to iterate through all view modes."""
+        modes = list(ViewMode)
+        assert len(modes) == 2
+        assert ViewMode.TABLE in modes
+        assert ViewMode.CARDS in modes
+
+    def test_modes_have_unique_values(self):
+        """Each mode should have a unique string value for serialization."""
+        values = [m.value for m in ViewMode]
+        assert len(values) == len(set(values)), "ViewMode values should be unique"
 
 
 # =============================================================================
