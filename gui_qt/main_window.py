@@ -1126,6 +1126,26 @@ class PriceCheckerWindow(QMainWindow):
             else:
                 panel.rare_eval_panel.setVisible(False)
 
+            # Update quick verdict panel (casual player summary)
+            # Get best price from results for verdict calculation
+            best_price = None
+            if data.formatted_rows:
+                # Use chaos_value from first result as estimate
+                first_row = data.formatted_rows[0]
+                best_price = first_row.get("chaos_value")
+                if best_price is not None:
+                    try:
+                        best_price = float(best_price)
+                    except (ValueError, TypeError):
+                        best_price = None
+
+            # Calculate verdict with parsed item and price
+            panel.quick_verdict_panel.update_verdict(
+                data.parsed_item,
+                price_chaos=best_price
+            )
+            panel.quick_verdict_panel.setVisible(True)
+
             # Add to history
             self._history_manager.add_entry(item_text, data.parsed_item, data.results)
 

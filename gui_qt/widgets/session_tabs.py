@@ -37,6 +37,7 @@ from gui_qt.widgets.results_table import ResultsTableWidget
 from gui_qt.widgets.item_inspector import ItemInspectorWidget
 from gui_qt.widgets.rare_evaluation_panel import RareEvaluationPanelWidget
 from gui_qt.widgets.ai_analysis_panel import AIAnalysisPanelWidget
+from gui_qt.widgets.quick_verdict_panel import QuickVerdictPanel
 
 if TYPE_CHECKING:
     pass
@@ -180,6 +181,11 @@ class SessionPanel(QWidget):
         self.rare_eval_panel.setVisible(False)
         layout.addWidget(self.rare_eval_panel)
 
+        # Bottom: Quick verdict panel (casual player summary)
+        self.quick_verdict_panel = QuickVerdictPanel()
+        self.quick_verdict_panel.setVisible(False)
+        layout.addWidget(self.quick_verdict_panel)
+
         # Bottom: AI analysis panel (hidden by default)
         self.ai_panel = AIAnalysisPanelWidget()
         self.ai_panel.setVisible(False)
@@ -198,6 +204,8 @@ class SessionPanel(QWidget):
         self.results_table.set_data([])
         self.item_inspector.clear()
         self.rare_eval_panel.setVisible(False)
+        self.quick_verdict_panel.clear()
+        self.quick_verdict_panel.setVisible(False)
         self.ai_panel.clear()
         self.ai_panel.setVisible(False)
 
