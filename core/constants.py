@@ -180,3 +180,27 @@ LOOT_MAX_DROPS_IN_MEMORY = 500
 
 # Minimum value to track as loot (chaos)
 LOOT_MIN_VALUE = 1.0
+
+
+# =============================================================================
+# Meta-Based Affix Weighting
+# =============================================================================
+
+# Cache staleness threshold (days)
+# Weights older than this are considered stale and log a warning
+# Stale data is still used if no fresher data available
+META_CACHE_EXPIRY_DAYS = 7
+
+# Threshold for applying meta popularity bonus
+# If calculated meta_weight >= threshold, apply bonus to affix weight
+# meta_weight = 5.0 + (popularity_percent * 0.1)
+# So 50% popularity => meta_weight = 10.0 (meets threshold)
+META_BONUS_THRESHOLD = 10
+
+# Weight boost amount for meta-popular affixes
+# Added to base weight when affix meets META_BONUS_THRESHOLD
+# Final weight is capped at max affix weight (10)
+META_BONUS_AMOUNT = 2
+
+# Maximum affix weight (weights are capped to prevent score overflow)
+MAX_AFFIX_WEIGHT = 10

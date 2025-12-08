@@ -856,3 +856,390 @@ class TestSummaryGeneration:
         summary = evaluator.get_summary(eval_result)
 
         assert "Crusader" in summary
+
+
+# -------------------------
+# Meta Integration Tests
+# -------------------------
+
+class TestMetaWeightLoading:
+    """Test meta weight loading from cache files."""
+
+    def test_loads_meta_weights_from_cache(self, tmp_path):
+        """Should load meta weights from meta_affixes.json."""
+        from datetime import datetime
+
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+
+        # Create meta_affixes.json
+        meta_data = {
+            "league": "TestLeague",
+            "builds_analyzed": 50,
+            "last_analysis": datetime.now().isoformat(),
+            "affixes": {
+                "life": {"popularity_percent": 80.0},
+                "resistances": {"popularity_percent": 60.0}
+            }
+        }
+        (data_dir / "meta_affixes.json").write_text(json.dumps(meta_data))
+
+        # Create minimal affixes file
+        (data_dir / "valuable_affixes.json").write_text(json.dumps({}))
+        (data_dir / "valuable_bases.json").write_text(json.dumps({}))
+
+        evaluator = RareItemEvaluator(data_dir=data_dir)
+
+        assert evaluator.meta_weights is not None
+        assert "life" in evaluator.meta_weights
+        assert evaluator._meta_cache_info is not None
+        assert evaluator._meta_cache_info["league"] == "TestLeague"
+
+    def test_meta_weights_empty_without_cache(self, tmp_path):
+        """Should return empty meta weights when no cache exists."""
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+        (data_dir / "valuable_affixes.json").write_text(json.dumps({}))
+        (data_dir / "valuable_bases.json").write_text(json.dumps({}))
+
+        evaluator = RareItemEvaluator(data_dir=data_dir)
+
+        assert evaluator.meta_weights == {}
+        assert evaluator._meta_cache_info is None
+
+    def test_fallback_to_build_archetypes(self, tmp_path):
+        """Should fallback to build_archetypes.json for meta weights."""
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+
+        # Create build_archetypes.json with meta weights
+        archetypes_data = {
+            "archetypes": {},
+            "_meta_weights": {
+                "popularity_boosts": {
+                    "life": 2,
+                    "movement_speed": 1
+                }
+            }
+        }
+        (data_dir / "build_archetypes.json").write_text(json.dumps(archetypes_data))
+        (data_dir / "valuable_affixes.json").write_text(json.dumps({}))
+        (data_dir / "valuable_bases.json").write_text(json.dumps({}))
+
+        evaluator = RareItemEvaluator(data_dir=data_dir)
+
+        assert evaluator.meta_weights is not None
+        assert "life" in evaluator.meta_weights
+        assert evaluator._meta_cache_info["source"] == "build_archetypes.json"
+
+
+class TestMetaBonusApplication:
+    """Test meta bonus application to affix weights."""
+
+    @pytest.fixture
+    def meta_evaluator(self, tmp_path):
+        """Create evaluator with meta weights configured."""
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+
+        # Create affixes file
+        affixes = {
+            "life": {
+                "tier1": ["+# to maximum Life"],
+                "tier1_range": [100, 109],
+                "weight": 8,
+                "min_value": 70
+            },
+            "resistances": {
+                "tier1": ["+#% to Fire Resistance"],
+                "tier1_range": [46, 48],
+                "weight": 6,
+                "min_value": 35
+            }
+        }
+        (data_dir / "valuable_affixes.json").write_text(json.dumps(affixes))
+        (data_dir / "valuable_bases.json").write_text(json.dumps({}))
+
+        # Create meta weights where life is very popular (should get bonus)
+        from datetime import datetime
+        meta_data = {
+            "league": "TestLeague",
+            "builds_analyzed": 100,
+            "last_analysis": datetime.now().isoformat(),
+            "affixes": {
+                "life": {"popularity_percent": 80.0},  # 5 + 80*0.1 = 13 >= 10 threshold
+                "resistances": {"popularity_percent": 30.0}  # 5 + 30*0.1 = 8 < 10 threshold
+            }
+        }
+        (data_dir / "meta_affixes.json").write_text(json.dumps(meta_data))
+
+        return RareItemEvaluator(data_dir=data_dir)
+
+    def test_get_affix_weight_applies_meta_bonus(self, meta_evaluator):
+        """Should apply +2 bonus to affixes meeting meta threshold."""
+        weight, has_bonus = meta_evaluator._get_affix_weight("life", "tier1")
+
+        # Base weight 8 + meta bonus 2 = 10 (capped)
+        assert weight == 10
+        assert has_bonus is True
+
+    def test_get_affix_weight_no_bonus_below_threshold(self, meta_evaluator):
+        """Should NOT apply bonus to affixes below meta threshold."""
+        weight, has_bonus = meta_evaluator._get_affix_weight("resistances", "tier1")
+
+        # Base weight 6, no bonus
+        assert weight == 6
+        assert has_bonus is False
+
+    def test_matched_affix_has_meta_bonus_flag(self, meta_evaluator):
+        """AffixMatch should have has_meta_bonus set correctly."""
+        item = create_rare_item(
+            explicits=["+105 to maximum Life", "+47% to Fire Resistance"]
+        )
+
+        matches = meta_evaluator._match_affixes(item)
+
+        life_matches = [m for m in matches if m.affix_type == "life"]
+        res_matches = [m for m in matches if m.affix_type == "resistances"]
+
+        assert len(life_matches) == 1
+        assert life_matches[0].has_meta_bonus is True
+
+        assert len(res_matches) == 1
+        assert res_matches[0].has_meta_bonus is False
+
+
+class TestMetaInfoDisplay:
+    """Test meta information display in summaries."""
+
+    def test_get_meta_info_with_cache(self, tmp_path):
+        """Should return formatted meta info string."""
+        from datetime import datetime
+
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+
+        meta_data = {
+            "league": "Settlers",
+            "builds_analyzed": 75,
+            "last_analysis": datetime.now().isoformat(),
+            "affixes": {
+                "life": {"popularity_percent": 100.0},
+                "resistances": {"popularity_percent": 80.0},
+                "chaos_resistance": {"popularity_percent": 60.0}
+            }
+        }
+        (data_dir / "meta_affixes.json").write_text(json.dumps(meta_data))
+        (data_dir / "valuable_affixes.json").write_text(json.dumps({}))
+        (data_dir / "valuable_bases.json").write_text(json.dumps({}))
+
+        evaluator = RareItemEvaluator(data_dir=data_dir)
+        meta_info = evaluator.get_meta_info()
+
+        assert "Settlers" in meta_info
+        assert "75 builds" in meta_info
+        assert "life" in meta_info.lower()
+        assert "Top Meta Affixes:" in meta_info
+
+    def test_get_meta_info_without_cache(self, tmp_path):
+        """Should return 'not available' message without cache."""
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+        (data_dir / "valuable_affixes.json").write_text(json.dumps({}))
+        (data_dir / "valuable_bases.json").write_text(json.dumps({}))
+
+        evaluator = RareItemEvaluator(data_dir=data_dir)
+        meta_info = evaluator.get_meta_info()
+
+        assert "Not available" in meta_info
+        assert "static weights" in meta_info.lower()
+
+    def test_summary_shows_meta_bonus_on_affixes(self, tmp_path):
+        """Summary should show [META +2] tag on boosted affixes."""
+        from datetime import datetime
+
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+
+        affixes = {
+            "life": {
+                "tier1": ["+# to maximum Life"],
+                "tier1_range": [100, 109],
+                "weight": 8,
+                "min_value": 70
+            }
+        }
+        (data_dir / "valuable_affixes.json").write_text(json.dumps(affixes))
+        (data_dir / "valuable_bases.json").write_text(json.dumps({}))
+
+        meta_data = {
+            "league": "TestLeague",
+            "builds_analyzed": 50,
+            "last_analysis": datetime.now().isoformat(),
+            "affixes": {
+                "life": {"popularity_percent": 80.0}
+            }
+        }
+        (data_dir / "meta_affixes.json").write_text(json.dumps(meta_data))
+
+        evaluator = RareItemEvaluator(data_dir=data_dir)
+        item = create_rare_item(explicits=["+105 to maximum Life"])
+
+        eval_result = evaluator.evaluate(item)
+        summary = evaluator.get_summary(eval_result)
+
+        assert "[META +2]" in summary
+
+
+class TestMetaWeightConstants:
+    """Test meta weight configuration constants."""
+
+    def test_meta_cache_expiry_days_default(self):
+        """META_CACHE_EXPIRY_DAYS should have reasonable default."""
+        from core.constants import META_CACHE_EXPIRY_DAYS
+        assert META_CACHE_EXPIRY_DAYS == 7
+
+    def test_meta_bonus_threshold_default(self):
+        """META_BONUS_THRESHOLD should have reasonable default."""
+        from core.constants import META_BONUS_THRESHOLD
+        assert META_BONUS_THRESHOLD == 10
+
+    def test_meta_bonus_amount_default(self):
+        """META_BONUS_AMOUNT should have reasonable default."""
+        from core.constants import META_BONUS_AMOUNT
+        assert META_BONUS_AMOUNT == 2
+
+    def test_max_affix_weight_default(self):
+        """MAX_AFFIX_WEIGHT should have reasonable default."""
+        from core.constants import MAX_AFFIX_WEIGHT
+        assert MAX_AFFIX_WEIGHT == 10
+
+
+class TestMetaWeightEdgeCases:
+    """Test edge cases for meta weight application."""
+
+    @pytest.fixture
+    def edge_case_evaluator(self, tmp_path):
+        """Create evaluator with high-weight affixes for edge case testing."""
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+
+        # Create affixes with high base weight (9) - near cap
+        affixes = {
+            "life": {
+                "tier1": ["+# to maximum Life"],
+                "tier1_range": [100, 109],
+                "weight": 9,  # High base weight
+                "min_value": 70
+            }
+        }
+        (data_dir / "valuable_affixes.json").write_text(json.dumps(affixes))
+        (data_dir / "valuable_bases.json").write_text(json.dumps({}))
+
+        # Create meta weights that would trigger bonus
+        from datetime import datetime
+        meta_data = {
+            "league": "TestLeague",
+            "builds_analyzed": 100,
+            "last_analysis": datetime.now().isoformat(),
+            "affixes": {
+                "life": {"popularity_percent": 80.0}  # Triggers meta bonus
+            }
+        }
+        (data_dir / "meta_affixes.json").write_text(json.dumps(meta_data))
+
+        return RareItemEvaluator(data_dir=data_dir)
+
+    def test_weight_capped_at_maximum(self, edge_case_evaluator):
+        """Weight should not exceed MAX_AFFIX_WEIGHT even with meta bonus."""
+        from core.constants import MAX_AFFIX_WEIGHT
+
+        # Base weight 9 + meta bonus 2 = 11, but should cap at 10
+        weight, has_bonus = edge_case_evaluator._get_affix_weight("life", "tier1")
+
+        assert weight <= MAX_AFFIX_WEIGHT
+        assert weight == MAX_AFFIX_WEIGHT  # Should be exactly at cap
+        assert has_bonus is True
+
+    def test_threshold_boundary_exactly_at_threshold(self, tmp_path):
+        """Test behavior at exactly 50% popularity (meta_weight = 10.0)."""
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+
+        affixes = {"life": {"tier1": ["+# to maximum Life"], "weight": 6, "min_value": 70}}
+        (data_dir / "valuable_affixes.json").write_text(json.dumps(affixes))
+        (data_dir / "valuable_bases.json").write_text(json.dumps({}))
+
+        # 50% popularity => meta_weight = 5.0 + (50 * 0.1) = 10.0 (exactly at threshold)
+        from datetime import datetime
+        meta_data = {
+            "league": "Test",
+            "builds_analyzed": 50,
+            "last_analysis": datetime.now().isoformat(),
+            "affixes": {"life": {"popularity_percent": 50.0}}
+        }
+        (data_dir / "meta_affixes.json").write_text(json.dumps(meta_data))
+
+        evaluator = RareItemEvaluator(data_dir=data_dir)
+        weight, has_bonus = evaluator._get_affix_weight("life", "tier1")
+
+        assert has_bonus is True
+        assert weight == 8  # Base 6 + bonus 2
+
+    def test_threshold_boundary_just_below_threshold(self, tmp_path):
+        """Test behavior at 49% popularity (meta_weight = 9.9)."""
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+
+        affixes = {"life": {"tier1": ["+# to maximum Life"], "weight": 6, "min_value": 70}}
+        (data_dir / "valuable_affixes.json").write_text(json.dumps(affixes))
+        (data_dir / "valuable_bases.json").write_text(json.dumps({}))
+
+        # 49% popularity => meta_weight = 5.0 + (49 * 0.1) = 9.9 (just below threshold)
+        from datetime import datetime
+        meta_data = {
+            "league": "Test",
+            "builds_analyzed": 50,
+            "last_analysis": datetime.now().isoformat(),
+            "affixes": {"life": {"popularity_percent": 49.0}}
+        }
+        (data_dir / "meta_affixes.json").write_text(json.dumps(meta_data))
+
+        evaluator = RareItemEvaluator(data_dir=data_dir)
+        weight, has_bonus = evaluator._get_affix_weight("life", "tier1")
+
+        assert has_bonus is False
+        assert weight == 6  # Base weight only, no bonus
+
+
+class TestAffixMatchWithMetaBonus:
+    """Test AffixMatch dataclass meta bonus field."""
+
+    def test_affix_match_default_has_meta_bonus_false(self):
+        """AffixMatch should default has_meta_bonus to False."""
+        match = AffixMatch(
+            affix_type="life",
+            pattern="+# to maximum Life",
+            mod_text="+100 to maximum Life",
+            value=100,
+            weight=10,
+            tier="tier1",
+            is_influence_mod=False
+        )
+
+        assert match.has_meta_bonus is False
+
+    def test_affix_match_with_meta_bonus_true(self):
+        """AffixMatch can be created with has_meta_bonus=True."""
+        match = AffixMatch(
+            affix_type="life",
+            pattern="+# to maximum Life",
+            mod_text="+100 to maximum Life",
+            value=100,
+            weight=10,
+            tier="tier1",
+            is_influence_mod=False,
+            has_meta_bonus=True
+        )
+
+        assert match.has_meta_bonus is True
