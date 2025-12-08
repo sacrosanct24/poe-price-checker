@@ -13,6 +13,9 @@ When an LLM reviews code, it can adopt these personas to provide focused, expert
 
 ## Available Personas
 
+### Technical Reviewers
+Code quality, security, and engineering best practices.
+
 | Persona | Focus | Command |
 |---------|-------|---------|
 | [Security Auditor](security-auditor.md) | OWASP, secrets, input validation | `/review-security` |
@@ -21,6 +24,15 @@ When an LLM reviews code, it can adopt these personas to provide focused, expert
 | [Test Strategist](test-strategist.md) | Coverage, edge cases, test quality | `/review-tests` |
 | [Accessibility Champion](accessibility-champion.md) | A11y, Qt accessibility | `/review-accessibility` |
 | [Documentation Curator](documentation-curator.md) | Docstrings, ADRs, accuracy | `/review-docs` |
+
+### Domain Expert Reviewers
+Product functionality and user experience from domain expertise.
+
+| Persona | Focus | Command | Knowledge Update |
+|---------|-------|---------|------------------|
+| [PoE Expert Player](poe-expert-player.md) | Game functionality, player UX, feature gaps | `/review-poe-expert` | Every 30 days |
+
+**Note**: Domain expert personas require periodic knowledge updates to stay current with game changes. Use `/update-poe-knowledge` to refresh game information.
 
 ## Usage
 
