@@ -59,5 +59,4 @@ jobs:
       uses: softprops/action-gh-release@v2
       with:
         files: dist/PoE-Price-Checker.exe
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        token: ${{ secrets.GITHUB_TOKEN }}
