@@ -1,0 +1,279 @@
+{
+  "league": "Keepers of the Flame",
+  "patch": "3.27",
+  "last_updated": "2025-12-08",
+  "update_source": "poe.ninja/builds, maxroll.gg",
+  "total_builds_analyzed": 15000,
+  "meta_summary": {
+    "dominant_archetypes": ["minion", "spell_dot", "melee_attack"],
+    "popular_defenses": ["life", "armour", "spell_suppression"],
+    "economy_notes": "Divine Orb primary currency, ~150-200c ratio"
+  },
+  "builds": [
+    {
+      "id": "summon_raging_spirits_necromancer",
+      "name": "SRS Necromancer",
+      "tier": "S",
+      "popularity_percent": 12.5,
+      "class": "Witch",
+      "ascendancy": "Necromancer",
+      "primary_skill": "Summon Raging Spirit",
+      "archetype": "minion",
+      "tags": ["league_starter", "budget_friendly", "boss_killer"],
+      "gear_requirements": {
+        "weapon": {
+          "slot": "wand",
+          "base_types": ["Convoking Wand", "Opal Wand"],
+          "required_affixes": [
+            {"name": "minion_damage", "pattern": "Minions deal #% increased Damage", "min_tier": 2, "priority": "required"},
+            {"name": "plus_gem_level", "pattern": "+# to Level of all Minion Skill Gems", "min_tier": 1, "priority": "high"}
+          ],
+          "desired_affixes": [
+            {"name": "minion_attack_speed", "pattern": "Minions have #% increased Attack Speed", "priority": "medium"},
+            {"name": "spell_damage", "pattern": "#% increased Spell Damage", "priority": "low"}
+          ]
+        },
+        "helmet": {
+          "slot": "helmet",
+          "base_types": ["Bone Helmet"],
+          "required_affixes": [
+            {"name": "life", "pattern": "+# to maximum Life", "min_tier": 2, "priority": "required"},
+            {"name": "minion_life", "pattern": "Minions have #% increased maximum Life", "min_tier": 3, "priority": "high"}
+          ],
+          "desired_affixes": [
+            {"name": "resistance", "pattern": "+#% to Elemental Resistances", "priority": "high"}
+          ]
+        },
+        "body_armour": {
+          "slot": "body_armour",
+          "unique_preference": ["Skin of the Lords", "Skin of the Loyal"],
+          "rare_required_affixes": [
+            {"name": "life", "pattern": "+# to maximum Life", "min_tier": 1, "priority": "required"},
+            {"name": "resistances", "pattern": "+#% to Fire/Cold/Lightning Resistance", "min_tier": 2, "priority": "high"}
+          ]
+        }
+      },
+      "key_uniques": [
+        {"name": "The Covenant", "slot": "body_armour", "usage_percent": 45},
+        {"name": "Bones of Ullr", "slot": "boots", "usage_percent": 30},
+        {"name": "United in Dream", "slot": "weapon", "usage_percent": 25}
+      ],
+      "desired_affixes_global": [
+        {"name": "minion_damage", "weight": 10},
+        {"name": "minion_life", "weight": 7},
+        {"name": "plus_minion_gems", "weight": 9},
+        {"name": "life", "weight": 8},
+        {"name": "resistances", "weight": 6}
+      ]
+    },
+    {
+      "id": "righteous_fire_juggernaut",
+      "name": "RF Juggernaut",
+      "tier": "S",
+      "popularity_percent": 10.2,
+      "class": "Marauder",
+      "ascendancy": "Juggernaut",
+      "primary_skill": "Righteous Fire",
+      "archetype": "spell_dot",
+      "tags": ["tanky", "league_starter", "easy_to_play"],
+      "gear_requirements": {
+        "helmet": {
+          "slot": "helmet",
+          "base_types": ["Royal Burgonet", "Eternal Burgonet"],
+          "influence_preference": "elder",
+          "required_affixes": [
+            {"name": "life", "pattern": "+# to maximum Life", "min_tier": 1, "priority": "required"},
+            {"name": "burning_damage", "pattern": "Nearby Enemies have -#% to Fire Resistance", "priority": "high"}
+          ],
+          "desired_affixes": [
+            {"name": "fire_dot_multi", "pattern": "+#% to Fire Damage over Time Multiplier", "priority": "high"},
+            {"name": "life_regen", "pattern": "Regenerate # Life per second", "priority": "medium"}
+          ]
+        },
+        "body_armour": {
+          "slot": "body_armour",
+          "unique_preference": ["Brass Dome"],
+          "rare_required_affixes": [
+            {"name": "life", "pattern": "+# to maximum Life", "min_tier": 1, "priority": "required"},
+            {"name": "armour", "pattern": "+# to Armour", "min_tier": 2, "priority": "high"}
+          ]
+        },
+        "ring": {
+          "slot": "ring",
+          "unique_preference": ["Rise of the Phoenix"],
+          "rare_required_affixes": [
+            {"name": "life", "pattern": "+# to maximum Life", "min_tier": 2, "priority": "required"},
+            {"name": "fire_resistance", "pattern": "+#% to Fire Resistance", "min_tier": 1, "priority": "required"}
+          ]
+        }
+      },
+      "key_uniques": [
+        {"name": "Rise of the Phoenix", "slot": "shield", "usage_percent": 85},
+        {"name": "Legacy of Fury", "slot": "boots", "usage_percent": 60},
+        {"name": "Brass Dome", "slot": "body_armour", "usage_percent": 40}
+      ],
+      "desired_affixes_global": [
+        {"name": "life", "weight": 10},
+        {"name": "fire_resistance", "weight": 9},
+        {"name": "life_regeneration", "weight": 9},
+        {"name": "fire_dot_multi", "weight": 8},
+        {"name": "armour", "weight": 7},
+        {"name": "max_fire_res", "weight": 10}
+      ]
+    },
+    {
+      "id": "lightning_strike_raider",
+      "name": "LS Raider",
+      "tier": "A",
+      "popularity_percent": 8.5,
+      "class": "Ranger",
+      "ascendancy": "Raider",
+      "primary_skill": "Lightning Strike",
+      "archetype": "melee_attack",
+      "tags": ["fast", "mapper", "expensive_endgame"],
+      "gear_requirements": {
+        "weapon": {
+          "slot": "claw",
+          "base_types": ["Imperial Claw", "Gemini Claw"],
+          "required_affixes": [
+            {"name": "flat_phys", "pattern": "Adds # to # Physical Damage", "min_tier": 1, "priority": "required"},
+            {"name": "attack_speed", "pattern": "#% increased Attack Speed", "min_tier": 2, "priority": "required"},
+            {"name": "crit_chance", "pattern": "#% increased Critical Strike Chance", "min_tier": 2, "priority": "high"}
+          ],
+          "desired_affixes": [
+            {"name": "crit_multi", "pattern": "+#% to Critical Strike Multiplier", "priority": "high"},
+            {"name": "lightning_damage", "pattern": "Adds # to # Lightning Damage", "priority": "medium"}
+          ]
+        },
+        "gloves": {
+          "slot": "gloves",
+          "influence_preference": "hunter",
+          "required_affixes": [
+            {"name": "life", "pattern": "+# to maximum Life", "min_tier": 2, "priority": "required"},
+            {"name": "accuracy", "pattern": "+# to Accuracy Rating", "min_tier": 2, "priority": "high"}
+          ],
+          "desired_affixes": [
+            {"name": "attack_speed", "pattern": "#% increased Attack Speed", "priority": "high"},
+            {"name": "strike_range", "pattern": "+# to Strike Skills target additional nearby Enemies", "priority": "high"}
+          ]
+        }
+      },
+      "key_uniques": [
+        {"name": "Hyrri's Ire", "slot": "body_armour", "usage_percent": 35},
+        {"name": "Nightblade Support", "slot": "gem", "usage_percent": 90},
+        {"name": "Perseverance", "slot": "belt", "usage_percent": 40}
+      ],
+      "desired_affixes_global": [
+        {"name": "attack_speed", "weight": 9},
+        {"name": "crit_chance", "weight": 8},
+        {"name": "crit_multi", "weight": 9},
+        {"name": "life", "weight": 8},
+        {"name": "spell_suppression", "weight": 8},
+        {"name": "lightning_damage", "weight": 6}
+      ]
+    },
+    {
+      "id": "tornado_shot_deadeye",
+      "name": "TS Deadeye",
+      "tier": "A",
+      "popularity_percent": 7.8,
+      "class": "Ranger",
+      "ascendancy": "Deadeye",
+      "primary_skill": "Tornado Shot",
+      "archetype": "ranged_attack",
+      "tags": ["mapper", "mf", "expensive"],
+      "gear_requirements": {
+        "weapon": {
+          "slot": "bow",
+          "base_types": ["Thicket Bow", "Imperial Bow"],
+          "required_affixes": [
+            {"name": "flat_phys", "pattern": "Adds # to # Physical Damage", "min_tier": 1, "priority": "required"},
+            {"name": "crit_chance", "pattern": "#% increased Critical Strike Chance", "min_tier": 2, "priority": "required"}
+          ],
+          "desired_affixes": [
+            {"name": "attack_speed", "pattern": "#% increased Attack Speed", "priority": "high"},
+            {"name": "additional_arrow", "pattern": "Bow Attacks fire an additional Arrow", "priority": "high"}
+          ]
+        },
+        "quiver": {
+          "slot": "quiver",
+          "required_affixes": [
+            {"name": "life", "pattern": "+# to maximum Life", "min_tier": 2, "priority": "required"},
+            {"name": "crit_multi", "pattern": "+#% to Critical Strike Multiplier", "min_tier": 2, "priority": "high"}
+          ],
+          "desired_affixes": [
+            {"name": "additional_arrow", "pattern": "Bow Attacks fire an additional Arrow", "priority": "high"},
+            {"name": "attack_speed", "pattern": "#% increased Attack Speed", "priority": "medium"}
+          ]
+        }
+      },
+      "key_uniques": [
+        {"name": "Hyrri's Ire", "slot": "body_armour", "usage_percent": 40},
+        {"name": "Dying Sun", "slot": "flask", "usage_percent": 60},
+        {"name": "Inspired Learning", "slot": "jewel", "usage_percent": 70}
+      ],
+      "desired_affixes_global": [
+        {"name": "crit_multi", "weight": 10},
+        {"name": "crit_chance", "weight": 8},
+        {"name": "additional_arrows", "weight": 9},
+        {"name": "life", "weight": 7},
+        {"name": "projectile_damage", "weight": 6}
+      ]
+    },
+    {
+      "id": "detonate_dead_elementalist",
+      "name": "DD Elementalist",
+      "tier": "A",
+      "popularity_percent": 6.2,
+      "class": "Witch",
+      "ascendancy": "Elementalist",
+      "primary_skill": "Detonate Dead",
+      "archetype": "spell",
+      "tags": ["boss_killer", "league_starter"],
+      "gear_requirements": {
+        "weapon": {
+          "slot": "sceptre",
+          "required_affixes": [
+            {"name": "spell_damage", "pattern": "#% increased Spell Damage", "min_tier": 2, "priority": "high"},
+            {"name": "fire_damage", "pattern": "#% increased Fire Damage", "min_tier": 2, "priority": "high"}
+          ],
+          "desired_affixes": [
+            {"name": "cast_speed", "pattern": "#% increased Cast Speed", "priority": "medium"},
+            {"name": "plus_fire_gems", "pattern": "+# to Level of all Fire Spell Skill Gems", "priority": "high"}
+          ]
+        }
+      },
+      "key_uniques": [
+        {"name": "Aegis Aurora", "slot": "shield", "usage_percent": 50},
+        {"name": "Ashes of the Stars", "slot": "amulet", "usage_percent": 35}
+      ],
+      "desired_affixes_global": [
+        {"name": "fire_damage", "weight": 8},
+        {"name": "spell_damage", "weight": 7},
+        {"name": "cast_speed", "weight": 6},
+        {"name": "life", "weight": 8},
+        {"name": "energy_shield", "weight": 6}
+      ]
+    }
+  ],
+  "affix_meta_weights": {
+    "life": {"base_weight": 10, "meta_multiplier": 1.5, "notes": "Universal, always valuable"},
+    "resistances": {"base_weight": 6, "meta_multiplier": 1.0, "notes": "Required but not differentiating"},
+    "spell_suppression": {"base_weight": 8, "meta_multiplier": 1.3, "notes": "Meta for evasion builds"},
+    "attack_speed": {"base_weight": 7, "meta_multiplier": 1.4, "notes": "High demand for attack builds"},
+    "cast_speed": {"base_weight": 6, "meta_multiplier": 1.2, "notes": "Less demand than attack speed"},
+    "crit_chance": {"base_weight": 7, "meta_multiplier": 1.3, "notes": "Popular with TS/LS builds"},
+    "crit_multi": {"base_weight": 8, "meta_multiplier": 1.4, "notes": "High demand for crit builds"},
+    "minion_damage": {"base_weight": 6, "meta_multiplier": 1.5, "notes": "SRS meta pushing demand"},
+    "fire_dot_multi": {"base_weight": 5, "meta_multiplier": 1.6, "notes": "RF popularity"},
+    "plus_gem_levels": {"base_weight": 9, "meta_multiplier": 1.4, "notes": "Always valuable for spells"},
+    "movement_speed": {"base_weight": 6, "meta_multiplier": 1.2, "notes": "QoL, not build-defining"}
+  },
+  "trending_uniques": [
+    {"name": "Mageblood", "price_trend": "stable", "usage_percent": 5, "notes": "Endgame chase"},
+    {"name": "Headhunter", "price_trend": "rising", "usage_percent": 8, "notes": "Mapping meta"},
+    {"name": "Ashes of the Stars", "price_trend": "stable", "usage_percent": 12, "notes": "Spell builds"},
+    {"name": "Aegis Aurora", "price_trend": "stable", "usage_percent": 10, "notes": "Tank builds"},
+    {"name": "Legacy of Fury", "price_trend": "rising", "usage_percent": 6, "notes": "RF synergy"}
+  ]
+}

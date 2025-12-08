@@ -1,0 +1,304 @@
+{
+  "league": "Fate of the Vaal",
+  "patch": "0.4.0",
+  "last_updated": "2025-12-08",
+  "update_source": "poe2.ninja/builds, maxroll.gg",
+  "total_builds_analyzed": 8000,
+  "meta_summary": {
+    "dominant_archetypes": ["ranged_attack", "minion", "shapeshifter"],
+    "popular_defenses": ["life", "armour", "block"],
+    "economy_notes": "Exalted Orb primary currency, Divine ~70-100 exalts"
+  },
+  "builds": [
+    {
+      "id": "lightning_arrow_deadeye",
+      "name": "Lightning Arrow Deadeye",
+      "tier": "S",
+      "popularity_percent": 32.5,
+      "class": "Ranger",
+      "ascendancy": "Deadeye",
+      "primary_skill": "Lightning Arrow",
+      "archetype": "ranged_attack",
+      "tags": ["meta_dominant", "fast_clear", "versatile"],
+      "gear_requirements": {
+        "weapon": {
+          "slot": "bow",
+          "base_types": ["Composite Bow", "Expert Composite Bow"],
+          "required_affixes": [
+            {"name": "flat_phys", "pattern": "Adds # to # Physical Damage", "min_tier": 2, "priority": "required"},
+            {"name": "attack_speed", "pattern": "#% increased Attack Speed", "min_tier": 2, "priority": "required"}
+          ],
+          "desired_affixes": [
+            {"name": "crit_chance", "pattern": "#% increased Critical Strike Chance", "priority": "high"},
+            {"name": "lightning_damage", "pattern": "Adds # to # Lightning Damage", "priority": "medium"}
+          ]
+        },
+        "quiver": {
+          "slot": "quiver",
+          "required_affixes": [
+            {"name": "life", "pattern": "+# to maximum Life", "min_tier": 2, "priority": "required"},
+            {"name": "accuracy", "pattern": "+# to Accuracy Rating", "min_tier": 2, "priority": "high"}
+          ],
+          "desired_affixes": [
+            {"name": "crit_multi", "pattern": "+#% to Critical Strike Multiplier", "priority": "high"},
+            {"name": "projectile_speed", "pattern": "#% increased Projectile Speed", "priority": "medium"}
+          ]
+        },
+        "body_armour": {
+          "slot": "body_armour",
+          "required_affixes": [
+            {"name": "life", "pattern": "+# to maximum Life", "min_tier": 2, "priority": "required"},
+            {"name": "evasion", "pattern": "+# to Evasion Rating", "min_tier": 2, "priority": "high"}
+          ],
+          "desired_affixes": [
+            {"name": "spell_suppression", "pattern": "+#% chance to Suppress Spell Damage", "priority": "high"}
+          ]
+        }
+      },
+      "key_uniques": [
+        {"name": "Stormcaller's Vision", "slot": "helmet", "usage_percent": 25}
+      ],
+      "desired_affixes_global": [
+        {"name": "attack_speed", "weight": 10},
+        {"name": "crit_chance", "weight": 9},
+        {"name": "crit_multi", "weight": 9},
+        {"name": "life", "weight": 8},
+        {"name": "accuracy", "weight": 7},
+        {"name": "lightning_damage", "weight": 8}
+      ]
+    },
+    {
+      "id": "minion_spirit_blood_mage",
+      "name": "Minion Spirit Blood Mage",
+      "tier": "S",
+      "popularity_percent": 15.2,
+      "class": "Witch",
+      "ascendancy": "Blood Mage",
+      "primary_skill": "Raise Spectre",
+      "archetype": "minion",
+      "tags": ["meta_strong", "boss_killer", "tanky"],
+      "gear_requirements": {
+        "weapon": {
+          "slot": "sceptre",
+          "required_affixes": [
+            {"name": "minion_damage", "pattern": "Minions deal #% increased Damage", "min_tier": 2, "priority": "required"},
+            {"name": "spirit", "pattern": "+# to Spirit", "min_tier": 2, "priority": "required"}
+          ],
+          "desired_affixes": [
+            {"name": "minion_life", "pattern": "Minions have #% increased maximum Life", "priority": "high"},
+            {"name": "plus_minion_gems", "pattern": "+# to Level of all Minion Skill Gems", "priority": "high"}
+          ]
+        },
+        "body_armour": {
+          "slot": "body_armour",
+          "required_affixes": [
+            {"name": "life", "pattern": "+# to maximum Life", "min_tier": 2, "priority": "required"},
+            {"name": "spirit", "pattern": "+# to Spirit", "min_tier": 2, "priority": "high"}
+          ]
+        },
+        "helmet": {
+          "slot": "helmet",
+          "required_affixes": [
+            {"name": "life", "pattern": "+# to maximum Life", "min_tier": 2, "priority": "required"}
+          ],
+          "desired_affixes": [
+            {"name": "minion_damage", "pattern": "Minions deal #% increased Damage", "priority": "high"}
+          ]
+        }
+      },
+      "key_uniques": [],
+      "desired_affixes_global": [
+        {"name": "spirit", "weight": 10},
+        {"name": "minion_damage", "weight": 9},
+        {"name": "minion_life", "weight": 7},
+        {"name": "life", "weight": 8},
+        {"name": "plus_minion_gems", "weight": 8}
+      ]
+    },
+    {
+      "id": "tempest_flurry_stormweaver",
+      "name": "Tempest Flurry Stormweaver",
+      "tier": "S",
+      "popularity_percent": 12.8,
+      "class": "Sorceress",
+      "ascendancy": "Stormweaver",
+      "primary_skill": "Tempest Flurry",
+      "archetype": "spell",
+      "tags": ["lightning", "fast_cast", "aoe"],
+      "gear_requirements": {
+        "weapon": {
+          "slot": "staff",
+          "required_affixes": [
+            {"name": "spell_damage", "pattern": "#% increased Spell Damage", "min_tier": 2, "priority": "required"},
+            {"name": "lightning_damage", "pattern": "#% increased Lightning Damage", "min_tier": 2, "priority": "high"}
+          ],
+          "desired_affixes": [
+            {"name": "cast_speed", "pattern": "#% increased Cast Speed", "priority": "high"},
+            {"name": "crit_chance", "pattern": "#% increased Critical Strike Chance for Spells", "priority": "high"}
+          ]
+        },
+        "body_armour": {
+          "slot": "body_armour",
+          "required_affixes": [
+            {"name": "energy_shield", "pattern": "+# to maximum Energy Shield", "min_tier": 2, "priority": "high"},
+            {"name": "spirit", "pattern": "+# to Spirit", "min_tier": 2, "priority": "high"}
+          ]
+        }
+      },
+      "key_uniques": [],
+      "desired_affixes_global": [
+        {"name": "spell_damage", "weight": 9},
+        {"name": "lightning_damage", "weight": 9},
+        {"name": "cast_speed", "weight": 8},
+        {"name": "crit_chance", "weight": 7},
+        {"name": "spirit", "weight": 8},
+        {"name": "energy_shield", "weight": 7}
+      ]
+    },
+    {
+      "id": "hollow_palm_invoker",
+      "name": "Hollow Palm Invoker",
+      "tier": "A",
+      "popularity_percent": 8.5,
+      "class": "Monk",
+      "ascendancy": "Invoker",
+      "primary_skill": "Unarmed Attacks",
+      "archetype": "melee_attack",
+      "tags": ["unarmed", "dexterity_stacking", "unique_playstyle"],
+      "gear_requirements": {
+        "amulet": {
+          "slot": "amulet",
+          "required_affixes": [
+            {"name": "dexterity", "pattern": "+# to Dexterity", "min_tier": 1, "priority": "required"},
+            {"name": "life", "pattern": "+# to maximum Life", "min_tier": 2, "priority": "high"}
+          ],
+          "desired_affixes": [
+            {"name": "attack_speed", "pattern": "#% increased Attack Speed", "priority": "high"},
+            {"name": "crit_multi", "pattern": "+#% to Critical Strike Multiplier", "priority": "high"}
+          ]
+        },
+        "ring": {
+          "slot": "ring",
+          "required_affixes": [
+            {"name": "dexterity", "pattern": "+# to Dexterity", "min_tier": 1, "priority": "required"}
+          ],
+          "desired_affixes": [
+            {"name": "life", "pattern": "+# to maximum Life", "priority": "high"},
+            {"name": "accuracy", "pattern": "+# to Accuracy Rating", "priority": "medium"}
+          ]
+        },
+        "body_armour": {
+          "slot": "body_armour",
+          "required_affixes": [
+            {"name": "dexterity", "pattern": "+# to Dexterity", "min_tier": 1, "priority": "high"},
+            {"name": "life", "pattern": "+# to maximum Life", "min_tier": 2, "priority": "required"}
+          ]
+        }
+      },
+      "key_uniques": [
+        {"name": "Hollow Palm Technique Keystone", "slot": "passive", "usage_percent": 100}
+      ],
+      "desired_affixes_global": [
+        {"name": "dexterity", "weight": 10},
+        {"name": "attack_speed", "weight": 8},
+        {"name": "life", "weight": 8},
+        {"name": "accuracy", "weight": 6},
+        {"name": "crit_multi", "weight": 7}
+      ]
+    },
+    {
+      "id": "galvanic_shards_witchhunter",
+      "name": "Galvanic Shards Witchhunter",
+      "tier": "A",
+      "popularity_percent": 7.2,
+      "class": "Mercenary",
+      "ascendancy": "Witchhunter",
+      "primary_skill": "Galvanic Shards",
+      "archetype": "ranged_attack",
+      "tags": ["lightning", "gun_build", "crit_focused"],
+      "gear_requirements": {
+        "weapon": {
+          "slot": "crossbow",
+          "required_affixes": [
+            {"name": "flat_lightning", "pattern": "Adds # to # Lightning Damage", "min_tier": 2, "priority": "required"},
+            {"name": "crit_chance", "pattern": "#% increased Critical Strike Chance", "min_tier": 2, "priority": "high"}
+          ],
+          "desired_affixes": [
+            {"name": "attack_speed", "pattern": "#% increased Attack Speed", "priority": "high"},
+            {"name": "crit_multi", "pattern": "+#% to Critical Strike Multiplier", "priority": "high"}
+          ]
+        }
+      },
+      "key_uniques": [],
+      "desired_affixes_global": [
+        {"name": "lightning_damage", "weight": 9},
+        {"name": "crit_chance", "weight": 9},
+        {"name": "crit_multi", "weight": 9},
+        {"name": "attack_speed", "weight": 7},
+        {"name": "life", "weight": 7}
+      ]
+    },
+    {
+      "id": "bear_form_druid",
+      "name": "Bear Form Druid",
+      "tier": "A",
+      "popularity_percent": 6.5,
+      "class": "Druid",
+      "ascendancy": "Shaman",
+      "primary_skill": "Shapeshifting - Bear",
+      "archetype": "shapeshifter",
+      "tags": ["new_class", "tanky", "melee"],
+      "notes": "New in 0.4.0 - meta still forming",
+      "gear_requirements": {
+        "weapon": {
+          "slot": "talisman",
+          "required_affixes": [
+            {"name": "physical_damage", "pattern": "#% increased Physical Damage", "min_tier": 2, "priority": "required"},
+            {"name": "life", "pattern": "+# to maximum Life", "min_tier": 2, "priority": "high"}
+          ],
+          "desired_affixes": [
+            {"name": "attack_speed", "pattern": "#% increased Attack Speed", "priority": "high"},
+            {"name": "armour", "pattern": "+# to Armour", "priority": "medium"}
+          ]
+        },
+        "body_armour": {
+          "slot": "body_armour",
+          "required_affixes": [
+            {"name": "life", "pattern": "+# to maximum Life", "min_tier": 1, "priority": "required"},
+            {"name": "armour", "pattern": "+# to Armour", "min_tier": 2, "priority": "high"}
+          ]
+        }
+      },
+      "key_uniques": [],
+      "desired_affixes_global": [
+        {"name": "life", "weight": 10},
+        {"name": "physical_damage", "weight": 8},
+        {"name": "armour", "weight": 8},
+        {"name": "attack_speed", "weight": 6},
+        {"name": "life_regen", "weight": 7}
+      ]
+    }
+  ],
+  "affix_meta_weights": {
+    "life": {"base_weight": 10, "meta_multiplier": 1.4, "notes": "Universal defense"},
+    "spirit": {"base_weight": 9, "meta_multiplier": 1.5, "notes": "PoE2-specific, high demand"},
+    "attack_speed": {"base_weight": 8, "meta_multiplier": 1.5, "notes": "LA dominance"},
+    "crit_chance": {"base_weight": 7, "meta_multiplier": 1.4, "notes": "Crit meta strong"},
+    "crit_multi": {"base_weight": 8, "meta_multiplier": 1.4, "notes": "Scaling priority"},
+    "spell_damage": {"base_weight": 7, "meta_multiplier": 1.3, "notes": "Stormweaver builds"},
+    "lightning_damage": {"base_weight": 7, "meta_multiplier": 1.5, "notes": "LA + Galvanic"},
+    "minion_damage": {"base_weight": 6, "meta_multiplier": 1.4, "notes": "Blood Mage popularity"},
+    "dexterity": {"base_weight": 5, "meta_multiplier": 1.6, "notes": "Hollow Palm stacking"},
+    "energy_shield": {"base_weight": 6, "meta_multiplier": 1.2, "notes": "Sorceress builds"},
+    "armour": {"base_weight": 6, "meta_multiplier": 1.3, "notes": "Druid/tank builds"}
+  },
+  "trending_uniques": [
+    {"name": "Stormcaller's Vision", "price_trend": "rising", "usage_percent": 15, "notes": "LA synergy"}
+  ],
+  "poe2_specific_notes": {
+    "rune_sockets": "Items with more rune sockets command premium",
+    "spirit": "New stat unique to PoE2, highly valuable for minion/aura builds",
+    "talismans": "New weapon type for Druid shapeshifting",
+    "economy": "Exalted Orbs are primary currency, not Chaos"
+  }
+}
