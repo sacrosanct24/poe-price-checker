@@ -9,6 +9,7 @@
 **Last Updated**: December 8, 2025
 **Next Review Due**: January 7, 2026
 **Update Command**: `/update-poe-knowledge`
+**Glossary**: `.claude/personas/poe-glossary.md`
 
 ## Player Profile
 
@@ -237,7 +238,86 @@
 - **Divine value**: Quality of the rolls within tier
 
 ### PoE2-Specific Terms
-- **Tablet**: Map modifier item
+- **Tablet**: Map modifier item (like Scarabs in PoE1)
 - **Waystone**: PoE2's map equivalent
-- **Rune socket**: New socket type for runes
-- **Precursor**: Base tablet type
+- **Rune socket**: New socket type for runes (separate from skill links)
+- **Precursor**: Base tablet type (can be upgraded to Rare)
+- **Talisman**: Two-handed weapon for shapeshifting (Druid)
+- **Lira Vaal**: Temple endgame content in Fate of the Vaal league
+
+## Current Game Knowledge (Simplified)
+
+### What's Happening in PoE 1 (3.27 Keepers of the Flame)
+**New to This League**:
+- **Breach is back!** - But now it's strategic, not just "kill everything"
+- You protect an NPC named Ailith while she cleanses areas
+- **Breach Hives**: Dungeons with bosses and good loot
+- **Grafts**: New gear slot! Hands that grow from your body with special skills
+
+**New Trading Feature**:
+- You can now trade with offline players through Faustus NPC
+- No more waiting for people to respond to whispers!
+- Available after completing Act 6
+
+**Things You Should Know**:
+- New currencies exist (Foulborn Regal Orb gives better mod rolls)
+- You can get a second ascendancy class (Bloodline Ascendancy) from bosses
+
+### What's Happening in PoE 2 (0.4.0 The Last of the Druids)
+**New Class - Druid** (December 12, 2025):
+- Can turn into animals: Bear, Wolf, Jaguar
+- Uses "Talismans" - special two-handed weapons for shapeshifting
+- Two ascendancies: Oracle and Shaman
+
+**Current League - Fate of the Vaal**:
+- Find ancient Vaal structures throughout the game
+- Sacrifice corrupted monsters to power devices
+- Build a temple (Lira Vaal) with rooms you choose
+- Each room gives different rewards
+
+**Currency Differences from PoE1**:
+- **Exalted Orbs are common** (like Chaos in PoE1)
+- **Chaos Orbs are rare** but do something different (remove + add a mod)
+- **Divine Orbs still valuable** for rerolling mod values
+
+### Understanding Mod Tiers (Essential Knowledge)
+
+When you press Alt on an item, you see mod tiers. Here's what they mean:
+
+| Tier | What It Means | Item Level Needed |
+|------|---------------|-------------------|
+| T1 | Best possible roll | Usually ilvl 82-86 |
+| T2 | Second best | Usually ilvl 75-82 |
+| T3 | Mid-tier | Usually ilvl 60-75 |
+| T4 | Low tier | Usually ilvl 36-60 |
+| T5 | Worst tier | Any ilvl |
+
+**Why This Matters**: A ring with T1 Life (+80-89 life) is worth MUCH more than T3 Life (+50-59 life)
+
+### Understanding Influences (PoE1)
+
+Items can have special "influences" that let them roll extra mods:
+
+| Influence | Symbol | Good For |
+|-----------|--------|----------|
+| Shaper | Tentacles | Spells, crit builds |
+| Elder | Eyeball | Physical DoT, minions |
+| Hunter | Green glow | Poison, chaos damage |
+| Redeemer | Ice crystals | Cold builds, crit |
+| Crusader | Red glow | Physical, fire, auras |
+| Warlord | Yellow glow | Fire DoT, fortify |
+
+**Tip**: Influenced items are usually worth more than non-influenced!
+
+### Price Ranges to Understand
+
+| Description | PoE1 Price | PoE2 Price |
+|-------------|------------|------------|
+| Vendor trash | 0c | 0 exalts |
+| Cheap / Budget | 1-10c | 1-20 exalts |
+| Mid-range | 10-100c | 20-200 exalts |
+| Expensive | 1-10 divine | 200-1000 exalts |
+| Very expensive | 10-50 divine | 1000+ exalts |
+| Mirror-tier | 50+ divine | N/A (economy still forming) |
+
+**Note**: 1 Divine ≈ 150-200 Chaos in PoE1

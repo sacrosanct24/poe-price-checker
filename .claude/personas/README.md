@@ -43,6 +43,11 @@ Product functionality and user experience from domain expertise.
 
 **Note**: Domain expert personas require periodic knowledge updates to stay current with game changes. Use `/update-poe-knowledge` to refresh game information.
 
+### Reference Materials
+| Resource | Description |
+|----------|-------------|
+| [PoE Glossary](poe-glossary.md) | Comprehensive terms, abbreviations, and slang |
+
 ## Usage
 
 ### Single Persona Review

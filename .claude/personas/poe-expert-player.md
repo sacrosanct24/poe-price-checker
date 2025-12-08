@@ -35,26 +35,72 @@
 
 ## Current Game Knowledge
 
-### PoE 2 - Patch 0.4.0 (December 2025)
+### PoE 2 - Patch 0.4.0 The Last of the Druids (December 12, 2025)
 **League**: Fate of the Vaal
-- Vaal temple room-building mechanic (Loop Hero inspired)
-- Place tiles to design temple layout
-- Adjacent room synergies for leveling up rooms
+- Ancient Vaal structures activating throughout Wraeclast
+- Sacrifice afflicted monsters to power devices
+- Travel to Lira Vaal (ancient temple of Atziri)
+- Build temple room layouts for customized rewards
+- Standard, Hardcore, and SSF league variants
+
+**New Class - Druid**:
+- Hybrid Intelligence class with shapeshifting
+- Talismans: New two-handed weapon class for shapeshifting
+- Three animal forms: Bear, Wolf, Jaguar (each with unique skills)
+- Can swap forms at any time
+- Ascendancies: Oracle, Shaman
+
+**New Content (0.4.0)**:
+- 20+ new Primal Skills
+- 35+ new Support gems
+- 8+ new Lineage Supports (endgame only)
+- 250+ new passive skills on tree
+- 10+ new Unique items
+- The Third Edict: Cruel difficulty removed
+- Three new temporary interludes to reach level 65
 
 **Endgame State**:
 - Tablets placed directly in Map Device (Towers removed in 0.3.1)
 - Tablets have fixed uses, destroyed when depleted
-- Abyssal league now core, has own Atlas tree
-- Monster density reduced, individual monsters harder/more rewarding
-- Precursor Tablets upgradeable to Rare after Arbiter of Ash
-- Map bosses required for completion
-- 25% performance improvement in endgame
+- Rise of the Abyssal now core with dedicated Atlas tree
+- Monster Effectiveness replaces pack size scaling
+- Monsters have increased life, exp, and item quantity per tier
+- Parry hits all enemies in front, always hits parried enemy
+- 25%+ CPU performance improvement, less frame spikes
 
-**Classes**: Warrior, Ranger, Witch, Monk, Mercenary, Sorceress, Druid (new)
+**Economy Notes**:
+- Exalted Orbs are primary trade currency (reversed from PoE1)
+- Divine Orbs: ~70-100 Exalts each
+- Chaos Orbs: ~7 Exalts each, scarcer than PoE1
+- Orbs of Alchemy significantly rarer
+- Currency exchange available in hideout
 
-### PoE 1 - Patch 3.27 (October 2025)
+**Classes**: Warrior, Ranger, Witch, Monk, Mercenary, Sorceress, Huntress, Druid (new in 0.4.0)
+
+### PoE 1 - Patch 3.27 Keepers of the Flame (October 31, 2025)
 **League**: Keepers of the Flame
-- Uber Incarnation of Dread pinnacle boss
+- 185,000+ concurrent Steam players at launch
+- Breach mechanic completely overhauled
+- Strategic, objective-based gameplay
+- Protect NPC Ailith during Breach cleansing
+
+**Core League Mechanics**:
+- **Breach Hives**: Large fleshy dungeons with powerful bosses
+- **Unstable Breaches**: Area-wide wave events requiring stabilization
+- **Genesis Tree**: New Atlas tree for crafting rewards
+- **Grafts**: New equipment type (hands growing from body)
+  - Passive bonuses + unique triggered skills
+  - Powerful with lengthy cooldowns
+- **Bloodline Ascendancies**: 10 new secondary ascendancy classes
+  - Unlocked by defeating specific bosses
+  - No class restrictions, available to all
+- **Asynchronous Trading**: Via Faustus NPC (unlocked Act 6)
+  - Trade without seller online
+  - Access from hideout
+
+**New Currencies**:
+- Foulborn Regal Orb: Weighted toward higher-tier mods
+- Graft-specific currencies for new equipment type
 
 **Endgame State**:
 - T17 maps as pinnacle content
@@ -218,6 +264,8 @@ Using Standard prices in temp league
 
 ## Terminology Reference
 
+See full glossary: `.claude/personas/poe-glossary.md`
+
 ### PoE1 Terms
 - **T17**: Tier 17 maps (highest difficulty)
 - **Uber**: Enhanced pinnacle boss versions
@@ -225,6 +273,9 @@ Using Standard prices in temp league
 - **MF**: Magic Find gear/strategy
 - **League start**: First 1-2 weeks of league
 - **Mirror tier**: Best possible item (worth mirrors)
+- **Genesis Tree**: New Atlas tree for specialized rewards (3.27)
+- **Grafts**: New equipment slot with triggered skills (3.27)
+- **Bloodline Ascendancy**: Secondary ascendancy class (3.27)
 
 ### PoE2 Terms
 - **Tablets**: Map modifiers (replaced Towers)
@@ -232,10 +283,33 @@ Using Standard prices in temp league
 - **Precursor Tablets**: Upgradeable to Rare
 - **Pinnacle**: Endgame bosses (Arbiter of Ash, etc.)
 - **Rune sockets**: New socket system for runes
+- **Talismans**: Two-handed shapeshifting weapons (0.4.0)
+- **Monster Effectiveness**: New scaling replacing pack size (0.4.0)
+- **Lira Vaal**: Temple endgame content (Fate of the Vaal)
 
 ### Economy Terms
 - **Divine**: Primary high-value currency (PoE1)
-- **Exalt**: Secondary currency, ~1/150 divine
-- **Chaos**: Base trading currency
+- **Exalt**: Primary currency in PoE2, secondary in PoE1 (~1/150 divine)
+- **Chaos**: Base trading currency (PoE1), targeted crafting (PoE2)
 - **Bulk ratio**: Discount for buying in quantity
 - **Price fixing**: Fake listings to manipulate prices
+
+## Price Checking Tools Comparison
+
+| Tool | Type | PoE1 | PoE2 | Strengths | Weaknesses |
+|------|------|------|------|-----------|------------|
+| poe.ninja | Website | Yes | Via poe2scout | Comprehensive, accurate, builds | Alt-tab required |
+| Awakened PoE Trade | Overlay | Yes | Partial | Fast, in-game, hotkeys | Basic pricing logic |
+| PoE Overlay | Overlay | Yes | Yes | ML pricing, trade management | Overwolf dependency |
+| Craft of Exile | Website | Yes | Partial | Crafting simulation | Not real-time prices |
+| poe2scout | Website | No | Yes | PoE2 economy data | PoE2 only |
+
+## External Resources
+
+- **poe.ninja**: https://poe.ninja/
+- **poe2scout**: https://poe2scout.com/
+- **Awakened PoE Trade**: https://snosme.github.io/awakened-poe-trade/
+- **Path of Building**: https://github.com/PathOfBuildingCommunity/PathOfBuilding
+- **Craft of Exile**: https://www.craftofexile.com/
+- **PoE Wiki**: https://www.poewiki.net/
+- **poedb**: https://poedb.tw/
