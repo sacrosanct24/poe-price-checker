@@ -30,7 +30,16 @@ Product functionality and user experience from domain expertise.
 
 | Persona | Focus | Command | Knowledge Update |
 |---------|-------|---------|------------------|
-| [PoE Expert Player](poe-expert-player.md) | Game functionality, player UX, feature gaps | `/review-poe-expert` | Every 30 days |
+| [PoE Expert Player](poe-expert-player.md) | Game functionality, feature gaps, competitive analysis | `/review-poe-expert` | Every 30 days |
+| [PoE Journeyman Player](poe-journeyman-player.md) | Usability, education, guidance, clarity | `/review-poe-journeyman` | Every 30 days |
+
+**Player Persona Comparison**:
+| Aspect | Expert (5000+ hrs) | Journeyman (200-500 hrs) |
+|--------|-------------------|-------------------------|
+| Focus | Is it accurate & fast? | Is it understandable? |
+| Evaluates | Feature completeness | Educational value |
+| Asks | "Would I use this?" | "Would I learn from this?" |
+| Priorities | Speed, accuracy, power features | Clarity, guidance, explanation |
 
 **Note**: Domain expert personas require periodic knowledge updates to stay current with game changes. Use `/update-poe-knowledge` to refresh game information.
 
