@@ -565,3 +565,360 @@ class TestGetAvailableLeagues:
 
         assert "Standard" not in leagues
         assert "Hardcore" not in leagues
+
+
+# =============================================================================
+# Additional PoEStashClient Tests - Extended Coverage
+# =============================================================================
+
+
+class TestPoEStashClientGet:
+    """Extended tests for PoEStashClient._get method."""
+
+    @pytest.fixture
+    def client(self):
+        """Create client instance."""
+        return PoEStashClient(poesessid="test_session_id")
+
+    @patch('data_sources.poe_stash_api.requests.Session.get')
+    def test_get_handles_non_http_request_exception(self, mock_get, client):
+        """Should raise on non-HTTP request exceptions."""
+        import requests
+        mock_get.side_effect = requests.exceptions.RequestException("Network error")
+
+        with pytest.raises(requests.exceptions.RequestException):
+            client._get("/test-endpoint")
+
+    @patch('data_sources.poe_stash_api.requests.Session.get')
+    def test_get_retries_429_max_times_then_raises(self, mock_get, client):
+        """Should exhaust retries and raise on persistent 429."""
+        import requests
+
+        mock_429_response = MagicMock()
+        mock_429_response.status_code = 429
+        mock_429_response.raise_for_status.side_effect = requests.exceptions.HTTPError("429")
+
+        # Return 429 for all calls (more than max_retries)
+        mock_get.return_value = mock_429_response
+
+        with patch('data_sources.poe_stash_api.time.sleep'):
+            with pytest.raises(requests.exceptions.HTTPError):
+                client._get("/test-endpoint", max_retries=2)
+
+        # Should have tried 3 times (initial + 2 retries)
+        assert mock_get.call_count == 3
+
+    @patch('data_sources.poe_stash_api.requests.Session.get')
+    def test_get_handles_other_http_errors(self, mock_get, client):
+        """Should raise on HTTP errors other than 403 and 429."""
+        import requests
+
+        mock_500_response = MagicMock()
+        mock_500_response.status_code = 500
+        mock_500_response.raise_for_status.side_effect = requests.exceptions.HTTPError("500")
+        mock_get.return_value = mock_500_response
+
+        with pytest.raises(requests.exceptions.HTTPError):
+            client._get("/test-endpoint")
+
+
+class TestPoEStashClientGetStashTabById:
+    """Tests for PoEStashClient.get_stash_tab_by_id method."""
+
+    @pytest.fixture
+    def client(self):
+        """Create client instance."""
+        return PoEStashClient(poesessid="test_session_id")
+
+    @patch.object(PoEStashClient, '_get')
+    def test_get_stash_tab_by_id_success(self, mock_get, client):
+        """Should fetch stash by ID."""
+        mock_get.return_value = {
+            "items": [{"name": "Test Item"}]
+        }
+
+        result = client.get_stash_tab_by_id(
+            account_name="TestAccount",
+            league="Standard",
+            stash_id="abc123"
+        )
+
+        assert result["items"][0]["name"] == "Test Item"
+        call_args = mock_get.call_args
+        params = call_args[0][1]
+        assert params["stashId"] == "abc123"
+
+    @patch.object(PoEStashClient, '_get')
+    def test_get_stash_tab_by_id_with_substash(self, mock_get, client):
+        """Should include substash ID when provided."""
+        mock_get.return_value = {"items": []}
+
+        client.get_stash_tab_by_id(
+            account_name="TestAccount",
+            league="Standard",
+            stash_id="abc123",
+            substash_id="sub456"
+        )
+
+        call_args = mock_get.call_args
+        params = call_args[0][1]
+        assert params["stashId"] == "abc123"
+        assert params["substashId"] == "sub456"
+
+    @patch.object(PoEStashClient, '_get')
+    def test_get_stash_tab_by_id_handles_error(self, mock_get, client):
+        """Should return empty items on error."""
+        mock_get.side_effect = Exception("API error")
+
+        result = client.get_stash_tab_by_id(
+            account_name="TestAccount",
+            league="Standard",
+            stash_id="abc123"
+        )
+
+        assert result == {"items": []}
+
+
+class TestPoEStashClientUniqueStashSubtabs:
+    """Tests for UniqueStash substab fetching logic."""
+
+    @pytest.fixture
+    def client(self):
+        """Create client instance."""
+        return PoEStashClient(poesessid="test_session_id")
+
+    @patch.object(PoEStashClient, 'get_stash_tabs')
+    @patch.object(PoEStashClient, 'get_stash_tab_items')
+    @patch.object(PoEStashClient, 'get_stash_tab_by_id')
+    def test_unique_stash_substab_fetch_when_parent_empty(
+        self, mock_by_id, mock_items, mock_tabs, client
+    ):
+        """Should try substab fetch when UniqueStash parent returns 0 items."""
+        mock_tabs.return_value = [
+            {
+                "n": "Unique Items",
+                "type": "UniqueStash",
+                "id": "unique-parent",
+                "children": [
+                    {"n": "Helmets", "id": "helmets-id"},
+                    {"n": "Boots", "id": "boots-id"},
+                ],
+            },
+        ]
+
+        # Parent fetch returns 0 items (triggers substab fetch)
+        mock_items.return_value = {"items": []}
+
+        # Substab fetches return items
+        mock_by_id.side_effect = [
+            {"items": [{"name": "Goldrim"}]},
+            {"items": [{"name": "Wanderlust"}]},
+        ]
+
+        snapshot = client.fetch_all_stashes("TestAccount", "Standard")
+
+        # Should have tried substab fetch
+        assert mock_by_id.call_count == 2
+
+        # Items from substabs should be in parent tab
+        assert snapshot.tabs[0].item_count == 2
+        assert snapshot.total_items == 2
+
+    @patch.object(PoEStashClient, 'get_stash_tabs')
+    @patch.object(PoEStashClient, 'get_stash_tab_items')
+    @patch.object(PoEStashClient, 'get_stash_tab_by_id')
+    def test_unique_stash_substab_fetch_handles_failures(
+        self, mock_by_id, mock_items, mock_tabs, client
+    ):
+        """Should handle substab fetch failures gracefully."""
+        mock_tabs.return_value = [
+            {
+                "n": "Unique Items",
+                "type": "UniqueStash",
+                "id": "unique-parent",
+                "children": [
+                    {"n": "Helmets", "id": "helmets-id"},
+                    {"n": "Boots", "id": "boots-id"},
+                ],
+            },
+        ]
+
+        mock_items.return_value = {"items": []}
+
+        # First substab fails, second succeeds
+        mock_by_id.side_effect = [
+            Exception("Substab fetch failed"),
+            {"items": [{"name": "Wanderlust"}]},
+        ]
+
+        snapshot = client.fetch_all_stashes("TestAccount", "Standard")
+
+        # Should still have the one successful item
+        assert snapshot.tabs[0].item_count == 1
+
+    @patch.object(PoEStashClient, 'get_stash_tabs')
+    @patch.object(PoEStashClient, 'get_stash_tab_items')
+    @patch.object(PoEStashClient, 'get_stash_tab_by_id')
+    def test_unique_stash_no_substab_fetch_when_parent_has_items(
+        self, mock_by_id, mock_items, mock_tabs, client
+    ):
+        """Should NOT try substab fetch when parent has items."""
+        mock_tabs.return_value = [
+            {
+                "n": "Unique Items",
+                "type": "UniqueStash",
+                "id": "unique-parent",
+                "children": [
+                    {"n": "Helmets", "id": "helmets-id"},
+                ],
+            },
+        ]
+
+        # Parent returns items - substab fetch should be skipped
+        mock_items.return_value = {"items": [{"name": "Goldrim"}]}
+
+        snapshot = client.fetch_all_stashes("TestAccount", "Standard")
+
+        # Should NOT have tried substab fetch
+        mock_by_id.assert_not_called()
+        assert snapshot.tabs[0].item_count == 1
+
+    @patch.object(PoEStashClient, 'get_stash_tabs')
+    @patch.object(PoEStashClient, 'get_stash_tab_items')
+    @patch.object(PoEStashClient, 'get_stash_tab_by_id')
+    def test_unique_stash_substab_no_id_skipped(
+        self, mock_by_id, mock_items, mock_tabs, client
+    ):
+        """Should skip substabs without ID."""
+        mock_tabs.return_value = [
+            {
+                "n": "Unique Items",
+                "type": "UniqueStash",
+                "id": "unique-parent",
+                "children": [
+                    {"n": "No ID Child"},  # No "id" field
+                    {"n": "Has ID", "id": "has-id"},
+                ],
+            },
+        ]
+
+        mock_items.return_value = {"items": []}
+        mock_by_id.return_value = {"items": [{"name": "Item"}]}
+
+        snapshot = client.fetch_all_stashes("TestAccount", "Standard")
+
+        # Should only try the child with ID
+        assert mock_by_id.call_count == 1
+
+    @patch.object(PoEStashClient, 'get_stash_tabs')
+    @patch.object(PoEStashClient, 'get_stash_tab_items')
+    def test_other_specialized_tabs_skip_substab_fetch(self, mock_items, mock_tabs, client):
+        """Other specialized tabs (MapStash, etc.) should not attempt substab fetch."""
+        specialized_types = ["MapStash", "FragmentStash", "DivinationCardStash", "EssenceStash"]
+
+        for tab_type in specialized_types:
+            mock_tabs.return_value = [
+                {
+                    "n": f"My {tab_type}",
+                    "type": tab_type,
+                    "id": "parent-id",
+                    "children": [
+                        {"n": "Child1", "id": "child1"},
+                    ],
+                },
+            ]
+
+            # Parent returns items - children ignored for specialized tabs
+            mock_items.return_value = {"items": [{"name": "Item"}]}
+
+            snapshot = client.fetch_all_stashes("TestAccount", "Standard")
+
+            # Children should NOT be fetched or created
+            assert len(snapshot.tabs[0].children) == 0
+            assert snapshot.tabs[0].item_count == 1
+
+
+class TestPoEStashClientRateLimiting:
+    """Tests for rate limiting behavior."""
+
+    @pytest.fixture
+    def client(self):
+        """Create client instance."""
+        return PoEStashClient(poesessid="test_session_id")
+
+    def test_rate_limit_no_wait_when_enough_time_passed(self, client):
+        """Should not wait when enough time has passed."""
+        client.REQUEST_DELAY = 0.1
+        client._last_request_time = time.time() - 1.0  # 1 second ago
+
+        start = time.time()
+        client._rate_limit()
+        elapsed = time.time() - start
+
+        # Should be nearly instant
+        assert elapsed < 0.05
+
+    def test_rate_limit_first_request_no_wait(self, client):
+        """First request should not wait."""
+        client.REQUEST_DELAY = 0.1
+        client._last_request_time = 0.0  # Never made a request
+
+        start = time.time()
+        client._rate_limit()
+        elapsed = time.time() - start
+
+        # Should be nearly instant
+        assert elapsed < 0.05
+
+
+class TestStashSnapshotEdgeCases:
+    """Edge case tests for StashSnapshot."""
+
+    def test_get_all_items_empty_snapshot(self):
+        """Should return empty list for empty snapshot."""
+        snapshot = StashSnapshot(
+            account_name="Test",
+            league="Standard",
+        )
+
+        assert snapshot.get_all_items() == []
+
+    def test_get_all_items_nested_children(self):
+        """Should handle multiple levels of children."""
+        inner_child = StashTab(
+            id="inner",
+            name="Inner",
+            index=0,
+            type="NormalStash",
+            items=[{"name": "InnerItem"}],
+        )
+        outer_child = StashTab(
+            id="outer",
+            name="Outer",
+            index=0,
+            type="NormalStash",
+            items=[{"name": "OuterItem"}],
+            children=[inner_child],  # Note: this is not typical but tests the logic
+        )
+        parent = StashTab(
+            id="parent",
+            name="Parent",
+            index=0,
+            type="Folder",
+            items=[{"name": "ParentItem"}],
+            children=[outer_child],
+        )
+
+        snapshot = StashSnapshot(
+            account_name="Test",
+            league="Standard",
+            tabs=[parent],
+        )
+
+        all_items = snapshot.get_all_items()
+
+        # get_all_items only goes one level deep (parent items + direct children items)
+        assert len(all_items) == 2
+        names = [i["name"] for i in all_items]
+        assert "ParentItem" in names
+        assert "OuterItem" in names
