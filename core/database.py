@@ -1563,7 +1563,7 @@ class Database:
             where_sql = "WHERE " + " AND ".join(clauses)
 
         # where_sql is constructed from hardcoded clauses, all values use parameterized queries
-        sql = f"""  # nosec
+        sql = f"""
             SELECT
                 id,
                 item_name,

@@ -1141,7 +1141,7 @@ class LeagueEconomyService:
             # placeholders are constructed from list length, all values parameterized
             placeholders = ",".join("?" * len(currencies))
             rows = self._db._execute_fetchall(
-                f"""  # nosec
+                f"""
                 SELECT * FROM league_currency_summary
                 WHERE league = ? AND currency_name IN ({placeholders})
                 ORDER BY avg_value DESC
