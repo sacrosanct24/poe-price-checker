@@ -100,7 +100,7 @@ class TestPOE2Classes:
 
     def test_has_expected_classes(self):
         """POE2 should have expected classes."""
-        expected = {"Warrior", "Ranger", "Witch", "Mercenary", "Monk", "Sorceress", "Huntress"}
+        expected = {"Warrior", "Ranger", "Witch", "Mercenary", "Monk", "Sorceress", "Huntress", "Druid"}
         assert set(POE2_CLASSES.keys()) == expected
 
     def test_warrior_ascendancies(self):
@@ -118,6 +118,14 @@ class TestPOE2Classes:
 
         assert "Blood Mage" in names
         assert "Infernalist" in names
+
+    def test_druid_ascendancies(self):
+        """Druid should have Oracle and Shaman."""
+        druid = POE2_CLASSES["Druid"]
+        names = [a.name for a in druid.ascendancies]
+
+        assert "Oracle" in names
+        assert "Shaman" in names
 
 
 class TestGetClassesForGame:
@@ -195,7 +203,7 @@ class TestDetectGameVersionFromAscendancy:
 
     def test_detects_poe2_only_ascendancies(self):
         """Should detect POE2-only ascendancies."""
-        poe2_only = ["Titan", "Stormweaver", "Blood Mage", "Witchhunter", "Chronomancer"]
+        poe2_only = ["Titan", "Stormweaver", "Blood Mage", "Witchhunter", "Chronomancer", "Oracle", "Shaman"]
 
         for asc in poe2_only:
             result = detect_game_version_from_ascendancy(asc)
@@ -230,7 +238,7 @@ class TestDetectGameVersionFromClass:
 
     def test_detects_poe2_only_classes(self):
         """Should detect POE2-only classes."""
-        poe2_only = ["Warrior", "Mercenary", "Monk", "Sorceress", "Huntress"]
+        poe2_only = ["Warrior", "Mercenary", "Monk", "Sorceress", "Huntress", "Druid"]
 
         for cls in poe2_only:
             result = detect_game_version_from_class(cls)

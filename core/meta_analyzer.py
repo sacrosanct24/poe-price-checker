@@ -285,15 +285,16 @@ class MetaAnalyzer:
         try:
             self.cache_file.parent.mkdir(parents=True, exist_ok=True)
 
-            data = {
+            data: Dict[str, object] = {
                 'league': league,
                 'builds_analyzed': self.builds_analyzed,
                 'last_analysis': self.last_analysis.isoformat() if self.last_analysis else None,
                 'affixes': {}
             }
 
+            affixes_dict: Dict[str, Dict[str, object]] = {}
             for affix_type, pop in self.affix_popularity.items():
-                data['affixes'][affix_type] = {
+                affixes_dict[affix_type] = {
                     'pattern': pop.affix_pattern,
                     'appearance_count': pop.appearance_count,
                     'total_builds': pop.total_builds,
@@ -303,6 +304,7 @@ class MetaAnalyzer:
                     'avg_value': pop.avg_value,
                     'popular_with': pop.popular_with,
                 }
+            data['affixes'] = affixes_dict
 
             with open(self.cache_file, 'w') as f:
                 json.dump(data, f, indent=2)
