@@ -191,6 +191,41 @@ The `mcp_poe_server.py` exposes tools for AI assistants:
 - `get_sales_summary` - Sales analytics
 - `list_characters` - PoB character profiles
 - `suggest_upgrades` - Upgrade recommendations
+- `run_tests` - Execute pytest with options
+- `run_linter` - Code quality checks
+- `run_security_scan` - Security analysis
+
+## Persona-Based Review System
+
+This project uses specialized reviewer personas for comprehensive code review.
+See `.claude/personas/` for detailed persona definitions.
+
+| Persona | Focus | Command |
+|---------|-------|---------|
+| Security Auditor | OWASP, secrets, injection | `/review-security` |
+| Performance Engineer | Complexity, async, memory | `/review-performance` |
+| Architecture Guardian | SOLID, patterns, layers | `/review-architecture` |
+| Test Strategist | Coverage, test quality | `/review-tests` |
+| Accessibility Champion | A11y, keyboard, screen reader | `/review-accessibility` |
+| Documentation Curator | Docstrings, ADRs | `/review-docs` |
+
+### Using Personas
+```bash
+# Single review
+/review-security core/item_parser.py
+
+# Full multi-persona audit
+/audit-full core/
+```
+
+## Quality Gates
+
+All code must pass quality gates before merge. See `docs/development/QUALITY_GATES.md`.
+
+Key gates:
+1. **Automated**: flake8, isort, mypy, pytest, bandit
+2. **Coverage**: ≥70% for core/, ≥60% overall
+3. **Persona Reviews**: Security, Architecture, Tests
 
 ## Quick Reference
 
@@ -203,3 +238,13 @@ The `mcp_poe_server.py` exposes tools for AI assistants:
 | Lint | `flake8 core/ gui_qt/` |
 | Type check | `mypy --config-file=mypy.ini` |
 | Format imports | `isort core/ gui_qt/` |
+| Security scan | `bandit -r core/ -ll` |
+| Pre-PR check | `/check-pr` |
+| Full audit | `/audit-full <path>` |
+
+## Further Reading
+
+- **Quality Gates**: `docs/development/QUALITY_GATES.md`
+- **LLM Workflow**: `docs/development/LLM_DEVELOPMENT_WORKFLOW.md`
+- **Personas**: `.claude/personas/README.md`
+- **ADRs**: `docs/decisions/README.md`

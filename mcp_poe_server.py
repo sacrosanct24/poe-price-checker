@@ -1165,6 +1165,134 @@ def get_architecture_overview() -> str:
     }, indent=2)
 
 
+@mcp.tool()
+def run_security_scan(path: str = "core/", full_scan: bool = False) -> dict:
+    """
+    Run security scanning tools on the codebase.
+
+    Args:
+        path: Path to scan (default: "core/")
+        full_scan: Run all security tools including dependency check
+
+    Returns:
+        Security scan results with findings by severity
+    """
+    results = {
+        "path": path,
+        "scans": {},
+        "summary": {"high": 0, "medium": 0, "low": 0}
+    }
+
+    # Run bandit
+    try:
+        bandit_result = subprocess.run(
+            ["python", "-m", "bandit", "-r", path, "-f", "json", "-ll"],
+            cwd=PROJECT_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=120
+        )
+
+        if bandit_result.stdout:
+            bandit_data = json.loads(bandit_result.stdout)
+            results["scans"]["bandit"] = {
+                "success": True,
+                "metrics": bandit_data.get("metrics", {}),
+                "results": bandit_data.get("results", [])[:10]  # Limit results
+            }
+
+            # Count by severity
+            for issue in bandit_data.get("results", []):
+                severity = issue.get("issue_severity", "").lower()
+                if severity in results["summary"]:
+                    results["summary"][severity] += 1
+        else:
+            results["scans"]["bandit"] = {
+                "success": bandit_result.returncode == 0,
+                "message": "No issues found" if bandit_result.returncode == 0 else "Scan failed"
+            }
+
+    except FileNotFoundError:
+        results["scans"]["bandit"] = {"error": "bandit not installed. Run: pip install bandit"}
+    except Exception as e:
+        results["scans"]["bandit"] = {"error": str(e)}
+
+    # Check for dangerous patterns
+    dangerous_patterns = {
+        "eval(": "Code execution",
+        "exec(": "Code execution",
+        "shell=True": "Command injection risk",
+        "os.system(": "Command injection risk"
+    }
+
+    pattern_findings = []
+    scan_path = PROJECT_ROOT / path
+
+    if scan_path.is_dir():
+        for py_file in scan_path.rglob("*.py"):
+            try:
+                content = py_file.read_text()
+                for pattern, risk in dangerous_patterns.items():
+                    if pattern in content:
+                        # Find line numbers
+                        for i, line in enumerate(content.split("\n"), 1):
+                            if pattern in line and not line.strip().startswith("#"):
+                                pattern_findings.append({
+                                    "file": str(py_file.relative_to(PROJECT_ROOT)),
+                                    "line": i,
+                                    "pattern": pattern,
+                                    "risk": risk
+                                })
+            except Exception:
+                pass
+
+    results["scans"]["dangerous_patterns"] = {
+        "findings": pattern_findings[:20],  # Limit
+        "count": len(pattern_findings)
+    }
+
+    # Full scan includes dependency check
+    if full_scan:
+        try:
+            safety_result = subprocess.run(
+                ["python", "-m", "safety", "check", "--json"],
+                cwd=PROJECT_ROOT,
+                capture_output=True,
+                text=True,
+                timeout=60
+            )
+
+            if safety_result.stdout:
+                try:
+                    safety_data = json.loads(safety_result.stdout)
+                    results["scans"]["dependencies"] = {
+                        "success": True,
+                        "vulnerabilities": safety_data[:5] if isinstance(safety_data, list) else []
+                    }
+                except json.JSONDecodeError:
+                    results["scans"]["dependencies"] = {
+                        "success": safety_result.returncode == 0,
+                        "output": safety_result.stdout[:500]
+                    }
+        except FileNotFoundError:
+            results["scans"]["dependencies"] = {"error": "safety not installed. Run: pip install safety"}
+        except Exception as e:
+            results["scans"]["dependencies"] = {"error": str(e)}
+
+    # Overall assessment
+    total_issues = sum(results["summary"].values())
+    if results["summary"]["high"] > 0:
+        results["risk_level"] = "HIGH"
+    elif results["summary"]["medium"] > 0:
+        results["risk_level"] = "MEDIUM"
+    elif total_issues > 0:
+        results["risk_level"] = "LOW"
+    else:
+        results["risk_level"] = "CLEAN"
+
+    return results
+
+
 if __name__ == "__main__":
     # Run the MCP server
     #
