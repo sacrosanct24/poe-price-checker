@@ -65,9 +65,10 @@ htmlcov/
 *.cover
 .hypothesis/
 
-# Claude Code local settings
-.claude/
-claude.md
+# Claude Code - keep commands shared, ignore local settings
+.claude/settings.json
+.claude/settings.local.json
+# Note: .claude/commands/ is tracked for shared slash commands
 
 # User data files
 data/characters.json
