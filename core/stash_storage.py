@@ -232,7 +232,7 @@ class StashStorageService:
         if not keep_ids:
             return 0
 
-        # Delete all others
+        # Delete all others - placeholders are constructed from list length, all values parameterized
         placeholders = ",".join("?" * len(keep_ids))
         # nosec B608 - placeholders are constructed from list length, all values parameterized
         cursor = self._db._execute(

@@ -1138,9 +1138,10 @@ class LeagueEconomyService:
             List of currency summary dictionaries
         """
         if currencies:
+            # placeholders are constructed from list length, all values parameterized
             placeholders = ",".join("?" * len(currencies))
             rows = self._db._execute_fetchall(
-                f"""
+                f"""  # nosec
                 SELECT * FROM league_currency_summary
                 WHERE league = ? AND currency_name IN ({placeholders})
                 ORDER BY avg_value DESC
