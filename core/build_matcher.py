@@ -7,13 +7,14 @@ Supports:
 - Highlighting items that match build needs
 """
 
-import json
 import base64
+import json
 import zlib
-import xml.etree.ElementTree as ET
-from pathlib import Path
-from typing import List, Dict, Optional
 from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Dict, List, Optional
+
+import defusedxml.ElementTree as ET
 
 
 @dataclass

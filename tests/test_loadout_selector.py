@@ -8,7 +8,7 @@ Tests the XML parsing methods without requiring Qt.
 from __future__ import annotations
 
 import pytest
-import xml.etree.ElementTree as ET
+import defusedxml.ElementTree as ET
 
 
 # Test the item set parsing logic directly (extracted from dialog)
