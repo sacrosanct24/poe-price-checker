@@ -353,6 +353,111 @@ class MetaAnalyzer:
             logger.error(f"Failed to load cache: {e}")
             return False
 
+    def load_meta_builds_knowledge(
+        self,
+        game_version: str = "poe1",
+        knowledge_dir: Optional[Path] = None
+    ) -> Dict[str, float]:
+        """
+        Load meta builds from curated knowledge base and generate weights.
+
+        This integrates with the manually curated meta builds data in
+        data/meta_builds/ which is updated regularly based on poe.ninja
+        and other sources.
+
+        Args:
+            game_version: "poe1" or "poe2"
+            knowledge_dir: Optional custom directory for knowledge files
+
+        Returns:
+            Dict mapping affix_type -> calculated weight
+        """
+        if knowledge_dir is None:
+            knowledge_dir = Path("data/meta_builds") / game_version
+
+        current_league_file = knowledge_dir / "current_league.json"
+
+        if not current_league_file.exists():
+            logger.warning(f"Meta builds knowledge not found: {current_league_file}")
+            return {}
+
+        try:
+            with open(current_league_file, 'r') as f:
+                data = json.load(f)
+
+            # Extract affix weights from the curated data
+            affix_weights = data.get('affix_meta_weights', {})
+            builds = data.get('builds', [])
+
+            logger.info(
+                f"Loaded meta builds knowledge: {len(builds)} builds, "
+                f"{len(affix_weights)} affix weights from {data.get('league', 'Unknown')}"
+            )
+
+            # Calculate final weights
+            final_weights = {}
+            for affix_type, weight_data in affix_weights.items():
+                base = weight_data.get('base_weight', 5.0)
+                multiplier = weight_data.get('meta_multiplier', 1.0)
+                final_weights[affix_type] = round(base * multiplier, 1)
+
+            # Boost weights based on build popularity
+            for build in builds:
+                popularity = build.get('popularity_percent', 0)
+                tier = build.get('tier', 'C')
+
+                # Tier multipliers
+                tier_mult = {'S': 1.5, 'A': 1.3, 'B': 1.15, 'C': 1.0, 'D': 0.9}.get(tier, 1.0)
+
+                # Process desired affixes
+                for affix in build.get('desired_affixes_global', []):
+                    affix_name = affix.get('name', '')
+                    affix_weight = affix.get('weight', 5)
+
+                    # Weighted by popularity and tier
+                    popularity_boost = (popularity / 100) * tier_mult
+                    current = final_weights.get(affix_name, 5.0)
+                    final_weights[affix_name] = round(
+                        current + (affix_weight * popularity_boost * 0.1), 1
+                    )
+
+            # Store for later use
+            self._meta_knowledge_weights = final_weights
+            self._meta_knowledge_data = data
+
+            return final_weights
+
+        except Exception as e:
+            logger.error(f"Failed to load meta builds knowledge: {e}")
+            return {}
+
+    def get_meta_build_matches(self, item_affixes: List[str]) -> List[str]:
+        """
+        Find meta builds that would want an item with given affixes.
+
+        Args:
+            item_affixes: List of affix types on the item
+
+        Returns:
+            List of build names that match
+        """
+        if not hasattr(self, '_meta_knowledge_data'):
+            return []
+
+        matches = []
+        builds = self._meta_knowledge_data.get('builds', [])
+
+        for build in builds:
+            desired = {a.get('name') for a in build.get('desired_affixes_global', [])}
+            item_set = set(item_affixes)
+
+            # Calculate overlap
+            overlap = len(desired & item_set)
+            if overlap >= 2:  # At least 2 matching affixes
+                matches.append(build.get('name', 'Unknown'))
+
+        return matches
+
     def print_summary(self) -> None:
         """Print a summary of meta analysis."""
         print("=" * 80)

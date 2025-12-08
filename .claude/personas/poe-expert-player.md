@@ -304,6 +304,26 @@ See full glossary: `.claude/personas/poe-glossary.md`
 | Craft of Exile | Website | Yes | Partial | Crafting simulation | Not real-time prices |
 | poe2scout | Website | No | Yes | PoE2 economy data | PoE2 only |
 
+## Meta Builds Knowledge Base
+
+The project maintains a curated meta builds knowledge base at `data/meta_builds/`:
+- **poe1/current_league.json** - Current PoE1 meta builds with gear requirements
+- **poe2/current_league.json** - Current PoE2 meta builds with gear requirements
+
+### Update Schedule
+| Timing | Action |
+|--------|--------|
+| Pre-League | Full refresh 1-2 days before |
+| Week 1-2 | Daily updates (meta forming) |
+| Week 3+ | Weekly updates |
+
+### Update Command
+```
+/update-meta-builds
+```
+
+This knowledge feeds into `core/meta_analyzer.py` to dynamically adjust item evaluation weights based on what's popular.
+
 ## External Resources
 
 - **poe.ninja**: https://poe.ninja/

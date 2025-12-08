@@ -241,10 +241,22 @@ Key gates:
 | Security scan | `bandit -r core/ -ll` |
 | Pre-PR check | `/check-pr` |
 | Full audit | `/audit-full <path>` |
+| Update meta builds | `/update-meta-builds` |
+
+## Meta Builds Knowledge
+
+The project tracks current meta builds to improve item evaluation accuracy:
+- **Location**: `data/meta_builds/poe1/` and `data/meta_builds/poe2/`
+- **Update schedule**: Pre-league, then weekly during league
+- **Integration**: `core/meta_analyzer.py` loads weights for `price_integrator.py`
+
+See `data/meta_builds/README.md` for schema and update procedures.
 
 ## Further Reading
 
 - **Quality Gates**: `docs/development/QUALITY_GATES.md`
 - **LLM Workflow**: `docs/development/LLM_DEVELOPMENT_WORKFLOW.md`
 - **Personas**: `.claude/personas/README.md`
+- **PoE Glossary**: `.claude/personas/poe-glossary.md`
+- **Meta Builds**: `data/meta_builds/README.md`
 - **ADRs**: `docs/decisions/README.md`
