@@ -12,11 +12,7 @@ from typing import Dict, List, Optional
 
 from core.pob_integration import PoBBuild, PoBItem, CharacterManager, PoBDecoder
 
-# Use defusedxml to prevent XXE attacks
-try:
-    import defusedxml.ElementTree as ET
-except ImportError:
-    import xml.etree.ElementTree as ET
+import defusedxml.ElementTree as ET
 
 logger = logging.getLogger(__name__)
 

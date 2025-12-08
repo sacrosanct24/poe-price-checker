@@ -26,17 +26,7 @@ import requests
 
 # Use defusedxml to prevent XXE (XML External Entity) attacks
 # PoB codes from untrusted sources could contain malicious XML
-try:
-    import defusedxml.ElementTree as ET
-    _USING_DEFUSEDXML = True
-except ImportError:
-    import xml.etree.ElementTree as ET
-    _USING_DEFUSEDXML = False
-    # Log warning once at module load
-    logging.getLogger(__name__).warning(
-        "defusedxml not installed - XML parsing may be vulnerable to XXE attacks. "
-        "Install with: pip install defusedxml"
-    )
+import defusedxml.ElementTree as ET
 
 if TYPE_CHECKING:
     from core.build_archetype import BuildArchetype

@@ -10,8 +10,9 @@ Supports:
 import json
 import base64
 import zlib
-import xml.etree.ElementTree as ET
 from pathlib import Path
+
+import defusedxml.ElementTree as ET
 from typing import List, Dict, Optional
 from dataclasses import dataclass, field
 

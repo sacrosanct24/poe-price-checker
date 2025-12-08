@@ -11,11 +11,11 @@ from __future__ import annotations
 
 import logging
 import re
-import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional, Set, Tuple
 
+import defusedxml.ElementTree as ET
 import requests
 
 from core.pob_integration import PoBBuild, PoBDecoder, PoBItem

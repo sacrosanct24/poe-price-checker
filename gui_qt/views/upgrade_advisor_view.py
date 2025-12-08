@@ -380,7 +380,7 @@ class UpgradeAdvisorView(QWidget):
         parts.extend(item.implicit_mods or [])
         parts.extend(item.explicit_mods or [])
         content = "|".join(parts)
-        return hashlib.md5(content.encode()).hexdigest()[:16]
+        return hashlib.md5(content.encode(), usedforsecurity=False).hexdigest()[:16]
 
     def _get_rarity_color(self, rarity: str) -> Optional[QColor]:
         """Get color for item rarity."""

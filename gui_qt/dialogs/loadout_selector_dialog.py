@@ -247,7 +247,7 @@ class LoadoutSelectorDialog(QDialog):
 
     def _parse_item_sets(self, xml_string: str) -> List[Dict]:
         """Parse item sets from PoB XML."""
-        import xml.etree.ElementTree as ET
+        import defusedxml.ElementTree as ET
 
         try:
             root = ET.fromstring(xml_string)

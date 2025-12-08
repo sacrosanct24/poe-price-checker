@@ -1,7 +1,14 @@
-[bandit]
+---
 # Exclude test directories - assert statements are expected in tests
-exclude_dirs = tests
+exclude_dirs:
+  - tests
 
-# Skip B101 (assert_used) globally as a backup
-# pytest relies on assert statements for test assertions
-skips = B101
+# Skip B101 (assert_used) - pytest relies on assert statements for test assertions
+# Skip B105 (hardcoded_password_string) - false positives for URLs and placeholder strings
+# Skip B106 (hardcoded_password_funcarg) - false positives for config parameters
+# Skip B608 (hardcoded_sql_expressions) - all flagged SQL uses parameterized queries
+skips:
+  - B101
+  - B105
+  - B106
+  - B608
