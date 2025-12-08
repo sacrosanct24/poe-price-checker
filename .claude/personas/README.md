@@ -47,6 +47,7 @@ Product functionality and user experience from domain expertise.
 | Resource | Description |
 |----------|-------------|
 | [PoE Glossary](poe-glossary.md) | Comprehensive terms, abbreviations, and slang |
+| [PoE Development Reference](../../docs/development/POE_DEVELOPMENT_REFERENCE.md) | API patterns, parsing techniques, best practices from ecosystem |
 
 ## Usage
 

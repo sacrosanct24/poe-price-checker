@@ -256,6 +256,7 @@ See `data/meta_builds/README.md` for schema and update procedures.
 
 - **Quality Gates**: `docs/development/QUALITY_GATES.md`
 - **LLM Workflow**: `docs/development/LLM_DEVELOPMENT_WORKFLOW.md`
+- **PoE Dev Reference**: `docs/development/POE_DEVELOPMENT_REFERENCE.md`
 - **Personas**: `.claude/personas/README.md`
 - **PoE Glossary**: `.claude/personas/poe-glossary.md`
 - **Meta Builds**: `data/meta_builds/README.md`
