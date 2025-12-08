@@ -156,12 +156,14 @@ class TestViewToggle:
 
     def test_view_changed_not_emitted_for_same_mode(self, qtbot, toggle):
         """view_changed should not emit when setting same mode."""
+        from PyQt6.QtWidgets import QApplication
+
         # Set to TABLE (already TABLE) - should not emit
         signals_emitted = []
         toggle.view_changed.connect(lambda m: signals_emitted.append(m))
         toggle.set_view(ViewMode.TABLE)
-        # Give a moment for any signal to process
-        qtbot.wait(50)
+        # Process any pending events
+        QApplication.processEvents()
         assert len(signals_emitted) == 0
 
     def test_button_group_is_exclusive(self, toggle):
