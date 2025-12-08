@@ -646,7 +646,7 @@ class LootDashboardWindow(QDialog):
         """Handle start button click."""
         result = self._controller.start_session()
         if result.is_err():
-            self._status_label.setText(f"Error: {result.unwrap_err()}")
+            self._status_label.setText(f"Error: {result.error}")
         else:
             self._update_ui()
 
@@ -654,7 +654,7 @@ class LootDashboardWindow(QDialog):
         """Handle stop button click."""
         result = self._controller.end_session()
         if result.is_err():
-            self._status_label.setText(f"Error: {result.unwrap_err()}")
+            self._status_label.setText(f"Error: {result.error}")
         else:
             self._update_ui()
             self._load_history()  # Refresh history
