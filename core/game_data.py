@@ -176,7 +176,14 @@ POE2_CLASSES: Dict[str, ClassInfo] = {
             AscendancyInfo("Beastmaster", 2),
         ]
     ),
-    # Druid coming later in PoE2
+    "Druid": ClassInfo(
+        name="Druid",
+        class_id=8,
+        ascendancies=[
+            AscendancyInfo("Oracle", 1),
+            AscendancyInfo("Shaman", 2),
+        ]
+    ),
 }
 
 
@@ -233,7 +240,7 @@ def detect_game_version_from_ascendancy(ascendancy: str) -> Optional[GameVersion
         "titan", "warbringer", "blood mage", "infernalist",
         "witchhunter", "gemling legionnaire", "invoker",
         "acolyte of chayula", "stormweaver", "chronomancer",
-        "amazon", "beastmaster"
+        "amazon", "beastmaster", "oracle", "shaman"
     }
 
     if asc_lower in poe1_only:
@@ -258,7 +265,7 @@ def detect_game_version_from_class(class_name: str) -> Optional[GameVersion]:
     poe1_only = {"scion", "marauder", "duelist", "templar", "shadow"}
 
     # PoE2-only classes
-    poe2_only = {"warrior", "mercenary", "monk", "sorceress", "huntress"}
+    poe2_only = {"warrior", "mercenary", "monk", "sorceress", "huntress", "druid"}
 
     if class_lower in poe1_only:
         return GameVersion.POE1

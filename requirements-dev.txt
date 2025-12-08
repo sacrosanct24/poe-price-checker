@@ -1,0 +1,76 @@
+# Development and Quality Assurance Dependencies
+# Install with: pip install -r requirements-dev.txt
+
+# =============================================================================
+# Testing
+# =============================================================================
+pytest>=7.4.0
+pytest-cov>=4.1.0
+pytest-mock>=3.11.0
+pytest-qt>=4.2.0
+pytest-xdist>=3.3.0
+pytest-timeout>=2.1.0
+
+# =============================================================================
+# Code Quality
+# =============================================================================
+# Linting
+flake8>=6.1.0
+flake8-bugbear>=23.7.0
+flake8-comprehensions>=3.14.0
+
+# Import sorting
+isort>=5.12.0
+
+# Type checking
+mypy>=1.13.0
+types-requests>=2.31.0
+
+# Pre-commit hooks
+pre-commit>=3.3.0
+
+# =============================================================================
+# Security Scanning
+# =============================================================================
+# Static security analysis
+bandit>=1.7.5
+
+# Dependency vulnerability scanning
+safety>=2.3.0
+pip-audit>=2.6.0
+
+# Secrets detection (optional)
+# detect-secrets>=1.4.0
+
+# =============================================================================
+# Documentation
+# =============================================================================
+# Docstring coverage (optional)
+# interrogate>=1.5.0
+
+# =============================================================================
+# Profiling & Debugging (optional)
+# =============================================================================
+# py-spy>=0.3.0  # Sampling profiler
+# memory-profiler>=0.61.0  # Memory profiling
+# line-profiler>=4.0.0  # Line-by-line profiling
+
+# =============================================================================
+# Usage
+# =============================================================================
+# Install all dev dependencies:
+#   pip install -r requirements-dev.txt
+#
+# Run security scan:
+#   bandit -r core/ data_sources/ -ll
+#   safety check
+#   pip-audit
+#
+# Run linting:
+#   flake8 core/ gui_qt/ data_sources/
+#   isort --check-only core/ gui_qt/ data_sources/
+#   mypy --config-file=mypy.ini core/ data_sources/
+#
+# Run tests:
+#   pytest tests/ -v --timeout=120
+#   pytest tests/ --cov=core --cov-report=html

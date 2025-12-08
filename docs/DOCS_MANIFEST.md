@@ -62,14 +62,17 @@ related_code:
 | POE_API_REFERENCE.md | current | stable | 2025-11-28 | 2026-02-28 | External API docs |
 | POEWATCH_API_REFERENCE.md | current | stable | 2025-11-28 | 2026-02-28 | External API docs |
 
-### Development (6 files)
+### Development (9 files)
 
 | File | Status | Stability | Last Reviewed | Next Review | Notes |
 |------|--------|-----------|---------------|-------------|-------|
 | CARGO_API_GUIDE.md | current | stable | 2025-11-28 | 2026-02-28 | PoE Wiki API reference |
 | DATA_SOURCES_GUIDE.md | current | volatile | 2025-11-28 | Per-release | Update when sources change |
 | DEVELOPMENT_GUIDE.md | current | stable | 2025-11-28 | 2026-02-28 | Core architecture |
+| LLM_DEVELOPMENT_WORKFLOW.md | current | stable | 2025-12-08 | 2026-03-08 | LLM coding patterns |
 | PLUGIN_SPEC.md | current | stable | 2025-11-28 | 2026-02-28 | Plugin API |
+| POE_DEVELOPMENT_REFERENCE.md | current | volatile | 2025-12-08 | Per-release | Ecosystem best practices |
+| QUALITY_GATES.md | current | stable | 2025-12-08 | 2026-03-08 | CI/CD quality checks |
 | STASH_SCANNER_CHECKLIST.md | current | stable | 2025-12-06 | 2026-03-06 | Implementation checklist |
 | STASH_SCANNER_SETUP.md | current | stable | 2025-12-06 | 2026-03-06 | Setup instructions |
 
