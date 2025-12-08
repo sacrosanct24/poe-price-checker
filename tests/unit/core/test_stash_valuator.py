@@ -31,6 +31,10 @@ class TestPriceSource:
         """POE_PRICES has correct value."""
         assert PriceSource.POE_PRICES.value == "poeprices.info"
 
+    def test_rare_evaluated_value(self):
+        """RARE_EVALUATED has correct value."""
+        assert PriceSource.RARE_EVALUATED.value == "rare_eval"
+
     def test_manual_value(self):
         """MANUAL has correct value."""
         assert PriceSource.MANUAL.value == "manual"
@@ -140,6 +144,78 @@ class TestPricedItem:
         item = PricedItem(
             name="", type_line="Test", base_type="Test",
             item_class="test", total_price=0.5
+        )
+        assert item.is_valuable is False
+
+    def test_eval_fields_default(self):
+        """Evaluation fields have correct defaults."""
+        item = PricedItem(
+            name="Test",
+            type_line="Type",
+            base_type="Base",
+            item_class="rare"
+        )
+        assert item.eval_score == 0
+        assert item.eval_tier == ""
+        assert item.eval_summary == ""
+
+    def test_display_price_evaluated_tier(self):
+        """Display price shows tier for evaluated items without price."""
+        item = PricedItem(
+            name="", type_line="Test", base_type="Test",
+            item_class="rare", total_price=0.0,
+            price_source=PriceSource.RARE_EVALUATED,
+            eval_tier="excellent"
+        )
+        assert item.display_price == "[excellent]"
+
+    def test_display_price_evaluated_no_tier(self):
+        """Display price shows ? for evaluated items without tier."""
+        item = PricedItem(
+            name="", type_line="Test", base_type="Test",
+            item_class="rare", total_price=0.0,
+            price_source=PriceSource.RARE_EVALUATED,
+            eval_tier=""
+        )
+        assert item.display_price == "?"
+
+    def test_is_valuable_evaluated_excellent(self):
+        """Evaluated item with excellent tier is valuable."""
+        item = PricedItem(
+            name="", type_line="Test", base_type="Test",
+            item_class="rare", total_price=0.0,
+            price_source=PriceSource.RARE_EVALUATED,
+            eval_tier="excellent"
+        )
+        assert item.is_valuable is True
+
+    def test_is_valuable_evaluated_good(self):
+        """Evaluated item with good tier is valuable."""
+        item = PricedItem(
+            name="", type_line="Test", base_type="Test",
+            item_class="rare", total_price=0.0,
+            price_source=PriceSource.RARE_EVALUATED,
+            eval_tier="good"
+        )
+        assert item.is_valuable is True
+
+    def test_is_valuable_evaluated_decent(self):
+        """Evaluated item with decent tier is not valuable."""
+        item = PricedItem(
+            name="", type_line="Test", base_type="Test",
+            item_class="rare", total_price=0.0,
+            price_source=PriceSource.RARE_EVALUATED,
+            eval_tier="decent"
+        )
+        assert item.is_valuable is False
+
+    def test_is_valuable_evaluated_low(self):
+        """Evaluated item with low tier is not valuable."""
+        item = PricedItem(
+            name="", type_line="Test", base_type="Test",
+            item_class="rare", total_price=0.0,
+            price_source=PriceSource.RARE_EVALUATED,
+            eval_tier="low"
         )
         assert item.is_valuable is False
 
@@ -524,8 +600,10 @@ class TestStashValuator:
         assert priced.unit_price == 0.0
         assert priced.price_source == PriceSource.UNKNOWN
 
-    def test_price_item_not_found(self, valuator, mock_ninja_client):
-        """Handle items not found in price database."""
+    def test_price_item_not_found(self, mock_ninja_client):
+        """Handle items not found in price database (without rare evaluation)."""
+        # Use valuator with evaluation disabled to test original behavior
+        valuator = StashValuator(evaluate_rares=False)
         mock_db = Mock()
         mock_db.get_price.return_value = None
         valuator.price_db = mock_db
@@ -727,6 +805,256 @@ class TestStashValuator:
 
         assert len(progress_calls) == 1
         assert progress_calls[0] == (1, 1, "Tab1")
+
+
+# ============================================================================
+# Rare Item Evaluation Tests
+# ============================================================================
+
+class TestRareItemEvaluation:
+    """Tests for rare item evaluation integration."""
+
+    @pytest.fixture
+    def mock_ninja_client(self):
+        """Create mock ninja client."""
+        with patch('core.stash_valuator.get_ninja_client') as mock:
+            client = Mock()
+            mock.return_value = client
+            yield client
+
+    @pytest.fixture
+    def valuator_with_eval(self, mock_ninja_client):
+        """Create valuator with rare evaluation enabled."""
+        return StashValuator(evaluate_rares=True)
+
+    @pytest.fixture
+    def valuator_without_eval(self, mock_ninja_client):
+        """Create valuator with rare evaluation disabled."""
+        return StashValuator(evaluate_rares=False)
+
+    def test_init_with_evaluate_rares_enabled(self, mock_ninja_client):
+        """Valuator initializes with evaluation enabled by default."""
+        valuator = StashValuator()
+        assert valuator._evaluate_rares is True
+        assert valuator._rare_evaluator is None  # Lazy loaded
+
+    def test_init_with_evaluate_rares_disabled(self, mock_ninja_client):
+        """Valuator can disable evaluation."""
+        valuator = StashValuator(evaluate_rares=False)
+        assert valuator._evaluate_rares is False
+
+    def test_get_rare_evaluator_lazy_load(self, valuator_with_eval):
+        """Rare evaluator is lazy loaded."""
+        assert valuator_with_eval._rare_evaluator is None
+        evaluator = valuator_with_eval._get_rare_evaluator()
+        assert evaluator is not None
+        assert valuator_with_eval._rare_evaluator is evaluator
+        # Second call returns same instance
+        assert valuator_with_eval._get_rare_evaluator() is evaluator
+
+    def test_price_rare_item_with_evaluation(self, valuator_with_eval):
+        """Unpriced rare items get evaluated."""
+        mock_db = Mock()
+        mock_db.get_price.return_value = None  # No price found
+        valuator_with_eval.price_db = mock_db
+
+        mock_tab = Mock()
+        mock_tab.name = "Rares"
+        mock_tab.index = 0
+
+        # Rare item with good mods
+        item = {
+            "frameType": 2,  # Rare
+            "typeLine": "Vaal Regalia",
+            "baseType": "Vaal Regalia",
+            "ilvl": 86,
+            "identified": True,
+            "explicitMods": [
+                "+120 to maximum Life",
+                "+45% to Fire Resistance",
+                "+45% to Cold Resistance",
+            ]
+        }
+
+        priced = valuator_with_eval._price_item(item, mock_tab)
+
+        assert priced.price_source == PriceSource.RARE_EVALUATED
+        assert priced.eval_score > 0
+        assert priced.eval_tier != ""
+        assert priced.eval_summary != ""
+
+    def test_price_rare_item_disabled_evaluation(self, valuator_without_eval):
+        """Rare items not evaluated when disabled."""
+        mock_db = Mock()
+        mock_db.get_price.return_value = None
+        valuator_without_eval.price_db = mock_db
+
+        mock_tab = Mock()
+        mock_tab.name = "Rares"
+        mock_tab.index = 0
+
+        item = {
+            "frameType": 2,
+            "typeLine": "Vaal Regalia",
+            "baseType": "Vaal Regalia",
+            "ilvl": 86,
+            "identified": True,
+            "explicitMods": ["+120 to maximum Life"]
+        }
+
+        priced = valuator_without_eval._price_item(item, mock_tab)
+
+        assert priced.price_source == PriceSource.UNKNOWN
+        assert priced.eval_score == 0
+        assert priced.eval_tier == ""
+
+    def test_price_unidentified_rare_not_evaluated(self, valuator_with_eval):
+        """Unidentified rare items not evaluated."""
+        mock_db = Mock()
+        mock_db.get_price.return_value = None
+        valuator_with_eval.price_db = mock_db
+
+        mock_tab = Mock()
+        mock_tab.name = "Rares"
+        mock_tab.index = 0
+
+        item = {
+            "frameType": 2,
+            "typeLine": "Vaal Regalia",
+            "identified": False,
+        }
+
+        priced = valuator_with_eval._price_item(item, mock_tab)
+
+        assert priced.price_source == PriceSource.UNKNOWN
+        assert priced.eval_score == 0
+
+    def test_price_rare_with_ninja_price_not_evaluated(self, valuator_with_eval):
+        """Rare items with ninja price are not evaluated."""
+        mock_price = Mock()
+        mock_price.chaos_value = 50.0
+        mock_db = Mock()
+        mock_db.get_price.return_value = mock_price
+        valuator_with_eval.price_db = mock_db
+
+        mock_tab = Mock()
+        mock_tab.name = "Rares"
+        mock_tab.index = 0
+
+        item = {
+            "frameType": 2,
+            "typeLine": "Some Priced Rare",
+            "identified": True,
+        }
+
+        priced = valuator_with_eval._price_item(item, mock_tab)
+
+        # Has price from ninja, not evaluated
+        assert priced.price_source == PriceSource.POE_NINJA
+        assert priced.total_price == 50.0
+        assert priced.eval_score == 0
+
+    def test_price_unique_not_evaluated(self, valuator_with_eval):
+        """Unique items without price are not evaluated."""
+        mock_db = Mock()
+        mock_db.get_price.return_value = None
+        valuator_with_eval.price_db = mock_db
+
+        mock_tab = Mock()
+        mock_tab.name = "Uniques"
+        mock_tab.index = 0
+
+        item = {
+            "frameType": 3,  # Unique
+            "name": "Unknown Unique",
+            "typeLine": "Leather Belt",
+            "identified": True,
+        }
+
+        priced = valuator_with_eval._price_item(item, mock_tab)
+
+        # Not evaluated - only rares
+        assert priced.price_source == PriceSource.UNKNOWN
+        assert priced.eval_score == 0
+
+    def test_valuate_tab_sorting_with_evaluated_items(self, valuator_with_eval):
+        """Tab sorting places priced items before evaluated items."""
+        mock_db = Mock()
+
+        def price_lookup(name, cls=None):
+            # Only currency has price
+            if "chaos orb" in name:
+                mock = Mock()
+                mock.chaos_value = 1.0
+                return mock
+            return None
+
+        mock_db.get_price.side_effect = price_lookup
+        valuator_with_eval.price_db = mock_db
+
+        mock_tab = Mock()
+        mock_tab.id = "tab-1"
+        mock_tab.name = "Mixed"
+        mock_tab.index = 0
+        mock_tab.type = "NormalStash"
+        mock_tab.items = [
+            # Rare with no price - will be evaluated
+            {
+                "frameType": 2,
+                "typeLine": "Hubris Circlet",
+                "ilvl": 86,
+                "identified": True,
+                "explicitMods": [
+                    "+100 to maximum Energy Shield",
+                    "+40% to Fire Resistance",
+                ]
+            },
+            # Currency with price
+            {"frameType": 5, "typeLine": "Chaos Orb", "stackSize": 5},
+        ]
+
+        priced_tab = valuator_with_eval.valuate_tab(mock_tab)
+
+        # Priced item (5c) should be first, then evaluated item
+        assert priced_tab.items[0].type_line == "Chaos Orb"
+        assert priced_tab.items[0].price_source == PriceSource.POE_NINJA
+        assert priced_tab.items[1].type_line == "Hubris Circlet"
+        assert priced_tab.items[1].price_source == PriceSource.RARE_EVALUATED
+
+    def test_valuate_tab_counts_evaluated_valuable(self, valuator_with_eval):
+        """Valuable evaluated items are counted."""
+        mock_db = Mock()
+        mock_db.get_price.return_value = None
+        valuator_with_eval.price_db = mock_db
+
+        # Mock the rare evaluator to return excellent tier
+        mock_evaluation = Mock()
+        mock_evaluation.total_score = 150
+        mock_evaluation.tier = "excellent"
+        mock_evaluator = Mock()
+        mock_evaluator.evaluate.return_value = mock_evaluation
+        mock_evaluator.get_summary.return_value = "Excellent rare"
+        valuator_with_eval._rare_evaluator = mock_evaluator
+
+        mock_tab = Mock()
+        mock_tab.id = "tab-1"
+        mock_tab.name = "Rares"
+        mock_tab.index = 0
+        mock_tab.type = "NormalStash"
+        mock_tab.items = [
+            {
+                "frameType": 2,
+                "typeLine": "Great Rare",
+                "ilvl": 86,
+                "identified": True,
+                "explicitMods": ["+100 to maximum Life"]
+            }
+        ]
+
+        priced_tab = valuator_with_eval.valuate_tab(mock_tab)
+
+        # Should count as valuable (excellent tier)
+        assert priced_tab.valuable_count == 1
 
 
 # ============================================================================

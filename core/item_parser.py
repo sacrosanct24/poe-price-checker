@@ -130,6 +130,90 @@ class ParsedItem:
             "rune_mods": self.rune_mods,
         }
 
+    @classmethod
+    def from_stash_item(cls, item: dict, raw_text: str = "") -> "ParsedItem":
+        """
+        Create a ParsedItem from a stash API item dictionary.
+
+        This allows RareItemEvaluator to work with items fetched from the stash API
+        without needing clipboard text.
+
+        Args:
+            item: Dictionary from PoE stash API (with keys like typeLine, explicitMods, etc.)
+            raw_text: Optional raw text representation (for display/debugging)
+
+        Returns:
+            ParsedItem populated from stash API data
+        """
+        # Map frameType to rarity string
+        frame_type = item.get("frameType", 0)
+        rarity_map = {
+            0: "Normal",
+            1: "Magic",
+            2: "Rare",
+            3: "Unique",
+            4: "Gem",
+            5: "Currency",
+            6: "Divination Card",
+        }
+        rarity = rarity_map.get(frame_type, "Unknown")
+
+        # Extract name, cleaning up PoE markup
+        name = item.get("name", "").replace("<<set:MS>><<set:M>><<set:S>>", "")
+        type_line = item.get("typeLine", "")
+        base_type = item.get("baseType", type_line)
+
+        # Build socket string and count links
+        sockets = item.get("sockets", [])
+        socket_str = ""
+        max_links = 0
+        if sockets:
+            groups: dict = {}
+            for s in sockets:
+                g = s.get("group", 0)
+                if g not in groups:
+                    groups[g] = []
+                groups[g].append(s.get("sColour", "?")[0])
+            socket_str = "-".join("".join(g) for g in groups.values())
+            max_links = max(len(g) for g in groups.values()) if groups else 0
+
+        # Extract influences from the influences object
+        influences = []
+        inf_obj = item.get("influences", {})
+        if inf_obj:
+            # API format: {"shaper": true, "elder": true, ...}
+            influence_names = {
+                "shaper": "Shaper",
+                "elder": "Elder",
+                "crusader": "Crusader",
+                "hunter": "Hunter",
+                "redeemer": "Redeemer",
+                "warlord": "Warlord",
+            }
+            for key, display_name in influence_names.items():
+                if inf_obj.get(key):
+                    influences.append(display_name)
+
+        return cls(
+            raw_text=raw_text or f"{name} {type_line}".strip(),
+            rarity=rarity,
+            name=name if name else None,
+            base_type=base_type if base_type else None,
+            item_level=item.get("ilvl"),
+            quality=item.get("quality"),
+            sockets=socket_str if socket_str else None,
+            links=max_links,
+            explicits=item.get("explicitMods", []),
+            implicits=item.get("implicitMods", []),
+            enchants=item.get("enchantMods", []),
+            influences=influences,
+            is_corrupted=item.get("corrupted", False),
+            is_fractured=item.get("fractured", False),
+            is_synthesised=item.get("synthesised", False),
+            is_mirrored=item.get("mirrored", False),
+        )
+
+
 # ----------------------------------------------------------------------
 # Parser Implementation
 # ----------------------------------------------------------------------
