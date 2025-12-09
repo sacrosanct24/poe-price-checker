@@ -6,8 +6,9 @@ PyQt6 widget for displaying rare item evaluation results.
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
+from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
     QWidget,
@@ -16,6 +17,8 @@ from PyQt6.QtWidgets import (
     QLabel,
     QGroupBox,
     QTextEdit,
+    QPushButton,
+    QFrame,
 )
 
 from gui_qt.styles import COLORS
@@ -29,8 +32,12 @@ class RareEvaluationPanelWidget(QGroupBox):
     - Tier badge (Excellent/Good/Average/Vendor)
     - Estimated value
     - Score breakdown
-    - Matched affixes
+    - Matched affixes with [META +2] tags
+    - Meta analysis info (league, top affixes)
     """
+
+    # Signal emitted when user clicks update meta weights button
+    update_meta_requested = pyqtSignal()
 
     TIER_COLORS = {
         "EXCELLENT": "#22dd22",   # Green
@@ -40,12 +47,20 @@ class RareEvaluationPanelWidget(QGroupBox):
         "NOT_RARE": "#888888",    # Gray
     }
 
+    # Color for meta bonus tag
+    META_BONUS_COLOR = "#00cc88"  # Teal/green
+
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__("Rare Item Evaluation", parent)
 
         self._evaluation = None
+        self._evaluator = None  # Reference to evaluator for meta info
         self._create_widgets()
         self.clear()
+
+    def set_evaluator(self, evaluator: Any) -> None:
+        """Set reference to the rare item evaluator for meta info access."""
+        self._evaluator = evaluator
 
     def _create_widgets(self) -> None:
         """Create all UI elements."""
@@ -118,6 +133,46 @@ class RareEvaluationPanelWidget(QGroupBox):
         """)
         layout.addWidget(self.affixes_text)
 
+        # Separator line
+        separator = QFrame()
+        separator.setFrameShape(QFrame.Shape.HLine)
+        separator.setStyleSheet(f"background-color: {COLORS['border']};")
+        layout.addWidget(separator)
+
+        # Row 5: Meta info section
+        meta_row = QHBoxLayout()
+        meta_row.setSpacing(8)
+
+        self.meta_label = QLabel()
+        self.meta_label.setStyleSheet(f"color: {COLORS['text_secondary']}; font-size: 11px;")
+        self.meta_label.setWordWrap(True)
+        meta_row.addWidget(self.meta_label, stretch=1)
+
+        # Update meta weights button
+        self.update_meta_btn = QPushButton("↻ Update")
+        self.update_meta_btn.setToolTip("Update meta weights from current league builds")
+        self.update_meta_btn.setMaximumWidth(80)
+        self.update_meta_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {COLORS['surface']};
+                border: 1px solid {COLORS['border']};
+                border-radius: 4px;
+                padding: 4px 8px;
+                font-size: 10px;
+            }}
+            QPushButton:hover {{
+                background-color: {COLORS['border']};
+            }}
+        """)
+        self.update_meta_btn.clicked.connect(self._on_update_meta_clicked)
+        meta_row.addWidget(self.update_meta_btn)
+
+        layout.addLayout(meta_row)
+
+    def _on_update_meta_clicked(self) -> None:
+        """Handle update meta weights button click."""
+        self.update_meta_requested.emit()
+
     def set_evaluation(self, evaluation: Any) -> None:
         """Display evaluation results."""
         self._evaluation = evaluation
@@ -136,15 +191,28 @@ class RareEvaluationPanelWidget(QGroupBox):
         self.base_score_label.setText(f"{evaluation.base_score}/50")
         self.affix_score_label.setText(f"{evaluation.affix_score}/100")
 
-        # Update affixes list
+        # Update affixes list with meta bonus highlighting
         if evaluation.matched_affixes:
-            lines = []
+            # Use HTML for color-coded meta tags
+            html_lines = []
             for match in evaluation.matched_affixes:
                 value_str = f" [{int(match.value)}]" if match.value else ""
                 weight_str = f" (weight: {match.weight})"
-                line = f"[OK] {match.affix_type}: {match.mod_text}{value_str}{weight_str}"
-                lines.append(line)
-            self.affixes_text.setPlainText("\n".join(lines))
+
+                # Add colored META +2 tag if applicable
+                meta_str = ""
+                if getattr(match, 'has_meta_bonus', False):
+                    meta_str = f' <span style="color: {self.META_BONUS_COLOR}; font-weight: bold;">[META +2]</span>'
+
+                line = f'[OK] {match.affix_type}: {match.mod_text}{value_str}{weight_str}{meta_str}'
+                html_lines.append(line)
+
+            # Set as HTML to render the colored meta tags
+            self.affixes_text.setHtml(
+                f'<pre style="font-family: monospace; font-size: 12px; margin: 0;">'
+                + "<br>".join(html_lines)
+                + "</pre>"
+            )
         else:
             text = "No valuable affixes found.\n\nThis item has:"
 
@@ -161,6 +229,50 @@ class RareEvaluationPanelWidget(QGroupBox):
 
             self.affixes_text.setPlainText(text)
 
+        # Update meta info section
+        self._update_meta_info()
+
+    def _update_meta_info(self) -> None:
+        """Update the meta info section based on evaluator state."""
+        if self._evaluator is None:
+            self.meta_label.setText("Meta: N/A (no evaluator)")
+            return
+
+        # Get meta info from evaluator
+        meta_info = getattr(self._evaluator, '_meta_cache_info', None)
+
+        if not meta_info:
+            self.meta_label.setText("Meta: Static weights (no meta data loaded)")
+            return
+
+        league = meta_info.get('league', 'Unknown')
+        builds = meta_info.get('builds_analyzed', 0)
+        source = meta_info.get('source', 'unknown')
+
+        # Get top meta affixes
+        meta_weights = getattr(self._evaluator, 'meta_weights', {})
+        top_affixes = []
+        if meta_weights:
+            sorted_affixes = []
+            for affix_type, data in meta_weights.items():
+                if isinstance(data, dict):
+                    pop = data.get('popularity_percent', 0)
+                else:
+                    pop = float(data) * 10
+                sorted_affixes.append((affix_type, pop))
+
+            sorted_affixes.sort(key=lambda x: x[1], reverse=True)
+            top_affixes = sorted_affixes[:3]
+
+        # Format display
+        top_str = ""
+        if top_affixes:
+            top_str = " | Top: " + ", ".join(
+                f"{a[0]}" for a in top_affixes
+            )
+
+        self.meta_label.setText(f"Meta: {league} ({builds} builds){top_str}")
+
     def clear(self) -> None:
         """Clear the evaluation display."""
         self._evaluation = None
@@ -171,3 +283,4 @@ class RareEvaluationPanelWidget(QGroupBox):
         self.base_score_label.setText("")
         self.affix_score_label.setText("")
         self.affixes_text.setPlainText("Paste a rare item to see evaluation...")
+        self.meta_label.setText("Meta: Waiting...")

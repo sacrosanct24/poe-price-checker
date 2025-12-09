@@ -496,6 +496,11 @@ class PriceCheckerWindow(QMainWindow):
         self.session_tabs.pin_requested.connect(self._on_pin_items_requested)
         self.session_tabs.compare_requested.connect(self._on_compare_items_requested)
         self.session_tabs.ai_analysis_requested.connect(self._on_ai_analysis_requested)
+        self.session_tabs.update_meta_requested.connect(self._on_update_meta_requested)
+
+        # Pass the rare evaluator to session tabs for meta info display
+        if self._rare_evaluator:
+            self.session_tabs.set_rare_evaluator(self._rare_evaluator)
 
         # Set AI configured callback for all results tables
         self.session_tabs.set_ai_configured_callback(self._is_ai_configured)
@@ -1492,7 +1497,21 @@ class PriceCheckerWindow(QMainWindow):
         self._init_rare_evaluator()
         # Update the controller with new evaluator
         self._price_controller.set_rare_evaluator(self._rare_evaluator)
+        # Update session tabs with new evaluator for meta info display
+        if hasattr(self, 'session_tabs'):
+            self.session_tabs.set_rare_evaluator(self._rare_evaluator)
         self._set_status("Rare evaluation settings reloaded")
+
+    def _on_update_meta_requested(self) -> None:
+        """Handle meta weights update request from rare evaluation panel."""
+        self._set_status("Updating meta weights...")
+        try:
+            # Reload the evaluator to refresh meta weights
+            self._reload_rare_evaluator()
+            self._set_status("Meta weights updated successfully")
+        except Exception as e:
+            self.logger.error(f"Failed to update meta weights: {e}")
+            self._set_status(f"Failed to update meta weights: {e}")
 
     def _show_price_rankings(self) -> None:
         """Show price rankings window."""

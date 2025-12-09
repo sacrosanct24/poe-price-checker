@@ -86,6 +86,7 @@ class SessionPanel(QWidget):
     pin_requested: pyqtSignal = pyqtSignal(list)
     compare_requested: pyqtSignal = pyqtSignal(list)
     ai_analysis_requested: pyqtSignal = pyqtSignal(str, list)  # item_text, price_results
+    update_meta_requested: pyqtSignal = pyqtSignal()  # Meta weights update request
 
     def __init__(self, session_name: str = "Session 1", parent: Optional[QWidget] = None):
         super().__init__(parent)
@@ -181,6 +182,9 @@ class SessionPanel(QWidget):
         self.rare_eval_panel.setVisible(False)
         layout.addWidget(self.rare_eval_panel)
 
+        # Forward the update_meta_requested signal
+        self.rare_eval_panel.update_meta_requested.connect(self._on_update_meta_requested)
+
         # Bottom: Quick verdict panel (casual player summary)
         self.quick_verdict_panel = QuickVerdictPanel()
         self.quick_verdict_panel.setVisible(False)
@@ -208,6 +212,14 @@ class SessionPanel(QWidget):
         self.quick_verdict_panel.setVisible(False)
         self.ai_panel.clear()
         self.ai_panel.setVisible(False)
+
+    def _on_update_meta_requested(self) -> None:
+        """Forward update meta request to parent."""
+        self.update_meta_requested.emit()
+
+    def set_rare_evaluator(self, evaluator: Any) -> None:
+        """Set the rare item evaluator for meta info display."""
+        self.rare_eval_panel.set_evaluator(evaluator)
 
     def _on_row_selected(self, row_data: Dict[str, Any]) -> None:
         """Handle row selection in results table."""
@@ -309,6 +321,10 @@ class SessionTabWidget(QTabWidget):
         compare_requested(items: List[Dict[str, Any]]):
             Emitted when user requests to compare items from any session.
             Forwarded from the active SessionPanel.
+
+        update_meta_requested():
+            Emitted when user requests to update meta weights.
+            Forwarded from the active SessionPanel's rare evaluation panel.
     """
 
     MAX_SESSIONS = 10
@@ -318,11 +334,13 @@ class SessionTabWidget(QTabWidget):
     pin_requested: pyqtSignal = pyqtSignal(list)
     compare_requested: pyqtSignal = pyqtSignal(list)
     ai_analysis_requested: pyqtSignal = pyqtSignal(str, list)  # item_text, price_results
+    update_meta_requested: pyqtSignal = pyqtSignal()  # Meta weights update request
 
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
 
         self._session_counter = 0
+        self._rare_evaluator = None  # Reference to rare evaluator for panels
 
         # Enable close buttons and movable tabs
         self.setTabsClosable(True)
@@ -480,6 +498,11 @@ class SessionTabWidget(QTabWidget):
         panel.pin_requested.connect(self.pin_requested.emit)
         panel.compare_requested.connect(self.compare_requested.emit)
         panel.ai_analysis_requested.connect(self.ai_analysis_requested.emit)
+        panel.update_meta_requested.connect(self.update_meta_requested.emit)
+
+        # Set rare evaluator if we have one
+        if self._rare_evaluator:
+            panel.set_rare_evaluator(self._rare_evaluator)
 
         # Set AI callback if we have one
         if hasattr(self, '_ai_configured_callback') and self._ai_configured_callback:
@@ -490,3 +513,12 @@ class SessionTabWidget(QTabWidget):
 
         logger.info(f"Added session: {session_name}")
         return panel
+
+    def set_rare_evaluator(self, evaluator: Any) -> None:
+        """Set the rare item evaluator for all session panels."""
+        self._rare_evaluator = evaluator
+        # Update all existing panels
+        for i in range(self.count()):
+            panel = self.widget(i)
+            if isinstance(panel, SessionPanel):
+                panel.set_rare_evaluator(evaluator)
