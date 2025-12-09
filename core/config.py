@@ -7,7 +7,9 @@ import json
 import logging
 import copy
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List, TypeVar, overload
+
+T = TypeVar('T')
 from datetime import datetime
 
 from core.game_version import GameVersion, GameConfig
@@ -266,6 +268,93 @@ class Config:
             logger.error(f"Failed to save config: {exc}")
 
     # ------------------------------------------------------------------
+    # Typed accessor helpers (for mypy compliance)
+    # ------------------------------------------------------------------
+
+    def _get_ui_float(self, key: str, default: float) -> float:
+        """Get a float value from ui config."""
+        return float(self.data["ui"].get(key, default))
+
+    def _get_ui_bool(self, key: str, default: bool) -> bool:
+        """Get a bool value from ui config."""
+        return bool(self.data["ui"].get(key, default))
+
+    def _get_ui_str(self, key: str, default: str) -> str:
+        """Get a str value from ui config."""
+        return str(self.data["ui"].get(key, default))
+
+    def _get_ui_str_optional(self, key: str) -> Optional[str]:
+        """Get an optional str value from ui config."""
+        val = self.data["ui"].get(key)
+        return str(val) if val is not None else None
+
+    def _get_accessibility_float(self, key: str, default: float) -> float:
+        """Get a float value from accessibility config."""
+        return float(self.data.get("accessibility", {}).get(key, default))
+
+    def _get_accessibility_int(self, key: str, default: int) -> int:
+        """Get an int value from accessibility config."""
+        return int(self.data.get("accessibility", {}).get(key, default))
+
+    def _get_accessibility_bool(self, key: str, default: bool) -> bool:
+        """Get a bool value from accessibility config."""
+        return bool(self.data.get("accessibility", {}).get(key, default))
+
+    def _get_performance_int(self, key: str, default: int) -> int:
+        """Get an int value from performance config."""
+        return int(self.data.get("performance", {}).get(key, default))
+
+    def _get_api_bool(self, key: str, default: bool) -> bool:
+        """Get a bool value from api config."""
+        return bool(self.data["api"].get(key, default))
+
+    def _get_api_float(self, key: str, default: float) -> float:
+        """Get a float value from api config."""
+        return float(self.data["api"].get(key, default))
+
+    def _get_verdict_float(self, key: str, default: float) -> float:
+        """Get a float value from verdict config."""
+        return float(self.data.get("verdict", {}).get(key, default))
+
+    def _get_verdict_str(self, key: str, default: str) -> str:
+        """Get a str value from verdict config."""
+        return str(self.data.get("verdict", {}).get(key, default))
+
+    def _get_stash_str(self, key: str, default: str) -> str:
+        """Get a str value from stash config."""
+        return str(self.data.get("stash", {}).get(key, default))
+
+    def _get_stash_str_optional(self, key: str) -> Optional[str]:
+        """Get an optional str value from stash config."""
+        val = self.data.get("stash", {}).get(key)
+        return str(val) if val is not None else None
+
+    def _get_ai_str(self, key: str, default: str) -> str:
+        """Get a str value from ai config."""
+        return str(self.data.get("ai", {}).get(key, default))
+
+    def _get_ai_int(self, key: str, default: int) -> int:
+        """Get an int value from ai config."""
+        return int(self.data.get("ai", {}).get(key, default))
+
+    def _get_loot_bool(self, key: str, default: bool) -> bool:
+        """Get a bool value from loot_tracking config."""
+        return bool(self.data.get("loot_tracking", {}).get(key, default))
+
+    def _get_loot_str(self, key: str, default: str) -> str:
+        """Get a str value from loot_tracking config."""
+        return str(self.data.get("loot_tracking", {}).get(key, default))
+
+    def _get_loot_float(self, key: str, default: float) -> float:
+        """Get a float value from loot_tracking config."""
+        return float(self.data.get("loot_tracking", {}).get(key, default))
+
+    def _get_loot_list(self, key: str, default: List[Any]) -> List[Any]:
+        """Get a list value from loot_tracking config."""
+        val = self.data.get("loot_tracking", {}).get(key, default)
+        return list(val) if val is not None else default
+
+    # ------------------------------------------------------------------
     # Current Game
     # ------------------------------------------------------------------
 
@@ -343,7 +432,7 @@ class Config:
         pricing = self.data.get("pricing", {}) or {}
         dp = pricing.get("display_policy", {}) or {}
         # Merge with defaults to ensure all keys present
-        defaults = self.DEFAULT_CONFIG["pricing"]["display_policy"].copy()
+        defaults: Dict[str, Any] = dict(self.DEFAULT_CONFIG["pricing"]["display_policy"])
         defaults.update({k: v for k, v in dp.items() if v is not None})
         return defaults
 
@@ -422,7 +511,7 @@ class Config:
     @property
     def min_value_chaos(self) -> float:
         """Minimum chaos value filter."""
-        return self.data["ui"].get("min_value_chaos", 0.0)
+        return self._get_ui_float("min_value_chaos", 0.0)
 
     @min_value_chaos.setter
     def min_value_chaos(self, value: float) -> None:
@@ -433,7 +522,7 @@ class Config:
     @property
     def show_vendor_items(self) -> bool:
         """Whether to show items below minimum value."""
-        return self.data["ui"].get("show_vendor_items", True)
+        return self._get_ui_bool("show_vendor_items", True)
 
     @show_vendor_items.setter
     def show_vendor_items(self, value: bool) -> None:
@@ -460,7 +549,7 @@ class Config:
     @property
     def theme(self) -> str:
         """Get the UI theme (dark, light, or system)."""
-        return self.data["ui"].get("theme", "dark")
+        return self._get_ui_str("theme", "dark")
 
     @theme.setter
     def theme(self, value: str) -> None:
@@ -473,7 +562,7 @@ class Config:
     @property
     def accent_color(self) -> Optional[str]:
         """Get the accent color (None = theme default, or currency key)."""
-        return self.data["ui"].get("accent_color")
+        return self._get_ui_str_optional("accent_color")
 
     @accent_color.setter
     def accent_color(self, value: Optional[str]) -> None:
@@ -488,7 +577,7 @@ class Config:
     @property
     def minimize_to_tray(self) -> bool:
         """Whether to minimize to system tray instead of taskbar."""
-        return self.data["ui"].get("minimize_to_tray", True)
+        return self._get_ui_bool("minimize_to_tray", True)
 
     @minimize_to_tray.setter
     def minimize_to_tray(self, value: bool) -> None:
@@ -499,7 +588,7 @@ class Config:
     @property
     def start_minimized(self) -> bool:
         """Whether to start the application minimized to tray."""
-        return self.data["ui"].get("start_minimized", False)
+        return self._get_ui_bool("start_minimized", False)
 
     @start_minimized.setter
     def start_minimized(self, value: bool) -> None:
@@ -510,7 +599,7 @@ class Config:
     @property
     def show_tray_notifications(self) -> bool:
         """Whether to show system tray notifications for price alerts."""
-        return self.data["ui"].get("show_tray_notifications", True)
+        return self._get_ui_bool("show_tray_notifications", True)
 
     @show_tray_notifications.setter
     def show_tray_notifications(self, value: bool) -> None:
@@ -521,7 +610,7 @@ class Config:
     @property
     def tray_alert_threshold(self) -> float:
         """Chaos value threshold for triggering tray notifications."""
-        return self.data["ui"].get("tray_alert_threshold", 50.0)
+        return self._get_ui_float("tray_alert_threshold", 50.0)
 
     @tray_alert_threshold.setter
     def tray_alert_threshold(self, value: float) -> None:
@@ -536,7 +625,7 @@ class Config:
     @property
     def verdict_vendor_threshold(self) -> float:
         """Chaos value threshold below which items are VENDOR."""
-        return self.data.get("verdict", {}).get("vendor_threshold", 2.0)
+        return self._get_verdict_float("vendor_threshold", 2.0)
 
     @verdict_vendor_threshold.setter
     def verdict_vendor_threshold(self, value: float) -> None:
@@ -547,7 +636,7 @@ class Config:
     @property
     def verdict_keep_threshold(self) -> float:
         """Chaos value threshold above which items are KEEP."""
-        return self.data.get("verdict", {}).get("keep_threshold", 15.0)
+        return self._get_verdict_float("keep_threshold", 15.0)
 
     @verdict_keep_threshold.setter
     def verdict_keep_threshold(self, value: float) -> None:
@@ -558,7 +647,7 @@ class Config:
     @property
     def verdict_preset(self) -> str:
         """Current verdict preset: default, league_start, mid_league, late_league, ssf."""
-        return self.data.get("verdict", {}).get("preset", "default")
+        return self._get_verdict_str("preset", "default")
 
     @verdict_preset.setter
     def verdict_preset(self, value: str) -> None:
@@ -575,7 +664,7 @@ class Config:
     @property
     def font_scale(self) -> float:
         """Font scaling factor (0.8 to 1.5)."""
-        return self.data.get("accessibility", {}).get("font_scale", 1.0)
+        return self._get_accessibility_float("font_scale", 1.0)
 
     @font_scale.setter
     def font_scale(self, value: float) -> None:
@@ -586,7 +675,7 @@ class Config:
     @property
     def tooltip_delay_ms(self) -> int:
         """Delay before showing tooltips in milliseconds."""
-        return self.data.get("accessibility", {}).get("tooltip_delay_ms", 500)
+        return self._get_accessibility_int("tooltip_delay_ms", 500)
 
     @tooltip_delay_ms.setter
     def tooltip_delay_ms(self, value: int) -> None:
@@ -597,7 +686,7 @@ class Config:
     @property
     def reduce_animations(self) -> bool:
         """Whether to reduce animations for accessibility."""
-        return self.data.get("accessibility", {}).get("reduce_animations", False)
+        return self._get_accessibility_bool("reduce_animations", False)
 
     @reduce_animations.setter
     def reduce_animations(self, value: bool) -> None:
@@ -618,7 +707,7 @@ class Config:
         Lower values = fresher data but more API calls.
         Default 24 hours balances freshness with API usage.
         """
-        return self.data.get("performance", {}).get("rankings_cache_hours", 24)
+        return self._get_performance_int("rankings_cache_hours", 24)
 
     @rankings_cache_hours.setter
     def rankings_cache_hours(self, value: int) -> None:
@@ -634,7 +723,7 @@ class Config:
         Guardrails: Min 300 (5 min), Max 7200 (2 hours).
         GGG recommends conservative API usage to avoid rate limits.
         """
-        return self.data.get("performance", {}).get("price_cache_ttl_seconds", 3600)
+        return self._get_performance_int("price_cache_ttl_seconds", 3600)
 
     @price_cache_ttl_seconds.setter
     def price_cache_ttl_seconds(self, value: int) -> None:
@@ -645,7 +734,7 @@ class Config:
     @property
     def toast_duration_ms(self) -> int:
         """Toast notification display duration in milliseconds."""
-        return self.data.get("performance", {}).get("toast_duration_ms", 3000)
+        return self._get_performance_int("toast_duration_ms", 3000)
 
     @toast_duration_ms.setter
     def toast_duration_ms(self, value: int) -> None:
@@ -656,7 +745,7 @@ class Config:
     @property
     def history_max_entries(self) -> int:
         """Maximum number of history entries to keep."""
-        return self.data.get("performance", {}).get("history_max_entries", 100)
+        return self._get_performance_int("history_max_entries", 100)
 
     @history_max_entries.setter
     def history_max_entries(self, value: int) -> None:
@@ -671,7 +760,7 @@ class Config:
     @property
     def auto_detect_league(self) -> bool:
         """Whether to auto-detect the current league from external APIs."""
-        return self.data["api"].get("auto_detect_league", True)
+        return self._get_api_bool("auto_detect_league", True)
 
     @auto_detect_league.setter
     def auto_detect_league(self, value: bool) -> None:
@@ -688,7 +777,7 @@ class Config:
         GGG recommends ~0.33 (1 req/3s) to avoid 429 rate limit errors.
         Setting this too high WILL result in temporary bans from the API.
         """
-        return self.data["api"].get("rate_limit_per_second", 0.33)
+        return self._get_api_float("rate_limit_per_second", 0.33)
 
     @api_rate_limit.setter
     def api_rate_limit(self, value: float) -> None:
@@ -814,7 +903,7 @@ class Config:
     @property
     def account_name(self) -> str:
         """Get PoE account name for stash access."""
-        return self.data.get("stash", {}).get("account_name", "")
+        return self._get_stash_str("account_name", "")
 
     @account_name.setter
     def account_name(self, value: str) -> None:
@@ -827,7 +916,7 @@ class Config:
     @property
     def stash_last_fetch(self) -> Optional[str]:
         """Get last stash fetch timestamp."""
-        return self.data.get("stash", {}).get("last_fetch")
+        return self._get_stash_str_optional("last_fetch")
 
     @stash_last_fetch.setter
     def stash_last_fetch(self, value: Optional[str]) -> None:
@@ -848,7 +937,7 @@ class Config:
     @property
     def ai_provider(self) -> str:
         """Get the configured AI provider (gemini, claude, openai, groq, xai, ollama, or empty)."""
-        return self.data.get("ai", {}).get("provider", "")
+        return self._get_ai_str("provider", "")
 
     @ai_provider.setter
     def ai_provider(self, value: str) -> None:
@@ -890,7 +979,7 @@ class Config:
     @property
     def ai_max_tokens(self) -> int:
         """Maximum tokens in AI response (100-2000)."""
-        return self.data.get("ai", {}).get("max_response_tokens", 500)
+        return self._get_ai_int("max_response_tokens", 500)
 
     @ai_max_tokens.setter
     def ai_max_tokens(self, value: int) -> None:
@@ -906,7 +995,7 @@ class Config:
         since large models like deepseek-r1:70b need time to load and generate.
         """
         default = 180 if self.ai_provider == "ollama" else 30
-        return self.data.get("ai", {}).get("timeout_seconds", default)
+        return int(self.data.get("ai", {}).get("timeout_seconds", default))
 
     @ai_timeout.setter
     def ai_timeout(self, value: int) -> None:
@@ -927,7 +1016,7 @@ class Config:
     @property
     def ollama_host(self) -> str:
         """Get the Ollama server host URL."""
-        return self.data.get("ai", {}).get("ollama_host", "http://localhost:11434")
+        return self._get_ai_str("ollama_host", "http://localhost:11434")
 
     @ollama_host.setter
     def ollama_host(self, value: str) -> None:
@@ -938,7 +1027,7 @@ class Config:
     @property
     def ollama_model(self) -> str:
         """Get the Ollama model to use."""
-        return self.data.get("ai", {}).get("ollama_model", "deepseek-r1:14b")
+        return self._get_ai_str("ollama_model", "deepseek-r1:14b")
 
     @ollama_model.setter
     def ollama_model(self, value: str) -> None:
@@ -953,7 +1042,7 @@ class Config:
         Returns empty string if using default prompt.
         Supports placeholders: {item_text}, {price_context}, {league}, {build_name}
         """
-        return self.data.get("ai", {}).get("custom_prompt", "")
+        return self._get_ai_str("custom_prompt", "")
 
     @ai_custom_prompt.setter
     def ai_custom_prompt(self, value: str) -> None:
@@ -967,7 +1056,7 @@ class Config:
 
         Examples: 'Lightning Arrow Deadeye', 'RF Chieftain', 'Tornado Shot MF'
         """
-        return self.data.get("ai", {}).get("build_name", "")
+        return self._get_ai_str("build_name", "")
 
     @ai_build_name.setter
     def ai_build_name(self, value: str) -> None:
@@ -982,7 +1071,7 @@ class Config:
     @property
     def loot_tracking_enabled(self) -> bool:
         """Check if loot tracking auto-start is enabled."""
-        return self.data.get("loot_tracking", {}).get("auto_start_enabled", False)
+        return self._get_loot_bool("auto_start_enabled", False)
 
     @loot_tracking_enabled.setter
     def loot_tracking_enabled(self, value: bool) -> None:
@@ -993,7 +1082,7 @@ class Config:
     @property
     def loot_client_txt_path(self) -> str:
         """Get the path to Client.txt for zone detection."""
-        return self.data.get("loot_tracking", {}).get("client_txt_path", "")
+        return self._get_loot_str("client_txt_path", "")
 
     @loot_client_txt_path.setter
     def loot_client_txt_path(self, value: str) -> None:
@@ -1004,7 +1093,7 @@ class Config:
     @property
     def loot_tracked_tabs(self) -> list:
         """Get the list of tabs to track for loot (empty = all tabs)."""
-        return self.data.get("loot_tracking", {}).get("tracked_tabs", [])
+        return self._get_loot_list("tracked_tabs", [])
 
     @loot_tracked_tabs.setter
     def loot_tracked_tabs(self, value: list) -> None:
@@ -1015,7 +1104,7 @@ class Config:
     @property
     def loot_min_value(self) -> float:
         """Get the minimum chaos value to count as loot."""
-        return self.data.get("loot_tracking", {}).get("min_loot_value", 1.0)
+        return self._get_loot_float("min_loot_value", 1.0)
 
     @loot_min_value.setter
     def loot_min_value(self, value: float) -> None:
@@ -1026,7 +1115,7 @@ class Config:
     @property
     def loot_notify_high_value(self) -> bool:
         """Check if high-value loot notifications are enabled."""
-        return self.data.get("loot_tracking", {}).get("notify_high_value", True)
+        return self._get_loot_bool("notify_high_value", True)
 
     @loot_notify_high_value.setter
     def loot_notify_high_value(self, value: bool) -> None:
@@ -1037,7 +1126,7 @@ class Config:
     @property
     def loot_high_value_threshold(self) -> float:
         """Get the chaos value threshold for high-value loot notifications."""
-        return self.data.get("loot_tracking", {}).get("high_value_threshold", 50.0)
+        return self._get_loot_float("high_value_threshold", 50.0)
 
     @loot_high_value_threshold.setter
     def loot_high_value_threshold(self, value: float) -> None:
@@ -1048,7 +1137,7 @@ class Config:
     @property
     def loot_poll_interval(self) -> float:
         """Get the Client.txt polling interval in seconds."""
-        return self.data.get("loot_tracking", {}).get("poll_interval", 1.0)
+        return self._get_loot_float("poll_interval", 1.0)
 
     @loot_poll_interval.setter
     def loot_poll_interval(self, value: float) -> None:
