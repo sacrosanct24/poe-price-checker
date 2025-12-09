@@ -178,8 +178,10 @@ class PinnedItemWidget(QFrame):
         self.inspect_requested.emit(self._item_data)
         super().mouseDoubleClickEvent(event)
 
-    def mouseMoveEvent(self, event: QMouseEvent) -> None:
+    def mouseMoveEvent(self, event: Optional[QMouseEvent]) -> None:
         """Handle mouse move to show/hide Alt+hover tooltip."""
+        if event is None:
+            return
         super().mouseMoveEvent(event)
 
         # Check if Alt is pressed

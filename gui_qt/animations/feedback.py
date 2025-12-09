@@ -207,9 +207,9 @@ class RippleEffect(QWidget):
 
         self._animation_group = group
 
-    def paintEvent(self, event: QPaintEvent) -> None:
+    def paintEvent(self, event: Optional[QPaintEvent]) -> None:
         """Paint the ripple."""
-        if self._ripple_radius <= 0:
+        if event is None or self._ripple_radius <= 0:
             return
 
         painter = QPainter(self)
@@ -365,9 +365,9 @@ class SuccessFeedback(QWidget):
 
         self._animation = anim
 
-    def paintEvent(self, event: QPaintEvent) -> None:
+    def paintEvent(self, event: Optional[QPaintEvent]) -> None:
         """Paint the feedback overlay."""
-        if self._opacity <= 0:
+        if event is None or self._opacity <= 0:
             return
 
         painter = QPainter(self)
@@ -478,9 +478,9 @@ class ErrorFeedback(QWidget):
 
         self._shake_animation = anim
 
-    def paintEvent(self, event: QPaintEvent) -> None:
+    def paintEvent(self, event: Optional[QPaintEvent]) -> None:
         """Paint the feedback overlay."""
-        if self._opacity <= 0:
+        if event is None or self._opacity <= 0:
             return
 
         painter = QPainter(self)
@@ -556,10 +556,12 @@ class HoverGlow(QWidget):
                 parent_rect.height() + self._glow_size * 2,
             )
 
-    def eventFilter(self, obj: QObject, event) -> bool:
+    def eventFilter(self, obj: Optional[QObject], event) -> bool:
         """Handle parent hover events."""
         from PyQt6.QtCore import QEvent
 
+        if obj is None or event is None:
+            return False
         if obj == self.parent():
             if event.type() == QEvent.Type.Enter:
                 self._animate_in()
@@ -602,9 +604,9 @@ class HoverGlow(QWidget):
 
         self._animation = anim
 
-    def paintEvent(self, event: QPaintEvent) -> None:
+    def paintEvent(self, event: Optional[QPaintEvent]) -> None:
         """Paint the glow."""
-        if self._opacity <= 0:
+        if event is None or self._opacity <= 0:
             return
 
         painter = QPainter(self)

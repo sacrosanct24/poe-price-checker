@@ -274,8 +274,10 @@ class ResultCard(QFrame):
         """Get the card's data."""
         return self._data
 
-    def mousePressEvent(self, event: QMouseEvent) -> None:
+    def mousePressEvent(self, event: Optional[QMouseEvent]) -> None:
         """Handle mouse press."""
+        if event is None:
+            return
         if event.button() == Qt.MouseButton.LeftButton:
             self.clicked.emit(self._data)
         elif event.button() == Qt.MouseButton.RightButton:
@@ -285,8 +287,10 @@ class ResultCard(QFrame):
             )
         super().mousePressEvent(event)
 
-    def mouseDoubleClickEvent(self, event: QMouseEvent) -> None:
+    def mouseDoubleClickEvent(self, event: Optional[QMouseEvent]) -> None:
         """Handle double click."""
+        if event is None:
+            return
         if event.button() == Qt.MouseButton.LeftButton:
             self.double_clicked.emit(self._data)
         super().mouseDoubleClickEvent(event)
