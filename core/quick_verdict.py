@@ -33,7 +33,7 @@ QUICK_VERDICT_DISCLAIMER = (
 import re
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from core.result import Result, Ok, Err
 
@@ -62,6 +62,10 @@ class VerdictThresholds:
     gem_level_bonus: float = 50.0    # +1 to gem levels is build-defining
     influenced_bonus: float = 20.0   # Influenced items have crafting potential
     fractured_bonus: float = 30.0    # Fractured items are crafting bases
+
+    # Meta weight bonuses (when meta data is available)
+    meta_bonus_per_affix: float = 5.0    # Bonus per meta-popular affix
+    meta_popularity_threshold: float = 30.0  # % popularity to count as "meta"
 
     @classmethod
     def for_league_start(cls) -> 'VerdictThresholds':
@@ -120,6 +124,18 @@ class VerdictResult:
     detailed_reasons: List[str]
     estimated_value: Optional[float] = None
     confidence: str = "medium"  # low, medium, high
+    meta_affixes_found: List[str] = None  # Meta-popular affixes on item
+    meta_bonus_applied: float = 0.0  # Total meta bonus added
+
+    def __post_init__(self):
+        """Initialize mutable defaults."""
+        if self.meta_affixes_found is None:
+            self.meta_affixes_found = []
+
+    @property
+    def has_meta_bonus(self) -> bool:
+        """Check if any meta bonus was applied."""
+        return self.meta_bonus_applied > 0
 
     @property
     def emoji(self) -> str:
@@ -146,11 +162,55 @@ class QuickVerdictCalculator:
 
     Designed for casual players who want quick decisions without
     deep market knowledge.
+
+    Can optionally use meta weights from MetaAnalyzer to boost
+    verdicts for items with currently-popular affixes.
     """
 
-    def __init__(self, thresholds: Optional[VerdictThresholds] = None):
-        """Initialize with optional custom thresholds."""
+    # Mapping of mod text patterns to meta affix types
+    MOD_TO_META_TYPE = {
+        'maximum life': 'life',
+        'regenerate': 'life',
+        'fire resistance': 'resistances',
+        'cold resistance': 'resistances',
+        'lightning resistance': 'resistances',
+        'chaos resistance': 'chaos_resistance',
+        'movement speed': 'movement_speed',
+        'attack speed': 'attack_speed',
+        'cast speed': 'cast_speed',
+        'suppress spell damage': 'spell_suppression',
+        'energy shield': 'energy_shield',
+        'critical strike multiplier': 'critical_strike_multiplier',
+        'to strength': 'attributes',
+        'to dexterity': 'attributes',
+        'to intelligence': 'attributes',
+        'maximum mana': 'mana',
+    }
+
+    def __init__(
+        self,
+        thresholds: Optional[VerdictThresholds] = None,
+        meta_weights: Optional[Dict[str, Any]] = None,
+    ):
+        """
+        Initialize with optional custom thresholds and meta weights.
+
+        Args:
+            thresholds: Custom verdict thresholds
+            meta_weights: Meta weight data from RareItemEvaluator.meta_weights
+                         Dict mapping affix_type -> {'popularity_percent': float, ...}
+        """
         self.thresholds = thresholds or VerdictThresholds()
+        self.meta_weights = meta_weights or {}
+
+    def set_meta_weights(self, meta_weights: Dict[str, Any]) -> None:
+        """
+        Update meta weights dynamically.
+
+        Args:
+            meta_weights: New meta weight data from RareItemEvaluator.meta_weights
+        """
+        self.meta_weights = meta_weights or {}
 
     def calculate(
         self,
@@ -216,15 +276,27 @@ class QuickVerdictCalculator:
             if not price_chaos:
                 reasons.append("Unique - check price (most are cheap)")
 
+        # Track meta bonuses
+        meta_affixes_found = []
+        meta_bonus = 0.0
+
         # Analyze rare item affixes
         if rarity == 'Rare':
-            affix_reasons = self._analyze_rare_affixes(item)
+            affix_reasons, meta_matches = self._analyze_rare_affixes_with_meta(item)
             reasons.extend(affix_reasons)
             if affix_reasons:
                 modifiers += len(affix_reasons) * 3.0
                 # Extra bonus for +gem level mods (build-defining)
                 if any('+level to' in r.lower() for r in affix_reasons):
                     modifiers += self.thresholds.gem_level_bonus
+
+            # Apply meta bonuses
+            if meta_matches:
+                meta_affixes_found = meta_matches
+                meta_bonus = len(meta_matches) * self.thresholds.meta_bonus_per_affix
+                modifiers += meta_bonus
+                if len(meta_matches) >= 2:
+                    reasons.append(f"Meta build synergy ({', '.join(meta_matches[:3])})")
 
         # Currency items
         if rarity == 'Currency':
@@ -269,7 +341,48 @@ class QuickVerdictCalculator:
             detailed_reasons=reasons,
             estimated_value=price_chaos,
             confidence=confidence,
+            meta_affixes_found=meta_affixes_found,
+            meta_bonus_applied=meta_bonus,
         )
+
+    def _analyze_rare_affixes_with_meta(self, item: Any) -> Tuple[List[str], List[str]]:
+        """
+        Analyze rare item affixes for value indicators with meta awareness.
+
+        Returns:
+            Tuple of (affix_reasons, meta_affix_types_found)
+        """
+        reasons = self._analyze_rare_affixes(item)
+        meta_matches = []
+
+        if not self.meta_weights:
+            return reasons, meta_matches
+
+        # Check item mods against meta weights
+        explicits = getattr(item, 'explicits', []) or []
+        implicits = getattr(item, 'implicits', []) or []
+        all_mods = list(explicits) + list(implicits)
+
+        for mod in all_mods:
+            mod_lower = mod.lower()
+
+            # Check against known meta patterns
+            for pattern, meta_type in self.MOD_TO_META_TYPE.items():
+                if pattern in mod_lower:
+                    # Check if this affix type is meta-popular
+                    if meta_type in self.meta_weights:
+                        weight_data = self.meta_weights[meta_type]
+                        if isinstance(weight_data, dict):
+                            popularity = weight_data.get('popularity_percent', 0)
+                        else:
+                            popularity = float(weight_data) * 10  # Convert raw weight
+
+                        if popularity >= self.thresholds.meta_popularity_threshold:
+                            if meta_type not in meta_matches:
+                                meta_matches.append(meta_type)
+                    break  # Only match one pattern per mod
+
+        return reasons, meta_matches
 
     def _analyze_rare_affixes(self, item: Any) -> List[str]:
         """Analyze rare item affixes for value indicators."""

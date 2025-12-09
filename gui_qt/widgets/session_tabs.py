@@ -221,6 +221,10 @@ class SessionPanel(QWidget):
         """Set the rare item evaluator for meta info display."""
         self.rare_eval_panel.set_evaluator(evaluator)
 
+        # Also propagate meta weights to quick verdict panel
+        if evaluator and hasattr(evaluator, 'meta_weights'):
+            self.quick_verdict_panel.set_meta_weights(evaluator.meta_weights)
+
     def _on_row_selected(self, row_data: Dict[str, Any]) -> None:
         """Handle row selection in results table."""
         self.row_selected.emit(row_data)

@@ -707,3 +707,209 @@ class TestUniqueItemHandling:
         result = calc.calculate(item, price_chaos=50.0)
 
         assert result.verdict == Verdict.KEEP
+
+
+# =============================================================================
+# Meta Weights Integration Tests
+# =============================================================================
+
+
+class TestMetaWeightsIntegration:
+    """Tests for meta weights integration in QuickVerdictCalculator."""
+
+    @pytest.fixture
+    def mock_meta_weights(self):
+        """Create mock meta weights data."""
+        return {
+            'life': {'popularity_percent': 80.0},
+            'resistances': {'popularity_percent': 75.0},
+            'movement_speed': {'popularity_percent': 60.0},
+            'attack_speed': {'popularity_percent': 35.0},
+            'mana': {'popularity_percent': 10.0},  # Below threshold
+        }
+
+    @pytest.fixture
+    def rare_item_with_meta_mods(self):
+        """Create a rare item with meta-popular mods."""
+        item = MagicMock()
+        item.rarity = "Rare"
+        item.explicits = [
+            "+95 to maximum Life",
+            "+40% to Fire Resistance",
+            "25% increased Movement Speed",
+        ]
+        item.implicits = []
+        item.sockets = 0
+        item.links = 0
+        item.influences = []
+        item.is_fractured = False
+        item.is_synthesised = False
+        return item
+
+    def test_init_with_meta_weights(self, mock_meta_weights):
+        """Should accept meta weights on initialization."""
+        calc = QuickVerdictCalculator(meta_weights=mock_meta_weights)
+        assert calc.meta_weights == mock_meta_weights
+
+    def test_set_meta_weights(self, mock_meta_weights):
+        """Should update meta weights dynamically."""
+        calc = QuickVerdictCalculator()
+        assert calc.meta_weights == {}
+
+        calc.set_meta_weights(mock_meta_weights)
+        assert calc.meta_weights == mock_meta_weights
+
+    def test_meta_affixes_detected(self, mock_meta_weights, rare_item_with_meta_mods):
+        """Should detect meta-popular affixes on items."""
+        calc = QuickVerdictCalculator(meta_weights=mock_meta_weights)
+
+        result = calc.calculate(rare_item_with_meta_mods, price_chaos=None)
+
+        # Should find life, resistances, and movement_speed as meta
+        assert len(result.meta_affixes_found) >= 2
+        assert 'life' in result.meta_affixes_found
+        assert 'resistances' in result.meta_affixes_found
+
+    def test_meta_bonus_applied(self, mock_meta_weights, rare_item_with_meta_mods):
+        """Should apply meta bonus when meta affixes found."""
+        calc = QuickVerdictCalculator(meta_weights=mock_meta_weights)
+
+        result = calc.calculate(rare_item_with_meta_mods, price_chaos=None)
+
+        # Should have meta bonus applied (5.0 per meta affix by default)
+        assert result.meta_bonus_applied > 0
+        assert result.has_meta_bonus is True
+
+    def test_no_meta_bonus_without_weights(self, rare_item_with_meta_mods):
+        """Should not apply meta bonus when no weights provided."""
+        calc = QuickVerdictCalculator()
+
+        result = calc.calculate(rare_item_with_meta_mods, price_chaos=None)
+
+        assert result.meta_bonus_applied == 0
+        assert result.has_meta_bonus is False
+        assert result.meta_affixes_found == []
+
+    def test_meta_below_threshold_not_counted(self, mock_meta_weights):
+        """Should not count meta affixes below popularity threshold."""
+        calc = QuickVerdictCalculator(meta_weights=mock_meta_weights)
+
+        item = MagicMock()
+        item.rarity = "Rare"
+        item.explicits = ["+50 to maximum Mana"]  # 10% popularity, below 30% threshold
+        item.implicits = []
+        item.sockets = 0
+        item.links = 0
+        item.influences = []
+        item.is_fractured = False
+        item.is_synthesised = False
+
+        result = calc.calculate(item, price_chaos=None)
+
+        # Mana has only 10% popularity, below 30% threshold
+        assert 'mana' not in result.meta_affixes_found
+
+    def test_meta_synergy_reason_added(self, mock_meta_weights, rare_item_with_meta_mods):
+        """Should add meta synergy reason when 2+ meta affixes found."""
+        calc = QuickVerdictCalculator(meta_weights=mock_meta_weights)
+
+        result = calc.calculate(rare_item_with_meta_mods, price_chaos=None)
+
+        # Should have meta synergy in reasons
+        assert any("meta build synergy" in r.lower() for r in result.detailed_reasons)
+
+    def test_meta_bonus_improves_verdict(self, mock_meta_weights):
+        """Meta bonus should help items reach KEEP threshold."""
+        calc_without_meta = QuickVerdictCalculator()
+        calc_with_meta = QuickVerdictCalculator(meta_weights=mock_meta_weights)
+
+        # Item with some value but not enough to KEEP without meta
+        item = MagicMock()
+        item.rarity = "Rare"
+        item.explicits = [
+            "+85 to maximum Life",
+            "+38% to Cold Resistance",
+        ]
+        item.implicits = []
+        item.sockets = 0
+        item.links = 0
+        item.influences = []
+        item.is_fractured = False
+        item.is_synthesised = False
+
+        # With 5c price: no meta = MAYBE, with meta = could be KEEP
+        result_no_meta = calc_without_meta.calculate(item, price_chaos=5.0)
+        result_with_meta = calc_with_meta.calculate(item, price_chaos=5.0)
+
+        # Meta bonus should improve the verdict
+        assert result_with_meta.meta_bonus_applied > 0
+
+    def test_custom_meta_threshold(self, mock_meta_weights):
+        """Should respect custom meta popularity threshold."""
+        thresholds = VerdictThresholds(meta_popularity_threshold=50.0)
+        calc = QuickVerdictCalculator(
+            thresholds=thresholds,
+            meta_weights=mock_meta_weights
+        )
+
+        item = MagicMock()
+        item.rarity = "Rare"
+        item.explicits = [
+            "+90 to maximum Life",      # 80% popularity - above
+            "10% increased Attack Speed", # 35% popularity - below 50%
+        ]
+        item.implicits = []
+        item.sockets = 0
+        item.links = 0
+        item.influences = []
+        item.is_fractured = False
+        item.is_synthesised = False
+
+        result = calc.calculate(item, price_chaos=None)
+
+        # Only life should count (80% > 50% threshold)
+        # attack_speed at 35% is below 50% threshold
+        assert 'life' in result.meta_affixes_found
+        assert 'attack_speed' not in result.meta_affixes_found
+
+
+class TestVerdictResultMetaFields:
+    """Tests for meta-related fields in VerdictResult."""
+
+    def test_has_meta_bonus_true(self):
+        """Should return True when meta bonus applied."""
+        result = VerdictResult(
+            verdict=Verdict.KEEP,
+            explanation="Test",
+            detailed_reasons=[],
+            meta_affixes_found=['life', 'resistances'],
+            meta_bonus_applied=10.0,
+        )
+        assert result.has_meta_bonus is True
+
+    def test_has_meta_bonus_false(self):
+        """Should return False when no meta bonus."""
+        result = VerdictResult(
+            verdict=Verdict.VENDOR,
+            explanation="Test",
+            detailed_reasons=[],
+        )
+        assert result.has_meta_bonus is False
+
+    def test_meta_affixes_default_empty(self):
+        """Should default to empty list for meta affixes."""
+        result = VerdictResult(
+            verdict=Verdict.MAYBE,
+            explanation="Test",
+            detailed_reasons=[],
+        )
+        assert result.meta_affixes_found == []
+
+    def test_meta_bonus_default_zero(self):
+        """Should default to zero meta bonus."""
+        result = VerdictResult(
+            verdict=Verdict.MAYBE,
+            explanation="Test",
+            detailed_reasons=[],
+        )
+        assert result.meta_bonus_applied == 0.0

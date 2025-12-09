@@ -9,7 +9,7 @@ Usage:
     panel.update_verdict(item, price_chaos=50.0)
 """
 
-from typing import Any, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
@@ -265,6 +265,14 @@ class QuickVerdictPanel(QWidget):
         # Details
         if result.detailed_reasons:
             details_text = "\n".join(f"• {r}" for r in result.detailed_reasons)
+
+            # Add meta bonus info if present
+            if result.has_meta_bonus:
+                meta_info = f"\n\n🔥 Meta bonus: +{result.meta_bonus_applied:.0f}"
+                if result.meta_affixes_found:
+                    meta_info += f" ({', '.join(result.meta_affixes_found)})"
+                details_text += meta_info
+
             self._details_list.setText(details_text)
             self._toggle_btn.setVisible(True)
         else:
@@ -330,6 +338,15 @@ class QuickVerdictPanel(QWidget):
         self._calculator.thresholds.keep_threshold = keep
         self.threshold_changed.emit(vendor, keep)
 
+    def set_meta_weights(self, meta_weights: Dict[str, Any]) -> None:
+        """
+        Update meta weights for smarter verdicts.
+
+        Args:
+            meta_weights: Meta weight data from RareItemEvaluator.meta_weights
+        """
+        self._calculator.set_meta_weights(meta_weights)
+
     def get_current_result(self) -> Optional[VerdictResult]:
         """Get the current verdict result."""
         return self._current_result
@@ -370,6 +387,10 @@ class CompactVerdictWidget(QWidget):
         self._emoji_label.setText(result.emoji)
         self._text_label.setText(f"{result.verdict.value.upper()} - {result.explanation}")
         self._text_label.setStyleSheet(f"color: {result.color};")
+
+    def set_meta_weights(self, meta_weights: Dict[str, Any]) -> None:
+        """Update meta weights for smarter verdicts."""
+        self._calculator.set_meta_weights(meta_weights)
 
     def clear(self) -> None:
         """Clear the display."""
