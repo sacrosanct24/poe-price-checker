@@ -226,32 +226,34 @@ class RareItemEvaluator:
         
         return compiled
 
-    def _load_valuable_affixes(self) -> Dict:
+    def _load_valuable_affixes(self) -> Dict[str, Any]:
         """Load valuable affixes configuration."""
         affix_file = self.data_dir / "valuable_affixes.json"
         if affix_file.exists():
             with open(affix_file, encoding='utf-8') as f:
-                return json.load(f)
+                result: Dict[str, Any] = json.load(f)
+                return result
         return {}
 
-    def _load_valuable_bases(self) -> Dict:
+    def _load_valuable_bases(self) -> Dict[str, Any]:
         """Load valuable base types configuration."""
         base_file = self.data_dir / "valuable_bases.json"
         if base_file.exists():
             with open(base_file, encoding='utf-8') as f:
-                return json.load(f)
+                result: Dict[str, Any] = json.load(f)
+                return result
         return {}
 
-    def _load_build_archetypes(self) -> Dict:
+    def _load_build_archetypes(self) -> Dict[str, Any]:
         """Load build archetype definitions."""
         archetype_file = self.data_dir / "build_archetypes.json"
         if archetype_file.exists():
             with open(archetype_file, encoding='utf-8') as f:
-                data = json.load(f)
-                return data.get("archetypes", {})
+                data: Dict[str, Any] = json.load(f)
+                return dict(data.get("archetypes", {}))
         return {}
 
-    def _load_meta_weights(self, current_league: Optional[str] = None) -> Dict:
+    def _load_meta_weights(self, current_league: Optional[str] = None) -> Dict[str, Any]:
         """
         Load meta-based weight adjustments if available and fresh.
 
@@ -266,7 +268,7 @@ class RareItemEvaluator:
         if meta_file.exists():
             try:
                 with open(meta_file, encoding='utf-8') as f:
-                    data = json.load(f)
+                    data: Dict[str, Any] = json.load(f)
 
                 # Check if cache is stale (older than META_CACHE_EXPIRY_DAYS)
                 last_analysis_str = data.get('last_analysis')
@@ -293,7 +295,7 @@ class RareItemEvaluator:
                     'source': 'meta_affixes.json'
                 }
 
-                affixes = data.get("affixes", {})
+                affixes: Dict[str, Any] = dict(data.get("affixes", {}))
                 if affixes:
                     logger.info(f"Loaded meta weights: {len(affixes)} affixes from {cache_league}")
                     return affixes
@@ -306,8 +308,10 @@ class RareItemEvaluator:
         if archetype_file.exists():
             try:
                 with open(archetype_file, encoding='utf-8') as f:
-                    data = json.load(f)
-                meta_weights = data.get("_meta_weights", {}).get("popularity_boosts", {})
+                    fallback_data: Dict[str, Any] = json.load(f)
+                meta_weights: Dict[str, Any] = dict(
+                    fallback_data.get("_meta_weights", {}).get("popularity_boosts", {})
+                )
                 if meta_weights:
                     self._meta_cache_info = {
                         'league': 'Static',
@@ -520,7 +524,7 @@ class RareItemEvaluator:
 
     def _check_ilvl(self, item: ParsedItem) -> bool:
         """Check if item level is high enough for top-tier mods."""
-        return item.item_level and item.item_level >= 84
+        return bool(item.item_level and item.item_level >= 84)
 
     def _match_affixes(self, item: ParsedItem) -> List[AffixMatch]:
         """
@@ -730,7 +734,7 @@ class RareItemEvaluator:
         total_bonus = 0
 
         # Count affixes by type
-        affix_counts = {}
+        affix_counts: Dict[str, int] = {}
         for match in matches:
             affix_counts[match.affix_type] = affix_counts.get(
                 match.affix_type, 0) + 1
@@ -840,7 +844,7 @@ class RareItemEvaluator:
             (bonus_score, list_of_reasons)
         """
         bonus = 0
-        reasons = []
+        reasons: List[str] = []
 
         item_slot = self._determine_item_slot(item)
         if not item_slot or item_slot not in self.slot_rules:
@@ -978,7 +982,7 @@ class RareItemEvaluator:
         Returns:
             (list_of_matching_archetypes, bonus_score)
         """
-        matched = []
+        matched: List[str] = []
         total_bonus = 0
 
         if not self.build_archetypes:
