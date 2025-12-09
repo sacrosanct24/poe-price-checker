@@ -185,6 +185,37 @@ class ItemTableModel(QAbstractTableModel):
         if cache_key in self._verdict_cache:
             return self._verdict_cache[cache_key]
 
+        # For items evaluated by RareItemEvaluator, use their eval_tier directly
+        # This ensures consistency between the two evaluation systems
+        if item.price_source == PriceSource.RARE_EVALUATED and item.eval_tier:
+            tier = item.eval_tier.lower()
+            if tier == "excellent":
+                verdict = VerdictResult(
+                    verdict=Verdict.KEEP,
+                    explanation="Excellent rare - high-value affixes",
+                    detailed_reasons=[item.eval_summary] if item.eval_summary else [],
+                    estimated_value=item.total_price if item.total_price > 0 else None,
+                    confidence="high",
+                )
+            elif tier == "good":
+                verdict = VerdictResult(
+                    verdict=Verdict.MAYBE,
+                    explanation="Good rare - worth checking",
+                    detailed_reasons=[item.eval_summary] if item.eval_summary else [],
+                    estimated_value=item.total_price if item.total_price > 0 else None,
+                    confidence="medium",
+                )
+            else:  # average, vendor, etc.
+                verdict = VerdictResult(
+                    verdict=Verdict.VENDOR,
+                    explanation=f"Rare evaluated as {tier}",
+                    detailed_reasons=[item.eval_summary] if item.eval_summary else [],
+                    estimated_value=item.total_price if item.total_price > 0 else None,
+                    confidence="medium",
+                )
+            self._verdict_cache[cache_key] = verdict
+            return verdict
+
         # Create a simple object for the calculator
         class ItemAdapter:
             """Adapter to make PricedItem work with QuickVerdictCalculator."""

@@ -326,6 +326,99 @@ class TestItemTableModelData:
         # Tooltip should contain verdict explanation
         assert "KEEP" in result or "VENDOR" in result or "MAYBE" in result
 
+    def test_data_verdict_respects_rare_evaluated_excellent(self):
+        """Should show KEEP for RARE_EVALUATED items with excellent tier."""
+        model = ItemTableModel()
+
+        item = MagicMock(spec=PricedItem)
+        item.name = "Rare Helmet"
+        item.type_line = "Hubris Circlet"
+        item.base_type = "Hubris Circlet"
+        item.display_name = "Rare Helmet"
+        item.stack_size = 1
+        item.total_price = 0.0  # No poe.ninja price
+        item.rarity = "Rare"
+        item.item_class = "Helmets"
+        item.price_source = PriceSource.RARE_EVALUATED
+        item.eval_tier = "excellent"
+        item.eval_summary = "High life, tri-res"
+        item.tab_name = "Dump"
+        item.ilvl = 86
+        item.links = 0
+        item.sockets = ""
+        item.corrupted = False
+        item.raw_item = {}
+
+        model.set_items([item])
+
+        verdict_col = 0
+        index = model.index(0, verdict_col)
+
+        result = model.data(index, Qt.ItemDataRole.DisplayRole)
+        assert result == "👍"  # Should be KEEP for excellent tier
+
+    def test_data_verdict_respects_rare_evaluated_good(self):
+        """Should show MAYBE for RARE_EVALUATED items with good tier."""
+        model = ItemTableModel()
+
+        item = MagicMock(spec=PricedItem)
+        item.name = "Rare Boots"
+        item.type_line = "Sorcerer Boots"
+        item.base_type = "Sorcerer Boots"
+        item.display_name = "Rare Boots"
+        item.stack_size = 1
+        item.total_price = 0.0
+        item.rarity = "Rare"
+        item.item_class = "Boots"
+        item.price_source = PriceSource.RARE_EVALUATED
+        item.eval_tier = "good"
+        item.eval_summary = "Movement speed, life"
+        item.tab_name = "Dump"
+        item.ilvl = 84
+        item.links = 0
+        item.sockets = ""
+        item.corrupted = False
+        item.raw_item = {}
+
+        model.set_items([item])
+
+        verdict_col = 0
+        index = model.index(0, verdict_col)
+
+        result = model.data(index, Qt.ItemDataRole.DisplayRole)
+        assert result == "🤔"  # Should be MAYBE for good tier
+
+    def test_data_verdict_respects_rare_evaluated_vendor(self):
+        """Should show VENDOR for RARE_EVALUATED items with vendor tier."""
+        model = ItemTableModel()
+
+        item = MagicMock(spec=PricedItem)
+        item.name = "Rare Gloves"
+        item.type_line = "Leather Gloves"
+        item.base_type = "Leather Gloves"
+        item.display_name = "Rare Gloves"
+        item.stack_size = 1
+        item.total_price = 0.0
+        item.rarity = "Rare"
+        item.item_class = "Gloves"
+        item.price_source = PriceSource.RARE_EVALUATED
+        item.eval_tier = "vendor"
+        item.eval_summary = "Low-tier affixes"
+        item.tab_name = "Dump"
+        item.ilvl = 68
+        item.links = 0
+        item.sockets = ""
+        item.corrupted = False
+        item.raw_item = {}
+
+        model.set_items([item])
+
+        verdict_col = 0
+        index = model.index(0, verdict_col)
+
+        result = model.data(index, Qt.ItemDataRole.DisplayRole)
+        assert result == "👎"  # Should be VENDOR for vendor tier
+
 
 class TestItemTableModelHeaderData:
     """Tests for header data."""
