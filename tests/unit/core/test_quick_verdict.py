@@ -1121,3 +1121,117 @@ class TestVerdictStatistics:
         assert stats.low_confidence_count == 1
         assert stats.medium_confidence_count == 0
         assert stats.high_confidence_count == 0
+
+    def test_to_dict(self):
+        """Should convert VerdictStatistics to dict for database storage."""
+        from core.quick_verdict import VerdictStatistics
+        stats = VerdictStatistics(
+            keep_count=5,
+            vendor_count=10,
+            maybe_count=3,
+            keep_value=250.5,
+            vendor_value=15.0,
+            maybe_value=50.0,
+            items_with_meta_bonus=2,
+            total_meta_bonus=30.0,
+            high_confidence_count=8,
+            medium_confidence_count=7,
+            low_confidence_count=3,
+        )
+
+        data = stats.to_dict()
+
+        assert data["keep_count"] == 5
+        assert data["vendor_count"] == 10
+        assert data["maybe_count"] == 3
+        assert data["keep_value"] == 250.5
+        assert data["items_with_meta_bonus"] == 2
+
+    def test_from_dict(self):
+        """Should create VerdictStatistics from dict."""
+        from core.quick_verdict import VerdictStatistics
+        data = {
+            "keep_count": 5,
+            "vendor_count": 10,
+            "maybe_count": 3,
+            "keep_value": 250.5,
+            "vendor_value": 15.0,
+            "maybe_value": 50.0,
+            "items_with_meta_bonus": 2,
+            "total_meta_bonus": 30.0,
+            "high_confidence_count": 8,
+            "medium_confidence_count": 7,
+            "low_confidence_count": 3,
+        }
+
+        stats = VerdictStatistics.from_dict(data)
+
+        assert stats.keep_count == 5
+        assert stats.vendor_count == 10
+        assert stats.maybe_count == 3
+        assert stats.keep_value == 250.5
+        assert stats.items_with_meta_bonus == 2
+
+    def test_from_dict_missing_keys(self):
+        """Should handle missing keys with defaults."""
+        from core.quick_verdict import VerdictStatistics
+        data = {"keep_count": 5}
+
+        stats = VerdictStatistics.from_dict(data)
+
+        assert stats.keep_count == 5
+        assert stats.vendor_count == 0
+        assert stats.maybe_count == 0
+
+    def test_merge(self):
+        """Should merge two VerdictStatistics instances."""
+        from core.quick_verdict import VerdictStatistics
+        stats1 = VerdictStatistics(
+            keep_count=5,
+            vendor_count=10,
+            keep_value=100.0,
+            items_with_meta_bonus=1,
+            total_meta_bonus=20.0,
+        )
+        stats2 = VerdictStatistics(
+            keep_count=3,
+            vendor_count=5,
+            keep_value=50.0,
+            items_with_meta_bonus=2,
+            total_meta_bonus=15.0,
+        )
+
+        stats1.merge(stats2)
+
+        assert stats1.keep_count == 8
+        assert stats1.vendor_count == 15
+        assert stats1.keep_value == 150.0
+        assert stats1.items_with_meta_bonus == 3
+        assert stats1.total_meta_bonus == 35.0
+
+    def test_round_trip_to_from_dict(self):
+        """Should preserve data through to_dict/from_dict cycle."""
+        from core.quick_verdict import VerdictStatistics
+        original = VerdictStatistics(
+            keep_count=5,
+            vendor_count=10,
+            maybe_count=3,
+            keep_value=250.5,
+            vendor_value=15.0,
+            maybe_value=50.0,
+            items_with_meta_bonus=2,
+            total_meta_bonus=30.0,
+            high_confidence_count=8,
+            medium_confidence_count=7,
+            low_confidence_count=3,
+        )
+
+        data = original.to_dict()
+        restored = VerdictStatistics.from_dict(data)
+
+        assert restored.keep_count == original.keep_count
+        assert restored.vendor_count == original.vendor_count
+        assert restored.maybe_count == original.maybe_count
+        assert restored.keep_value == original.keep_value
+        assert restored.total_count == original.total_count
+        assert restored.total_value == original.total_value

@@ -417,6 +417,7 @@ class VerdictStatisticsWidget(QWidget):
     """
 
     stats_reset = pyqtSignal()  # Emitted when user clicks reset
+    stats_changed = pyqtSignal(VerdictStatistics)  # Emitted when stats change
 
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
@@ -511,6 +512,7 @@ class VerdictStatisticsWidget(QWidget):
         """
         self._stats.record(result)
         self._update_display()
+        self.stats_changed.emit(self._stats)
 
     def update_stats(self, stats: VerdictStatistics) -> None:
         """

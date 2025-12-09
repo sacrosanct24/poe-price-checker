@@ -87,6 +87,7 @@ class SessionPanel(QWidget):
     compare_requested: pyqtSignal = pyqtSignal(list)
     ai_analysis_requested: pyqtSignal = pyqtSignal(str, list)  # item_text, price_results
     update_meta_requested: pyqtSignal = pyqtSignal()  # Meta weights update request
+    verdict_stats_changed: pyqtSignal = pyqtSignal(object)  # VerdictStatistics changed
 
     def __init__(self, session_name: str = "Session 1", parent: Optional[QWidget] = None):
         super().__init__(parent)
@@ -192,6 +193,7 @@ class SessionPanel(QWidget):
 
         # Bottom: Verdict statistics (session tracking)
         self.verdict_stats_widget = VerdictStatisticsWidget()
+        self.verdict_stats_widget.stats_changed.connect(self.verdict_stats_changed.emit)
         layout.addWidget(self.verdict_stats_widget)
 
         # Bottom: AI analysis panel (hidden by default)
@@ -241,6 +243,22 @@ class SessionPanel(QWidget):
             result: VerdictResult to record
         """
         self.verdict_stats_widget.record_verdict(result)
+
+    def get_verdict_stats(self) -> Any:
+        """Get the current verdict statistics.
+
+        Returns:
+            VerdictStatistics instance
+        """
+        return self.verdict_stats_widget.get_stats()
+
+    def set_verdict_stats(self, stats: Any) -> None:
+        """Set verdict statistics (for loading from database).
+
+        Args:
+            stats: VerdictStatistics instance to set
+        """
+        self.verdict_stats_widget.update_stats(stats)
 
     def _on_row_selected(self, row_data: Dict[str, Any]) -> None:
         """Handle row selection in results table."""
@@ -356,6 +374,7 @@ class SessionTabWidget(QTabWidget):
     compare_requested: pyqtSignal = pyqtSignal(list)
     ai_analysis_requested: pyqtSignal = pyqtSignal(str, list)  # item_text, price_results
     update_meta_requested: pyqtSignal = pyqtSignal()  # Meta weights update request
+    verdict_stats_changed: pyqtSignal = pyqtSignal(object)  # VerdictStatistics changed
 
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
@@ -520,6 +539,7 @@ class SessionTabWidget(QTabWidget):
         panel.compare_requested.connect(self.compare_requested.emit)
         panel.ai_analysis_requested.connect(self.ai_analysis_requested.emit)
         panel.update_meta_requested.connect(self.update_meta_requested.emit)
+        panel.verdict_stats_changed.connect(self.verdict_stats_changed.emit)
 
         # Set rare evaluator if we have one
         if self._rare_evaluator:
@@ -557,6 +577,27 @@ class SessionTabWidget(QTabWidget):
             panel = self.widget(i)
             if isinstance(panel, SessionPanel):
                 panel.set_verdict_thresholds(vendor, keep)
+
+    def get_current_verdict_stats(self) -> Any:
+        """Get verdict statistics from the current session.
+
+        Returns:
+            VerdictStatistics from the current panel, or None
+        """
+        panel = self.currentWidget()
+        if isinstance(panel, SessionPanel):
+            return panel.get_verdict_stats()
+        return None
+
+    def set_current_verdict_stats(self, stats: Any) -> None:
+        """Set verdict statistics for the current session.
+
+        Args:
+            stats: VerdictStatistics to set
+        """
+        panel = self.currentWidget()
+        if isinstance(panel, SessionPanel):
+            panel.set_verdict_stats(stats)
 
     def record_verdict(self, result: Any, session_index: Optional[int] = None) -> None:
         """Record a verdict result in session statistics.

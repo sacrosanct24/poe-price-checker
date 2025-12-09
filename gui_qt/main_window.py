@@ -278,6 +278,34 @@ class PriceCheckerWindow(QMainWindow):
             return
         self._do_price_check(item_text, session_index)
 
+    def _on_verdict_stats_changed(self, stats) -> None:
+        """Handle verdict statistics change - save to database."""
+        try:
+            from datetime import datetime
+            from core.quick_verdict import VerdictStatistics
+
+            # Get current league and game version from config
+            league = self.ctx.config.league or "Standard"
+            game_version = self.ctx.config.game_version or "poe1"
+            session_date = datetime.now().strftime("%Y-%m-%d")
+
+            # Convert VerdictStatistics to dict if needed
+            if isinstance(stats, VerdictStatistics):
+                stats_dict = stats.to_dict()
+            else:
+                stats_dict = stats
+
+            # Save to database
+            self.ctx.db.save_verdict_statistics(
+                league=league,
+                game_version=game_version,
+                session_date=session_date,
+                stats=stats_dict,
+            )
+            self.logger.debug(f"Saved verdict stats: {stats_dict}")
+        except Exception as e:
+            self.logger.warning(f"Failed to save verdict statistics: {e}")
+
     # -------------------------------------------------------------------------
     # Menu Bar
     # -------------------------------------------------------------------------
@@ -497,6 +525,7 @@ class PriceCheckerWindow(QMainWindow):
         self.session_tabs.compare_requested.connect(self._on_compare_items_requested)
         self.session_tabs.ai_analysis_requested.connect(self._on_ai_analysis_requested)
         self.session_tabs.update_meta_requested.connect(self._on_update_meta_requested)
+        self.session_tabs.verdict_stats_changed.connect(self._on_verdict_stats_changed)
 
         # Pass the rare evaluator to session tabs for meta info display
         if self._rare_evaluator:
@@ -504,6 +533,9 @@ class PriceCheckerWindow(QMainWindow):
 
         # Set verdict thresholds from config
         self._apply_verdict_thresholds()
+
+        # Load saved verdict statistics for today
+        self._load_verdict_statistics()
 
         # Set AI configured callback for all results tables
         self.session_tabs.set_ai_configured_callback(self._is_ai_configured)
@@ -1329,6 +1361,35 @@ class PriceCheckerWindow(QMainWindow):
             vendor = self.ctx.config.verdict_vendor_threshold
             keep = self.ctx.config.verdict_keep_threshold
             self.session_tabs.set_verdict_thresholds(vendor, keep)
+
+    def _load_verdict_statistics(self) -> None:
+        """Load saved verdict statistics from database for today's session."""
+        try:
+            from datetime import datetime
+            from core.quick_verdict import VerdictStatistics
+
+            # Get current league and game version from config
+            league = self.ctx.config.league or "Standard"
+            game_version = self.ctx.config.game_version or "poe1"
+            session_date = datetime.now().strftime("%Y-%m-%d")
+
+            # Try to load today's stats from database
+            saved_stats = self.ctx.db.get_verdict_statistics(
+                league=league,
+                game_version=game_version,
+                session_date=session_date,
+            )
+
+            if saved_stats:
+                # Convert dict to VerdictStatistics
+                stats = VerdictStatistics.from_dict(saved_stats)
+                self.session_tabs.set_current_verdict_stats(stats)
+                self.logger.info(
+                    f"Loaded verdict stats for {league} ({session_date}): "
+                    f"{stats.total_count} items"
+                )
+        except Exception as e:
+            self.logger.warning(f"Failed to load verdict statistics: {e}")
 
     def _cleanup_before_close(self) -> None:
         """Clean up resources before closing."""

@@ -288,6 +288,53 @@ class VerdictStatistics:
 
         return summary
 
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert statistics to a dictionary for database storage."""
+        return {
+            "keep_count": self.keep_count,
+            "vendor_count": self.vendor_count,
+            "maybe_count": self.maybe_count,
+            "keep_value": self.keep_value,
+            "vendor_value": self.vendor_value,
+            "maybe_value": self.maybe_value,
+            "items_with_meta_bonus": self.items_with_meta_bonus,
+            "total_meta_bonus": self.total_meta_bonus,
+            "high_confidence_count": self.high_confidence_count,
+            "medium_confidence_count": self.medium_confidence_count,
+            "low_confidence_count": self.low_confidence_count,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'VerdictStatistics':
+        """Create a VerdictStatistics instance from a dictionary."""
+        return cls(
+            keep_count=data.get("keep_count", 0),
+            vendor_count=data.get("vendor_count", 0),
+            maybe_count=data.get("maybe_count", 0),
+            keep_value=data.get("keep_value", 0.0),
+            vendor_value=data.get("vendor_value", 0.0),
+            maybe_value=data.get("maybe_value", 0.0),
+            items_with_meta_bonus=data.get("items_with_meta_bonus", 0),
+            total_meta_bonus=data.get("total_meta_bonus", 0.0),
+            high_confidence_count=data.get("high_confidence_count", 0),
+            medium_confidence_count=data.get("medium_confidence_count", 0),
+            low_confidence_count=data.get("low_confidence_count", 0),
+        )
+
+    def merge(self, other: 'VerdictStatistics') -> None:
+        """Merge another VerdictStatistics into this one."""
+        self.keep_count += other.keep_count
+        self.vendor_count += other.vendor_count
+        self.maybe_count += other.maybe_count
+        self.keep_value += other.keep_value
+        self.vendor_value += other.vendor_value
+        self.maybe_value += other.maybe_value
+        self.items_with_meta_bonus += other.items_with_meta_bonus
+        self.total_meta_bonus += other.total_meta_bonus
+        self.high_confidence_count += other.high_confidence_count
+        self.medium_confidence_count += other.medium_confidence_count
+        self.low_confidence_count += other.low_confidence_count
+
 
 class QuickVerdictCalculator:
     """

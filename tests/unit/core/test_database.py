@@ -485,3 +485,219 @@ def test_clear_upgrade_advice_history(temp_db):
 
     # Should have 0 entries
     assert len(temp_db.get_upgrade_advice_history("TestBuild", "Helmet")) == 0
+
+
+# -------------------------
+# Verdict Statistics (v11+)
+# -------------------------
+
+def test_save_verdict_statistics_creates_entry(temp_db):
+    """Test saving verdict statistics creates a new entry."""
+    stats = {
+        "keep_count": 5,
+        "vendor_count": 10,
+        "maybe_count": 3,
+        "keep_value": 250.5,
+        "vendor_value": 15.0,
+        "maybe_value": 50.0,
+        "items_with_meta_bonus": 2,
+        "total_meta_bonus": 30.0,
+        "high_confidence_count": 8,
+        "medium_confidence_count": 7,
+        "low_confidence_count": 3,
+    }
+
+    temp_db.save_verdict_statistics(
+        league="TestLeague",
+        game_version="poe1",
+        session_date="2025-01-15",
+        stats=stats,
+    )
+
+    result = temp_db.get_verdict_statistics(
+        league="TestLeague",
+        game_version="poe1",
+        session_date="2025-01-15",
+    )
+
+    assert result is not None
+    assert result["keep_count"] == 5
+    assert result["vendor_count"] == 10
+    assert result["maybe_count"] == 3
+    assert result["keep_value"] == 250.5
+    assert result["items_with_meta_bonus"] == 2
+
+
+def test_save_verdict_statistics_upserts(temp_db):
+    """Test saving verdict statistics updates existing entry."""
+    stats1 = {"keep_count": 5, "vendor_count": 10, "maybe_count": 3}
+    stats2 = {"keep_count": 15, "vendor_count": 20, "maybe_count": 8}
+
+    temp_db.save_verdict_statistics(
+        league="TestLeague",
+        game_version="poe1",
+        session_date="2025-01-15",
+        stats=stats1,
+    )
+
+    # Save again with updated stats
+    temp_db.save_verdict_statistics(
+        league="TestLeague",
+        game_version="poe1",
+        session_date="2025-01-15",
+        stats=stats2,
+    )
+
+    result = temp_db.get_verdict_statistics(
+        league="TestLeague",
+        game_version="poe1",
+        session_date="2025-01-15",
+    )
+
+    # Should have the updated values
+    assert result["keep_count"] == 15
+    assert result["vendor_count"] == 20
+    assert result["maybe_count"] == 8
+
+
+def test_get_verdict_statistics_returns_none_if_not_found(temp_db):
+    """Test getting verdict statistics returns None when not found."""
+    result = temp_db.get_verdict_statistics(
+        league="NonExistent",
+        game_version="poe1",
+        session_date="2025-01-15",
+    )
+
+    assert result is None
+
+
+def test_get_verdict_statistics_filters_by_league(temp_db):
+    """Test getting verdict statistics filters by league correctly."""
+    temp_db.save_verdict_statistics(
+        league="League1",
+        game_version="poe1",
+        session_date="2025-01-15",
+        stats={"keep_count": 5},
+    )
+    temp_db.save_verdict_statistics(
+        league="League2",
+        game_version="poe1",
+        session_date="2025-01-15",
+        stats={"keep_count": 10},
+    )
+
+    result = temp_db.get_verdict_statistics(
+        league="League1",
+        game_version="poe1",
+        session_date="2025-01-15",
+    )
+
+    assert result is not None
+    assert result["keep_count"] == 5
+
+
+def test_get_verdict_statistics_history(temp_db):
+    """Test getting verdict statistics history."""
+    from datetime import datetime, timedelta
+
+    # Create stats for recent dates (relative to today)
+    today = datetime.now()
+    dates = [
+        (today - timedelta(days=2)).strftime("%Y-%m-%d"),
+        (today - timedelta(days=1)).strftime("%Y-%m-%d"),
+        today.strftime("%Y-%m-%d"),
+    ]
+
+    for i, date in enumerate(dates):
+        temp_db.save_verdict_statistics(
+            league="TestLeague",
+            game_version="poe1",
+            session_date=date,
+            stats={"keep_count": i + 1},
+        )
+
+    history = temp_db.get_verdict_statistics_history(
+        league="TestLeague",
+        game_version="poe1",
+        days=30,
+    )
+
+    assert len(history) == 3
+    # Newest first (today's date)
+    assert history[0]["session_date"] == dates[2]
+    assert history[0]["keep_count"] == 3
+
+
+def test_get_verdict_statistics_summary(temp_db):
+    """Test getting aggregated verdict statistics summary."""
+    from datetime import datetime, timedelta
+
+    # Use recent dates relative to today
+    today = datetime.now()
+    dates = [
+        (today - timedelta(days=2)).strftime("%Y-%m-%d"),
+        (today - timedelta(days=1)).strftime("%Y-%m-%d"),
+        today.strftime("%Y-%m-%d"),
+    ]
+
+    for date in dates:
+        temp_db.save_verdict_statistics(
+            league="TestLeague",
+            game_version="poe1",
+            session_date=date,
+            stats={"keep_count": 10, "vendor_count": 5, "keep_value": 100.0},
+        )
+
+    summary = temp_db.get_verdict_statistics_summary(
+        league="TestLeague",
+        game_version="poe1",
+    )
+
+    assert summary["session_count"] == 3
+    assert summary["total_keep"] == 30  # 10 * 3
+    assert summary["total_vendor"] == 15  # 5 * 3
+    assert summary["total_keep_value"] == 300.0  # 100 * 3
+
+
+def test_clear_verdict_statistics_all(temp_db):
+    """Test clearing all verdict statistics."""
+    temp_db.save_verdict_statistics(
+        league="League1",
+        game_version="poe1",
+        session_date="2025-01-15",
+        stats={"keep_count": 5},
+    )
+    temp_db.save_verdict_statistics(
+        league="League2",
+        game_version="poe2",
+        session_date="2025-01-15",
+        stats={"keep_count": 10},
+    )
+
+    deleted = temp_db.clear_verdict_statistics()
+
+    assert deleted == 2
+    assert temp_db.get_verdict_statistics("League1", "poe1", "2025-01-15") is None
+    assert temp_db.get_verdict_statistics("League2", "poe2", "2025-01-15") is None
+
+
+def test_clear_verdict_statistics_by_league(temp_db):
+    """Test clearing verdict statistics by league."""
+    temp_db.save_verdict_statistics(
+        league="League1",
+        game_version="poe1",
+        session_date="2025-01-15",
+        stats={"keep_count": 5},
+    )
+    temp_db.save_verdict_statistics(
+        league="League2",
+        game_version="poe1",
+        session_date="2025-01-15",
+        stats={"keep_count": 10},
+    )
+
+    deleted = temp_db.clear_verdict_statistics(league="League1")
+
+    assert deleted == 1
+    assert temp_db.get_verdict_statistics("League1", "poe1", "2025-01-15") is None
+    assert temp_db.get_verdict_statistics("League2", "poe1", "2025-01-15") is not None
