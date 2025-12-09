@@ -10,9 +10,9 @@
 
 ### Active Task
 ```
-TASK: Add tests for core/price_rankings.py
+TASK: Add tests for core/price_integrator.py
 STATUS: pending
-COVERAGE: 63% -> target 80%
+COVERAGE: 67% -> target 80%
 ```
 
 ### Task Queue (priority by coverage gap)
@@ -20,7 +20,7 @@ COVERAGE: 63% -> target 80%
 #### Critical (<65% coverage)
 1. [x] `core/league_economy_history.py` - **43% -> 83%** DONE (+40%)
 2. [x] `core/value_rules.py` - **63% -> 100%** DONE (+37%)
-3. [ ] `core/price_rankings.py` - **63%** (486 lines, 180 missing)
+3. [x] `core/price_rankings.py` - **63% -> 78%** DONE (+15%)
 4. [ ] `core/price_integrator.py` - **67%** (394 lines, 130 missing)
 
 #### Medium (65-75% coverage)
@@ -34,6 +34,7 @@ COVERAGE: 63% -> target 80%
 - [x] Created task tracking system (2025-12-09)
 - [x] `league_economy_history.py` tests: 43% -> 83% (2025-12-09)
 - [x] `value_rules.py` tests: 63% -> 100% (2025-12-09)
+- [x] `price_rankings.py` tests: 63% -> 78% (2025-12-09)
 
 ---
 
