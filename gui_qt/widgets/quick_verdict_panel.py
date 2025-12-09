@@ -26,6 +26,7 @@ from gui_qt.styles import COLORS
 from core.quick_verdict import (
     QuickVerdictCalculator,
     VerdictResult,
+    VerdictStatistics,
     Verdict,
     VerdictThresholds,
 )
@@ -401,3 +402,174 @@ class CompactVerdictWidget(QWidget):
         self._emoji_label.setText("❓")
         self._text_label.setText("Waiting...")
         self._text_label.setStyleSheet(f"color: {COLORS['text']};")
+
+
+class VerdictStatisticsWidget(QWidget):
+    """
+    Compact widget displaying verdict statistics for a session.
+
+    Shows verdict distribution (keep/vendor/maybe counts) and
+    estimated value of keep items.
+
+    Usage:
+        stats_widget = VerdictStatisticsWidget()
+        stats_widget.update_stats(verdict_statistics)
+    """
+
+    stats_reset = pyqtSignal()  # Emitted when user clicks reset
+
+    def __init__(self, parent: Optional[QWidget] = None):
+        super().__init__(parent)
+        self._stats = VerdictStatistics()
+        self._setup_ui()
+
+    def _setup_ui(self) -> None:
+        """Set up the widget UI."""
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(8, 4, 8, 4)
+        layout.setSpacing(12)
+
+        # Stats frame
+        self._stats_frame = QFrame()
+        self._stats_frame.setFrameStyle(QFrame.Shape.StyledPanel)
+        self._stats_frame.setStyleSheet(f"""
+            QFrame {{
+                background-color: {COLORS['surface']};
+                border: 1px solid {COLORS['border']};
+                border-radius: 4px;
+                padding: 4px;
+            }}
+        """)
+
+        stats_layout = QHBoxLayout(self._stats_frame)
+        stats_layout.setContentsMargins(8, 4, 8, 4)
+        stats_layout.setSpacing(16)
+
+        # Session label
+        session_label = QLabel("Session:")
+        session_label.setStyleSheet(f"color: {COLORS['text_secondary']}; font-size: 11px;")
+        stats_layout.addWidget(session_label)
+
+        # Keep count
+        self._keep_label = QLabel("👍 0")
+        self._keep_label.setStyleSheet(f"color: #22bb22; font-weight: bold;")
+        self._keep_label.setToolTip("Items marked as KEEP")
+        stats_layout.addWidget(self._keep_label)
+
+        # Vendor count
+        self._vendor_label = QLabel("👎 0")
+        self._vendor_label.setStyleSheet(f"color: #bb2222; font-weight: bold;")
+        self._vendor_label.setToolTip("Items marked as VENDOR")
+        stats_layout.addWidget(self._vendor_label)
+
+        # Maybe count
+        self._maybe_label = QLabel("🤔 0")
+        self._maybe_label.setStyleSheet(f"color: #bbbb22; font-weight: bold;")
+        self._maybe_label.setToolTip("Items marked as MAYBE")
+        stats_layout.addWidget(self._maybe_label)
+
+        # Separator
+        separator = QFrame()
+        separator.setFrameShape(QFrame.Shape.VLine)
+        separator.setStyleSheet(f"color: {COLORS['border']};")
+        stats_layout.addWidget(separator)
+
+        # Estimated value
+        self._value_label = QLabel("Est: ~0c")
+        self._value_label.setStyleSheet(f"color: {COLORS['high_value']}; font-weight: bold;")
+        self._value_label.setToolTip("Estimated total value of KEEP items")
+        stats_layout.addWidget(self._value_label)
+
+        layout.addWidget(self._stats_frame)
+
+        # Reset button
+        reset_btn = QPushButton("↻")
+        reset_btn.setFixedSize(24, 24)
+        reset_btn.setToolTip("Reset session statistics")
+        reset_btn.clicked.connect(self._on_reset_clicked)
+        reset_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {COLORS['surface']};
+                border: 1px solid {COLORS['border']};
+                border-radius: 4px;
+                font-size: 14px;
+            }}
+            QPushButton:hover {{
+                background-color: {COLORS['border']};
+            }}
+        """)
+        layout.addWidget(reset_btn)
+
+        layout.addStretch()
+
+    def record_verdict(self, result: VerdictResult) -> None:
+        """
+        Record a new verdict result and update display.
+
+        Args:
+            result: The VerdictResult to record
+        """
+        self._stats.record(result)
+        self._update_display()
+
+    def update_stats(self, stats: VerdictStatistics) -> None:
+        """
+        Update display with external statistics.
+
+        Args:
+            stats: Statistics to display
+        """
+        self._stats = stats
+        self._update_display()
+
+    def get_stats(self) -> VerdictStatistics:
+        """Get current statistics."""
+        return self._stats
+
+    def _update_display(self) -> None:
+        """Update the display with current statistics."""
+        self._keep_label.setText(f"👍 {self._stats.keep_count}")
+        self._vendor_label.setText(f"👎 {self._stats.vendor_count}")
+        self._maybe_label.setText(f"🤔 {self._stats.maybe_count}")
+
+        if self._stats.keep_value > 0:
+            self._value_label.setText(f"Est: ~{self._stats.keep_value:.0f}c")
+        else:
+            self._value_label.setText("Est: ~0c")
+
+        # Update tooltips with detailed info
+        self._keep_label.setToolTip(
+            f"Items marked as KEEP: {self._stats.keep_count}\n"
+            f"Total estimated value: {self._stats.keep_value:.1f}c\n"
+            f"Percentage: {self._stats.keep_percentage:.1f}%"
+        )
+        self._vendor_label.setToolTip(
+            f"Items marked as VENDOR: {self._stats.vendor_count}\n"
+            f"Percentage: {self._stats.vendor_percentage:.1f}%"
+        )
+        self._maybe_label.setToolTip(
+            f"Items marked as MAYBE: {self._stats.maybe_count}\n"
+            f"Percentage: {self._stats.maybe_percentage:.1f}%"
+        )
+
+        # Show meta bonus info if applicable
+        if self._stats.items_with_meta_bonus > 0:
+            meta_info = (
+                f"Items with meta bonus: {self._stats.items_with_meta_bonus}\n"
+                f"Average meta bonus: {self._stats.average_meta_bonus:.1f}"
+            )
+            self._value_label.setToolTip(
+                f"Estimated total value of KEEP items: {self._stats.keep_value:.1f}c\n\n"
+                f"{meta_info}"
+            )
+
+    def _on_reset_clicked(self) -> None:
+        """Handle reset button click."""
+        self._stats.reset()
+        self._update_display()
+        self.stats_reset.emit()
+
+    def reset(self) -> None:
+        """Reset statistics and display."""
+        self._stats.reset()
+        self._update_display()

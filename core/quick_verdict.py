@@ -156,6 +156,139 @@ class VerdictResult:
         }[self.verdict]
 
 
+@dataclass
+class VerdictStatistics:
+    """
+    Tracks verdict statistics over a session or time period.
+
+    Maintains counts for each verdict type, estimated values,
+    and meta bonus tracking for analytics.
+    """
+    keep_count: int = 0
+    vendor_count: int = 0
+    maybe_count: int = 0
+
+    # Value tracking (only for items with estimates)
+    keep_value: float = 0.0
+    vendor_value: float = 0.0
+    maybe_value: float = 0.0
+
+    # Meta bonus tracking
+    items_with_meta_bonus: int = 0
+    total_meta_bonus: float = 0.0
+
+    # Confidence tracking
+    high_confidence_count: int = 0
+    medium_confidence_count: int = 0
+    low_confidence_count: int = 0
+
+    @property
+    def total_count(self) -> int:
+        """Total number of verdicts tracked."""
+        return self.keep_count + self.vendor_count + self.maybe_count
+
+    @property
+    def total_value(self) -> float:
+        """Total estimated value across all verdicts."""
+        return self.keep_value + self.vendor_value + self.maybe_value
+
+    @property
+    def keep_percentage(self) -> float:
+        """Percentage of items marked as KEEP."""
+        if self.total_count == 0:
+            return 0.0
+        return (self.keep_count / self.total_count) * 100
+
+    @property
+    def vendor_percentage(self) -> float:
+        """Percentage of items marked as VENDOR."""
+        if self.total_count == 0:
+            return 0.0
+        return (self.vendor_count / self.total_count) * 100
+
+    @property
+    def maybe_percentage(self) -> float:
+        """Percentage of items marked as MAYBE."""
+        if self.total_count == 0:
+            return 0.0
+        return (self.maybe_count / self.total_count) * 100
+
+    @property
+    def average_meta_bonus(self) -> float:
+        """Average meta bonus per item with bonus."""
+        if self.items_with_meta_bonus == 0:
+            return 0.0
+        return self.total_meta_bonus / self.items_with_meta_bonus
+
+    def record(self, result: VerdictResult) -> None:
+        """
+        Record a verdict result into statistics.
+
+        Args:
+            result: The VerdictResult to record
+        """
+        # Count by verdict type
+        if result.verdict == Verdict.KEEP:
+            self.keep_count += 1
+            if result.estimated_value:
+                self.keep_value += result.estimated_value
+        elif result.verdict == Verdict.VENDOR:
+            self.vendor_count += 1
+            if result.estimated_value:
+                self.vendor_value += result.estimated_value
+        else:  # MAYBE
+            self.maybe_count += 1
+            if result.estimated_value:
+                self.maybe_value += result.estimated_value
+
+        # Track confidence
+        if result.confidence == "high":
+            self.high_confidence_count += 1
+        elif result.confidence == "medium":
+            self.medium_confidence_count += 1
+        else:
+            self.low_confidence_count += 1
+
+        # Track meta bonus
+        if result.has_meta_bonus:
+            self.items_with_meta_bonus += 1
+            self.total_meta_bonus += result.meta_bonus_applied
+
+    def reset(self) -> None:
+        """Reset all statistics to zero."""
+        self.keep_count = 0
+        self.vendor_count = 0
+        self.maybe_count = 0
+        self.keep_value = 0.0
+        self.vendor_value = 0.0
+        self.maybe_value = 0.0
+        self.items_with_meta_bonus = 0
+        self.total_meta_bonus = 0.0
+        self.high_confidence_count = 0
+        self.medium_confidence_count = 0
+        self.low_confidence_count = 0
+
+    def summary_text(self) -> str:
+        """Get a concise summary string for display."""
+        if self.total_count == 0:
+            return "No verdicts yet"
+
+        parts = []
+        if self.keep_count > 0:
+            parts.append(f"👍 {self.keep_count}")
+        if self.vendor_count > 0:
+            parts.append(f"👎 {self.vendor_count}")
+        if self.maybe_count > 0:
+            parts.append(f"🤔 {self.maybe_count}")
+
+        summary = " | ".join(parts)
+
+        if self.keep_value > 0:
+            summary += f" | Est: ~{self.keep_value:.0f}c"
+
+        return summary
+
+
 class QuickVerdictCalculator:
     """
     Calculates simple keep/vendor/maybe verdicts for items.

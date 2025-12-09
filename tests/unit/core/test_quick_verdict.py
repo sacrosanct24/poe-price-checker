@@ -913,3 +913,211 @@ class TestVerdictResultMetaFields:
             detailed_reasons=[],
         )
         assert result.meta_bonus_applied == 0.0
+
+
+class TestVerdictStatistics:
+    """Tests for VerdictStatistics class."""
+
+    def test_initial_counts_zero(self):
+        """Should start with all counts at zero."""
+        from core.quick_verdict import VerdictStatistics
+        stats = VerdictStatistics()
+        assert stats.keep_count == 0
+        assert stats.vendor_count == 0
+        assert stats.maybe_count == 0
+        assert stats.total_count == 0
+
+    def test_record_keep_verdict(self):
+        """Should record keep verdict correctly."""
+        from core.quick_verdict import VerdictStatistics
+        stats = VerdictStatistics()
+        result = VerdictResult(
+            verdict=Verdict.KEEP,
+            explanation="Keep this",
+            detailed_reasons=[],
+            estimated_value=50.0,
+            confidence="high",
+        )
+        stats.record(result)
+        assert stats.keep_count == 1
+        assert stats.vendor_count == 0
+        assert stats.maybe_count == 0
+        assert stats.keep_value == 50.0
+        assert stats.high_confidence_count == 1
+
+    def test_record_vendor_verdict(self):
+        """Should record vendor verdict correctly."""
+        from core.quick_verdict import VerdictStatistics
+        stats = VerdictStatistics()
+        result = VerdictResult(
+            verdict=Verdict.VENDOR,
+            explanation="Vendor this",
+            detailed_reasons=[],
+            estimated_value=1.0,
+            confidence="high",
+        )
+        stats.record(result)
+        assert stats.vendor_count == 1
+        assert stats.keep_count == 0
+        assert stats.vendor_value == 1.0
+
+    def test_record_maybe_verdict(self):
+        """Should record maybe verdict correctly."""
+        from core.quick_verdict import VerdictStatistics
+        stats = VerdictStatistics()
+        result = VerdictResult(
+            verdict=Verdict.MAYBE,
+            explanation="Check further",
+            detailed_reasons=[],
+            estimated_value=10.0,
+            confidence="medium",
+        )
+        stats.record(result)
+        assert stats.maybe_count == 1
+        assert stats.maybe_value == 10.0
+        assert stats.medium_confidence_count == 1
+
+    def test_percentages(self):
+        """Should calculate percentages correctly."""
+        from core.quick_verdict import VerdictStatistics
+        stats = VerdictStatistics()
+
+        # Record 2 keep, 2 vendor, 1 maybe
+        for _ in range(2):
+            stats.record(VerdictResult(
+                verdict=Verdict.KEEP,
+                explanation="Keep",
+                detailed_reasons=[],
+            ))
+        for _ in range(2):
+            stats.record(VerdictResult(
+                verdict=Verdict.VENDOR,
+                explanation="Vendor",
+                detailed_reasons=[],
+            ))
+        stats.record(VerdictResult(
+            verdict=Verdict.MAYBE,
+            explanation="Maybe",
+            detailed_reasons=[],
+        ))
+
+        assert stats.total_count == 5
+        assert stats.keep_percentage == 40.0
+        assert stats.vendor_percentage == 40.0
+        assert stats.maybe_percentage == 20.0
+
+    def test_meta_bonus_tracking(self):
+        """Should track meta bonus correctly."""
+        from core.quick_verdict import VerdictStatistics
+        stats = VerdictStatistics()
+
+        result_with_bonus = VerdictResult(
+            verdict=Verdict.KEEP,
+            explanation="Meta",
+            detailed_reasons=[],
+            meta_affixes_found=["life", "resistance"],
+            meta_bonus_applied=25.0,
+        )
+        result_without = VerdictResult(
+            verdict=Verdict.VENDOR,
+            explanation="No meta",
+            detailed_reasons=[],
+        )
+
+        stats.record(result_with_bonus)
+        stats.record(result_without)
+
+        assert stats.items_with_meta_bonus == 1
+        assert stats.total_meta_bonus == 25.0
+        assert stats.average_meta_bonus == 25.0
+
+    def test_reset(self):
+        """Should reset all statistics to zero."""
+        from core.quick_verdict import VerdictStatistics
+        stats = VerdictStatistics()
+
+        stats.record(VerdictResult(
+            verdict=Verdict.KEEP,
+            explanation="Keep",
+            detailed_reasons=[],
+            estimated_value=100.0,
+        ))
+
+        assert stats.keep_count == 1
+        assert stats.keep_value == 100.0
+
+        stats.reset()
+
+        assert stats.keep_count == 0
+        assert stats.keep_value == 0.0
+        assert stats.total_count == 0
+
+    def test_summary_text_empty(self):
+        """Should show no verdicts message when empty."""
+        from core.quick_verdict import VerdictStatistics
+        stats = VerdictStatistics()
+        assert stats.summary_text() == "No verdicts yet"
+
+    def test_summary_text_with_data(self):
+        """Should show summary with counts and value."""
+        from core.quick_verdict import VerdictStatistics
+        stats = VerdictStatistics()
+
+        stats.record(VerdictResult(
+            verdict=Verdict.KEEP,
+            explanation="Keep",
+            detailed_reasons=[],
+            estimated_value=50.0,
+        ))
+        stats.record(VerdictResult(
+            verdict=Verdict.VENDOR,
+            explanation="Vendor",
+            detailed_reasons=[],
+        ))
+
+        summary = stats.summary_text()
+        assert "👍 1" in summary
+        assert "👎 1" in summary
+        assert "50c" in summary
+
+    def test_total_value(self):
+        """Should calculate total value across all verdict types."""
+        from core.quick_verdict import VerdictStatistics
+        stats = VerdictStatistics()
+
+        stats.record(VerdictResult(
+            verdict=Verdict.KEEP,
+            explanation="Keep",
+            detailed_reasons=[],
+            estimated_value=100.0,
+        ))
+        stats.record(VerdictResult(
+            verdict=Verdict.VENDOR,
+            explanation="Vendor",
+            detailed_reasons=[],
+            estimated_value=5.0,
+        ))
+        stats.record(VerdictResult(
+            verdict=Verdict.MAYBE,
+            explanation="Maybe",
+            detailed_reasons=[],
+            estimated_value=25.0,
+        ))
+
+        assert stats.total_value == 130.0
+
+    def test_confidence_tracking_low(self):
+        """Should track low confidence verdicts."""
+        from core.quick_verdict import VerdictStatistics
+        stats = VerdictStatistics()
+
+        stats.record(VerdictResult(
+            verdict=Verdict.MAYBE,
+            explanation="Uncertain",
+            detailed_reasons=[],
+            confidence="low",
+        ))
+
+        assert stats.low_confidence_count == 1
+        assert stats.medium_confidence_count == 0
+        assert stats.high_confidence_count == 0

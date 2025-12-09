@@ -1148,11 +1148,14 @@ class PriceCheckerWindow(QMainWindow):
                         best_price = None
 
             # Calculate verdict with parsed item and price
-            panel.quick_verdict_panel.update_verdict(
+            verdict_result = panel.quick_verdict_panel.update_verdict(
                 data.parsed_item,
                 price_chaos=best_price
             )
             panel.quick_verdict_panel.setVisible(True)
+
+            # Record verdict in session statistics
+            panel.record_verdict(verdict_result)
 
             # Add to history
             self._history_manager.add_entry(item_text, data.parsed_item, data.results)

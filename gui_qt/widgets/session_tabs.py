@@ -37,7 +37,7 @@ from gui_qt.widgets.results_table import ResultsTableWidget
 from gui_qt.widgets.item_inspector import ItemInspectorWidget
 from gui_qt.widgets.rare_evaluation_panel import RareEvaluationPanelWidget
 from gui_qt.widgets.ai_analysis_panel import AIAnalysisPanelWidget
-from gui_qt.widgets.quick_verdict_panel import QuickVerdictPanel
+from gui_qt.widgets.quick_verdict_panel import QuickVerdictPanel, VerdictStatisticsWidget
 
 if TYPE_CHECKING:
     pass
@@ -190,6 +190,10 @@ class SessionPanel(QWidget):
         self.quick_verdict_panel.setVisible(False)
         layout.addWidget(self.quick_verdict_panel)
 
+        # Bottom: Verdict statistics (session tracking)
+        self.verdict_stats_widget = VerdictStatisticsWidget()
+        layout.addWidget(self.verdict_stats_widget)
+
         # Bottom: AI analysis panel (hidden by default)
         self.ai_panel = AIAnalysisPanelWidget()
         self.ai_panel.setVisible(False)
@@ -210,6 +214,7 @@ class SessionPanel(QWidget):
         self.rare_eval_panel.setVisible(False)
         self.quick_verdict_panel.clear()
         self.quick_verdict_panel.setVisible(False)
+        self.verdict_stats_widget.reset()
         self.ai_panel.clear()
         self.ai_panel.setVisible(False)
 
@@ -228,6 +233,14 @@ class SessionPanel(QWidget):
     def set_verdict_thresholds(self, vendor: float, keep: float) -> None:
         """Set verdict thresholds from config."""
         self.quick_verdict_panel.set_thresholds(vendor, keep)
+
+    def record_verdict(self, result: Any) -> None:
+        """Record a verdict result in session statistics.
+
+        Args:
+            result: VerdictResult to record
+        """
+        self.verdict_stats_widget.record_verdict(result)
 
     def _on_row_selected(self, row_data: Dict[str, Any]) -> None:
         """Handle row selection in results table."""
@@ -544,3 +557,17 @@ class SessionTabWidget(QTabWidget):
             panel = self.widget(i)
             if isinstance(panel, SessionPanel):
                 panel.set_verdict_thresholds(vendor, keep)
+
+    def record_verdict(self, result: Any, session_index: Optional[int] = None) -> None:
+        """Record a verdict result in session statistics.
+
+        Args:
+            result: VerdictResult to record
+            session_index: Which session to record to (default: current)
+        """
+        if session_index is None:
+            session_index = self.currentIndex()
+        if 0 <= session_index < self.count():
+            panel = self.widget(session_index)
+            if isinstance(panel, SessionPanel):
+                panel.record_verdict(result)
