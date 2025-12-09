@@ -225,6 +225,10 @@ class SessionPanel(QWidget):
         if evaluator and hasattr(evaluator, 'meta_weights'):
             self.quick_verdict_panel.set_meta_weights(evaluator.meta_weights)
 
+    def set_verdict_thresholds(self, vendor: float, keep: float) -> None:
+        """Set verdict thresholds from config."""
+        self.quick_verdict_panel.set_thresholds(vendor, keep)
+
     def _on_row_selected(self, row_data: Dict[str, Any]) -> None:
         """Handle row selection in results table."""
         self.row_selected.emit(row_data)
@@ -508,6 +512,10 @@ class SessionTabWidget(QTabWidget):
         if self._rare_evaluator:
             panel.set_rare_evaluator(self._rare_evaluator)
 
+        # Set verdict thresholds if we have them
+        if hasattr(self, '_verdict_vendor') and hasattr(self, '_verdict_keep'):
+            panel.set_verdict_thresholds(self._verdict_vendor, self._verdict_keep)
+
         # Set AI callback if we have one
         if hasattr(self, '_ai_configured_callback') and self._ai_configured_callback:
             panel.results_table.set_ai_configured_callback(self._ai_configured_callback)
@@ -526,3 +534,13 @@ class SessionTabWidget(QTabWidget):
             panel = self.widget(i)
             if isinstance(panel, SessionPanel):
                 panel.set_rare_evaluator(evaluator)
+
+    def set_verdict_thresholds(self, vendor: float, keep: float) -> None:
+        """Set verdict thresholds for all session panels."""
+        self._verdict_vendor = vendor
+        self._verdict_keep = keep
+        # Update all existing panels
+        for i in range(self.count()):
+            panel = self.widget(i)
+            if isinstance(panel, SessionPanel):
+                panel.set_verdict_thresholds(vendor, keep)

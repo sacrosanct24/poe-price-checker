@@ -19,8 +19,8 @@ class TestSettingsDialogInit:
         assert dialog.windowTitle() == "Settings"
         assert dialog._config is mock_config
 
-    def test_has_four_tabs(self, qtbot):
-        """Dialog has four tabs: Accessibility, Performance, System Tray, AI."""
+    def test_has_five_tabs(self, qtbot):
+        """Dialog has five tabs: Accessibility, Performance, System Tray, AI, Verdict."""
         from gui_qt.dialogs.settings_dialog import SettingsDialog
 
         mock_config = self._create_mock_config()
@@ -28,11 +28,12 @@ class TestSettingsDialogInit:
         dialog = SettingsDialog(mock_config)
         qtbot.addWidget(dialog)
 
-        assert dialog._tabs.count() == 4
+        assert dialog._tabs.count() == 5
         assert dialog._tabs.tabText(0) == "Accessibility"
         assert dialog._tabs.tabText(1) == "Performance"
         assert dialog._tabs.tabText(2) == "System Tray"
         assert dialog._tabs.tabText(3) == "AI"
+        assert dialog._tabs.tabText(4) == "Verdict"
 
     def _create_mock_config(self):
         """Create a mock config with all required properties."""
@@ -61,6 +62,10 @@ class TestSettingsDialogInit:
         mock_config.get_ai_api_key = MagicMock(return_value="")
         mock_config.ollama_host = ""
         mock_config.ollama_model = "deepseek-r1:14b"
+        # Verdict
+        mock_config.verdict_vendor_threshold = 2.0
+        mock_config.verdict_keep_threshold = 15.0
+        mock_config.verdict_preset = "default"
         return mock_config
 
 
@@ -91,6 +96,10 @@ class TestAccessibilityTab:
         mock_config.get_ai_api_key = MagicMock(return_value="")
         mock_config.ollama_host = ""
         mock_config.ollama_model = "deepseek-r1:14b"
+        # Verdict
+        mock_config.verdict_vendor_threshold = 2.0
+        mock_config.verdict_keep_threshold = 15.0
+        mock_config.verdict_preset = "default"
         return mock_config
 
     def test_font_scale_slider_range(self, qtbot):
@@ -166,6 +175,10 @@ class TestPerformanceTab:
         mock_config.get_ai_api_key = MagicMock(return_value="")
         mock_config.ollama_host = ""
         mock_config.ollama_model = "deepseek-r1:14b"
+        # Verdict
+        mock_config.verdict_vendor_threshold = 2.0
+        mock_config.verdict_keep_threshold = 15.0
+        mock_config.verdict_preset = "default"
         return mock_config
 
     def test_rankings_cache_range(self, qtbot):
@@ -260,6 +273,10 @@ class TestSystemTrayTab:
         mock_config.get_ai_api_key = MagicMock(return_value="")
         mock_config.ollama_host = ""
         mock_config.ollama_model = "deepseek-r1:14b"
+        # Verdict
+        mock_config.verdict_vendor_threshold = 2.0
+        mock_config.verdict_keep_threshold = 15.0
+        mock_config.verdict_preset = "default"
         return mock_config
 
     def test_loads_settings_from_config(self, qtbot):
@@ -323,6 +340,10 @@ class TestSettingsDialogSave:
         mock_config.get_ai_api_key = MagicMock(return_value="")
         mock_config.ollama_host = ""
         mock_config.ollama_model = "deepseek-r1:14b"
+        # Verdict
+        mock_config.verdict_vendor_threshold = 2.0
+        mock_config.verdict_keep_threshold = 15.0
+        mock_config.verdict_preset = "default"
         return mock_config
 
     def test_save_updates_all_config_values(self, qtbot):
@@ -386,6 +407,10 @@ class TestSettingsDialogReset:
         mock_config.get_ai_api_key = MagicMock(return_value="")
         mock_config.ollama_host = ""
         mock_config.ollama_model = "deepseek-r1:14b"
+        # Verdict
+        mock_config.verdict_vendor_threshold = 2.0
+        mock_config.verdict_keep_threshold = 15.0
+        mock_config.verdict_preset = "default"
         return mock_config
 
     def test_reset_accessibility_tab(self, qtbot):
@@ -540,3 +565,185 @@ class TestConfigGuardrails:
 
         config.history_max_entries = 1000  # Above max
         assert config.history_max_entries == 500
+
+
+class TestVerdictTab:
+    """Tests for Verdict settings tab."""
+
+    def _create_mock_config(self):
+        """Create a mock config with all required properties."""
+        mock_config = MagicMock()
+        mock_config.font_scale = 1.0
+        mock_config.tooltip_delay_ms = 500
+        mock_config.reduce_animations = False
+        mock_config.rankings_cache_hours = 24
+        mock_config.price_cache_ttl_seconds = 3600
+        mock_config.api_rate_limit = 0.33
+        mock_config.toast_duration_ms = 3000
+        mock_config.history_max_entries = 100
+        mock_config.minimize_to_tray = True
+        mock_config.start_minimized = False
+        mock_config.show_tray_notifications = True
+        mock_config.tray_alert_threshold = 50.0
+        # AI
+        mock_config.ai_provider = ""
+        mock_config.ai_max_tokens = 500
+        mock_config.ai_timeout = 30
+        mock_config.ai_build_name = ""
+        mock_config.ai_custom_prompt = ""
+        mock_config.get_ai_api_key = MagicMock(return_value="")
+        mock_config.ollama_host = ""
+        mock_config.ollama_model = "deepseek-r1:14b"
+        # Verdict
+        mock_config.verdict_vendor_threshold = 2.0
+        mock_config.verdict_keep_threshold = 15.0
+        mock_config.verdict_preset = "default"
+        return mock_config
+
+    def test_verdict_tab_exists(self, qtbot):
+        """Verdict tab is present in settings dialog."""
+        from gui_qt.dialogs.settings_dialog import SettingsDialog
+
+        mock_config = self._create_mock_config()
+        dialog = SettingsDialog(mock_config)
+        qtbot.addWidget(dialog)
+
+        assert dialog._tabs.tabText(4) == "Verdict"
+
+    def test_verdict_threshold_spinboxes_exist(self, qtbot):
+        """Vendor and keep threshold spinboxes are present."""
+        from gui_qt.dialogs.settings_dialog import SettingsDialog
+
+        mock_config = self._create_mock_config()
+        dialog = SettingsDialog(mock_config)
+        qtbot.addWidget(dialog)
+
+        assert hasattr(dialog, '_vendor_threshold_spin')
+        assert hasattr(dialog, '_keep_threshold_spin')
+
+    def test_verdict_thresholds_load_from_config(self, qtbot):
+        """Verdict thresholds are loaded from config."""
+        from gui_qt.dialogs.settings_dialog import SettingsDialog
+
+        mock_config = self._create_mock_config()
+        mock_config.verdict_vendor_threshold = 5.0
+        mock_config.verdict_keep_threshold = 25.0
+
+        dialog = SettingsDialog(mock_config)
+        qtbot.addWidget(dialog)
+
+        assert dialog._vendor_threshold_spin.value() == 5.0
+        assert dialog._keep_threshold_spin.value() == 25.0
+
+    def test_vendor_threshold_range(self, qtbot):
+        """Vendor threshold has correct range (0.1-50.0)."""
+        from gui_qt.dialogs.settings_dialog import SettingsDialog
+
+        mock_config = self._create_mock_config()
+        dialog = SettingsDialog(mock_config)
+        qtbot.addWidget(dialog)
+
+        assert dialog._vendor_threshold_spin.minimum() == 0.1
+        assert dialog._vendor_threshold_spin.maximum() == 50.0
+
+    def test_keep_threshold_range(self, qtbot):
+        """Keep threshold has correct range (1.0-500.0)."""
+        from gui_qt.dialogs.settings_dialog import SettingsDialog
+
+        mock_config = self._create_mock_config()
+        dialog = SettingsDialog(mock_config)
+        qtbot.addWidget(dialog)
+
+        assert dialog._keep_threshold_spin.minimum() == 1.0
+        assert dialog._keep_threshold_spin.maximum() == 500.0
+
+    def test_preset_buttons_apply_thresholds(self, qtbot):
+        """Preset buttons apply correct threshold values."""
+        from gui_qt.dialogs.settings_dialog import SettingsDialog
+
+        mock_config = self._create_mock_config()
+        dialog = SettingsDialog(mock_config)
+        qtbot.addWidget(dialog)
+
+        # Apply league start preset
+        dialog._apply_verdict_preset("league_start")
+        assert dialog._vendor_threshold_spin.value() == 1.0
+        assert dialog._keep_threshold_spin.value() == 5.0
+
+        # Apply late league preset
+        dialog._apply_verdict_preset("late_league")
+        assert dialog._vendor_threshold_spin.value() == 5.0
+        assert dialog._keep_threshold_spin.value() == 20.0
+
+    def test_manual_change_sets_custom_preset(self, qtbot):
+        """Manual threshold change updates preset label to Custom."""
+        from gui_qt.dialogs.settings_dialog import SettingsDialog
+
+        mock_config = self._create_mock_config()
+        dialog = SettingsDialog(mock_config)
+        qtbot.addWidget(dialog)
+
+        # Apply a known preset first
+        dialog._apply_verdict_preset("league_start")
+        assert "League Start" in dialog._preset_label.text()
+
+        # Manually change a threshold
+        dialog._vendor_threshold_spin.setValue(7.5)
+        assert "Custom" in dialog._preset_label.text()
+
+    def test_reset_verdict_tab(self, qtbot):
+        """Reset restores verdict defaults."""
+        from gui_qt.dialogs.settings_dialog import SettingsDialog
+
+        mock_config = self._create_mock_config()
+        mock_config.verdict_vendor_threshold = 10.0
+        mock_config.verdict_keep_threshold = 50.0
+
+        dialog = SettingsDialog(mock_config)
+        qtbot.addWidget(dialog)
+
+        # Verify non-default values are loaded
+        assert dialog._vendor_threshold_spin.value() == 10.0
+        assert dialog._keep_threshold_spin.value() == 50.0
+
+        # Select verdict tab and reset
+        dialog._tabs.setCurrentIndex(4)
+        dialog._reset_to_defaults()
+
+        # Verify defaults are restored
+        assert dialog._vendor_threshold_spin.value() == 2.0
+        assert dialog._keep_threshold_spin.value() == 15.0
+
+
+class TestVerdictConfigGuardrails:
+    """Tests for verdict config property guardrails."""
+
+    def test_verdict_vendor_threshold_guardrails(self, tmp_path):
+        """Vendor threshold is clamped to 0.1-50.0."""
+        from core.config import Config
+
+        config = Config(config_file=tmp_path / "test_config.json")
+
+        config.verdict_vendor_threshold = 0.01  # Below min
+        assert config.verdict_vendor_threshold == 0.1
+
+        config.verdict_vendor_threshold = 100.0  # Above max
+        assert config.verdict_vendor_threshold == 50.0
+
+        config.verdict_vendor_threshold = 5.0  # Within range
+        assert config.verdict_vendor_threshold == 5.0
+
+    def test_verdict_keep_threshold_guardrails(self, tmp_path):
+        """Keep threshold is clamped to 1.0-500.0."""
+        from core.config import Config
+
+        config = Config(config_file=tmp_path / "test_config.json")
+
+        config.verdict_keep_threshold = 0.5  # Below min
+        assert config.verdict_keep_threshold == 1.0
+
+        config.verdict_keep_threshold = 1000.0  # Above max
+        assert config.verdict_keep_threshold == 500.0
+
+        config.verdict_keep_threshold = 25.0  # Within range
+        assert config.verdict_keep_threshold == 25.0

@@ -502,6 +502,9 @@ class PriceCheckerWindow(QMainWindow):
         if self._rare_evaluator:
             self.session_tabs.set_rare_evaluator(self._rare_evaluator)
 
+        # Set verdict thresholds from config
+        self._apply_verdict_thresholds()
+
         # Set AI configured callback for all results tables
         self.session_tabs.set_ai_configured_callback(self._is_ai_configured)
 
@@ -1313,7 +1316,16 @@ class PriceCheckerWindow(QMainWindow):
 
         dialog = SettingsDialog(self.ctx.config, parent=self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
+            # Apply updated verdict thresholds
+            self._apply_verdict_thresholds()
             self._set_status("Settings saved")
+
+    def _apply_verdict_thresholds(self) -> None:
+        """Apply verdict thresholds from config to session tabs."""
+        if hasattr(self, 'session_tabs'):
+            vendor = self.ctx.config.verdict_vendor_threshold
+            keep = self.ctx.config.verdict_keep_threshold
+            self.session_tabs.set_verdict_thresholds(vendor, keep)
 
     def _cleanup_before_close(self) -> None:
         """Clean up resources before closing."""

@@ -350,6 +350,14 @@ class ItemTableModel(QAbstractTableModel):
         self.beginResetModel()
         self.endResetModel()
 
+    def set_verdict_thresholds(self, vendor: float, keep: float) -> None:
+        """Set verdict thresholds for calculation."""
+        self._verdict_calculator.set_thresholds_from_values(vendor, keep)
+        self._verdict_cache.clear()  # Clear cache to recalculate with new thresholds
+        # Refresh display
+        self.beginResetModel()
+        self.endResetModel()
+
     def set_min_value(self, min_value: float) -> None:
         """Set minimum value filter."""
         self.beginResetModel()
@@ -547,6 +555,15 @@ class StashViewerWindow(QDialog):
         """
         self._item_model.set_meta_weights(meta_weights)
 
+    def set_verdict_thresholds(self, vendor: float, keep: float) -> None:
+        """Set verdict thresholds for Quick Verdict calculation.
+
+        Args:
+            vendor: Threshold below which items are VENDOR
+            keep: Threshold above which items are KEEP
+        """
+        self._item_model.set_verdict_thresholds(vendor, keep)
+
     def _create_widgets(self) -> None:
         """Create all UI elements."""
         layout = QVBoxLayout(self)
@@ -717,6 +734,12 @@ class StashViewerWindow(QDialog):
         last_fetch = self.ctx.config.stash_last_fetch
         if last_fetch:
             self.last_fetch_label.setText(f"Last fetched: {last_fetch}")
+
+        # Apply verdict thresholds from config
+        self.set_verdict_thresholds(
+            self.ctx.config.verdict_vendor_threshold,
+            self.ctx.config.verdict_keep_threshold,
+        )
 
     def _load_cached_stash(self) -> None:
         """Load the most recent cached stash snapshot on startup."""

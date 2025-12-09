@@ -136,6 +136,16 @@ class Config:
             # Example: {"poe.ninja": true, "poe.watch": false}
             "enabled_sources": {},
         },
+        "verdict": {
+            # Quick Verdict thresholds for keep/vendor decisions
+            # Items below vendor_threshold = VENDOR
+            # Items above keep_threshold = KEEP
+            # Items between = MAYBE
+            "vendor_threshold": 2.0,
+            "keep_threshold": 15.0,
+            # League timing preset: "default", "league_start", "mid_league", "late_league", "ssf"
+            "preset": "default",
+        },
         "ai": {
             # AI provider for item analysis: "gemini", "claude", "openai", or ""
             "provider": "",
@@ -518,6 +528,45 @@ class Config:
         """Set tray alert threshold and persist."""
         self.data["ui"]["tray_alert_threshold"] = max(0.0, float(value))
         self.save()
+
+    # ------------------------------------------------------------------
+    # Verdict Settings (Quick Verdict keep/vendor thresholds)
+    # ------------------------------------------------------------------
+
+    @property
+    def verdict_vendor_threshold(self) -> float:
+        """Chaos value threshold below which items are VENDOR."""
+        return self.data.get("verdict", {}).get("vendor_threshold", 2.0)
+
+    @verdict_vendor_threshold.setter
+    def verdict_vendor_threshold(self, value: float) -> None:
+        """Set vendor threshold with guardrails (0.1 to 50.0)."""
+        self.data.setdefault("verdict", {})["vendor_threshold"] = max(0.1, min(50.0, float(value)))
+        self.save()
+
+    @property
+    def verdict_keep_threshold(self) -> float:
+        """Chaos value threshold above which items are KEEP."""
+        return self.data.get("verdict", {}).get("keep_threshold", 15.0)
+
+    @verdict_keep_threshold.setter
+    def verdict_keep_threshold(self, value: float) -> None:
+        """Set keep threshold with guardrails (1.0 to 500.0)."""
+        self.data.setdefault("verdict", {})["keep_threshold"] = max(1.0, min(500.0, float(value)))
+        self.save()
+
+    @property
+    def verdict_preset(self) -> str:
+        """Current verdict preset: default, league_start, mid_league, late_league, ssf."""
+        return self.data.get("verdict", {}).get("preset", "default")
+
+    @verdict_preset.setter
+    def verdict_preset(self, value: str) -> None:
+        """Set verdict preset and persist."""
+        valid_presets = {"default", "league_start", "mid_league", "late_league", "ssf"}
+        if value in valid_presets:
+            self.data.setdefault("verdict", {})["preset"] = value
+            self.save()
 
     # ------------------------------------------------------------------
     # Accessibility Settings

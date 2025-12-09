@@ -82,6 +82,10 @@ class SettingsDialog(QDialog):
         ai_tab = self._create_ai_tab()
         self._tabs.addTab(ai_tab, "AI")
 
+        # Verdict tab
+        verdict_tab = self._create_verdict_tab()
+        self._tabs.addTab(verdict_tab, "Verdict")
+
         # Buttons
         button_row = QHBoxLayout()
         button_row.addStretch()
@@ -707,6 +711,135 @@ class SettingsDialog(QDialog):
         # Could be used to highlight the relevant API key field
         pass
 
+    def _create_verdict_tab(self) -> QWidget:
+        """Create the Verdict settings tab for keep/vendor thresholds."""
+        from core.quick_verdict import VerdictThresholds
+
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+        layout.setSpacing(16)
+
+        # Thresholds group
+        thresholds_group = QGroupBox("Verdict Thresholds")
+        thresholds_layout = QVBoxLayout(thresholds_group)
+        thresholds_layout.setSpacing(12)
+
+        info_label = QLabel(
+            "Configure chaos value thresholds for Quick Verdict decisions.\n"
+            "Items below Vendor threshold = 👎 VENDOR\n"
+            "Items above Keep threshold = 👍 KEEP\n"
+            "Items between = 🤔 MAYBE"
+        )
+        info_label.setStyleSheet("color: gray; font-size: 11px;")
+        thresholds_layout.addWidget(info_label)
+
+        # Vendor threshold
+        vendor_row = QHBoxLayout()
+        vendor_label = QLabel("Vendor threshold:")
+        vendor_label.setMinimumWidth(120)
+        vendor_row.addWidget(vendor_label)
+
+        self._vendor_threshold_spin = QDoubleSpinBox()
+        self._vendor_threshold_spin.setRange(0.1, 50.0)
+        self._vendor_threshold_spin.setSingleStep(0.5)
+        self._vendor_threshold_spin.setSuffix(" chaos")
+        self._vendor_threshold_spin.setToolTip(
+            "Items with value below this threshold will be marked as VENDOR.\n"
+            "Default: 2.0 chaos"
+        )
+        self._vendor_threshold_spin.valueChanged.connect(self._on_verdict_threshold_changed)
+        vendor_row.addWidget(self._vendor_threshold_spin)
+        vendor_row.addStretch()
+        thresholds_layout.addLayout(vendor_row)
+
+        # Keep threshold
+        keep_row = QHBoxLayout()
+        keep_label = QLabel("Keep threshold:")
+        keep_label.setMinimumWidth(120)
+        keep_row.addWidget(keep_label)
+
+        self._keep_threshold_spin = QDoubleSpinBox()
+        self._keep_threshold_spin.setRange(1.0, 500.0)
+        self._keep_threshold_spin.setSingleStep(1.0)
+        self._keep_threshold_spin.setSuffix(" chaos")
+        self._keep_threshold_spin.setToolTip(
+            "Items with value above this threshold will be marked as KEEP.\n"
+            "Default: 15.0 chaos"
+        )
+        self._keep_threshold_spin.valueChanged.connect(self._on_verdict_threshold_changed)
+        keep_row.addWidget(self._keep_threshold_spin)
+        keep_row.addStretch()
+        thresholds_layout.addLayout(keep_row)
+
+        layout.addWidget(thresholds_group)
+
+        # Presets group
+        presets_group = QGroupBox("League Timing Presets")
+        presets_layout = QVBoxLayout(presets_group)
+        presets_layout.setSpacing(12)
+
+        preset_info = QLabel(
+            "Use presets based on league timing. Early league keeps more items,\n"
+            "late league is more selective. SSF mode keeps anything useful."
+        )
+        preset_info.setStyleSheet("color: gray; font-size: 11px;")
+        presets_layout.addWidget(preset_info)
+
+        # Preset buttons
+        preset_btn_row = QHBoxLayout()
+
+        presets = [
+            ("League Start", "league_start", "Very lenient - keep more items (1c vendor, 5c keep)"),
+            ("Mid League", "mid_league", "Balanced thresholds (2c vendor, 10c keep)"),
+            ("Late League", "late_league", "More selective (5c vendor, 20c keep)"),
+            ("SSF", "ssf", "Keep anything useful (0.5c vendor, 3c keep)"),
+        ]
+
+        for label, preset_id, tooltip in presets:
+            btn = QPushButton(label)
+            btn.setToolTip(tooltip)
+            btn.clicked.connect(lambda checked, p=preset_id: self._apply_verdict_preset(p))
+            preset_btn_row.addWidget(btn)
+
+        preset_btn_row.addStretch()
+        presets_layout.addLayout(preset_btn_row)
+
+        # Current preset label
+        self._preset_label = QLabel("Current preset: Default")
+        self._preset_label.setStyleSheet("font-style: italic;")
+        presets_layout.addWidget(self._preset_label)
+
+        layout.addWidget(presets_group)
+
+        # Push content to top
+        layout.addStretch()
+
+        return tab
+
+    def _apply_verdict_preset(self, preset: str) -> None:
+        """Apply a verdict threshold preset."""
+        from core.quick_verdict import VerdictThresholds
+
+        preset_map = {
+            "league_start": VerdictThresholds.for_league_start(),
+            "mid_league": VerdictThresholds.for_mid_league(),
+            "late_league": VerdictThresholds.for_late_league(),
+            "ssf": VerdictThresholds.for_ssf(),
+        }
+
+        if preset in preset_map:
+            thresholds = preset_map[preset]
+            self._vendor_threshold_spin.setValue(thresholds.vendor_threshold)
+            self._keep_threshold_spin.setValue(thresholds.keep_threshold)
+
+            preset_names = {
+                "league_start": "League Start",
+                "mid_league": "Mid League",
+                "late_league": "Late League",
+                "ssf": "SSF",
+            }
+            self._preset_label.setText(f"Current preset: {preset_names.get(preset, preset)}")
+
     def _on_font_scale_changed(self, value: int) -> None:
         """Update font scale label when slider changes."""
         self._font_scale_label.setText(f"{value}%")
@@ -725,6 +858,12 @@ class SettingsDialog(QDialog):
         """Handle notifications checkbox state change."""
         enabled = self._show_notifications_cb.isChecked()
         self._threshold_spin.setEnabled(enabled)
+
+    def _on_verdict_threshold_changed(self) -> None:
+        """Handle manual change to verdict threshold spinboxes."""
+        # When user manually edits thresholds, mark as Custom preset
+        if hasattr(self, '_preset_label'):
+            self._preset_label.setText("Current preset: Custom")
 
     def _load_settings(self) -> None:
         """Load current settings into the widgets."""
@@ -791,6 +930,21 @@ class SettingsDialog(QDialog):
         self._ai_build_edit.setText(self._config.ai_build_name)
         self._ai_prompt_edit.setPlainText(self._config.ai_custom_prompt)
 
+        # Verdict
+        self._vendor_threshold_spin.setValue(self._config.verdict_vendor_threshold)
+        self._keep_threshold_spin.setValue(self._config.verdict_keep_threshold)
+        preset = self._config.verdict_preset
+        if preset and preset != "default":
+            preset_names = {
+                "league_start": "League Start",
+                "mid_league": "Mid League",
+                "late_league": "Late League",
+                "ssf": "SSF",
+            }
+            self._preset_label.setText(f"Current preset: {preset_names.get(preset, preset)}")
+        else:
+            self._preset_label.setText("Current preset: Custom")
+
         # Update dependent states
         self._on_font_scale_changed(self._font_scale_slider.value())
         self._on_rate_limit_changed(self._rate_limit_slider.value())
@@ -822,6 +976,10 @@ class SettingsDialog(QDialog):
             self._ai_timeout_spin.setValue(30)
             self._ai_build_edit.clear()
             self._ai_prompt_edit.clear()
+        elif current_tab == 4:  # Verdict
+            self._vendor_threshold_spin.setValue(2.0)
+            self._keep_threshold_spin.setValue(15.0)
+            self._preset_label.setText("Current preset: Default")
 
     def _save_and_accept(self) -> None:
         """Save settings and close the dialog."""
@@ -875,6 +1033,22 @@ class SettingsDialog(QDialog):
         self._config.ai_timeout = self._ai_timeout_spin.value()
         self._config.ai_build_name = self._ai_build_edit.text()
         self._config.ai_custom_prompt = self._ai_prompt_edit.toPlainText()
+
+        # Verdict
+        self._config.verdict_vendor_threshold = self._vendor_threshold_spin.value()
+        self._config.verdict_keep_threshold = self._keep_threshold_spin.value()
+        # Determine preset based on current values
+        preset_text = self._preset_label.text()
+        if "League Start" in preset_text:
+            self._config.verdict_preset = "league_start"
+        elif "Mid League" in preset_text:
+            self._config.verdict_preset = "mid_league"
+        elif "Late League" in preset_text:
+            self._config.verdict_preset = "late_league"
+        elif "SSF" in preset_text:
+            self._config.verdict_preset = "ssf"
+        else:
+            self._config.verdict_preset = "custom"
 
         self.accept()
 

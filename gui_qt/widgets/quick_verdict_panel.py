@@ -392,6 +392,10 @@ class CompactVerdictWidget(QWidget):
         """Update meta weights for smarter verdicts."""
         self._calculator.set_meta_weights(meta_weights)
 
+    def set_thresholds(self, vendor: float, keep: float) -> None:
+        """Update verdict thresholds."""
+        self._calculator.set_thresholds_from_values(vendor, keep)
+
     def clear(self) -> None:
         """Clear the display."""
         self._emoji_label.setText("❓")

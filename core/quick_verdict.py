@@ -212,6 +212,32 @@ class QuickVerdictCalculator:
         """
         self.meta_weights = meta_weights or {}
 
+    def set_thresholds(self, thresholds: VerdictThresholds) -> None:
+        """
+        Update verdict thresholds dynamically.
+
+        Args:
+            thresholds: New verdict thresholds to use
+        """
+        self.thresholds = thresholds or VerdictThresholds()
+
+    def set_thresholds_from_values(
+        self,
+        vendor_threshold: float,
+        keep_threshold: float,
+    ) -> None:
+        """
+        Update verdict thresholds from individual values.
+
+        Args:
+            vendor_threshold: Threshold below which items are VENDOR
+            keep_threshold: Threshold above which items are KEEP
+        """
+        self.thresholds = VerdictThresholds(
+            vendor_threshold=vendor_threshold,
+            keep_threshold=keep_threshold,
+        )
+
     def calculate(
         self,
         item: Any,
