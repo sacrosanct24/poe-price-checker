@@ -13,7 +13,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from core.item_parser import ParsedItem
 from core.rare_item_evaluator import RareItemEvaluator
@@ -203,7 +203,7 @@ class StashValuator:
     def load_prices(
         self,
         league: str,
-        progress_callback: Optional[callable] = None
+        progress_callback: Optional[Callable[[int, int, str], Any]] = None
     ) -> None:
         """
         Load prices from poe.ninja for a league.
@@ -455,7 +455,7 @@ class StashValuator:
     def valuate_snapshot(
         self,
         snapshot: StashSnapshot,
-        progress_callback: Optional[callable] = None,
+        progress_callback: Optional[Callable[[int, int, str], Any]] = None,
     ) -> ValuationResult:
         """
         Price all items in a stash snapshot.
@@ -521,7 +521,7 @@ def valuate_stash(
     account_name: str,
     league: str,
     max_tabs: Optional[int] = None,
-    progress_callback: Optional[callable] = None,
+    progress_callback: Optional[Callable[[int, int, str], Any]] = None,
 ) -> ValuationResult:
     """
     Fetch and valuate stash.
