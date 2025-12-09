@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from typing import Optional, Dict, List, Any
+from typing import Optional, Dict, List, Any, cast
 from data_sources.base_api import BaseAPIClient
 import logging
 
@@ -54,11 +54,21 @@ class PoeWatchAPI(BaseAPIClient):
         query = params.get('q', '') if params else ''
         return f"{endpoint}:{league}:{category}:{item_id}:{query}"
 
-    def get(self, endpoint: str, params: Optional[Dict] = None, **kwargs) -> Any:
+    def get(
+        self,
+        endpoint: str,
+        params: Optional[Dict] = None,
+        use_cache: bool = True,
+        ttl_override: Optional[int] = None,
+        timeout_override: Any = None,
+    ) -> Dict[str, Any]:
         """Override get to track request count."""
         self.request_count += 1
         logger.info(f"[poe.watch] API Request #{self.request_count}: {endpoint} (params: {params})")
-        return super().get(endpoint, params=params, **kwargs)
+        return super().get(
+            endpoint, params=params, use_cache=use_cache,
+            ttl_override=ttl_override, timeout_override=timeout_override
+        )
 
     def get_leagues(self) -> List[Dict[str, str]]:
         """
@@ -67,7 +77,7 @@ class PoeWatchAPI(BaseAPIClient):
         Returns:
             List of league dicts with 'name', 'start_date', 'end_date'
         """
-        return self.get("leagues")
+        return cast(List[Dict[str, str]], self.get("leagues"))
 
     def get_categories(self) -> List[Dict[str, Any]]:
         """
@@ -77,8 +87,13 @@ class PoeWatchAPI(BaseAPIClient):
             List of category dicts with 'id', 'name', 'display', 'groups'
         """
         if self._category_cache is None:
-            self._category_cache = self.get("categories")
-        return self._category_cache
+            result = self.get("categories")
+            # API may return dict with 'result' key or direct list
+            if isinstance(result, dict):
+                self._category_cache = cast(List[Dict[str, Any]], result.get("result", []))
+            else:
+                self._category_cache = cast(List[Dict[str, Any]], result)
+        return self._category_cache if self._category_cache is not None else []
 
     def get_items_by_category(
         self,
@@ -107,7 +122,7 @@ class PoeWatchAPI(BaseAPIClient):
             **filters
         }
 
-        return self.get("get", params=params)
+        return cast(List[Dict[str, Any]], self.get("get", params=params))
 
     def search_items(self, query: str) -> List[Dict[str, Any]]:
         """
@@ -120,7 +135,7 @@ class PoeWatchAPI(BaseAPIClient):
             List of matching items
         """
         params = {'league': self.league, 'q': query}
-        return self.get("search", params=params)
+        return cast(List[Dict[str, Any]], self.get("search", params=params))
 
     def get_item_history(self, item_id: int) -> List[Dict[str, Any]]:
         """
@@ -133,7 +148,7 @@ class PoeWatchAPI(BaseAPIClient):
             List of historical price points with 'mean', 'date', 'id'
         """
         params = {'league': self.league, 'id': item_id}
-        return self.get("history", params=params)
+        return cast(List[Dict[str, Any]], self.get("history", params=params))
 
     def get_enchants(self, item_id: int) -> List[Dict[str, Any]]:
         """
@@ -147,7 +162,7 @@ class PoeWatchAPI(BaseAPIClient):
         """
         params = {'league': self.league, 'id': item_id}
         try:
-            return self.get("enchants", params=params)
+            return cast(List[Dict[str, Any]], self.get("enchants", params=params))
         except Exception as e:
             logger.warning(f"Failed to get enchants for item {item_id}: {e}")
             return []
@@ -164,7 +179,7 @@ class PoeWatchAPI(BaseAPIClient):
         """
         params = {'league': self.league, 'id': item_id}
         try:
-            return self.get("corruptions", params=params)
+            return cast(List[Dict[str, Any]], self.get("corruptions", params=params))
         except Exception as e:
             logger.warning(f"Failed to get corruptions for item {item_id}: {e}")
             return []
@@ -177,7 +192,7 @@ class PoeWatchAPI(BaseAPIClient):
             Dict with 'items' key containing list of all items
         """
         params = {'league': self.league}
-        return self.get("compact", params=params)
+        return cast(Dict[str, List[Dict[str, Any]]], self.get("compact", params=params))
 
     def get_status(self) -> Dict[str, Any]:
         """
@@ -186,7 +201,7 @@ class PoeWatchAPI(BaseAPIClient):
         Returns:
             Dict with 'changeID', 'requestedStashes', 'computedStashes'
         """
-        return self.get("status")
+        return cast(Dict[str, Any], self.get("status"))
 
     def load_all_prices(self) -> Dict[str, Dict[str, Any]]:
         """

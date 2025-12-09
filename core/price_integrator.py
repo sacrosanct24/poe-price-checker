@@ -14,7 +14,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from functools import lru_cache
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from core.item_parser import ParsedItem
 from core.rare_item_evaluator import RareItemEvaluation, RareItemEvaluator
@@ -468,7 +468,7 @@ class PriceIntegrator:
 
         # Try exact match first
         if base_lower in base_type_to_class:
-            return base_type_to_class[base_lower]
+            return str(base_type_to_class[base_lower])
 
         # Pattern-based inference
         if any(word in base_lower for word in ["regalia", "plate", "garb", "vest", "robe", "mail", "coat"]):
@@ -609,8 +609,8 @@ class PriceIntegrator:
 
             # Unique items - use poe.ninja
             if rarity == "UNIQUE":
-                result = self.get_unique_price(item)
-                if not result:
+                unique_result = self.get_unique_price(item)
+                if not unique_result:
                     # Fallback for unpriced uniques
                     result = PriceResult(
                         chaos_value=1,
@@ -619,6 +619,8 @@ class PriceIntegrator:
                         source="fallback",
                         notes=["Unique not found in poe.ninja"]
                     )
+                else:
+                    result = unique_result
 
             # Rare items - use ML prediction + evaluator
             elif rarity == "RARE":
@@ -656,7 +658,7 @@ class PriceIntegrator:
         """
         self._ensure_prices_loaded()
 
-        high_value = []
+        high_value: List[Dict[str, Any]] = []
         for name, chaos in self._unique_prices.items():
             if chaos >= min_chaos:
                 high_value.append({
@@ -666,7 +668,7 @@ class PriceIntegrator:
                 })
 
         # Sort by value descending
-        high_value.sort(key=lambda x: x['chaos_value'], reverse=True)
+        high_value.sort(key=lambda x: float(x.get('chaos_value', 0)), reverse=True)
         return high_value
 
     def get_divine_value(self) -> float:
