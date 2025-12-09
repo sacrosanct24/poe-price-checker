@@ -39,6 +39,9 @@ def mock_ctx():
 def mock_priced_item():
     """Create a mock PricedItem."""
     item = MagicMock(spec=PricedItem)
+    item.name = "Exalted Orb"
+    item.type_line = "Exalted Orb"
+    item.base_type = "Exalted Orb"
     item.display_name = "Exalted Orb"
     item.stack_size = 5
     item.unit_price = 10.0
@@ -48,6 +51,11 @@ def mock_priced_item():
     item.item_class = "Currency"
     item.price_source = PriceSource.POE_NINJA
     item.tab_name = "Currency Tab"
+    item.ilvl = 0
+    item.links = 0
+    item.sockets = ""
+    item.corrupted = False
+    item.raw_item = {}
     return item
 
 
@@ -213,13 +221,28 @@ class TestItemTableModelFiltering:
 class TestItemTableModelData:
     """Tests for data retrieval."""
 
+    # Column indices after adding verdict column at position 0
+    # 0: verdict, 1: display_name, 2: stack_size, 3: unit_price,
+    # 4: total_price, 5: rarity, 6: price_source
+
+    def test_data_display_role_verdict(self, mock_priced_item):
+        """Should return verdict emoji."""
+        model = ItemTableModel()
+        model.set_items([mock_priced_item])
+
+        verdict_col = 0  # Verdict column
+        index = model.index(0, verdict_col)
+
+        result = model.data(index, Qt.ItemDataRole.DisplayRole)
+        # Currency items with price should get KEEP verdict
+        assert result in ["👍", "👎", "🤔"]
+
     def test_data_display_role_name(self, mock_priced_item):
         """Should return item name for display."""
         model = ItemTableModel()
         model.set_items([mock_priced_item])
 
-        # Find name column
-        name_col = 0  # First column is display_name
+        name_col = 1  # display_name column (shifted by 1)
         index = model.index(0, name_col)
 
         result = model.data(index, Qt.ItemDataRole.DisplayRole)
@@ -230,7 +253,7 @@ class TestItemTableModelData:
         model = ItemTableModel()
         model.set_items([mock_priced_item])
 
-        stack_col = 1  # Stack size column
+        stack_col = 2  # Stack size column (shifted by 1)
         index = model.index(0, stack_col)
 
         result = model.data(index, Qt.ItemDataRole.DisplayRole)
@@ -241,7 +264,7 @@ class TestItemTableModelData:
         model = ItemTableModel()
         model.set_items([mock_priced_item])
 
-        unit_col = 2  # Unit price column
+        unit_col = 3  # Unit price column (shifted by 1)
         index = model.index(0, unit_col)
 
         result = model.data(index, Qt.ItemDataRole.DisplayRole)
@@ -253,7 +276,7 @@ class TestItemTableModelData:
         model = ItemTableModel()
         model.set_items([mock_priced_item])
 
-        source_col = 5  # Price source column
+        source_col = 6  # Price source column (shifted by 1)
         index = model.index(0, source_col)
 
         result = model.data(index, Qt.ItemDataRole.DisplayRole)
@@ -273,11 +296,35 @@ class TestItemTableModelData:
         model = ItemTableModel()
         model.set_items([mock_priced_item])
 
-        total_col = 3  # Total price column
+        total_col = 4  # Total price column (shifted by 1)
         index = model.index(0, total_col)
 
         result = model.data(index, Qt.ItemDataRole.TextAlignmentRole)
         assert result is not None
+
+    def test_data_verdict_alignment_center(self, mock_priced_item):
+        """Should center-align verdict column."""
+        model = ItemTableModel()
+        model.set_items([mock_priced_item])
+
+        verdict_col = 0
+        index = model.index(0, verdict_col)
+
+        result = model.data(index, Qt.ItemDataRole.TextAlignmentRole)
+        assert result == Qt.AlignmentFlag.AlignCenter
+
+    def test_data_verdict_tooltip(self, mock_priced_item):
+        """Should show tooltip for verdict."""
+        model = ItemTableModel()
+        model.set_items([mock_priced_item])
+
+        verdict_col = 0
+        index = model.index(0, verdict_col)
+
+        result = model.data(index, Qt.ItemDataRole.ToolTipRole)
+        assert result is not None
+        # Tooltip should contain verdict explanation
+        assert "KEEP" in result or "VENDOR" in result or "MAYBE" in result
 
 
 class TestItemTableModelHeaderData:
@@ -633,10 +680,22 @@ class TestStashViewerWindowEdgeCases:
         item.stack_size = 1
         item.total_price = 100.0
         item.display_name = "Test"
+        # Add required attributes for verdict calculation
+        item.name = "Test"
+        item.type_line = "Test"
+        item.base_type = "Test"
+        item.tab_name = "Test Tab"
+        item.rarity = "Normal"
+        item.item_class = "Armour"
+        item.ilvl = 0
+        item.links = 0
+        item.sockets = ""
+        item.corrupted = False
+        item.raw_item = {}
 
         model.set_items([item])
 
-        stack_col = 1
+        stack_col = 2  # Shifted by 1 due to verdict column
         index = model.index(0, stack_col)
         result = model.data(index, Qt.ItemDataRole.DisplayRole)
         assert result == ""
@@ -649,10 +708,23 @@ class TestStashViewerWindowEdgeCases:
         item.unit_price = 0.5
         item.total_price = 100.0
         item.display_name = "Test"
+        # Add required attributes for verdict calculation
+        item.name = "Test"
+        item.type_line = "Test"
+        item.base_type = "Test"
+        item.tab_name = "Test Tab"
+        item.rarity = "Normal"
+        item.item_class = "Armour"
+        item.stack_size = 1
+        item.ilvl = 0
+        item.links = 0
+        item.sockets = ""
+        item.corrupted = False
+        item.raw_item = {}
 
         model.set_items([item])
 
-        unit_col = 2
+        unit_col = 3  # Shifted by 1 due to verdict column
         index = model.index(0, unit_col)
         result = model.data(index, Qt.ItemDataRole.DisplayRole)
         assert "0.50c" in result
@@ -665,10 +737,23 @@ class TestStashViewerWindowEdgeCases:
         item.price_source = PriceSource.POE_PRICES
         item.total_price = 100.0
         item.display_name = "Test"
+        # Add required attributes for verdict calculation
+        item.name = "Test"
+        item.type_line = "Test"
+        item.base_type = "Test"
+        item.tab_name = "Test Tab"
+        item.rarity = "Normal"
+        item.item_class = "Armour"
+        item.stack_size = 1
+        item.ilvl = 0
+        item.links = 0
+        item.sockets = ""
+        item.corrupted = False
+        item.raw_item = {}
 
         model.set_items([item])
 
-        source_col = 5
+        source_col = 6  # Shifted by 1 due to verdict column
         index = model.index(0, source_col)
         result = model.data(index, Qt.ItemDataRole.DisplayRole)
         assert result == "poeprices"
