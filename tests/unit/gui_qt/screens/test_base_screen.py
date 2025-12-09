@@ -76,18 +76,18 @@ class TestBaseScreen:
         """screen_name should return the concrete class name."""
         assert screen.screen_name == "Test Screen"
 
-    def test_on_enter_is_abstract(self):
+    def test_on_enter_is_abstract(self, qtbot, mock_ctx):
         """on_enter should be abstract and must be implemented."""
         # ConcreteScreen implements it, so this tests the implementation
-        mock_ctx = MagicMock()
         screen = ConcreteScreen(mock_ctx)
+        qtbot.addWidget(screen)
         screen.on_enter()
         assert screen.enter_called
 
-    def test_on_leave_is_abstract(self):
+    def test_on_leave_is_abstract(self, qtbot, mock_ctx):
         """on_leave should be abstract and must be implemented."""
-        mock_ctx = MagicMock()
         screen = ConcreteScreen(mock_ctx)
+        qtbot.addWidget(screen)
         screen.on_leave()
         assert screen.leave_called
 
@@ -117,9 +117,10 @@ class TestBaseScreenAbstract:
         """on_leave should be marked as abstract."""
         assert getattr(BaseScreen.on_leave, '__isabstractmethod__', False)
 
-    def test_base_screen_requires_implementation(self):
+    def test_base_screen_requires_implementation(self, qtbot):
         """BaseScreen subclass needs on_enter and on_leave implemented."""
         # If we can create ConcreteScreen (which implements both), it works
         mock_ctx = MagicMock()
         screen = ConcreteScreen(mock_ctx)
+        qtbot.addWidget(screen)
         assert screen is not None
