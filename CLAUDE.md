@@ -261,3 +261,4 @@ See `data/meta_builds/README.md` for schema and update procedures.
 - **PoE Glossary**: `.claude/personas/poe-glossary.md`
 - **Meta Builds**: `data/meta_builds/README.md`
 - **ADRs**: `docs/decisions/README.md`
+- Always utilize appropriate personas

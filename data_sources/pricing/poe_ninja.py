@@ -334,7 +334,7 @@ class PoeNinjaAPI(BaseAPIClient):
             Dict with keys: 'currency', 'uniques', 'fragments', etc.
             Each value is a dict of {item_name_lower: item_data}
         """
-        cache = {
+        cache: Dict[str, Dict[str, Any]] = {
             'currency': {},
             'uniques': {},
             'fragments': {},
@@ -372,7 +372,8 @@ class PoeNinjaAPI(BaseAPIClient):
                 logger.info(f"Loading {item_type}...")
                 try:
                     data = self._get_item_overview(item_type)
-
+                    if data is None:
+                        continue
                     for item in data.get("lines", []):
                         # For uniques, include base type in key
                         if cache_key == 'uniques' and item.get("baseType"):
@@ -420,13 +421,13 @@ class PoeNinjaAPI(BaseAPIClient):
         # Exact name match first
         for line in lines:
             if norm(line.get("name")) == key:
-                return line
+                return dict(line)
 
         # Fallback: loose substring match
         for line in lines:
             n = norm(line.get("name"))
             if key in n or n in key:
-                return line
+                return dict(line)
 
         return None
 
@@ -537,7 +538,7 @@ class PoeNinjaAPI(BaseAPIClient):
                             item_key = f"{item['name'].lower()} {item['baseType'].lower()}"
 
                         if search_key == item_key or item_name.lower() in item_key:
-                            return item
+                            return dict(item)
 
                 except Exception as e:
                     logger.debug(f"Search in {item_type} failed: {e}")
@@ -597,7 +598,7 @@ class PoeNinjaAPI(BaseAPIClient):
             candidates,
             key=lambda ln: float(ln.get("chaosValue") or 0.0),
         )
-        return best
+        return dict(best)
 
 
 # Testing

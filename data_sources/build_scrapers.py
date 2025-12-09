@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 import re
 import time
-from typing import List, Optional
+from typing import Any, Dict, List, Optional, Union
 from dataclasses import dataclass, field
 from datetime import datetime
 from urllib.parse import urlparse
@@ -142,7 +142,7 @@ class PoeNinjaBuildScraper:
 
         # Build URL with filters
         url = f"{self.BASE_URL}/{self.league}"
-        params = {
+        params: Dict[str, Any] = {
             'sort': sort_by,
             'take': min(limit, 100)
         }
@@ -244,10 +244,11 @@ class PoeNinjaBuildScraper:
 
             links = soup.find_all('a', href=True)
             for link in links:
-                href = link['href']
-                if is_allowed_pob_url(href):
-                    logger.info(f"Found PoB link: {href}")
-                    return href
+                href = link.get('href', '')
+                href_str = str(href) if href else ''
+                if is_allowed_pob_url(href_str):
+                    logger.info(f"Found PoB link: {href_str}")
+                    return href_str
 
             # Look for embedded PoB code
             textareas = soup.find_all('textarea')
@@ -495,7 +496,7 @@ class PoBArchivesScraper:
         Returns:
             List of ScrapedBuild objects
         """
-        builds = []
+        builds: List[ScrapedBuild] = []
 
         # pobarchives.com uses internal build IDs, not direct pobb.in links
         # Structure: <article class="listing-style1">
@@ -524,7 +525,8 @@ class PoBArchivesScraper:
             if len(builds) >= limit:
                 break
 
-            href = link.get('href', '')
+            href_raw = link.get('href', '')
+            href = str(href_raw) if href_raw else ''
             build_id = href.replace('/build/', '')
 
             # Skip duplicates
@@ -541,14 +543,16 @@ class PoBArchivesScraper:
                 build_name = link.get_text(strip=True)
 
             # Try to extract ascendancy from alt text or nearby elements
-            ascendancy = None
+            ascendancy: Optional[str] = None
             parent = link.find_parent(['article', 'div'])
             if parent:
                 # Look for ascendancy icon alt text
                 img = parent.find('img', alt=True)
-                if img and img['alt'] in ascendancies:
-                    ascendancy = img['alt']
-                else:
+                if img:
+                    img_alt = str(img.get('alt', ''))
+                    if img_alt in ascendancies:
+                        ascendancy = img_alt
+                if ascendancy is None:
                     # Check title text for ascendancy
                     for asc in ascendancies:
                         if asc.lower() in build_name.lower():
@@ -593,10 +597,11 @@ class PoBArchivesScraper:
             # Find pobb.in links
             pobb_links = soup.find_all('a', href=re.compile(r'pobb\.in/[A-Za-z0-9_-]+'))
             if pobb_links:
-                pobb_url = pobb_links[0].get('href', '')
-                if not pobb_url.startswith('http'):
+                pobb_url_raw = pobb_links[0].get('href', '')
+                pobb_url = str(pobb_url_raw) if pobb_url_raw else ''
+                if pobb_url and not pobb_url.startswith('http'):
                     pobb_url = 'https://' + pobb_url.lstrip('/')
-                return pobb_url
+                return pobb_url if pobb_url else None
 
             return None
 
@@ -754,7 +759,7 @@ class BuildSourceProvider:
             return None
 
         source_info = cls.SOURCES[source]
-        url = source_info["base_url"]
+        url = str(source_info["base_url"])
 
         # Add filters for supported sources
         if source == "pobarchives" and category:

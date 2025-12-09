@@ -37,6 +37,7 @@ from gui_qt.widgets.results_table import ResultsTableWidget
 from gui_qt.widgets.item_inspector import ItemInspectorWidget
 from gui_qt.widgets.rare_evaluation_panel import RareEvaluationPanelWidget
 from gui_qt.widgets.ai_analysis_panel import AIAnalysisPanelWidget
+from gui_qt.widgets.quick_verdict_panel import QuickVerdictPanel, VerdictStatisticsWidget
 
 if TYPE_CHECKING:
     pass
@@ -85,6 +86,8 @@ class SessionPanel(QWidget):
     pin_requested: pyqtSignal = pyqtSignal(list)
     compare_requested: pyqtSignal = pyqtSignal(list)
     ai_analysis_requested: pyqtSignal = pyqtSignal(str, list)  # item_text, price_results
+    update_meta_requested: pyqtSignal = pyqtSignal()  # Meta weights update request
+    verdict_stats_changed: pyqtSignal = pyqtSignal(object)  # VerdictStatistics changed
 
     def __init__(self, session_name: str = "Session 1", parent: Optional[QWidget] = None):
         super().__init__(parent)
@@ -180,6 +183,19 @@ class SessionPanel(QWidget):
         self.rare_eval_panel.setVisible(False)
         layout.addWidget(self.rare_eval_panel)
 
+        # Forward the update_meta_requested signal
+        self.rare_eval_panel.update_meta_requested.connect(self._on_update_meta_requested)
+
+        # Bottom: Quick verdict panel (casual player summary)
+        self.quick_verdict_panel = QuickVerdictPanel()
+        self.quick_verdict_panel.setVisible(False)
+        layout.addWidget(self.quick_verdict_panel)
+
+        # Bottom: Verdict statistics (session tracking)
+        self.verdict_stats_widget = VerdictStatisticsWidget()
+        self.verdict_stats_widget.stats_changed.connect(self.verdict_stats_changed.emit)
+        layout.addWidget(self.verdict_stats_widget)
+
         # Bottom: AI analysis panel (hidden by default)
         self.ai_panel = AIAnalysisPanelWidget()
         self.ai_panel.setVisible(False)
@@ -198,8 +214,51 @@ class SessionPanel(QWidget):
         self.results_table.set_data([])
         self.item_inspector.clear()
         self.rare_eval_panel.setVisible(False)
+        self.quick_verdict_panel.clear()
+        self.quick_verdict_panel.setVisible(False)
+        self.verdict_stats_widget.reset()
         self.ai_panel.clear()
         self.ai_panel.setVisible(False)
+
+    def _on_update_meta_requested(self) -> None:
+        """Forward update meta request to parent."""
+        self.update_meta_requested.emit()
+
+    def set_rare_evaluator(self, evaluator: Any) -> None:
+        """Set the rare item evaluator for meta info display."""
+        self.rare_eval_panel.set_evaluator(evaluator)
+
+        # Also propagate meta weights to quick verdict panel
+        if evaluator and hasattr(evaluator, 'meta_weights'):
+            self.quick_verdict_panel.set_meta_weights(evaluator.meta_weights)
+
+    def set_verdict_thresholds(self, vendor: float, keep: float) -> None:
+        """Set verdict thresholds from config."""
+        self.quick_verdict_panel.set_thresholds(vendor, keep)
+
+    def record_verdict(self, result: Any) -> None:
+        """Record a verdict result in session statistics.
+
+        Args:
+            result: VerdictResult to record
+        """
+        self.verdict_stats_widget.record_verdict(result)
+
+    def get_verdict_stats(self) -> Any:
+        """Get the current verdict statistics.
+
+        Returns:
+            VerdictStatistics instance
+        """
+        return self.verdict_stats_widget.get_stats()
+
+    def set_verdict_stats(self, stats: Any) -> None:
+        """Set verdict statistics (for loading from database).
+
+        Args:
+            stats: VerdictStatistics instance to set
+        """
+        self.verdict_stats_widget.update_stats(stats)
 
     def _on_row_selected(self, row_data: Dict[str, Any]) -> None:
         """Handle row selection in results table."""
@@ -301,6 +360,10 @@ class SessionTabWidget(QTabWidget):
         compare_requested(items: List[Dict[str, Any]]):
             Emitted when user requests to compare items from any session.
             Forwarded from the active SessionPanel.
+
+        update_meta_requested():
+            Emitted when user requests to update meta weights.
+            Forwarded from the active SessionPanel's rare evaluation panel.
     """
 
     MAX_SESSIONS = 10
@@ -310,11 +373,14 @@ class SessionTabWidget(QTabWidget):
     pin_requested: pyqtSignal = pyqtSignal(list)
     compare_requested: pyqtSignal = pyqtSignal(list)
     ai_analysis_requested: pyqtSignal = pyqtSignal(str, list)  # item_text, price_results
+    update_meta_requested: pyqtSignal = pyqtSignal()  # Meta weights update request
+    verdict_stats_changed: pyqtSignal = pyqtSignal(object)  # VerdictStatistics changed
 
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
 
         self._session_counter = 0
+        self._rare_evaluator = None  # Reference to rare evaluator for panels
 
         # Enable close buttons and movable tabs
         self.setTabsClosable(True)
@@ -472,6 +538,16 @@ class SessionTabWidget(QTabWidget):
         panel.pin_requested.connect(self.pin_requested.emit)
         panel.compare_requested.connect(self.compare_requested.emit)
         panel.ai_analysis_requested.connect(self.ai_analysis_requested.emit)
+        panel.update_meta_requested.connect(self.update_meta_requested.emit)
+        panel.verdict_stats_changed.connect(self.verdict_stats_changed.emit)
+
+        # Set rare evaluator if we have one
+        if self._rare_evaluator:
+            panel.set_rare_evaluator(self._rare_evaluator)
+
+        # Set verdict thresholds if we have them
+        if hasattr(self, '_verdict_vendor') and hasattr(self, '_verdict_keep'):
+            panel.set_verdict_thresholds(self._verdict_vendor, self._verdict_keep)
 
         # Set AI callback if we have one
         if hasattr(self, '_ai_configured_callback') and self._ai_configured_callback:
@@ -482,3 +558,57 @@ class SessionTabWidget(QTabWidget):
 
         logger.info(f"Added session: {session_name}")
         return panel
+
+    def set_rare_evaluator(self, evaluator: Any) -> None:
+        """Set the rare item evaluator for all session panels."""
+        self._rare_evaluator = evaluator
+        # Update all existing panels
+        for i in range(self.count()):
+            panel = self.widget(i)
+            if isinstance(panel, SessionPanel):
+                panel.set_rare_evaluator(evaluator)
+
+    def set_verdict_thresholds(self, vendor: float, keep: float) -> None:
+        """Set verdict thresholds for all session panels."""
+        self._verdict_vendor = vendor
+        self._verdict_keep = keep
+        # Update all existing panels
+        for i in range(self.count()):
+            panel = self.widget(i)
+            if isinstance(panel, SessionPanel):
+                panel.set_verdict_thresholds(vendor, keep)
+
+    def get_current_verdict_stats(self) -> Any:
+        """Get verdict statistics from the current session.
+
+        Returns:
+            VerdictStatistics from the current panel, or None
+        """
+        panel = self.currentWidget()
+        if isinstance(panel, SessionPanel):
+            return panel.get_verdict_stats()
+        return None
+
+    def set_current_verdict_stats(self, stats: Any) -> None:
+        """Set verdict statistics for the current session.
+
+        Args:
+            stats: VerdictStatistics to set
+        """
+        panel = self.currentWidget()
+        if isinstance(panel, SessionPanel):
+            panel.set_verdict_stats(stats)
+
+    def record_verdict(self, result: Any, session_index: Optional[int] = None) -> None:
+        """Record a verdict result in session statistics.
+
+        Args:
+            result: VerdictResult to record
+            session_index: Which session to record to (default: current)
+        """
+        if session_index is None:
+            session_index = self.currentIndex()
+        if 0 <= session_index < self.count():
+            panel = self.widget(session_index)
+            if isinstance(panel, SessionPanel):
+                panel.record_verdict(result)

@@ -12,6 +12,7 @@ This module evaluates rare items by:
 import json
 import logging
 import re
+from datetime import datetime, timedelta
 from functools import lru_cache
 from pathlib import Path
 from typing import List, Dict, Optional, Tuple, Any, Pattern
@@ -19,6 +20,12 @@ from dataclasses import dataclass, field
 from core.item_parser import ParsedItem
 from core.build_archetype import (
     BuildArchetype, get_weight_multiplier
+)
+from core.constants import (
+    META_CACHE_EXPIRY_DAYS,
+    META_BONUS_THRESHOLD,
+    META_BONUS_AMOUNT,
+    MAX_AFFIX_WEIGHT,
 )
 
 logger = logging.getLogger(__name__)
@@ -34,6 +41,7 @@ class AffixMatch:
     weight: int      # Importance weight (1-10)
     tier: str        # "tier1", "tier2", "tier3"
     is_influence_mod: bool = False  # True if from influence
+    has_meta_bonus: bool = False  # True if weight includes meta bonus
 
 
 @dataclass
@@ -121,6 +129,7 @@ class RareItemEvaluator:
 
         # Phase 2: Build archetypes and meta integration
         self.build_archetypes = self._load_build_archetypes()
+        self._meta_cache_info: Optional[Dict] = None  # Set by _load_meta_weights
         self.meta_weights = self._load_meta_weights()
         
         # Performance optimization: Pre-compile all regex patterns
@@ -217,40 +226,80 @@ class RareItemEvaluator:
         
         return compiled
 
-    def _load_valuable_affixes(self) -> Dict:
+    def _load_valuable_affixes(self) -> Dict[str, Any]:
         """Load valuable affixes configuration."""
         affix_file = self.data_dir / "valuable_affixes.json"
         if affix_file.exists():
-            with open(affix_file) as f:
-                return json.load(f)
+            with open(affix_file, encoding='utf-8') as f:
+                result: Dict[str, Any] = json.load(f)
+                return result
         return {}
 
-    def _load_valuable_bases(self) -> Dict:
+    def _load_valuable_bases(self) -> Dict[str, Any]:
         """Load valuable base types configuration."""
         base_file = self.data_dir / "valuable_bases.json"
         if base_file.exists():
-            with open(base_file) as f:
-                return json.load(f)
+            with open(base_file, encoding='utf-8') as f:
+                result: Dict[str, Any] = json.load(f)
+                return result
         return {}
 
-    def _load_build_archetypes(self) -> Dict:
+    def _load_build_archetypes(self) -> Dict[str, Any]:
         """Load build archetype definitions."""
         archetype_file = self.data_dir / "build_archetypes.json"
         if archetype_file.exists():
-            with open(archetype_file) as f:
-                data = json.load(f)
-                return data.get("archetypes", {})
+            with open(archetype_file, encoding='utf-8') as f:
+                data: Dict[str, Any] = json.load(f)
+                return dict(data.get("archetypes", {}))
         return {}
 
-    def _load_meta_weights(self) -> Dict:
-        """Load meta-based weight adjustments."""
+    def _load_meta_weights(self, current_league: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Load meta-based weight adjustments if available and fresh.
+
+        Args:
+            current_league: Optional league name to verify cache relevance
+
+        Returns:
+            Dict mapping affix_type -> weight data, or empty dict if unavailable/stale
+        """
         # First try meta_affixes.json (from MetaAnalyzer)
         meta_file = self.data_dir / "meta_affixes.json"
         if meta_file.exists():
             try:
-                with open(meta_file) as f:
-                    data = json.load(f)
-                    return data.get("affixes", {})
+                with open(meta_file, encoding='utf-8') as f:
+                    data: Dict[str, Any] = json.load(f)
+
+                # Check if cache is stale (older than META_CACHE_EXPIRY_DAYS)
+                last_analysis_str = data.get('last_analysis')
+                if last_analysis_str:
+                    try:
+                        last_analysis = datetime.fromisoformat(last_analysis_str)
+                        if datetime.now() - last_analysis > timedelta(days=META_CACHE_EXPIRY_DAYS):
+                            logger.info(f"Meta weights cache is stale (>{META_CACHE_EXPIRY_DAYS} days old)")
+                            # Continue to fallback rather than return empty - stale data better than none
+                    except (ValueError, TypeError):
+                        pass  # Invalid date format, continue with data
+
+                # Check if cache is for the right league (if specified)
+                cache_league = data.get('league', '')
+                if current_league and cache_league and cache_league.lower() != current_league.lower():
+                    logger.info(f"Meta weights cache is for {cache_league}, current league is {current_league}")
+                    # Still use it - cross-league meta is better than nothing
+
+                # Store metadata for display
+                self._meta_cache_info = {
+                    'league': cache_league,
+                    'builds_analyzed': data.get('builds_analyzed', 0),
+                    'last_analysis': last_analysis_str,
+                    'source': 'meta_affixes.json'
+                }
+
+                affixes: Dict[str, Any] = dict(data.get("affixes", {}))
+                if affixes:
+                    logger.info(f"Loaded meta weights: {len(affixes)} affixes from {cache_league}")
+                    return affixes
+
             except Exception as e:
                 logger.debug(f"Failed to load meta_affixes.json: {e}")
 
@@ -258,12 +307,23 @@ class RareItemEvaluator:
         archetype_file = self.data_dir / "build_archetypes.json"
         if archetype_file.exists():
             try:
-                with open(archetype_file) as f:
-                    data = json.load(f)
-                    return data.get("_meta_weights", {}).get("popularity_boosts", {})
+                with open(archetype_file, encoding='utf-8') as f:
+                    fallback_data: Dict[str, Any] = json.load(f)
+                meta_weights: Dict[str, Any] = dict(
+                    fallback_data.get("_meta_weights", {}).get("popularity_boosts", {})
+                )
+                if meta_weights:
+                    self._meta_cache_info = {
+                        'league': 'Static',
+                        'builds_analyzed': 0,
+                        'last_analysis': None,
+                        'source': 'build_archetypes.json'
+                    }
+                    return meta_weights
             except Exception as e:
                 logger.debug(f"Failed to load build_archetypes.json: {e}")
 
+        self._meta_cache_info = None
         return {}
 
     def evaluate(self, item: ParsedItem) -> RareItemEvaluation:
@@ -464,7 +524,7 @@ class RareItemEvaluator:
 
     def _check_ilvl(self, item: ParsedItem) -> bool:
         """Check if item level is high enough for top-tier mods."""
-        return item.item_level and item.item_level >= 84
+        return bool(item.item_level and item.item_level >= 84)
 
     def _match_affixes(self, item: ParsedItem) -> List[AffixMatch]:
         """
@@ -509,9 +569,9 @@ class RareItemEvaluator:
                             affix_type, affix_data, value
                         )
 
-                        # Get weight for actual tier
-                        tier_weight = affix_data.get(
-                            f"{actual_tier}_weight", base_weight
+                        # Get weight for actual tier (includes meta bonus if applicable)
+                        tier_weight, has_meta_bonus = self._get_affix_weight(
+                            affix_type, actual_tier
                         )
 
                         # Check minimum value requirement
@@ -523,7 +583,8 @@ class RareItemEvaluator:
                                 value=value,
                                 weight=tier_weight,
                                 tier=actual_tier,
-                                is_influence_mod=False
+                                is_influence_mod=False,
+                                has_meta_bonus=has_meta_bonus
                             ))
                             matched_this_mod = True
                             break  # Only match once per mod
@@ -560,6 +621,47 @@ class RareItemEvaluator:
             return "tier2"
 
         return "tier3"
+
+    def _get_affix_weight(self, affix_type: str, tier: str) -> Tuple[int, bool]:
+        """
+        Get weight for affix, with meta bonus if applicable.
+
+        Args:
+            affix_type: The type of affix (e.g., "life", "resistances")
+            tier: The tier of the affix ("tier1", "tier2", "tier3")
+
+        Returns:
+            Tuple of (final_weight, has_meta_bonus)
+        """
+        # Get base weight from config
+        affix_data = self.valuable_affixes.get(affix_type, {})
+        base_weight = affix_data.get(f"{tier}_weight", affix_data.get("weight", 5))
+        has_meta_bonus = False
+
+        # Apply meta bonus if affix is popular in current meta
+        if self.meta_weights and affix_type in self.meta_weights:
+            meta_data = self.meta_weights[affix_type]
+
+            # Handle different meta_weights formats
+            if isinstance(meta_data, dict):
+                # From meta_affixes.json (MetaAnalyzer output)
+                popularity = meta_data.get("popularity_percent", 0)
+                # Generate dynamic weight based on popularity
+                meta_weight = 5.0 + (popularity * 0.1)
+            else:
+                # Simple boost value from build_archetypes.json
+                meta_weight = float(meta_data)
+
+            # Add meta bonus if weight meets threshold
+            if meta_weight >= META_BONUS_THRESHOLD:
+                base_weight = min(MAX_AFFIX_WEIGHT, base_weight + META_BONUS_AMOUNT)
+                has_meta_bonus = True
+                logger.debug(
+                    f"Meta bonus applied to {affix_type}: "
+                    f"{base_weight - META_BONUS_AMOUNT} → {base_weight}"
+                )
+
+        return base_weight, has_meta_bonus
 
     def _match_influence_mods(self, item: ParsedItem) -> List[AffixMatch]:
         """
@@ -632,7 +734,7 @@ class RareItemEvaluator:
         total_bonus = 0
 
         # Count affixes by type
-        affix_counts = {}
+        affix_counts: Dict[str, int] = {}
         for match in matches:
             affix_counts[match.affix_type] = affix_counts.get(
                 match.affix_type, 0) + 1
@@ -742,7 +844,7 @@ class RareItemEvaluator:
             (bonus_score, list_of_reasons)
         """
         bonus = 0
-        reasons = []
+        reasons: List[str] = []
 
         item_slot = self._determine_item_slot(item)
         if not item_slot or item_slot not in self.slot_rules:
@@ -880,7 +982,7 @@ class RareItemEvaluator:
         Returns:
             (list_of_matching_archetypes, bonus_score)
         """
-        matched = []
+        matched: List[str] = []
         total_bonus = 0
 
         if not self.build_archetypes:
@@ -1045,6 +1147,45 @@ class RareItemEvaluator:
         else:
             return "vendor", "<5c"
 
+    def get_meta_info(self) -> str:
+        """
+        Get formatted meta analysis information for display.
+
+        Returns:
+            Multi-line string with meta info, or message if not available
+        """
+        if not self._meta_cache_info:
+            return "Meta Analysis: Not available (using static weights)"
+
+        info = self._meta_cache_info
+        league = info.get('league', 'Unknown')
+        builds = info.get('builds_analyzed', 0)
+        source = info.get('source', 'unknown')
+
+        lines = [f"Meta Analysis: {league} league ({builds} builds)"]
+
+        # Get top meta affixes from loaded weights
+        if self.meta_weights:
+            # Sort by popularity
+            sorted_affixes = []
+            for affix_type, data in self.meta_weights.items():
+                if isinstance(data, dict):
+                    pop = data.get('popularity_percent', 0)
+                else:
+                    pop = float(data) * 10  # Estimate popularity from weight
+                sorted_affixes.append((affix_type, pop))
+
+            sorted_affixes.sort(key=lambda x: x[1], reverse=True)
+
+            if sorted_affixes:
+                lines.append("Top Meta Affixes:")
+                for affix_type, popularity in sorted_affixes[:5]:
+                    lines.append(f"  • {affix_type}: {popularity:.1f}%")
+
+        lines.append(f"Source: {source}")
+
+        return "\n".join(lines)
+
     def get_summary(self, evaluation: RareItemEvaluation) -> str:
         """
         Get human-readable summary of evaluation.
@@ -1092,7 +1233,8 @@ class RareItemEvaluator:
                 value_str = f" [{match.value}]" if match.value else ""
                 tier_str = f" ({match.tier})" if not match.is_influence_mod else " (influence)"
                 weight_str = f" weight:{match.weight}"
-                lines.append(f"  [OK] {match.affix_type}: {match.mod_text}{value_str}{tier_str}{weight_str}")
+                meta_str = " [META +2]" if match.has_meta_bonus else ""
+                lines.append(f"  [OK] {match.affix_type}: {match.mod_text}{value_str}{tier_str}{weight_str}{meta_str}")
         else:
             lines.append("No valuable affixes found")
 
@@ -1158,6 +1300,12 @@ class RareItemEvaluator:
         lines.append(f"Valuable Base: {valuable_base}")
         high_ilvl = 'Yes' if evaluation.has_high_ilvl else 'No'
         lines.append(f"High iLvl (84+): {high_ilvl}")
+
+        # Meta analysis info
+        meta_affixes_with_bonus = [m for m in evaluation.matched_affixes if m.has_meta_bonus]
+        if meta_affixes_with_bonus or self.meta_weights:
+            lines.append("")
+            lines.append(self.get_meta_info())
 
         return "\n".join(lines)
 

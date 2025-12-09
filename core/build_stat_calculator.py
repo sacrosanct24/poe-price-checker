@@ -9,7 +9,7 @@ from __future__ import annotations
 import re
 import logging
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Mapping, Optional, Tuple, Union
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +60,7 @@ class BuildStats:
     total_ehp: float = 0.0
 
     @classmethod
-    def from_pob_stats(cls, stats: Dict[str, float]) -> "BuildStats":
+    def from_pob_stats(cls, stats: Mapping[str, Union[int, float]]) -> "BuildStats":
         """Create BuildStats from PoB PlayerStat dictionary."""
         return cls(
             # Scaling percentages
@@ -95,7 +95,7 @@ class BuildStats:
             total_ehp=stats.get("TotalEHP", 0.0),
         )
 
-    def get_summary(self) -> Dict[str, str]:
+    def get_summary(self) -> Dict[str, Optional[str]]:
         """Get a summary dict for display."""
         return {
             "Life": f"{int(self.total_life)} (+{int(self.life_inc)}%)",

@@ -34,6 +34,284 @@ def test_parsed_item_to_dict():
 
 
 # --------------------------------------
+# ParsedItem.from_stash_item()
+# --------------------------------------
+
+class TestFromStashItem:
+    """Tests for ParsedItem.from_stash_item() class method."""
+
+    def test_basic_rare_item(self):
+        """Parse a basic rare item from stash API data."""
+        stash_item = {
+            "frameType": 2,  # Rare
+            "name": "<<set:MS>><<set:M>><<set:S>>Dragon Wrap",
+            "typeLine": "Vaal Regalia",
+            "baseType": "Vaal Regalia",
+            "ilvl": 86,
+            "identified": True,
+            "explicitMods": [
+                "+120 to maximum Life",
+                "+45% to Fire Resistance",
+            ],
+            "implicitMods": [
+                "+50 to maximum Energy Shield"
+            ],
+        }
+
+        item = ParsedItem.from_stash_item(stash_item)
+
+        assert item.rarity == "Rare"
+        assert item.name == "Dragon Wrap"  # Prefix stripped
+        assert item.base_type == "Vaal Regalia"
+        assert item.item_level == 86
+        assert item.explicits == ["+120 to maximum Life", "+45% to Fire Resistance"]
+        assert item.implicits == ["+50 to maximum Energy Shield"]
+
+    def test_unique_item(self):
+        """Parse a unique item from stash API data."""
+        stash_item = {
+            "frameType": 3,  # Unique
+            "name": "<<set:MS>><<set:M>><<set:S>>Headhunter",
+            "typeLine": "Leather Belt",
+            "baseType": "Leather Belt",
+            "ilvl": 85,
+        }
+
+        item = ParsedItem.from_stash_item(stash_item)
+
+        assert item.rarity == "Unique"
+        assert item.name == "Headhunter"
+        assert item.base_type == "Leather Belt"
+
+    def test_currency_item(self):
+        """Parse a currency item from stash API data."""
+        stash_item = {
+            "frameType": 5,  # Currency
+            "typeLine": "Divine Orb",
+        }
+
+        item = ParsedItem.from_stash_item(stash_item)
+
+        assert item.rarity == "Currency"
+        assert item.base_type == "Divine Orb"
+
+    def test_gem_item(self):
+        """Parse a gem from stash API data."""
+        stash_item = {
+            "frameType": 4,  # Gem
+            "typeLine": "Vaal Grace",
+        }
+
+        item = ParsedItem.from_stash_item(stash_item)
+
+        assert item.rarity == "Gem"
+
+    def test_div_card_item(self):
+        """Parse a divination card from stash API data."""
+        stash_item = {
+            "frameType": 6,  # Divination Card
+            "typeLine": "The Doctor",
+        }
+
+        item = ParsedItem.from_stash_item(stash_item)
+
+        assert item.rarity == "Divination Card"
+
+    def test_with_influences(self):
+        """Parse item with influences."""
+        stash_item = {
+            "frameType": 2,
+            "typeLine": "Hubris Circlet",
+            "baseType": "Hubris Circlet",
+            "ilvl": 86,
+            "influences": {
+                "shaper": True,
+                "elder": True,
+            }
+        }
+
+        item = ParsedItem.from_stash_item(stash_item)
+
+        assert "Shaper" in item.influences
+        assert "Elder" in item.influences
+        assert len(item.influences) == 2
+
+    def test_with_single_influence(self):
+        """Parse item with single influence."""
+        stash_item = {
+            "frameType": 2,
+            "typeLine": "Hubris Circlet",
+            "ilvl": 86,
+            "influences": {
+                "hunter": True,
+            }
+        }
+
+        item = ParsedItem.from_stash_item(stash_item)
+
+        assert item.influences == ["Hunter"]
+
+    def test_corrupted_item(self):
+        """Parse corrupted item."""
+        stash_item = {
+            "frameType": 2,
+            "typeLine": "Vaal Regalia",
+            "corrupted": True,
+        }
+
+        item = ParsedItem.from_stash_item(stash_item)
+
+        assert item.is_corrupted is True
+
+    def test_fractured_item(self):
+        """Parse fractured item."""
+        stash_item = {
+            "frameType": 2,
+            "typeLine": "Vaal Regalia",
+            "fractured": True,
+        }
+
+        item = ParsedItem.from_stash_item(stash_item)
+
+        assert item.is_fractured is True
+
+    def test_synthesised_item(self):
+        """Parse synthesised item."""
+        stash_item = {
+            "frameType": 2,
+            "typeLine": "Vaal Regalia",
+            "synthesised": True,
+        }
+
+        item = ParsedItem.from_stash_item(stash_item)
+
+        assert item.is_synthesised is True
+
+    def test_mirrored_item(self):
+        """Parse mirrored item."""
+        stash_item = {
+            "frameType": 2,
+            "typeLine": "Vaal Regalia",
+            "mirrored": True,
+        }
+
+        item = ParsedItem.from_stash_item(stash_item)
+
+        assert item.is_mirrored is True
+
+    def test_with_sockets(self):
+        """Parse item with sockets."""
+        stash_item = {
+            "frameType": 2,
+            "typeLine": "Body Armour",
+            "sockets": [
+                {"group": 0, "sColour": "R"},
+                {"group": 0, "sColour": "G"},
+                {"group": 0, "sColour": "B"},
+                {"group": 0, "sColour": "W"},
+                {"group": 0, "sColour": "W"},
+                {"group": 0, "sColour": "W"},
+            ]
+        }
+
+        item = ParsedItem.from_stash_item(stash_item)
+
+        assert item.sockets == "RGBWWW"
+        assert item.links == 6
+
+    def test_with_multiple_socket_groups(self):
+        """Parse item with multiple socket groups (unlinked)."""
+        stash_item = {
+            "frameType": 2,
+            "typeLine": "Body Armour",
+            "sockets": [
+                {"group": 0, "sColour": "R"},
+                {"group": 0, "sColour": "G"},
+                {"group": 1, "sColour": "B"},
+                {"group": 1, "sColour": "W"},
+            ]
+        }
+
+        item = ParsedItem.from_stash_item(stash_item)
+
+        assert item.sockets == "RG-BW"
+        assert item.links == 2
+
+    def test_with_enchants(self):
+        """Parse item with enchant mods."""
+        stash_item = {
+            "frameType": 2,
+            "typeLine": "Hubris Circlet",
+            "ilvl": 86,
+            "enchantMods": [
+                "Molten Strike fires 3 additional Projectiles"
+            ],
+        }
+
+        item = ParsedItem.from_stash_item(stash_item)
+
+        assert "Molten Strike fires 3 additional Projectiles" in item.enchants
+
+    def test_with_quality(self):
+        """Parse item with quality."""
+        stash_item = {
+            "frameType": 2,
+            "typeLine": "Body Armour",
+            "quality": 20,
+        }
+
+        item = ParsedItem.from_stash_item(stash_item)
+
+        assert item.quality == 20
+
+    def test_empty_influences(self):
+        """Handle empty influences object."""
+        stash_item = {
+            "frameType": 2,
+            "typeLine": "Hubris Circlet",
+            "influences": {}
+        }
+
+        item = ParsedItem.from_stash_item(stash_item)
+
+        assert item.influences == []
+
+    def test_no_influences_key(self):
+        """Handle missing influences key."""
+        stash_item = {
+            "frameType": 2,
+            "typeLine": "Hubris Circlet",
+        }
+
+        item = ParsedItem.from_stash_item(stash_item)
+
+        assert item.influences == []
+
+    def test_raw_text_default(self):
+        """Raw text is constructed from name and typeLine."""
+        stash_item = {
+            "frameType": 2,
+            "name": "Test Name",
+            "typeLine": "Test Type",
+        }
+
+        item = ParsedItem.from_stash_item(stash_item)
+
+        assert item.raw_text == "Test Name Test Type"
+
+    def test_raw_text_custom(self):
+        """Custom raw text can be provided."""
+        stash_item = {
+            "frameType": 2,
+            "typeLine": "Test Type",
+        }
+
+        item = ParsedItem.from_stash_item(stash_item, raw_text="Custom raw text")
+
+        assert item.raw_text == "Custom raw text"
+
+
+# --------------------------------------
 # Magic item parsing
 # --------------------------------------
 

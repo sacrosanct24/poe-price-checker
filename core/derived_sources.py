@@ -28,7 +28,7 @@ class UndercutPriceSource(PriceSource):
             return []
 
         # Ask the base service for its rows (poe_ninja-based)
-        base_rows = self.base_service.check_item(item_text)  # type: ignore[call-arg]
+        base_rows = self.base_service.check_item(item_text)
 
         derived: list[dict[str, Any]] = []
 

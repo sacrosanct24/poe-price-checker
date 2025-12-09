@@ -278,6 +278,34 @@ class PriceCheckerWindow(QMainWindow):
             return
         self._do_price_check(item_text, session_index)
 
+    def _on_verdict_stats_changed(self, stats) -> None:
+        """Handle verdict statistics change - save to database."""
+        try:
+            from datetime import datetime
+            from core.quick_verdict import VerdictStatistics
+
+            # Get current league and game version from config
+            league = self.ctx.config.league or "Standard"
+            game_version = self.ctx.config.game_version or "poe1"
+            session_date = datetime.now().strftime("%Y-%m-%d")
+
+            # Convert VerdictStatistics to dict if needed
+            if isinstance(stats, VerdictStatistics):
+                stats_dict = stats.to_dict()
+            else:
+                stats_dict = stats
+
+            # Save to database
+            self.ctx.db.save_verdict_statistics(
+                league=league,
+                game_version=game_version,
+                session_date=session_date,
+                stats=stats_dict,
+            )
+            self.logger.debug(f"Saved verdict stats: {stats_dict}")
+        except Exception as e:
+            self.logger.warning(f"Failed to save verdict statistics: {e}")
+
     # -------------------------------------------------------------------------
     # Menu Bar
     # -------------------------------------------------------------------------
@@ -496,6 +524,18 @@ class PriceCheckerWindow(QMainWindow):
         self.session_tabs.pin_requested.connect(self._on_pin_items_requested)
         self.session_tabs.compare_requested.connect(self._on_compare_items_requested)
         self.session_tabs.ai_analysis_requested.connect(self._on_ai_analysis_requested)
+        self.session_tabs.update_meta_requested.connect(self._on_update_meta_requested)
+        self.session_tabs.verdict_stats_changed.connect(self._on_verdict_stats_changed)
+
+        # Pass the rare evaluator to session tabs for meta info display
+        if self._rare_evaluator:
+            self.session_tabs.set_rare_evaluator(self._rare_evaluator)
+
+        # Set verdict thresholds from config
+        self._apply_verdict_thresholds()
+
+        # Load saved verdict statistics for today
+        self._load_verdict_statistics()
 
         # Set AI configured callback for all results tables
         self.session_tabs.set_ai_configured_callback(self._is_ai_configured)
@@ -1126,6 +1166,29 @@ class PriceCheckerWindow(QMainWindow):
             else:
                 panel.rare_eval_panel.setVisible(False)
 
+            # Update quick verdict panel (casual player summary)
+            # Get best price from results for verdict calculation
+            best_price = None
+            if data.formatted_rows:
+                # Use chaos_value from first result as estimate
+                first_row = data.formatted_rows[0]
+                best_price = first_row.get("chaos_value")
+                if best_price is not None:
+                    try:
+                        best_price = float(best_price)
+                    except (ValueError, TypeError):
+                        best_price = None
+
+            # Calculate verdict with parsed item and price
+            verdict_result = panel.quick_verdict_panel.update_verdict(
+                data.parsed_item,
+                price_chaos=best_price
+            )
+            panel.quick_verdict_panel.setVisible(True)
+
+            # Record verdict in session statistics
+            panel.record_verdict(verdict_result)
+
             # Add to history
             self._history_manager.add_entry(item_text, data.parsed_item, data.results)
 
@@ -1288,7 +1351,45 @@ class PriceCheckerWindow(QMainWindow):
 
         dialog = SettingsDialog(self.ctx.config, parent=self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
+            # Apply updated verdict thresholds
+            self._apply_verdict_thresholds()
             self._set_status("Settings saved")
+
+    def _apply_verdict_thresholds(self) -> None:
+        """Apply verdict thresholds from config to session tabs."""
+        if hasattr(self, 'session_tabs'):
+            vendor = self.ctx.config.verdict_vendor_threshold
+            keep = self.ctx.config.verdict_keep_threshold
+            self.session_tabs.set_verdict_thresholds(vendor, keep)
+
+    def _load_verdict_statistics(self) -> None:
+        """Load saved verdict statistics from database for today's session."""
+        try:
+            from datetime import datetime
+            from core.quick_verdict import VerdictStatistics
+
+            # Get current league and game version from config
+            league = self.ctx.config.league or "Standard"
+            game_version = self.ctx.config.game_version or "poe1"
+            session_date = datetime.now().strftime("%Y-%m-%d")
+
+            # Try to load today's stats from database
+            saved_stats = self.ctx.db.get_verdict_statistics(
+                league=league,
+                game_version=game_version,
+                session_date=session_date,
+            )
+
+            if saved_stats:
+                # Convert dict to VerdictStatistics
+                stats = VerdictStatistics.from_dict(saved_stats)
+                self.session_tabs.set_current_verdict_stats(stats)
+                self.logger.info(
+                    f"Loaded verdict stats for {league} ({session_date}): "
+                    f"{stats.total_count} items"
+                )
+        except Exception as e:
+            self.logger.warning(f"Failed to load verdict statistics: {e}")
 
     def _cleanup_before_close(self) -> None:
         """Clean up resources before closing."""
@@ -1472,7 +1573,21 @@ class PriceCheckerWindow(QMainWindow):
         self._init_rare_evaluator()
         # Update the controller with new evaluator
         self._price_controller.set_rare_evaluator(self._rare_evaluator)
+        # Update session tabs with new evaluator for meta info display
+        if hasattr(self, 'session_tabs'):
+            self.session_tabs.set_rare_evaluator(self._rare_evaluator)
         self._set_status("Rare evaluation settings reloaded")
+
+    def _on_update_meta_requested(self) -> None:
+        """Handle meta weights update request from rare evaluation panel."""
+        self._set_status("Updating meta weights...")
+        try:
+            # Reload the evaluator to refresh meta weights
+            self._reload_rare_evaluator()
+            self._set_status("Meta weights updated successfully")
+        except Exception as e:
+            self.logger.error(f"Failed to update meta weights: {e}")
+            self._set_status(f"Failed to update meta weights: {e}")
 
     def _show_price_rankings(self) -> None:
         """Show price rankings window."""

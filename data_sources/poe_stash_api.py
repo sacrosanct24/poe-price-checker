@@ -12,7 +12,7 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, cast
 
 import requests
 
@@ -82,7 +82,7 @@ class PoEStashClient:
         self,
         poesessid: str,
         user_agent: str = "PoEPriceChecker/1.0",
-        rate_limit_callback: Optional[callable] = None,
+        rate_limit_callback: Optional[Callable[[int, int], Any]] = None,
     ):
         """
         Initialize the client.
@@ -137,7 +137,7 @@ class PoEStashClient:
             try:
                 response = self.session.get(url, params=params, timeout=30)
                 response.raise_for_status()
-                return response.json()
+                return cast(Dict[str, Any], response.json())
             except requests.exceptions.HTTPError:
                 if response.status_code == 403:
                     logger.error("Access denied - POESESSID may be invalid or expired")
@@ -187,7 +187,11 @@ class PoEStashClient:
 
     def get_characters(self) -> List[Dict[str, Any]]:
         """Get list of characters on the account."""
-        return self._get(self.CHARACTERS_URL)
+        result = self._get(self.CHARACTERS_URL)
+        # API returns dict with 'characters' key or a list directly
+        if isinstance(result, dict):
+            return cast(List[Dict[str, Any]], result.get("characters", []))
+        return cast(List[Dict[str, Any]], result)
 
     def get_stash_tabs(
         self,
@@ -212,7 +216,7 @@ class PoEStashClient:
         }
 
         result = self._get(self.STASH_URL, params)
-        return result.get("tabs", [])
+        return cast(List[Dict[str, Any]], result.get("tabs", []))
 
     def get_stash_tab_items(
         self,
@@ -285,7 +289,7 @@ class PoEStashClient:
         account_name: str,
         league: str,
         max_tabs: Optional[int] = None,
-        progress_callback: Optional[callable] = None,
+        progress_callback: Optional[Callable[[int, int], Any]] = None,
     ) -> StashSnapshot:
         """
         Fetch all stash tabs and their items.

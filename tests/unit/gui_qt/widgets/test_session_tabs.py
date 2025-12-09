@@ -73,6 +73,11 @@ class TestSessionPanel:
         assert session_panel.filter_input is not None
         assert session_panel.source_filter is not None
         assert session_panel.rare_eval_panel is not None
+        assert session_panel.quick_verdict_panel is not None
+
+    def test_quick_verdict_panel_hidden_initially(self, session_panel):
+        """Test that quick verdict panel is hidden on init."""
+        assert not session_panel.quick_verdict_panel.isVisible()
 
     def test_set_results(self, session_panel):
         """Test setting results updates the panel."""
@@ -120,11 +125,13 @@ class TestSessionPanel:
         """Test clearing the session."""
         session_panel.input_text.setPlainText("Some text")
         session_panel._all_results = [{"item_name": "Item"}]
+        session_panel.quick_verdict_panel.setVisible(True)
 
         session_panel._on_clear()
 
         assert session_panel.input_text.toPlainText() == ""
         assert session_panel._all_results == []
+        assert not session_panel.quick_verdict_panel.isVisible()
 
     def test_check_price_signal(self, session_panel, qtbot):
         """Test that check price button emits signal."""

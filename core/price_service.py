@@ -210,13 +210,13 @@ class PriceService:
         rarity = self._get_rarity(parsed)
         rare_evaluation = None
 
-        if rarity and rarity.upper() == "RARE" and self.rare_evaluator is not None:
+        if rarity and rarity.upper() == "RARE" and self.rare_evaluator is not None and parsed is not None:
             try:
                 # Always evaluate rares to get affix data for trade API
                 rare_evaluation = self.rare_evaluator.evaluate(parsed)
 
                 # Attach evaluation to parsed item for trade API to use
-                parsed._rare_evaluation = rare_evaluation
+                parsed._rare_evaluation = rare_evaluation  # type: ignore[attr-defined]
 
                 # Populate explanation with rare evaluation details
                 explanation.is_rare_evaluation = True
@@ -558,16 +558,27 @@ class PriceService:
         """
         game_version, league = self._resolve_game_and_league()
 
+        # Ensure we have required values for database insert
+        if game_version is None or league is None:
+            self.logger.warning(
+                "Cannot save trade quotes: game_version or league is None"
+            )
+            return
+
         item_name = getattr(parsed_item, "display_name", None) or getattr(
             parsed_item, "name", "<unknown>"
         )
         base_type = getattr(parsed_item, "base_type", None)
 
+        # Ensure item_name is a string
+        if item_name is None:
+            item_name = "<unknown>"
+
         # 1) Insert price_check row using Database.create_price_check
         price_check_id = self.db.create_price_check(
             game_version=game_version,
             league=league,
-            item_name=item_name,
+            item_name=str(item_name),
             item_base_type=base_type,
             source="trade+poe.ninja",
             query_hash=None,
@@ -619,13 +630,14 @@ class PriceService:
             if curr in {"chaos", "c"}:
                 chaos_price = float(amount)
             elif curr in {"divine", "divine orb", "d"}:
-                if not getattr(self.poe_ninja, "divine_chaos_rate", None):
+                divine_rate = getattr(self.poe_ninja, "divine_chaos_rate", None) if self.poe_ninja else None
+                if not divine_rate:
                     self.logger.debug(
                         "Skipping divine-quoted trade listing (no divine rate): %r", q
                     )
                     skipped += 1
                     continue
-                chaos_price = float(amount) * float(self.poe_ninja.divine_chaos_rate)
+                chaos_price = float(amount) * float(divine_rate)
             else:
                 # Extend later with exalts etc.
                 self.logger.debug(

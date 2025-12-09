@@ -13,7 +13,7 @@ Archetypes determine:
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Mapping, Optional, Any, Union
 import json
 import logging
 
@@ -219,7 +219,7 @@ def _get_stat(stats: Dict[str, float], names: List[str], default: float = 0.0) -
     return default
 
 
-def detect_archetype(stats: Dict[str, float], main_skill: str = "") -> BuildArchetype:
+def detect_archetype(stats: Mapping[str, Union[int, float]], main_skill: str = "") -> BuildArchetype:
     """
     Detect build archetype from PoB PlayerStats.
 

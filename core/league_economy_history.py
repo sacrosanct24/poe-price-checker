@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from core.database import Database
@@ -267,7 +267,7 @@ class LeagueEconomyService:
         item_type: str = "UniqueItem",
         delimiter: str = ";",
         batch_size: int = 10000,
-        progress_callback: Optional[callable] = None,
+        progress_callback: Optional[Callable[[int], Any]] = None,
     ) -> int:
         """
         Import item prices from a large CSV file using streaming.
@@ -367,7 +367,7 @@ class LeagueEconomyService:
         league: str,
         delimiter: str = ";",
         batch_size: int = 10000,
-        progress_callback: Optional[callable] = None,
+        progress_callback: Optional[Callable[[int], Any]] = None,
     ) -> int:
         """
         Import currency rates from a large CSV file using streaming.
@@ -987,6 +987,10 @@ class LeagueEconomyService:
                 """,
                 (league, currency),
             )
+
+            # Skip if no stats available
+            if stats is None:
+                continue
 
             # Insert summary
             self._db._execute(

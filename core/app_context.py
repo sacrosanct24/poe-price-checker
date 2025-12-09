@@ -272,7 +272,7 @@ def create_app_context() -> AppContext:
         if isinstance(enabled_map, dict) and enabled_map:
             # Some older test doubles may not implement set_enabled_state
             if hasattr(multi_price_service, "set_enabled_state"):
-                multi_price_service.set_enabled_state(enabled_map)  # type: ignore[attr-defined]
+                multi_price_service.set_enabled_state(enabled_map)
     except Exception:
         pass  # Defensive: ignore invalid enabled_sources config
 

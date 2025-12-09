@@ -12,6 +12,12 @@ review_frequency: quarterly
 
 ---
 
+## 🗺️ Roadmap
+
+- **[Feature Roadmap](ROADMAP.md)** ⭐ - Planned features and development priorities
+
+---
+
 ## 📚 Core References
 
 ### Game Knowledge

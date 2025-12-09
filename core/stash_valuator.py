@@ -13,8 +13,10 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
+from core.item_parser import ParsedItem
+from core.rare_item_evaluator import RareItemEvaluator
 from data_sources.poe_ninja_client import (
     NinjaPriceDatabase,
     get_ninja_client,
@@ -32,6 +34,7 @@ class PriceSource(Enum):
     """Source of price data."""
     POE_NINJA = "poe.ninja"
     POE_PRICES = "poeprices.info"
+    RARE_EVALUATED = "rare_eval"  # RareItemEvaluator score-based estimation
     MANUAL = "manual"
     UNKNOWN = "unknown"
 
@@ -62,6 +65,11 @@ class PricedItem:
     price_min: float = 0.0
     price_max: float = 0.0
 
+    # Rare item evaluation data (populated when price_source == RARE_EVALUATED)
+    eval_score: int = 0  # Total score from RareItemEvaluator
+    eval_tier: str = ""  # Tier: "excellent", "good", "decent", "low", etc.
+    eval_summary: str = ""  # Brief explanation for tooltip/display
+
     # Tab info
     tab_name: str = ""
     tab_index: int = 0
@@ -84,12 +92,20 @@ class PricedItem:
             return f"{self.total_price:.1f}c"
         elif self.total_price > 0:
             return f"{self.total_price:.2f}c"
+        # For evaluated rares without market price, show tier
+        if self.price_source == PriceSource.RARE_EVALUATED and self.eval_tier:
+            return f"[{self.eval_tier}]"
         return "?"
 
     @property
     def is_valuable(self) -> bool:
         """Check if item has significant value."""
-        return self.total_price >= 1.0
+        if self.total_price >= 1.0:
+            return True
+        # Evaluated rares with good scores are also valuable
+        if self.price_source == PriceSource.RARE_EVALUATED:
+            return self.eval_tier in ("excellent", "good")
+        return False
 
 
 @dataclass
@@ -165,15 +181,29 @@ class StashValuator:
         "beast": "beasts",
     }
 
-    def __init__(self):
+    def __init__(self, evaluate_rares: bool = True):
+        """
+        Initialize stash valuator.
+
+        Args:
+            evaluate_rares: If True, use RareItemEvaluator for unpriced rare items
+        """
         self.ninja_client = get_ninja_client()
         self.price_db: Optional[NinjaPriceDatabase] = None
         self._current_league: str = ""
+        self._evaluate_rares = evaluate_rares
+        self._rare_evaluator: Optional[RareItemEvaluator] = None
+
+    def _get_rare_evaluator(self) -> RareItemEvaluator:
+        """Lazy-load the rare item evaluator."""
+        if self._rare_evaluator is None:
+            self._rare_evaluator = RareItemEvaluator()
+        return self._rare_evaluator
 
     def load_prices(
         self,
         league: str,
-        progress_callback: Optional[callable] = None
+        progress_callback: Optional[Callable[[int, int, str], Any]] = None
     ) -> None:
         """
         Load prices from poe.ninja for a league.
@@ -324,6 +354,34 @@ class StashValuator:
         rarity_map = {0: "Normal", 1: "Magic", 2: "Rare", 3: "Unique", 4: "Gem", 5: "Currency", 6: "Divination"}
         rarity = rarity_map.get(frame_type, "Unknown")
 
+        # For unpriced rare items, run evaluation
+        eval_score = 0
+        eval_tier = ""
+        eval_summary = ""
+
+        if (
+            price_source == PriceSource.UNKNOWN
+            and item_class == "rare"
+            and self._evaluate_rares
+            and item.get("identified", True)  # Only evaluate identified items
+        ):
+            try:
+                parsed_item = ParsedItem.from_stash_item(item)
+                evaluator = self._get_rare_evaluator()
+                evaluation = evaluator.evaluate(parsed_item)
+
+                eval_score = evaluation.total_score
+                eval_tier = evaluation.tier
+                eval_summary = evaluator.get_summary(evaluation)
+                price_source = PriceSource.RARE_EVALUATED
+
+                logger.debug(
+                    "Evaluated rare '%s': score=%d, tier=%s",
+                    type_line, eval_score, eval_tier
+                )
+            except Exception as e:
+                logger.warning("Failed to evaluate rare item '%s': %s", type_line, e)
+
         return PricedItem(
             name=name,
             type_line=type_line,
@@ -341,6 +399,9 @@ class StashValuator:
             unit_price=unit_price,
             total_price=total_price,
             price_source=price_source,
+            eval_score=eval_score,
+            eval_tier=eval_tier,
+            eval_summary=eval_summary,
             tab_name=tab.name,
             tab_index=tab.index,
             x=item.get("x", 0),
@@ -368,8 +429,18 @@ class StashValuator:
             if priced.is_valuable:
                 valuable_count += 1
 
-        # Sort by value descending
-        items.sort(key=lambda x: x.total_price, reverse=True)
+        # Sort by value descending, with evaluated items sorted by score after priced items
+        def sort_key(x: PricedItem) -> tuple:
+            # Primary: actual chaos value (priced items first)
+            # Secondary: evaluation score for unpriced rares
+            # This places priced items first, then evaluated rares by score, then unknowns
+            if x.total_price > 0:
+                return (1, x.total_price, 0)  # Priced items: sort by price
+            elif x.eval_score > 0:
+                return (0, 0, x.eval_score)  # Evaluated: sort by score after priced
+            return (-1, 0, 0)  # Unknown: last
+
+        items.sort(key=sort_key, reverse=True)
 
         return PricedTab(
             id=tab.id,
@@ -384,7 +455,7 @@ class StashValuator:
     def valuate_snapshot(
         self,
         snapshot: StashSnapshot,
-        progress_callback: Optional[callable] = None,
+        progress_callback: Optional[Callable[[int, int, str], Any]] = None,
     ) -> ValuationResult:
         """
         Price all items in a stash snapshot.
@@ -450,7 +521,7 @@ def valuate_stash(
     account_name: str,
     league: str,
     max_tabs: Optional[int] = None,
-    progress_callback: Optional[callable] = None,
+    progress_callback: Optional[Callable[[int, int, str], Any]] = None,
 ) -> ValuationResult:
     """
     Fetch and valuate stash.
