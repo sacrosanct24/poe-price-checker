@@ -282,3 +282,222 @@ Settlers;2024-07-26;Divine Orb;Chaos Orb;180.5;High
         rows = service.import_currency_csv(csv, "Settlers")
         # Only Divine -> Chaos row should be imported
         assert rows == 1
+
+
+class TestFileCsvImport:
+    """Tests for file-based CSV imports."""
+
+    def test_import_currency_csv_file(self, service, tmp_path):
+        """Test importing currency rates from a file."""
+        csv_file = tmp_path / "currency.csv"
+        csv_file.write_text("""League;Date;Get;Pay;Value;Confidence
+Settlers;2024-07-26;Divine Orb;Chaos Orb;180.5;High
+Settlers;2024-07-27;Divine Orb;Chaos Orb;175.0;High
+Settlers;2024-07-28;Divine Orb;Chaos Orb;170.0;High
+""")
+
+        rows = service.import_currency_csv_file(csv_file, "Settlers")
+
+        assert rows == 3
+        # Verify data was imported
+        history = service.get_divine_rate_history("Settlers")
+        assert len(history) == 3
+
+    def test_import_currency_csv_file_with_callback(self, service, tmp_path):
+        """Test file import with progress callback."""
+        csv_file = tmp_path / "currency.csv"
+        csv_file.write_text("""League;Date;Get;Pay;Value;Confidence
+Settlers;2024-07-26;Divine Orb;Chaos Orb;180.5;High
+Settlers;2024-07-27;Divine Orb;Chaos Orb;175.0;High
+""")
+
+        callback_counts = []
+
+        def progress_callback(rows):
+            callback_counts.append(rows)
+
+        rows = service.import_currency_csv_file(
+            csv_file, "Settlers", progress_callback=progress_callback
+        )
+
+        assert rows == 2
+
+    def test_import_item_csv_file(self, service, tmp_path):
+        """Test importing item prices from a file."""
+        csv_file = tmp_path / "items.csv"
+        csv_file.write_text("""League;Date;Name;BaseType;Value
+Settlers;2024-07-26;Mageblood;Heavy Belt;150000.0
+Settlers;2024-07-26;Headhunter;Leather Belt;45000.0
+Settlers;2024-07-27;Mageblood;Heavy Belt;148000.0
+""")
+
+        rows = service.import_item_csv_file(csv_file, "Settlers")
+
+        assert rows == 3
+
+    def test_import_item_csv_file_skips_bad_rows(self, service, tmp_path):
+        """Test file import skips malformed rows."""
+        csv_file = tmp_path / "items.csv"
+        csv_file.write_text("""League;Date;Name;BaseType;Value
+Settlers;bad-date;Item1;Base;100.0
+Settlers;2024-07-26;;Base;100.0
+Settlers;2024-07-26;ValidItem;Base;100.0
+""")
+
+        rows = service.import_item_csv_file(csv_file, "Settlers")
+
+        # Only the valid row should be imported
+        assert rows == 1
+
+    def test_import_csv_file_filters_by_league(self, service, tmp_path):
+        """Test file import filters by league correctly."""
+        csv_file = tmp_path / "currency.csv"
+        csv_file.write_text("""League;Date;Get;Pay;Value;Confidence
+Settlers;2024-07-26;Divine Orb;Chaos Orb;180.0;High
+Necropolis;2024-07-26;Divine Orb;Chaos Orb;200.0;High
+Settlers;2024-07-27;Divine Orb;Chaos Orb;175.0;High
+""")
+
+        rows = service.import_currency_csv_file(csv_file, "Settlers")
+
+        assert rows == 2
+
+
+class TestDataAggregation:
+    """Tests for data aggregation methods."""
+
+    def test_aggregate_league(self, service, sample_currency_csv, sample_item_csv):
+        """Test full league data aggregation."""
+        # Import test data
+        service.import_currency_csv(sample_currency_csv, "Settlers")
+        service.import_item_csv(sample_item_csv, "Settlers")
+
+        result = service.aggregate_league("Settlers")
+
+        assert result is True
+
+    def test_aggregate_currency_summary(self, service, sample_currency_csv):
+        """Test currency summary aggregation."""
+        service.import_currency_csv(sample_currency_csv, "Settlers")
+
+        # Call private method directly
+        count = service._aggregate_currency_summary("Settlers")
+
+        assert count == 2  # Divine Orb and Exalted Orb
+
+    def test_aggregate_top_items_requires_minimum_data_points(self, service):
+        """Test that top items aggregation requires minimum data points."""
+        # Import a single item entry (not enough for aggregation)
+        service.import_item_csv(
+            """League;Date;Name;BaseType;Value
+Settlers;2024-07-26;Mageblood;Heavy Belt;150000.0
+""",
+            "Settlers",
+        )
+
+        # Should return 0 because we need at least 10 data points per item
+        count = service._aggregate_top_items("Settlers")
+
+        assert count == 0
+
+    def test_aggregate_top_items_with_enough_data(self, service):
+        """Test top items aggregation with sufficient data points."""
+        # Create enough data points (at least 10)
+        csv_lines = ["League;Date;Name;BaseType;Value"]
+        for i in range(15):
+            csv_lines.append(f"Settlers;2024-07-{10+i:02d};Mageblood;Heavy Belt;{150000.0 - i*100}")
+
+        service.import_item_csv("\n".join(csv_lines), "Settlers")
+
+        count = service._aggregate_top_items("Settlers")
+
+        assert count >= 1
+
+    def test_aggregate_league_handles_errors(self, service):
+        """Test that aggregation handles errors gracefully."""
+        # Try to aggregate non-existent league (should not crash)
+        result = service.aggregate_league("NonExistentLeague")
+
+        # Should return True (no error, just no data)
+        assert result is True
+
+
+class TestFetchOperations:
+    """Tests for poe.ninja fetch operations (mocked)."""
+
+    def test_fetch_current_rates_with_mock(self, service, mocker):
+        """Test fetching current rates with mocked client."""
+        # Mock the poe_ninja_client
+        mock_client = mocker.MagicMock()
+        mock_price = mocker.MagicMock()
+        mock_price.name = "Divine Orb"
+        mock_price.chaos_value = 185.5
+        mock_client.get_currency_prices.return_value = [mock_price]
+
+        mocker.patch(
+            "data_sources.poe_ninja_client.get_ninja_client",
+            return_value=mock_client,
+        )
+
+        rates = service.fetch_current_rates("Settlers")
+
+        assert "Divine Orb" in rates
+        assert rates["Divine Orb"] == 185.5
+
+    def test_fetch_current_rates_handles_error(self, service, mocker):
+        """Test that fetch handles errors gracefully."""
+        mocker.patch(
+            "data_sources.poe_ninja_client.get_ninja_client",
+            side_effect=Exception("Network error"),
+        )
+
+        rates = service.fetch_current_rates("Settlers")
+
+        assert rates == {}
+
+    def test_fetch_and_store_snapshot_with_mock(self, service, mocker):
+        """Test fetching and storing economy snapshot with mocked client."""
+        mock_client = mocker.MagicMock()
+
+        # Mock currency prices
+        mock_divine = mocker.MagicMock()
+        mock_divine.name = "Divine Orb"
+        mock_divine.chaos_value = 180.0
+
+        mock_exalt = mocker.MagicMock()
+        mock_exalt.name = "Exalted Orb"
+        mock_exalt.chaos_value = 12.0
+
+        mock_client.get_currency_prices.return_value = [mock_divine, mock_exalt]
+
+        # Mock item prices
+        mock_item = mocker.MagicMock()
+        mock_item.name = "Mageblood"
+        mock_item.base_type = "Heavy Belt"
+        mock_item.chaos_value = 150000.0
+        mock_item.divine_value = 833.0
+
+        mock_client.get_item_prices.return_value = [mock_item]
+
+        mocker.patch(
+            "data_sources.poe_ninja_client.get_ninja_client",
+            return_value=mock_client,
+        )
+
+        snapshot = service.fetch_and_store_snapshot("Settlers")
+
+        assert snapshot is not None
+        assert snapshot.divine_to_chaos == 180.0
+        assert snapshot.exalt_to_chaos == 12.0
+        assert len(snapshot.top_uniques) > 0
+
+    def test_fetch_and_store_snapshot_handles_error(self, service, mocker):
+        """Test that fetch snapshot handles errors gracefully."""
+        mocker.patch(
+            "data_sources.poe_ninja_client.get_ninja_client",
+            side_effect=Exception("Network error"),
+        )
+
+        snapshot = service.fetch_and_store_snapshot("Settlers")
+
+        assert snapshot is None
