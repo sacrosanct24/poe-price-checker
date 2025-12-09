@@ -23,7 +23,7 @@ import threading
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Iterator, List, Optional
+from typing import Any, Dict, Iterator, List, Optional, cast
 
 from core.game_version import GameVersion
 
@@ -126,7 +126,8 @@ class Database:
         """Thread-safe fetchone helper."""
         with self._lock:
             cursor = self.conn.execute(sql, params)
-            return cursor.fetchone()
+            result = cursor.fetchone()
+            return cast(Optional[sqlite3.Row], result)
 
     def _execute_fetchall(
         self, sql: str, params: tuple = ()

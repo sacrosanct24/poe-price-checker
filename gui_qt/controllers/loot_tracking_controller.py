@@ -513,7 +513,7 @@ class LootTrackingController(QObject):
         """
         # Basic heuristics based on rarity
         frame_type = item.get("frameType", 0)
-        stack_size = item.get("stackSize", 1)
+        stack_size = int(item.get("stackSize", 1))
 
         if frame_type == 3:  # Unique
             return 10.0

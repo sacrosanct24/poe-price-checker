@@ -663,7 +663,7 @@ class ThemeManager:
                 )
                 value, _ = winreg.QueryValueEx(key, "AppsUseLightTheme")
                 winreg.CloseKey(key)
-                return value == 0  # 0 = dark mode, 1 = light mode
+                return bool(value == 0)  # 0 = dark mode, 1 = light mode
             except (FileNotFoundError, OSError):
                 pass  # Registry key not found, fall through to QPalette
 
@@ -689,7 +689,7 @@ class ThemeManager:
             if app:
                 palette = app.palette()
                 bg = palette.color(QPalette.ColorRole.Window)
-                return bg.lightness() < 128
+                return bool(bg.lightness() < 128)
         except Exception:
             pass  # No app instance, assume dark theme
 

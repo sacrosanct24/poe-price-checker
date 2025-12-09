@@ -124,7 +124,7 @@ class VerdictResult:
     detailed_reasons: List[str]
     estimated_value: Optional[float] = None
     confidence: str = "medium"  # low, medium, high
-    meta_affixes_found: List[str] = None  # Meta-popular affixes on item
+    meta_affixes_found: Optional[List[str]] = None  # Meta-popular affixes on item
     meta_bonus_applied: float = 0.0  # Total meta bonus added
 
     def __post_init__(self):
@@ -559,7 +559,7 @@ class QuickVerdictCalculator:
             Tuple of (affix_reasons, meta_affix_types_found)
         """
         reasons = self._analyze_rare_affixes(item)
-        meta_matches = []
+        meta_matches: List[str] = []
 
         if not self.meta_weights:
             return reasons, meta_matches

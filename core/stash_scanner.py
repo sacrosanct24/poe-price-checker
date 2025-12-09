@@ -150,7 +150,7 @@ class StashScanner:
             response.raise_for_status()
 
             data = response.json()
-            tabs = data.get('tabs', [])
+            tabs: List[Dict[str, Any]] = data.get('tabs', [])
 
             self.logger.info("Found %d stash tabs", len(tabs))
 
@@ -198,7 +198,7 @@ class StashScanner:
             response.raise_for_status()
 
             data = response.json()
-            items = data.get('items', [])
+            items: List[Dict[str, Any]] = data.get('items', [])
 
             self.logger.info("Found %d items in tab %d", len(items), tab_index)
 

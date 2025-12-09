@@ -44,6 +44,9 @@ class HistoryManager:
 
     _instance: Optional['HistoryManager'] = None
     _lock: threading.Lock = threading.Lock()
+    _history: Deque[HistoryEntry]
+    _max_entries: int
+    _on_change_callbacks: List[Callable[[], None]]
 
     def __new__(cls, max_entries: int = HISTORY_MAX_ENTRIES) -> 'HistoryManager':
         """Singleton pattern with thread-safe double-checked locking."""

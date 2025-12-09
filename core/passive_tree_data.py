@@ -10,7 +10,7 @@ import json
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 import requests
 
@@ -95,7 +95,7 @@ class PassiveTreeDataProvider:
             }
             response = requests.get(SKILLTREE_DATA_URL, headers=headers, timeout=60)
             response.raise_for_status()
-            data = response.json()
+            data: Dict[str, Any] = response.json()
 
             # Cache locally
             with open(self.cache_path, 'w', encoding='utf-8') as f:

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from core.build_stat_calculator import BuildStats
 from core.build_priorities import BuildPriorities, AVAILABLE_STATS
@@ -455,16 +455,17 @@ def build_trade_query(requirements: BiSRequirements, league: str = "Standard") -
         Trade API query dict
     """
     # Start with basic query structure
-    query = {
+    stats_filter: Dict[str, Any] = {"type": "and", "filters": []}
+    query: Dict[str, Any] = {
         "query": {
             "status": {"option": "online"},
-            "stats": [{"type": "and", "filters": []}],
+            "stats": [stats_filter],
         },
         "sort": {"price": "asc"},
     }
 
     # Add stat filters from required stats (first 2)
-    stat_filters = []
+    stat_filters: List[Dict[str, Any]] = []
     for stat in requirements.required_stats[:2]:
         stat_filters.append({
             "id": stat.stat_id,
@@ -479,7 +480,7 @@ def build_trade_query(requirements: BiSRequirements, league: str = "Standard") -
             "value": {"min": stat.min_value},
         })
 
-    query["query"]["stats"][0]["filters"] = stat_filters
+    stats_filter["filters"] = stat_filters
 
     return query
 

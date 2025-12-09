@@ -70,7 +70,7 @@ class PoeTradeClient(BaseAPIClient):
     # BaseAPIClient abstract method
     # ------------------------------------------------------------------ #
 
-    def _get_cache_key(
+    def _get_cache_key(  # type: ignore[override]
         self,
         method: str,
         path: str,

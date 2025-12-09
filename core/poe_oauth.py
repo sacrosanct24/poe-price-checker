@@ -431,11 +431,13 @@ if __name__ == "__main__":
 
     if client.is_authenticated():
         print("✓ Already authenticated!")
-        print(f"Access token: {client.access_token[:20]}...")
+        if client.access_token:
+            print(f"Access token: {client.access_token[:20]}...")
     else:
         print("Starting authentication...")
         if client.authenticate():
             print("✓ Authentication successful!")
-            print(f"Access token: {client.access_token[:20]}...")
+            if client.access_token:
+                print(f"Access token: {client.access_token[:20]}...")
         else:
             print("✗ Authentication failed")

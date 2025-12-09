@@ -344,7 +344,7 @@ class PoBDecoder:
                 response.raise_for_status()
                 data = response.json()
                 # The API returns the code in a 'code' or 'content' field
-                return data.get("code") or data.get("content", "")
+                return str(data.get("code") or data.get("content") or "")
             except Exception as e:
                 logger.error(f"Failed to fetch pobb.in: {e}")
                 raise ValueError(f"Could not fetch pobb.in: {e}")

@@ -273,9 +273,10 @@ class PriceRankingCache:
                 return False
             updated_at = ranking.updated_at
         else:
-            updated_at = self._cache_metadata.get("last_updated")
-            if not updated_at:
+            updated_at_raw = self._cache_metadata.get("last_updated")
+            if not updated_at_raw:
                 return False
+            updated_at = str(updated_at_raw)
 
         try:
             updated_dt = datetime.fromisoformat(updated_at.replace('Z', '+00:00'))
@@ -551,7 +552,9 @@ class Top20Calculator:
         logger.info(f"Fetching top 20 for {display_name}...")
 
         try:
-            items = self._fetch_slot_top20(api_type, item_types, divine_rate)
+            # Convert item_types to expected type (str or List[str])
+            item_types_arg = list(item_types) if not isinstance(item_types, str) else item_types
+            items = self._fetch_slot_top20(api_type, item_types_arg, divine_rate)
 
             slot_key = f"slot_{slot}"
             ranking = CategoryRanking(
@@ -913,7 +916,7 @@ class PriceRankingHistory:
             VALUES (?, ?, ?)
         """, (league, ranking.category, today))
 
-        snapshot_id = cursor.lastrowid
+        snapshot_id = cursor.lastrowid or 0
 
         # Delete old items for this snapshot (in case of replace)
         cursor.execute("DELETE FROM ranked_items WHERE snapshot_id = ?", (snapshot_id,))

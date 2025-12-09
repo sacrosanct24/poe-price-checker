@@ -557,7 +557,7 @@ class BuildComparator:
         guide_skill_set: SkillSetSpec,
     ) -> SkillDelta:
         """Compare skill gem setups."""
-        guide_gems = {}
+        guide_gems: Dict[str, Dict[str, Any]] = {}
         for skill in guide_skill_set.skills:
             for gem in skill["gems"]:
                 name = gem["name"]
@@ -756,11 +756,11 @@ class BuildComparator:
             guide_spec_title=target_spec.title if target_spec else "",
         )
 
-    def _extract_player_gems(self, build: PoBBuild) -> Dict[str, Dict]:
+    def _extract_player_gems(self, build: PoBBuild) -> Dict[str, Dict[str, Any]]:
         """Extract gem info from player build."""
         # This is simplified - real implementation would parse skills
         # from raw_xml similar to guide parsing
-        gems = {}
+        gems: Dict[str, Dict[str, Any]] = {}
 
         if build.raw_xml:
             try:
@@ -846,9 +846,9 @@ if __name__ == "__main__":
         # Test level matching
         print("\nLevel-appropriate spec selection:")
         for level in [40, 70, 85, 92, 98]:
-            spec = parser.find_spec_for_level(specs, level)
-            ss = parser.find_skill_set_for_level(skill_sets, level)
-            print(f"  Level {level}: Tree='{spec.title if spec else 'None'}', Skills='{ss.title if ss else 'None'}'")
+            matched_spec = parser.find_spec_for_level(specs, level)
+            matched_ss = parser.find_skill_set_for_level(skill_sets, level)
+            print(f"  Level {level}: Tree='{matched_spec.title if matched_spec else 'None'}', Skills='{matched_ss.title if matched_ss else 'None'}'")
 
     except Exception as e:
         print(f"Error: {e}")

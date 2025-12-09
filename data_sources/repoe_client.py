@@ -137,7 +137,7 @@ class RePoEClient:
         try:
             response = requests.get(url, timeout=60)
             response.raise_for_status()
-            data = response.json()
+            data: Dict[str, Any] = response.json()
 
             # Cache locally
             cache_path = self._get_cache_path(data_type)
@@ -163,14 +163,15 @@ class RePoEClient:
         """
         # Check memory cache first
         if data_type in self._data_cache:
-            return self._data_cache[data_type]
+            cached: Dict[str, Any] = self._data_cache[data_type]
+            return cached
 
         # Check local file cache
         cache_path = self._get_cache_path(data_type)
         if cache_path.exists():
             try:
                 with open(cache_path, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
+                    data: Dict[str, Any] = json.load(f)
                 self._data_cache[data_type] = data
                 return data
             except Exception as e:
@@ -178,10 +179,10 @@ class RePoEClient:
 
         # Download if auto_download enabled
         if self.auto_download:
-            data = self._download_data(data_type)
-            if data:
-                self._data_cache[data_type] = data
-            return data
+            downloaded = self._download_data(data_type)
+            if downloaded:
+                self._data_cache[data_type] = downloaded
+            return downloaded
 
         return None
 

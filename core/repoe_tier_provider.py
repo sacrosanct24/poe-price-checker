@@ -468,7 +468,10 @@ class BaseItemRecommender:
     def _get_base_items(self) -> Dict:
         """Load base items with caching."""
         if self._base_items is None:
-            self._base_items = self._client.get_base_items() or {}
+            if self._client is not None:
+                self._base_items = self._client.get_base_items() or {}
+            else:
+                self._base_items = {}
         return self._base_items
 
     def _get_defense_type(self, tags: List[str]) -> str:

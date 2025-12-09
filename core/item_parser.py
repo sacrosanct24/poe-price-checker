@@ -608,4 +608,5 @@ Corrupted
 """
     result = parser.parse(sample)
     print(result)
-    print(result.to_dict())
+    if result:
+        print(result.to_dict())

@@ -338,7 +338,7 @@ class AIUpgradeAdvisorService:
         Returns:
             List of potential upgrade candidates from stash.
         """
-        candidates = []
+        candidates: List[StashUpgradeCandidate] = []
 
         storage = self.get_stash_storage()
         stored = storage.load_latest_snapshot(account_name, league)

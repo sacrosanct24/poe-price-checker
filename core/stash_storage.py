@@ -417,20 +417,22 @@ class StashStorageService:
             "fetched_at": snapshot.fetched_at,
             "tabs": [],
         }
+        tabs_list: List[Dict[str, Any]] = []
 
         for tab in snapshot.tabs:
-            tab_data = {
+            children_list: List[Dict[str, Any]] = []
+            tab_data: Dict[str, Any] = {
                 "id": tab.id,
                 "name": tab.name,
                 "index": tab.index,
                 "type": tab.type,
                 "items": tab.items,  # Already list of dicts
                 "folder": tab.folder,
-                "children": [],
+                "children": children_list,
             }
 
             for child in tab.children:
-                child_data = {
+                child_data: Dict[str, Any] = {
                     "id": child.id,
                     "name": child.name,
                     "index": child.index,
@@ -438,15 +440,17 @@ class StashStorageService:
                     "items": child.items,
                     "folder": child.folder,
                 }
-                tab_data["children"].append(child_data)
+                children_list.append(child_data)
 
-            data["tabs"].append(tab_data)
+            tabs_list.append(tab_data)
+        data["tabs"] = tabs_list
 
         return json.dumps(data)
 
     def _serialize_valuation(self, valuation: "ValuationResult") -> str:
         """Serialize a ValuationResult to JSON."""
-        data = {
+        tabs_list: List[Dict[str, Any]] = []
+        data: Dict[str, Any] = {
             "league": valuation.league,
             "account_name": valuation.account_name,
             "total_value": valuation.total_value,
@@ -454,22 +458,23 @@ class StashStorageService:
             "priced_items": valuation.priced_items,
             "unpriced_items": valuation.unpriced_items,
             "errors": valuation.errors,
-            "tabs": [],
+            "tabs": tabs_list,
         }
 
         for tab in valuation.tabs:
-            tab_data = {
+            items_list: List[Dict[str, Any]] = []
+            tab_data: Dict[str, Any] = {
                 "id": tab.id,
                 "name": tab.name,
                 "index": tab.index,
                 "tab_type": tab.tab_type,
                 "total_value": tab.total_value,
                 "valuable_count": tab.valuable_count,
-                "items": [],
+                "items": items_list,
             }
 
             for item in tab.items:
-                item_data = {
+                item_data: Dict[str, Any] = {
                     "name": item.name,
                     "type_line": item.type_line,
                     "base_type": item.base_type,
@@ -494,9 +499,9 @@ class StashStorageService:
                     "y": item.y,
                     # Don't store raw_item - it's redundant with snapshot
                 }
-                tab_data["items"].append(item_data)
+                items_list.append(item_data)
 
-            data["tabs"].append(tab_data)
+            tabs_list.append(tab_data)
 
         return json.dumps(data)
 

@@ -142,12 +142,12 @@ class KeyboardNavigator(QObject):
     def _get_current_index(self) -> int:
         """Get current selection index."""
         if isinstance(self._parent, (QTableWidget, QTableView)):
-            return self._parent.currentRow()
+            return int(self._parent.currentRow())
         elif isinstance(self._parent, (QListWidget, QListView)):
-            return self._parent.currentRow()
+            return int(self._parent.currentRow())
         elif isinstance(self._parent, (QTreeWidget, QTreeView)):
             index = self._parent.currentIndex()
-            return index.row() if index.isValid() else 0
+            return int(index.row()) if index.isValid() else 0
         return 0
 
     def _set_current_index(self, index: int) -> None:

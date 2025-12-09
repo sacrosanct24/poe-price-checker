@@ -492,6 +492,7 @@ if __name__ == "__main__":
     from dataclasses import dataclass as dc, field as f
     from typing import List as L, Dict as D
 
+    from typing import Optional as O
     @dc
     class MockTab:
         id: str
@@ -499,7 +500,7 @@ if __name__ == "__main__":
         index: int
         type: str
         items: L[D] = f(default_factory=list)
-        folder: str = None
+        folder: O[str] = None
         children: L = f(default_factory=list)
 
     @dc
@@ -530,8 +531,8 @@ if __name__ == "__main__":
 
     # Test diff
     engine = StashDiffEngine()
-    engine.set_before_snapshot(before_snapshot)
-    diff = engine.compute_diff(after_snapshot)
+    engine.set_before_snapshot(before_snapshot)  # type: ignore[arg-type]
+    diff = engine.compute_diff(after_snapshot)  # type: ignore[arg-type]
 
     print(f"\nDiff summary: {diff.get_summary()}")
     print(f"Added items: {len(diff.added_items)}")

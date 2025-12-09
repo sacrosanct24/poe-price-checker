@@ -123,7 +123,7 @@ class PoBLocalScanner:
         if not force_refresh and self._cached_builds:
             return self._cached_builds
 
-        builds = []
+        builds: List[LocalBuildInfo] = []
         path = self.builds_path
 
         if not path:

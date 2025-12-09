@@ -43,7 +43,7 @@ class ExistingServiceAdapter(PriceSource):
     service: Any
 
     def check_item(self, item_text: str) -> list[dict[str, Any]]:
-        raw_results = self.service.check_item(item_text)  # type: ignore[call-arg]
+        raw_results = self.service.check_item(item_text)
         rows: list[dict[str, Any]] = []
 
         for row in raw_results:

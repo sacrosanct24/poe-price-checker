@@ -12,7 +12,7 @@ import json
 import zlib
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 import defusedxml.ElementTree as ET
 
@@ -227,7 +227,7 @@ class BuildMatcher:
         Returns:
             List of matching builds with relevance score
         """
-        matches = []
+        matches: List[Dict[str, Any]] = []
 
         for build in self.builds:
             score = 0
@@ -278,8 +278,8 @@ class BuildMatcher:
                     "matched_requirements": matched_requirements
                 })
 
-        # Sort by score (cast to int since we know score is always int)
-        matches.sort(key=lambda x: int(x["score"]), reverse=True)  # type: ignore[arg-type]
+        # Sort by score descending
+        matches.sort(key=lambda x: int(x.get("score", 0)), reverse=True)
 
         return matches
 

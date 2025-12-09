@@ -391,7 +391,7 @@ class UpgradeFinderService:
         max_results: int,
     ) -> List[UpgradeCandidate]:
         """Execute trade API search and return candidates."""
-        candidates = []
+        candidates: List[UpgradeCandidate] = []
 
         try:
             from data_sources.pricing.trade_api import TradeApiSource
@@ -399,7 +399,7 @@ class UpgradeFinderService:
             source = TradeApiSource(league=self.league)
             search_id, result_ids = source._search(query, max_results=max_results)
 
-            if not result_ids:
+            if not result_ids or not search_id:
                 return candidates
 
             listings = source._fetch_listings(search_id, result_ids[:max_results])
@@ -473,7 +473,7 @@ class UpgradeFinderService:
         # Calculate DPS impact
         if dps_calculator:
             try:
-                dps_impact = dps_calculator.calculate_item_impact(candidate.all_mods)
+                dps_impact = dps_calculator.calculate_impact(candidate.all_mods)
                 candidate.dps_impact = dps_impact
                 candidate.dps_change = dps_impact.total_dps_change
                 candidate.dps_percent_change = dps_impact.total_dps_percent
@@ -486,7 +486,7 @@ class UpgradeFinderService:
         dps_contribution = candidate.dps_percent_change * 10  # Scale % to points
 
         # Price efficiency bonus (cheaper = better for same stats)
-        price_penalty = 0
+        price_penalty: float = 0.0
         if candidate.price_chaos > 0:
             # Small penalty for expensive items
             price_penalty = candidate.price_chaos / 100

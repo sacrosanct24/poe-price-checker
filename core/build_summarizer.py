@@ -425,7 +425,7 @@ class BuildSummarizer:
                 return "Chaos"
             return "Mixed"
 
-        max_type = max(damage_types, key=damage_types.get)
+        max_type = max(damage_types, key=lambda k: damage_types.get(k, 0))
         return max_type
 
     def _detect_playstyle(self, build: "PoBBuild") -> str:

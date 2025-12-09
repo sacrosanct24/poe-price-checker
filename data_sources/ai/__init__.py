@@ -16,7 +16,7 @@ Usage:
 
 from __future__ import annotations
 
-from typing import Optional, Literal
+from typing import Any, Dict, Optional, Literal
 import logging
 
 from data_sources.ai.base_ai_client import BaseAIClient, AIResponse
@@ -87,15 +87,15 @@ def create_ai_client(
 
     # Special handling for Ollama
     if provider_lower == "ollama":
-        kwargs = {
+        ollama_kwargs: Dict[str, Any] = {
             "timeout": timeout,
             "max_tokens": max_tokens,
         }
         if ollama_host:
-            kwargs["host"] = ollama_host
+            ollama_kwargs["host"] = ollama_host
         if ollama_model:
-            kwargs["model"] = ollama_model
-        return OllamaClient(**kwargs)
+            ollama_kwargs["model"] = ollama_model
+        return OllamaClient(**ollama_kwargs)
 
     return client_class(
         api_key=api_key,

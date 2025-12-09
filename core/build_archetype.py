@@ -211,11 +211,11 @@ LIGHTNING_RES_OVERCAP = ["LightningResistOverCap", "LightningResistOvercap"]
 CHAOS_RES = ["ChaosResist", "ChaosRes"]
 
 
-def _get_stat(stats: Dict[str, float], names: List[str], default: float = 0.0) -> float:
+def _get_stat(stats: Mapping[str, Union[int, float]], names: List[str], default: float = 0.0) -> float:
     """Get a stat value trying multiple possible names."""
     for name in names:
         if name in stats:
-            return stats[name]
+            return float(stats[name])
     return default
 
 

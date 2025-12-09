@@ -178,7 +178,7 @@ class GuideGearExtractor:
         is_unique = item.rarity == "UNIQUE"
 
         # Extract key mods (up to 5 most relevant)
-        key_mods = []
+        key_mods: List[str] = []
         all_mods = (item.implicit_mods or []) + (item.explicit_mods or [])
 
         # Prioritize certain mod types

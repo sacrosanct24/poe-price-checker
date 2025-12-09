@@ -183,7 +183,7 @@ class CargoAPIClient:
         """
         self._wait_for_rate_limit()
 
-        params = {
+        params: Dict[str, Any] = {
             'action': 'cargoquery',
             'format': 'json',
             'tables': tables,
