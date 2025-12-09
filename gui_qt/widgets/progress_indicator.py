@@ -157,8 +157,10 @@ class CircularProgress(QWidget):
             self._spin_animation.stop()
             self._spin_animation = None
 
-    def paintEvent(self, event: QPaintEvent) -> None:
+    def paintEvent(self, event: Optional[QPaintEvent]) -> None:
         """Paint the circular progress."""
+        if event is None:
+            return
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
@@ -321,8 +323,10 @@ class LinearProgress(QWidget):
             self._animation.stop()
             self._animation = None
 
-    def paintEvent(self, event: QPaintEvent) -> None:
+    def paintEvent(self, event: Optional[QPaintEvent]) -> None:
         """Paint the linear progress bar."""
+        if event is None:
+            return
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
@@ -582,8 +586,10 @@ class LoadingOverlay(QWidget):
         self._spinner.stop()
         self.hide()
 
-    def paintEvent(self, event: QPaintEvent) -> None:
+    def paintEvent(self, event: Optional[QPaintEvent]) -> None:
         """Paint semi-transparent background."""
+        if event is None:
+            return
         painter = QPainter(self)
         painter.fillRect(self.rect(), QColor(0, 0, 0, 128))
 

@@ -503,7 +503,7 @@ class UpgradeFinderDialog(QDialog):
             self.results_table.setItem(row, 2, price_item)
 
             # Life delta
-            life_delta = 0
+            life_delta: float = 0.0
             if candidate.upgrade_impact:
                 life_delta = candidate.upgrade_impact.effective_life_delta
             life_text = f"+{int(life_delta)}" if life_delta > 0 else str(int(life_delta))
@@ -515,7 +515,7 @@ class UpgradeFinderDialog(QDialog):
             self.results_table.setItem(row, 3, life_item)
 
             # Res delta
-            res_delta = 0
+            res_delta: float = 0.0
             if candidate.upgrade_impact:
                 res_delta = (
                     candidate.upgrade_impact.fire_res_delta +

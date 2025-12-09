@@ -105,8 +105,10 @@ class SkeletonBase(QWidget):
             if instance.isVisible():
                 instance.update()
 
-    def paintEvent(self, event: QPaintEvent) -> None:
+    def paintEvent(self, event: Optional[QPaintEvent]) -> None:
         """Paint skeleton with optional shimmer."""
+        if event is None:
+            return
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 

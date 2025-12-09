@@ -118,9 +118,9 @@ class FocusRing(QWidget):
             self.show()
             self.update()
 
-    def paintEvent(self, event: QPaintEvent) -> None:
+    def paintEvent(self, event: Optional[QPaintEvent]) -> None:
         """Paint the focus ring."""
-        if self._target is None:
+        if self._target is None or event is None:
             return
 
         painter = QPainter(self)
@@ -237,8 +237,10 @@ class FocusManager(QObject):
             and widget.focusPolicy() != Qt.FocusPolicy.NoFocus
         )
 
-    def eventFilter(self, obj: QObject, event: QEvent) -> bool:
+    def eventFilter(self, obj: Optional[QObject], event: Optional[QEvent]) -> bool:
         """Filter events to track focus changes."""
+        if obj is None or event is None:
+            return False
         if event.type() == QEvent.Type.FocusIn:
             if isinstance(obj, QWidget):
                 self._on_focus_changed(obj)
@@ -263,11 +265,12 @@ class FocusManager(QObject):
 
     def _is_in_scope(self, widget: QWidget, scope: QWidget) -> bool:
         """Check if widget is within the focus scope."""
-        current = widget
+        current: Optional[QWidget] = widget
         while current:
             if current is scope:
                 return True
-            current = current.parent()
+            parent = current.parent()
+            current = parent if isinstance(parent, QWidget) else None
         return False
 
     def _update_focus_ring(self, widget: QWidget) -> None:

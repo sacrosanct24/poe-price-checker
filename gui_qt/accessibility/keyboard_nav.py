@@ -71,8 +71,10 @@ class KeyboardNavigator(QObject):
         # Install event filter
         parent.installEventFilter(self)
 
-    def eventFilter(self, obj: QObject, event: QEvent) -> bool:
+    def eventFilter(self, obj: Optional[QObject], event: Optional[QEvent]) -> bool:
         """Filter keyboard events."""
+        if obj is None or event is None:
+            return False
         if event.type() != QEvent.Type.KeyPress:
             return super().eventFilter(obj, event)
 

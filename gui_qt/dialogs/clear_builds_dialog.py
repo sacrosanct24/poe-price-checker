@@ -26,7 +26,7 @@ try:
     BUILD_CATEGORIES = list(BuildCategory)
 except ImportError:
     BUILD_CATEGORIES = []
-    BuildCategory = None
+    BuildCategory = None  # type: ignore[assignment]
 
 logger = logging.getLogger(__name__)
 

@@ -114,8 +114,10 @@ class ShimmerEffect(QWidget):
             self._animation = None
         self.hide()
 
-    def paintEvent(self, event: QPaintEvent) -> None:
+    def paintEvent(self, event: Optional[QPaintEvent]) -> None:
         """Paint the shimmer gradient."""
+        if event is None:
+            return
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
@@ -358,8 +360,10 @@ class SkeletonShimmer(QWidget):
             self._animation.stop()
             self._animation = None
 
-    def paintEvent(self, event: QPaintEvent) -> None:
+    def paintEvent(self, event: Optional[QPaintEvent]) -> None:
         """Paint skeleton with shimmer."""
+        if event is None:
+            return
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
