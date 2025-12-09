@@ -126,7 +126,7 @@ def _eval_condition(cond: str, item: ParsedItem, slot: str) -> bool:
             return count > target
         if op == "<":
             return count < target
-        return False
+        return False  # pragma: no cover - regex only allows valid operators
 
     # ---- mod ~ 'pattern' ----
     m = re.match(r"mod\s*~\s*'([^']+)'", cond)
@@ -149,11 +149,17 @@ def _eval_condition(cond: str, item: ParsedItem, slot: str) -> bool:
             rhs_val = rhs.upper()
         elif field == "item_level":
             lhs = int(item.item_level or 0)
-            rhs_val = int(rhs)
+            try:
+                rhs_val = int(rhs)
+            except ValueError:
+                return False
         elif field in {"gem_level", "gem_quality"}:
             # If the dataclass doesn't have these, we treat them as 0
             lhs = int(getattr(item, field, 0) or 0)
-            rhs_val = int(rhs)
+            try:
+                rhs_val = int(rhs)
+            except ValueError:
+                return False
         elif field in {"is_corrupted", "is_fractured", "is_mirrored", "is_synthesised"}:
             lhs = bool(getattr(item, field, False))
             rhs_val = rhs.lower() in {"true", "1", "yes"}
@@ -173,7 +179,7 @@ def _eval_condition(cond: str, item: ParsedItem, slot: str) -> bool:
         if isinstance(lhs, (int, float)):
             try:
                 rhs_num = float(rhs_val)
-            except ValueError:
+            except ValueError:  # pragma: no cover - rhs_val is already int from earlier conversion
                 return False
 
             if op == "==":
@@ -188,7 +194,7 @@ def _eval_condition(cond: str, item: ParsedItem, slot: str) -> bool:
                 return lhs > rhs_num
             if op == "<":
                 return lhs < rhs_num
-            return False
+            return False  # pragma: no cover - regex only allows valid operators
 
         # Strings
         lhs_str = str(lhs)
