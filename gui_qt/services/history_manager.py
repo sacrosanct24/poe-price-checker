@@ -53,10 +53,11 @@ class HistoryManager:
         if cls._instance is None:
             with cls._lock:
                 if cls._instance is None:
-                    cls._instance = super().__new__(cls)
-                    cls._instance._history: Deque[HistoryEntry] = deque(maxlen=max_entries)
-                    cls._instance._max_entries = max_entries
-                    cls._instance._on_change_callbacks: List[Callable[[], None]] = []
+                    instance = super().__new__(cls)
+                    instance._history = deque(maxlen=max_entries)  # type: ignore[attr-defined]
+                    instance._max_entries = max_entries  # type: ignore[attr-defined]
+                    instance._on_change_callbacks = []  # type: ignore[attr-defined]
+                    cls._instance = instance
         return cls._instance
 
     @property

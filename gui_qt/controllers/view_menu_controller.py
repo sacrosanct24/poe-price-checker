@@ -123,6 +123,8 @@ class ViewMenuController:
             Tuple of (theme_actions, accent_actions, column_actions) dictionaries.
         """
         view_menu = menubar.addMenu("&View")
+        if not view_menu:
+            return self._theme_actions, self._accent_actions, self._column_actions
 
         # Window visibility section
         history_action = QAction("Session &History", self._parent)

@@ -109,8 +109,9 @@ class PoBPanel(QWidget):
 
         # Column sizing
         header = self.equipment_tree.header()
-        header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        if header:
+            header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+            header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
 
         self.equipment_tree.itemClicked.connect(self._on_item_clicked)
         self.equipment_tree.itemDoubleClicked.connect(self._on_item_double_clicked)
@@ -291,12 +292,14 @@ class PoBPanel(QWidget):
         )
 
         # Show the menu with slot for upgrade analysis
-        self._context_menu_manager.show_menu(
-            self.equipment_tree.viewport().mapToGlobal(position),
-            item_context,
-            self.equipment_tree,
-            slot=slot,
-        )
+        viewport = self.equipment_tree.viewport()
+        if viewport:
+            self._context_menu_manager.show_menu(
+                viewport.mapToGlobal(position),
+                item_context,
+                self.equipment_tree,
+                slot=slot,
+            )
 
     def _on_check_selected(self) -> None:
         """Check price of selected item."""

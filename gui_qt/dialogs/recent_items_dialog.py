@@ -68,14 +68,17 @@ class RecentItemsDialog(QDialog):
         self._table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self._table.setAlternatingRowColors(True)
         self._table.setShowGrid(False)
-        self._table.verticalHeader().setVisible(False)
+        vertical_header = self._table.verticalHeader()
+        if vertical_header:
+            vertical_header.setVisible(False)
 
         # Configure header
         header_view = self._table.horizontalHeader()
-        header_view.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
-        header_view.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        header_view.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
-        header_view.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+        if header_view:
+            header_view.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+            header_view.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+            header_view.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+            header_view.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
 
         # Double-click to select
         self._table.cellDoubleClicked.connect(self._on_double_click)
