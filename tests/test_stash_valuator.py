@@ -352,8 +352,9 @@ class TestStashValuator:
         assert priced.unit_price == 8000.0
 
     def test_price_item_unknown(self):
-        """Test pricing an unknown item."""
-        valuator = StashValuator()
+        """Test pricing an unknown item (with evaluation disabled)."""
+        # Use evaluate_rares=False to test original behavior without rare evaluation
+        valuator = StashValuator(evaluate_rares=False)
         valuator.price_db = NinjaPriceDatabase(league="Phrecia")
         valuator._current_league = "Phrecia"
 
