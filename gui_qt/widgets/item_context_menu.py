@@ -151,16 +151,18 @@ class ItemContextMenuManager(QObject):
         # Inspect Item
         if self._show_inspect:
             inspect_action = menu.addAction("Inspect Item")
-            inspect_action.triggered.connect(
-                lambda: self.inspect_requested.emit(item)
-            )
+            if inspect_action:
+                inspect_action.triggered.connect(
+                    lambda: self.inspect_requested.emit(item)
+                )
 
         # Price Check
         if self._show_price_check and item.item_text:
             price_check_action = menu.addAction("Price Check")
-            price_check_action.triggered.connect(
-                lambda: self.price_check_requested.emit(item.item_text)
-            )
+            if price_check_action:
+                price_check_action.triggered.connect(
+                    lambda: self.price_check_requested.emit(item.item_text)
+                )
 
         # Ask AI About This Item
         if self._show_ai:
@@ -168,12 +170,13 @@ class ItemContextMenuManager(QObject):
                 self._ai_configured_callback() if self._ai_configured_callback else False
             )
             ai_action = menu.addAction("Ask AI About This Item")
-            ai_action.setEnabled(ai_configured)
-            if not ai_configured:
-                ai_action.setToolTip("Configure AI in Settings > AI")
-            ai_action.triggered.connect(
-                lambda: self._trigger_ai_analysis(item)
-            )
+            if ai_action:
+                ai_action.setEnabled(ai_configured)
+                if not ai_configured:
+                    ai_action.setToolTip("Configure AI in Settings > AI")
+                ai_action.triggered.connect(
+                    lambda: self._trigger_ai_analysis(item)
+                )
 
         # Analyze Upgrades (for PoB equipment slots)
         if self._show_upgrade_analysis and slot:
@@ -181,15 +184,16 @@ class ItemContextMenuManager(QObject):
                 self._ai_configured_callback() if self._ai_configured_callback else False
             )
             upgrade_action = menu.addAction(f"Analyze Upgrades for {slot}")
-            upgrade_action.setEnabled(ai_configured)
-            if not ai_configured:
-                upgrade_action.setToolTip("Configure AI in Settings > AI")
-            # Capture slot in closure
-            slot_name = slot
-            item_text = item.item_text
-            upgrade_action.triggered.connect(
-                lambda: self.upgrade_analysis_requested.emit(slot_name, item_text)
-            )
+            if upgrade_action:
+                upgrade_action.setEnabled(ai_configured)
+                if not ai_configured:
+                    upgrade_action.setToolTip("Configure AI in Settings > AI")
+                # Capture slot in closure
+                slot_name = slot
+                item_text = item.item_text
+                upgrade_action.triggered.connect(
+                    lambda: self.upgrade_analysis_requested.emit(slot_name, item_text)
+                )
 
         # Add separator before copy actions
         if self._show_copy and (self._show_inspect or self._show_price_check or self._show_ai):
@@ -199,22 +203,26 @@ class ItemContextMenuManager(QObject):
         if self._show_copy:
             copy_menu = menu.addMenu("Copy")
 
-            copy_name_action = copy_menu.addAction("Item Name")
-            copy_name_action.triggered.connect(
-                lambda: self._copy_to_clipboard(item.item_name)
-            )
+            if copy_menu:
+                copy_name_action = copy_menu.addAction("Item Name")
+                if copy_name_action:
+                    copy_name_action.triggered.connect(
+                        lambda: self._copy_to_clipboard(item.item_name)
+                    )
 
-            if item.item_text:
-                copy_text_action = copy_menu.addAction("Item Text")
-                copy_text_action.triggered.connect(
-                    lambda: self._copy_to_clipboard(item.item_text)
-                )
+                if item.item_text:
+                    copy_text_action = copy_menu.addAction("Item Text")
+                    if copy_text_action:
+                        copy_text_action.triggered.connect(
+                            lambda: self._copy_to_clipboard(item.item_text)
+                        )
 
-            if item.chaos_value:
-                copy_price_action = copy_menu.addAction("Price (Chaos)")
-                copy_price_action.triggered.connect(
-                    lambda: self._copy_to_clipboard(f"{item.chaos_value:.0f}c")
-                )
+                if item.chaos_value:
+                    copy_price_action = copy_menu.addAction("Price (Chaos)")
+                    if copy_price_action:
+                        copy_price_action.triggered.connect(
+                            lambda: self._copy_to_clipboard(f"{item.chaos_value:.0f}c")
+                        )
 
         return menu
 

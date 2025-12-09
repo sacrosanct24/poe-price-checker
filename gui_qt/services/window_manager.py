@@ -137,11 +137,11 @@ class WindowManager:
                 logger.debug(f"Window {window_id} was destroyed, recreating")
 
         # Create new window
-        window = self._create_window(window_id, window_class, **kwargs)
-        if window:
-            self._windows[window_id] = window
+        new_window = self._create_window(window_id, window_class, **kwargs)
+        if new_window:
+            self._windows[window_id] = new_window
 
-        return window
+        return new_window
 
     def _create_window(
         self,

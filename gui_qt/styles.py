@@ -686,7 +686,7 @@ class ThemeManager:
             from PyQt6.QtWidgets import QApplication
             from PyQt6.QtGui import QPalette
             app = QApplication.instance()
-            if app:
+            if app and isinstance(app, QApplication):
                 palette = app.palette()
                 bg = palette.color(QPalette.ColorRole.Window)
                 return bool(bg.lightness() < 128)

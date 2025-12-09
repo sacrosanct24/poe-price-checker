@@ -70,7 +70,7 @@ class SystemTrayManager(QObject):
     def _get_default_icon(self) -> QIcon:
         """Get the default application icon."""
         app = QApplication.instance()
-        if app:
+        if app and isinstance(app, QApplication):
             icon = app.windowIcon()
             if not icon.isNull():
                 return icon

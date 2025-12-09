@@ -95,8 +95,9 @@ class MenuBuilder:
         """
         for menu_config in config:
             menu = menubar.addMenu(menu_config.text)
-            self.menus[menu_config.text] = menu
-            self._populate_menu(menu, menu_config.items)
+            if menu:
+                self.menus[menu_config.text] = menu
+                self._populate_menu(menu, menu_config.items)
 
     def _populate_menu(
         self,
@@ -142,11 +143,12 @@ class MenuBuilder:
         self.actions[item.text] = action
         return action
 
-    def _add_submenu(self, parent_menu: QMenu, submenu: SubMenu) -> QMenu:
+    def _add_submenu(self, parent_menu: QMenu, submenu: SubMenu) -> Optional[QMenu]:
         """Create and add a submenu."""
         menu = parent_menu.addMenu(submenu.text)
-        self.menus[submenu.text] = menu
-        self._populate_menu(menu, submenu.items)
+        if menu:
+            self.menus[submenu.text] = menu
+            self._populate_menu(menu, submenu.items)
         return menu
 
     def get_action(self, text: str) -> Optional[QAction]:

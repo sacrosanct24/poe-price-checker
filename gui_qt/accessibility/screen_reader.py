@@ -139,7 +139,7 @@ def announce(
     """
     # Find the active window to use as context
     app = QApplication.instance()
-    if app is None:
+    if app is None or not isinstance(app, QApplication):
         return
 
     active_window = app.activeWindow()

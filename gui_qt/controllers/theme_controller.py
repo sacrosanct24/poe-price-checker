@@ -107,7 +107,7 @@ class ThemeController:
         # Apply stylesheet
         app = QApplication.instance()
         stylesheet = theme_manager.get_stylesheet()
-        if app:
+        if app and isinstance(app, QApplication):
             app.setStyleSheet(stylesheet)
         window.setStyleSheet(stylesheet)
 
@@ -137,7 +137,7 @@ class ThemeController:
         # Apply stylesheet
         app = QApplication.instance()
         stylesheet = theme_manager.get_stylesheet()
-        if app:
+        if app and isinstance(app, QApplication):
             app.setStyleSheet(stylesheet)
         window.setStyleSheet(stylesheet)
 
@@ -192,7 +192,7 @@ class ThemeController:
         # Apply stylesheet
         app = QApplication.instance()
         stylesheet = theme_manager.get_stylesheet()
-        if app:
+        if app and isinstance(app, QApplication):
             app.setStyleSheet(stylesheet)
         window.setStyleSheet(stylesheet)
 
@@ -220,7 +220,7 @@ class ThemeController:
         """Handle theme change callback from ThemeManager."""
         app = QApplication.instance()
         stylesheet = get_theme_manager().get_stylesheet()
-        if app:
+        if app and isinstance(app, QApplication):
             app.setStyleSheet(stylesheet)
         window.setStyleSheet(stylesheet)
         self._update_theme_menu_checks(theme)

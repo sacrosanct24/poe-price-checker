@@ -101,9 +101,10 @@ class FocusRing(QWidget):
             return
 
         # Calculate position relative to parent
-        if self.parent():
+        parent_widget = self.parentWidget()
+        if parent_widget:
             # Get widget geometry in parent coordinates
-            pos = widget.mapTo(self.parent(), widget.rect().topLeft())
+            pos = widget.mapTo(parent_widget, widget.rect().topLeft())
             rect = widget.rect()
 
             # Expand for offset
@@ -162,7 +163,8 @@ class FocusManager(QObject):
         """
         super().__init__()
 
-        self._app = app or QApplication.instance()
+        instance = QApplication.instance()
+        self._app: Optional[QApplication] = app or (instance if isinstance(instance, QApplication) else None)
         self._focus_ring: Optional[FocusRing] = None
         self._focus_scopes: list[QWidget] = []
         self._saved_focus: WeakValueDictionary = WeakValueDictionary()
@@ -452,7 +454,8 @@ def setup_dialog_focus(
         primary_button: Default button (receives Enter key)
         initial_focus: Widget to focus when dialog opens
     """
-    if primary_button:
+    from PyQt6.QtWidgets import QPushButton
+    if primary_button and isinstance(primary_button, QPushButton):
         primary_button.setDefault(True)
 
     if initial_focus:
@@ -474,7 +477,7 @@ def restore_focus_after(
         fallback: Widget to focus if original focus lost
     """
     app = QApplication.instance()
-    original_focus = app.focusWidget() if app else None
+    original_focus = app.focusWidget() if app and isinstance(app, QApplication) else None
 
     operation()
 

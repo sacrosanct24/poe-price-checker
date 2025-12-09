@@ -78,7 +78,10 @@ class KeyboardNavigator(QObject):
         if event.type() != QEvent.Type.KeyPress:
             return super().eventFilter(obj, event)
 
+        from PyQt6.QtGui import QKeyEvent
         key_event = event
+        if not isinstance(key_event, QKeyEvent):
+            return super().eventFilter(obj, event)
         key = key_event.key()
         modifiers = key_event.modifiers()
 
@@ -143,10 +146,14 @@ class KeyboardNavigator(QObject):
 
     def _get_current_index(self) -> int:
         """Get current selection index."""
-        if isinstance(self._parent, (QTableWidget, QTableView)):
+        if isinstance(self._parent, QTableWidget):
             return int(self._parent.currentRow())
-        elif isinstance(self._parent, (QListWidget, QListView)):
+        elif isinstance(self._parent, QTableView):
+            return int(self._parent.currentIndex().row())
+        elif isinstance(self._parent, QListWidget):
             return int(self._parent.currentRow())
+        elif isinstance(self._parent, QListView):
+            return int(self._parent.currentIndex().row())
         elif isinstance(self._parent, (QTreeWidget, QTreeView)):
             index = self._parent.currentIndex()
             return int(index.row()) if index.isValid() else 0
@@ -350,7 +357,7 @@ class ArrowNavigationMixin:
     def keyPressEvent(self, event: QKeyEvent) -> None:
         """Handle arrow key navigation."""
         if not self._arrow_nav_enabled:
-            super().keyPressEvent(event)
+            super().keyPressEvent(event)  # type: ignore[misc]
             return
 
         key = event.key()
@@ -366,7 +373,7 @@ class ArrowNavigationMixin:
         elif key in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
             self.on_item_activated(self.get_current_index())
         else:
-            super().keyPressEvent(event)
+            super().keyPressEvent(event)  # type: ignore[misc]
 
     def _arrow_navigate(self, delta: int) -> None:
         """Navigate by delta items."""

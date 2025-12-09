@@ -30,7 +30,7 @@ Usage:
 
 from abc import ABC, abstractmethod
 import logging
-from typing import Any, Dict, Generic, List, Optional, TypeVar
+from typing import Any, Callable, Dict, Generic, List, Optional, TypeVar
 
 from PyQt6.QtCore import Qt, QObject, QTimer, QRect, pyqtSignal
 from PyQt6.QtWidgets import (
@@ -63,7 +63,7 @@ class VirtualListModel(Generic[T]):
             data: Initial data list
         """
         self._data: List[T] = data or []
-        self._on_change_callbacks: List[callable] = []
+        self._on_change_callbacks: List[Callable[[], None]] = []
 
     def set_data(self, data: List[T]) -> None:
         """
@@ -114,7 +114,7 @@ class VirtualListModel(Generic[T]):
         """Get item count."""
         return len(self._data)
 
-    def on_change(self, callback: callable) -> None:
+    def on_change(self, callback: Callable[[], None]) -> None:
         """
         Register change callback.
 
@@ -213,7 +213,9 @@ class SimpleRowDelegate(RowDelegate):
 
     def bind(self, widget: QWidget, data: Any, index: int) -> None:
         """Bind data to label."""
-        widget.setText(str(data))
+        from PyQt6.QtWidgets import QLabel
+        if isinstance(widget, QLabel):
+            widget.setText(str(data))
 
     def row_height(self) -> int:
         """Get row height."""
@@ -272,7 +274,9 @@ class VirtualScrollArea(QScrollArea):
         self.setWidget(self._container)
 
         # Connect scroll events
-        self.verticalScrollBar().valueChanged.connect(self._on_scroll)
+        scrollbar = self.verticalScrollBar()
+        if scrollbar:
+            scrollbar.valueChanged.connect(self._on_scroll)
 
     def set_model(self, model: VirtualListModel) -> None:
         """
@@ -324,8 +328,12 @@ class VirtualScrollArea(QScrollArea):
             return
 
         # Calculate visible range
-        viewport_height = self.viewport().height()
-        scroll_y = self.verticalScrollBar().value()
+        vp = self.viewport()
+        sb = self.verticalScrollBar()
+        if not vp or not sb:
+            return
+        viewport_height = vp.height()
+        scroll_y = sb.value()
 
         first = max(0, scroll_y // row_height - self.BUFFER_ROWS)
         last = min(
@@ -355,6 +363,8 @@ class VirtualScrollArea(QScrollArea):
 
     def _show_row(self, index: int) -> None:
         """Show a row at the given index."""
+        if not self._model or not self._delegate:
+            return
         widget = self._get_widget()
         data = self._model.get(index)
 
@@ -379,16 +389,20 @@ class VirtualScrollArea(QScrollArea):
         if self._widget_pool:
             return self._widget_pool.pop()
 
+        if not self._delegate:
+            raise RuntimeError("Delegate not set")
         widget = self._delegate.create_widget(self._container)
-        widget.mousePressEvent = lambda e, w=widget: self._on_widget_click(w, e)
-        widget.mouseDoubleClickEvent = lambda e, w=widget: self._on_widget_double_click(w, e)
+        # Override event handlers for click handling
+        widget.mousePressEvent = lambda e, w=widget: self._on_widget_click(w, e)  # type: ignore[method-assign,misc]
+        widget.mouseDoubleClickEvent = lambda e, w=widget: self._on_widget_double_click(w, e)  # type: ignore[method-assign,misc]
         return widget
 
     def _recycle_widget(self, index: int) -> None:
         """Recycle widget at index back to pool."""
         if index in self._active_widgets:
             widget = self._active_widgets.pop(index)
-            self._delegate.unbind(widget)
+            if self._delegate:
+                self._delegate.unbind(widget)
             widget.hide()
             self._widget_pool.append(widget)
 
@@ -402,7 +416,7 @@ class VirtualScrollArea(QScrollArea):
     def _on_widget_click(self, widget: QWidget, event) -> None:
         """Handle widget click."""
         index = self._get_widget_index(widget)
-        if index is None:
+        if index is None or not self._model:
             return
 
         data = self._model.get(index)
@@ -439,7 +453,7 @@ class VirtualScrollArea(QScrollArea):
     def _on_widget_double_click(self, widget: QWidget, event) -> None:
         """Handle widget double-click."""
         index = self._get_widget_index(widget)
-        if index is not None:
+        if index is not None and self._model:
             data = self._model.get(index)
             self.row_double_clicked.emit(index, data)
 
@@ -464,6 +478,8 @@ class VirtualScrollArea(QScrollArea):
 
     def get_selected_data(self) -> List[Any]:
         """Get data for selected rows."""
+        if not self._model:
+            return []
         return [
             self._model.get(i)
             for i in sorted(self._selected_indices)
@@ -499,7 +515,9 @@ class VirtualScrollArea(QScrollArea):
 
         row_height = self._delegate.row_height()
         target_y = index * row_height
-        self.verticalScrollBar().setValue(target_y)
+        sb = self.verticalScrollBar()
+        if sb:
+            sb.setValue(target_y)
 
     def resizeEvent(self, event) -> None:
         """Handle resize to update visible rows."""

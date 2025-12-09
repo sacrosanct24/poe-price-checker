@@ -388,8 +388,10 @@ class BaseDialog(QDialog):
         self._focusable_widgets.append(self._primary_button)
 
         # Update styling
-        self._primary_button.style().unpolish(self._primary_button)
-        self._primary_button.style().polish(self._primary_button)
+        style = self._primary_button.style()
+        if style:
+            style.unpolish(self._primary_button)
+            style.polish(self._primary_button)
 
         self._main_layout.addWidget(self._button_row)
 

@@ -30,7 +30,7 @@ Usage:
 
 from functools import wraps
 import logging
-from typing import Any, Callable, Dict, Generic, Optional, Type, TypeVar
+from typing import Any, Callable, Dict, Generic, Optional, Type, TypeVar, cast
 from weakref import WeakValueDictionary
 
 from PyQt6.QtCore import Qt, QObject, QTimer, pyqtSignal
@@ -110,7 +110,7 @@ def lazy_property(func: Callable[[Any], T]) -> property:
     def wrapper(self: Any) -> T:
         if not hasattr(self, attr_name):
             setattr(self, attr_name, func(self))
-        return getattr(self, attr_name)
+        return cast(T, getattr(self, attr_name))
 
     return property(wrapper)
 
@@ -240,7 +240,7 @@ class LazyLoader(QObject):
 
         try:
             logger.debug(f"Loading widget: {key}")
-            widget = factory()
+            widget: QWidget = factory()
             self._loaded[key] = widget
             self.widget_loaded.emit(key)
             return widget
