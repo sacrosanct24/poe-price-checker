@@ -364,7 +364,7 @@ class ItemInspectorWidget(QWidget):
                 elif result.mod_type == "armour" and result.multiplier > 1:
                     text = f"+{int(result.raw_value)} armour → {int(result.effective_value)} effective"
                     color = COLORS.get('armour', "#ccaa66")
-                elif result.mod_type == "strength":
+                elif result.mod_type == "strength" and self._build_stats:
                     life_from_str = (result.raw_value / 2) * (1 + self._build_stats.life_inc / 100)
                     text = f"+{int(result.raw_value)} str = +{int(life_from_str)} effective life"
                     color = COLORS.get('strength', "#ff8866")
@@ -461,7 +461,7 @@ class ItemInspectorWidget(QWidget):
 
     def _build_upgrade_comparison_html(self, new_mods: List[str]) -> str:
         """Build HTML for upgrade comparison section."""
-        if not self._upgrade_calculator:
+        if not self._upgrade_calculator or not self._current_equipped_mods:
             return ""
 
         # Calculate upgrade impact

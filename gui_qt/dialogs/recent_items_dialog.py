@@ -208,5 +208,6 @@ class RecentItemsDialog(QDialog):
         if name_item:
             entry = name_item.data(Qt.ItemDataRole.UserRole)
             if entry:
-                return entry.get("item_text")
+                item_text = entry.get("item_text")
+                return str(item_text) if item_text is not None else None
         return None

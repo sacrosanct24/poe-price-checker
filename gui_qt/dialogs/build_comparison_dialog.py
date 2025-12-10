@@ -33,7 +33,7 @@ from gui_qt.styles import COLORS, apply_window_icon
 from gui_qt.widgets.build_filter_widget import BuildFilterWidget
 from core.tree_comparison import TreeComparisonService, TreeComparisonResult
 from core.pob_integration import CharacterManager, PoBDecoder
-from core.build_comparison import GuideBuildParser
+from core.build_comparison import GuideBuildParser, TreeSpec
 from core.passive_tree_data import get_passive_tree_provider, PassiveNode
 
 logger = logging.getLogger(__name__)
@@ -55,14 +55,14 @@ class BuildComparisonDialog(QDialog):
         self._tree_provider = get_passive_tree_provider()
 
         # Store parsed tree specs for loadout selection
-        self._your_tree_specs: List[dict] = []
-        self._target_tree_specs: List[dict] = []
+        self._your_tree_specs: List[TreeSpec] = []
+        self._target_tree_specs: List[TreeSpec] = []
         self._your_pob_xml: Optional[str] = None
         self._target_pob_xml: Optional[str] = None
 
         # Store specs for profile-loaded builds
-        self._your_profile_tree_specs: List[dict] = []
-        self._target_profile_tree_specs: List[dict] = []
+        self._your_profile_tree_specs: List[TreeSpec] = []
+        self._target_profile_tree_specs: List[TreeSpec] = []
 
         # Store profile metadata for filtering
         self._profile_metadata: dict = {}  # name -> {class, ascendancy}

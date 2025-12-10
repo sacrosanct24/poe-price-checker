@@ -893,7 +893,9 @@ class BiSSearchDialog(QDialog):
             )
 
             from PyQt6.QtWidgets import QApplication
-            QApplication.clipboard().setText(json.dumps(query, indent=2))
+            clipboard = QApplication.clipboard()
+            if clipboard:
+                clipboard.setText(json.dumps(query, indent=2))
 
             webbrowser.open(base_url)
 

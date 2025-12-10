@@ -38,9 +38,9 @@ try:
     SCRAPERS_AVAILABLE = True
 except ImportError:
     SCRAPERS_AVAILABLE = False
-    PoBArchivesScraper = None  # type: ignore[assignment]
-    BuildSourceProvider = None  # type: ignore[assignment]
-    ScrapedBuild = None  # type: ignore[assignment]
+    PoBArchivesScraper = None  # type: ignore[misc,assignment]
+    BuildSourceProvider = None  # type: ignore[misc,assignment]
+    ScrapedBuild = None  # type: ignore[misc,assignment]
 
 
 class ScraperThread(QThread):

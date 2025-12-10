@@ -24,9 +24,10 @@ from gui_qt.styles import COLORS, apply_window_icon
 try:
     from core.pob_integration import BuildCategory
     BUILD_CATEGORIES = list(BuildCategory)
+    HAS_BUILD_CATEGORY = True
 except ImportError:
     BUILD_CATEGORIES = []
-    BuildCategory = None  # type: ignore[assignment]
+    HAS_BUILD_CATEGORY = False
 
 logger = logging.getLogger(__name__)
 

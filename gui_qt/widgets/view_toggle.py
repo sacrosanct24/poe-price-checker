@@ -332,10 +332,12 @@ class ResultsViewSwitcher(QWidget):
         """Get selected items from the current view."""
         if self._current_mode == ViewMode.TABLE:
             if hasattr(self._table, 'get_selected_rows'):
-                return self._table.get_selected_rows()
+                result = self._table.get_selected_rows()
+                return list(result) if result else []
         else:
             if hasattr(self._cards, 'get_selected_data'):
-                return self._cards.get_selected_data()
+                result = self._cards.get_selected_data()
+                return list(result) if result else []
         return []
 
     def select_all(self) -> None:

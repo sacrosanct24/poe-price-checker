@@ -214,6 +214,13 @@ class LootDashboardWindow(QDialog):
         self._ctx = ctx
         self._controller = controller
 
+        # Declare stat labels that are created dynamically by _create_stat_display
+        self._duration_label: QLabel
+        self._maps_label: QLabel
+        self._drops_label: QLabel
+        self._value_label: QLabel
+        self._rate_label: QLabel
+
         self.setWindowTitle("Loot Tracking Dashboard")
         self.setMinimumSize(700, 550)
         self.resize(900, 700)
@@ -341,7 +348,9 @@ class LootDashboardWindow(QDialog):
         # Column widths
         for i, (_, _, width) in enumerate(TopDropsModel.COLUMNS):
             self._drops_table.setColumnWidth(i, width)
-        self._drops_table.horizontalHeader().setStretchLastSection(True)
+        header = self._drops_table.horizontalHeader()
+        if header:
+            header.setStretchLastSection(True)
 
         drops_layout.addWidget(self._drops_table)
         splitter.addWidget(drops_group)
@@ -361,7 +370,9 @@ class LootDashboardWindow(QDialog):
         # Column widths
         for i, (_, _, width) in enumerate(MapRunsModel.COLUMNS):
             self._maps_table.setColumnWidth(i, width)
-        self._maps_table.horizontalHeader().setStretchLastSection(True)
+        header = self._maps_table.horizontalHeader()
+        if header:
+            header.setStretchLastSection(True)
 
         maps_layout.addWidget(self._maps_table)
         splitter.addWidget(maps_group)

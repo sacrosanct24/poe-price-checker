@@ -395,11 +395,14 @@ class ResultCardsView(QScrollArea):
         # Clear grid
         while self._grid.count():
             item = self._grid.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
+            if item and item.widget():
+                widget = item.widget()
+                if widget:
+                    widget.deleteLater()
 
         # Calculate columns based on width
-        available_width = self.viewport().width() - (Spacing.MD * 2)
+        viewport = self.viewport()
+        available_width = (viewport.width() if viewport else 300) - (Spacing.MD * 2)
         card_total_width = ResultCard.CARD_WIDTH + ResultCard.CARD_SPACING
         columns = max(
             self.MIN_COLUMNS,
@@ -463,56 +466,65 @@ class ResultCardsView(QScrollArea):
         # Single item actions
         if count == 1:
             inspect_action = menu.addAction("Inspect Item")
-            inspect_action.triggered.connect(
-                lambda: self.card_double_clicked.emit(selected[0])
-            )
+            if inspect_action:
+                inspect_action.triggered.connect(
+                    lambda: self.card_double_clicked.emit(selected[0])
+                )
 
         # Multi-item actions
         if count >= 2:
             compare_action = menu.addAction(f"Compare {count} Items")
-            compare_action.triggered.connect(
-                lambda: self.compare_requested.emit(selected)
-            )
-            if count > 3:
-                compare_action.setEnabled(False)
-                compare_action.setText("Compare Items (max 3)")
+            if compare_action:
+                compare_action.triggered.connect(
+                    lambda: self.compare_requested.emit(selected)
+                )
+                if count > 3:
+                    compare_action.setEnabled(False)
+                    compare_action.setText("Compare Items (max 3)")
 
         menu.addSeparator()
 
         # Copy actions
         copy_menu = menu.addMenu("Copy")
-        copy_names = copy_menu.addAction("Item Names")
-        copy_names.triggered.connect(
-            lambda: self._copy_to_clipboard(
-                [r.get("item_name", "") for r in selected]
-            )
-        )
-        copy_prices = copy_menu.addAction("Prices (Chaos)")
-        copy_prices.triggered.connect(
-            lambda: self._copy_to_clipboard(
-                [str(r.get("chaos_value", "")) for r in selected]
-            )
-        )
+        if copy_menu:
+            copy_names = copy_menu.addAction("Item Names")
+            if copy_names:
+                copy_names.triggered.connect(
+                    lambda: self._copy_to_clipboard(
+                        [r.get("item_name", "") for r in selected]
+                    )
+                )
+            copy_prices = copy_menu.addAction("Prices (Chaos)")
+            if copy_prices:
+                copy_prices.triggered.connect(
+                    lambda: self._copy_to_clipboard(
+                        [str(r.get("chaos_value", "")) for r in selected]
+                    )
+                )
 
         menu.addSeparator()
 
         # Export
         export_action = menu.addAction(f"Export {count} Item(s)...")
-        export_action.triggered.connect(
-            lambda: self.export_requested.emit(selected)
-        )
+        if export_action:
+            export_action.triggered.connect(
+                lambda: self.export_requested.emit(selected)
+            )
 
         # Select all
         menu.addSeparator()
-        select_all = menu.addAction("Select All")
-        select_all.triggered.connect(self.select_all)
+        select_all_action = menu.addAction("Select All")
+        if select_all_action:
+            select_all_action.triggered.connect(self.select_all)
 
         menu.exec(pos)
 
     def _copy_to_clipboard(self, items: List[str]) -> None:
         """Copy items to clipboard."""
         text = "\n".join(str(item) for item in items if item)
-        QApplication.clipboard().setText(text)
+        clipboard = QApplication.clipboard()
+        if clipboard:
+            clipboard.setText(text)
 
     def get_selected_data(self) -> List[Dict[str, Any]]:
         """Get data for all selected cards."""

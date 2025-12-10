@@ -31,7 +31,7 @@ from core.result import Result, Ok, Err
 
 if TYPE_CHECKING:
     from core.interfaces import IItemParser, IPriceService
-    from core.rare_item_evaluator import RareItemEvaluator, ItemEvaluation
+    from core.rare_item_evaluator import RareItemEvaluator, RareItemEvaluation
     from core.item_parser import ParsedItem
 
 logger = logging.getLogger(__name__)
@@ -51,7 +51,7 @@ class PriceCheckResult:
     parsed_item: 'ParsedItem'
     results: List[Dict[str, Any]]
     formatted_rows: List[Dict[str, Any]] = field(default_factory=list)
-    evaluation: Optional['ItemEvaluation'] = None
+    evaluation: Optional['RareItemEvaluation'] = None
     is_rare: bool = False
 
     @property
@@ -267,7 +267,7 @@ class PriceCheckController:
     def evaluate_rare(
         self,
         parsed: 'ParsedItem'
-    ) -> Result['ItemEvaluation', str]:
+    ) -> Result['RareItemEvaluation', str]:
         """
         Evaluate a rare item.
 

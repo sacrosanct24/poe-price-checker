@@ -19,7 +19,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, Dict, List, Optional, TYPE_CHECKING, cast
 from uuid import uuid4
 
 from PyQt6.QtCore import QObject, pyqtSignal
@@ -48,6 +48,8 @@ from gui_qt.workers.loot_tracking_worker import (
 if TYPE_CHECKING:
     from core.interfaces import IAppContext
     from data_sources.poe_stash_api import StashSnapshot
+    from core.config import Config
+    from core.database import Database
 
 logger = logging.getLogger(__name__)
 
@@ -107,7 +109,8 @@ class LootTrackingController(QObject):
         """
         super().__init__(parent)
         self._ctx = ctx
-        self._config = ctx.config
+        # Cast to Config for access to loot-tracking-specific attributes
+        self._config: "Config" = cast("Config", ctx.config)
 
         # Get config values
         self._league = self._config.league
@@ -567,7 +570,7 @@ class LootTrackingController(QObject):
             session: The session to save.
         """
         try:
-            db = self._ctx.db
+            db: "Database" = cast("Database", self._ctx.db)
             cursor = db.conn.cursor()
 
             # Insert session
@@ -666,7 +669,7 @@ class LootTrackingController(QObject):
             List of session summary dicts.
         """
         try:
-            db = self._ctx.db
+            db: "Database" = cast("Database", self._ctx.db)
             cursor = db.conn.cursor()
 
             query = """
@@ -713,7 +716,7 @@ class LootTrackingController(QObject):
             Dict with session details, or None if not found.
         """
         try:
-            db = self._ctx.db
+            db: "Database" = cast("Database", self._ctx.db)
             cursor = db.conn.cursor()
 
             # Get session

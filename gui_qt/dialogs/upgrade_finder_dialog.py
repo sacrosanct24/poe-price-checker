@@ -231,9 +231,9 @@ class UpgradeFinderDialog(QDialog):
         self.results_table.setHorizontalHeaderLabels([
             "Slot", "Item", "Price", "Life", "Res", "Score"
         ])
-        self.results_table.horizontalHeader().setSectionResizeMode(
-            1, QHeaderView.ResizeMode.Stretch
-        )
+        header = self.results_table.horizontalHeader()
+        if header:
+            header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         self.results_table.setSelectionBehavior(
             QTableWidget.SelectionBehavior.SelectRows
         )
@@ -560,6 +560,8 @@ class UpgradeFinderDialog(QDialog):
         # Get data from first column of selected row
         row = selected[0].row()
         first_item = self.results_table.item(row, 0)
+        if not first_item:
+            return
         data = first_item.data(Qt.ItemDataRole.UserRole)
 
         if data:

@@ -178,6 +178,8 @@ class PoEItemTooltip(QFrame):
         screen = QApplication.screenAt(pos)
         if screen is None:
             screen = QApplication.primaryScreen()
+        if screen is None:
+            return
 
         screen_rect = screen.availableGeometry()
         tooltip_size = self.sizeHint()
@@ -468,7 +470,7 @@ class ItemTooltipMixin:
         self._alt_was_pressed = False
 
         # Track mouse to enable/disable tooltip
-        self.setMouseTracking(True)
+        self.setMouseTracking(True)  # type: ignore[attr-defined]
 
     def _get_item_at_pos(self, pos: QPoint) -> Optional[Any]:
         """

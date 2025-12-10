@@ -25,7 +25,7 @@ Usage:
 
 from typing import Optional
 
-from PyQt6.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve, pyqtProperty
+from PyQt6.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve, pyqtProperty  # type: ignore[attr-defined]
 from PyQt6.QtGui import QPainter, QColor, QLinearGradient, QPaintEvent
 from PyQt6.QtWidgets import QWidget, QGraphicsOpacityEffect
 
@@ -163,8 +163,9 @@ class ShimmerEffect(QWidget):
     def resizeEvent(self, event) -> None:
         """Resize with parent."""
         super().resizeEvent(event)
-        if self.parent():
-            self.setGeometry(self.parent().rect())
+        parent = self.parent()
+        if parent and isinstance(parent, QWidget):
+            self.setGeometry(parent.rect())
 
 
 class ShimmerMixin:
@@ -199,7 +200,7 @@ class ShimmerMixin:
         """
         if self._shimmer_effect is None:
             self._shimmer_effect = ShimmerEffect(
-                self,
+                self,  # type: ignore[arg-type]
                 color=color,
                 opacity=opacity,
             )

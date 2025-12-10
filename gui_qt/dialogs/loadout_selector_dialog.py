@@ -206,6 +206,12 @@ class LoadoutSelectorDialog(QDialog):
         try:
             # Handle Maxroll URLs
             if "maxroll.gg" in code:
+                if not self._fetcher:
+                    QMessageBox.warning(
+                        self, "Not Available",
+                        "Maxroll URL fetcher is not available."
+                    )
+                    return
                 build_id = self._fetcher.extract_build_id(code)
                 if not build_id:
                     QMessageBox.warning(

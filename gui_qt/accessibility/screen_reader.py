@@ -191,8 +191,8 @@ def _announce_via_event(widget: QWidget, message: str) -> None:
 
     # Send name changed event if QAccessible is available
     if HAS_QACCESSIBLE and QAccessible is not None and QAccessibleEvent is not None:
-        event = QAccessibleEvent(widget, QAccessible.Event.NameChanged)
-        QAccessible.updateAccessibility(event)
+        event = QAccessibleEvent(widget, QAccessible.Event.NameChanged)  # type: ignore[attr-defined]
+        QAccessible.updateAccessibility(event)  # type: ignore[attr-defined]
 
     # Restore original name after brief delay
     QTimer.singleShot(100, lambda: widget.setAccessibleName(original_name))

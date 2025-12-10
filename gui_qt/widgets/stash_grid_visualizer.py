@@ -99,6 +99,8 @@ class StashGridCellItem(QGraphicsRectItem):
 
     def _add_value_label(self) -> None:
         """Add a value label to the cell."""
+        if not self.cell.item:
+            return
         value = self.cell.item.total_price
 
         # Format value
@@ -144,8 +146,8 @@ class StashGridCellItem(QGraphicsRectItem):
         if self.cell.item:
             # Emit signal through scene
             scene = self.scene()
-            if hasattr(scene, "cellClicked"):
-                scene.cellClicked.emit(self.cell)
+            if scene and hasattr(scene, "cellClicked"):
+                scene.cellClicked.emit(self.cell)  # type: ignore[attr-defined]
         super().mousePressEvent(event)
 
 
@@ -191,7 +193,8 @@ class StashGridScene(QGraphicsScene):
             QPen(QColor(COLORS["border"])),
             QBrush(QColor(COLORS["background"]))
         )
-        bg_rect.setZValue(-1)
+        if bg_rect:
+            bg_rect.setZValue(-1)
 
         # Draw grid lines
         pen = QPen(QColor(COLORS["border"]), 1)
@@ -224,7 +227,7 @@ class StashGridScene(QGraphicsScene):
         if cell.is_empty:
             return self._show_empty
 
-        if cell.item.total_price < self._min_value_filter:
+        if cell.item and cell.item.total_price < self._min_value_filter:
             return False
 
         return True
