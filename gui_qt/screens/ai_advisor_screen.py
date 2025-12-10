@@ -29,6 +29,7 @@ from gui_qt.screens.base_screen import BaseScreen
 if TYPE_CHECKING:
     from core.interfaces import IAppContext
     from core.pob_integration import CharacterManager
+    from gui_qt.views.upgrade_advisor_view import UpgradeAdvisorView
 
 logger = logging.getLogger(__name__)
 
@@ -132,8 +133,8 @@ class AIAdvisorScreen(BaseScreen):
         """Initialize the AI Advisor screen."""
         super().__init__(ctx, on_status, parent)
         self._character_manager = character_manager
-        self._upgrade_advisor = None
-        self._actions_panel = None
+        self._upgrade_advisor: Optional["UpgradeAdvisorView"] = None
+        self._actions_panel: Optional[BuildActionsPanel] = None
 
         self._create_ui()
 
@@ -195,11 +196,14 @@ class AIAdvisorScreen(BaseScreen):
         self._character_manager = character_manager
         # Recreate UI with the manager
         # Clear existing layout
-        if self.layout():
-            while self.layout().count():
-                item = self.layout().takeAt(0)
-                if item.widget():
-                    item.widget().deleteLater()
+        layout = self.layout()
+        if layout:
+            while layout.count():
+                item = layout.takeAt(0)
+                if item and item.widget():
+                    widget = item.widget()
+                    if widget:
+                        widget.deleteLater()
         self._create_ui()
 
     def get_upgrade_advisor(self):

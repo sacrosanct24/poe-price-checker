@@ -84,10 +84,10 @@ class QuickStatsPanel(QFrame):
         try:
             db = self.ctx.db
 
-            # Get sales stats
-            total_sales = db.get_total_sales() or 0
-            today_sales = db.get_sales_today() or 0
-            week_sales = db.get_sales_this_week() or 0
+            # Get sales stats (methods may not exist on interface)
+            total_sales = getattr(db, 'get_total_sales', lambda: 0)() or 0
+            today_sales = getattr(db, 'get_sales_today', lambda: 0)() or 0
+            week_sales = getattr(db, 'get_sales_this_week', lambda: 0)() or 0
 
             self._revenue_label.setText(f"Total Revenue: {total_sales:,.0f}c")
             self._sold_today_label.setText(f"Sold Today: {today_sales}")
@@ -174,9 +174,9 @@ class DaytraderScreen(BaseScreen):
     ):
         """Initialize the Daytrader screen."""
         super().__init__(ctx, on_status, parent)
-        self._stats_panel = None
-        self._actions_panel = None
-        self._tab_widget = None
+        self._stats_panel: Optional[QuickStatsPanel] = None
+        self._actions_panel: Optional[QuickActionsPanel] = None
+        self._tab_widget: Optional[QTabWidget] = None
 
         self._create_ui()
 

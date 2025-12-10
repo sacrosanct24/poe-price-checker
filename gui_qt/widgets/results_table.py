@@ -663,7 +663,9 @@ class ResultsTableWidget(QTableView, ItemTooltipMixin):
         if select_all_action:
             select_all_action.triggered.connect(self.select_all)
 
-        menu.exec(self.viewport().mapToGlobal(position))
+        viewport = self.viewport()
+        if viewport:
+            menu.exec(viewport.mapToGlobal(position))
 
     def _trigger_ai_analysis(self, row: Dict[str, Any]) -> None:
         """Trigger AI analysis for a selected item row."""
@@ -685,7 +687,9 @@ class ResultsTableWidget(QTableView, ItemTooltipMixin):
     def _copy_to_clipboard(self, items: List[str]) -> None:
         """Copy items to clipboard, one per line."""
         text = "\n".join(str(item) for item in items if item)
-        QApplication.clipboard().setText(text)
+        clipboard = QApplication.clipboard()
+        if clipboard:
+            clipboard.setText(text)
 
     def _copy_selected_tsv(self, rows: List[Dict[str, Any]]) -> None:
         """Copy selected rows as TSV to clipboard."""
@@ -710,7 +714,9 @@ class ResultsTableWidget(QTableView, ItemTooltipMixin):
                 values.append(str(val) if val is not None else "")
             lines.append("\t".join(values))
 
-        QApplication.clipboard().setText("\n".join(lines))
+        clipboard = QApplication.clipboard()
+        if clipboard:
+            clipboard.setText("\n".join(lines))
 
     def to_tsv(self, include_header: bool = True) -> str:
         """Export table data as TSV string."""
@@ -761,6 +767,8 @@ class ResultsTableWidget(QTableView, ItemTooltipMixin):
                 config = json.load(f)
 
             header = self.horizontalHeader()
+            if not header:
+                return
 
             # Restore column order
             if "order" in config:
@@ -802,10 +810,12 @@ class ResultsTableWidget(QTableView, ItemTooltipMixin):
         """Save current column order and visibility to disk."""
         try:
             header = self.horizontalHeader()
-            config = {}
+            if not header:
+                return
+            config: Dict[str, Any] = {}
 
             # Save column order (by key)
-            order = []
+            order: List[str] = []
             for visual_idx in range(header.count()):
                 logical_idx = header.logicalIndex(visual_idx)
                 key = ResultsTableModel.COLUMNS[logical_idx][0]
@@ -813,14 +823,14 @@ class ResultsTableWidget(QTableView, ItemTooltipMixin):
             config["order"] = order
 
             # Save hidden columns
-            hidden = []
+            hidden: List[str] = []
             for i, (key, _, _) in enumerate(ResultsTableModel.COLUMNS):
                 if self.isColumnHidden(i):
                     hidden.append(key)
             config["hidden"] = hidden
 
             # Save column widths
-            widths = {}
+            widths: Dict[str, int] = {}
             for i, (key, _, default_width) in enumerate(ResultsTableModel.COLUMNS):
                 current_width = self.columnWidth(i)
                 if current_width != default_width and current_width > 0:
@@ -846,32 +856,38 @@ class ResultsTableWidget(QTableView, ItemTooltipMixin):
     def _show_header_context_menu(self, position) -> None:
         """Show context menu for column visibility and reset."""
         header = self.horizontalHeader()
+        if not header:
+            return
         menu = QMenu(self)
 
         # Column visibility submenu
         visibility_menu = menu.addMenu("Show/Hide Columns")
-        for i, (key, name, _) in enumerate(ResultsTableModel.COLUMNS):
-            # Skip the hidden price_explanation column
-            if key == "price_explanation":
-                continue
+        if visibility_menu:
+            for i, (key, name, _) in enumerate(ResultsTableModel.COLUMNS):
+                # Skip the hidden price_explanation column
+                if key == "price_explanation":
+                    continue
 
-            action = visibility_menu.addAction(name)
-            action.setCheckable(True)
-            action.setChecked(not self.isColumnHidden(i))
-            action.setData(i)
-            action.triggered.connect(
-                lambda checked, idx=i: self._toggle_column_visibility(idx, checked)
-            )
+                action = visibility_menu.addAction(name)
+                if action:
+                    action.setCheckable(True)
+                    action.setChecked(not self.isColumnHidden(i))
+                    action.setData(i)
+                    action.triggered.connect(
+                        lambda checked, idx=i: self._toggle_column_visibility(idx, checked)
+                    )
 
         menu.addSeparator()
 
         # Reset column order
         reset_order_action = menu.addAction("Reset Column Order")
-        reset_order_action.triggered.connect(self.reset_column_order)
+        if reset_order_action:
+            reset_order_action.triggered.connect(self.reset_column_order)
 
         # Reset all (order + visibility + widths)
         reset_all_action = menu.addAction("Reset All to Defaults")
-        reset_all_action.triggered.connect(self.reset_column_config)
+        if reset_all_action:
+            reset_all_action.triggered.connect(self.reset_column_config)
 
         menu.exec(header.mapToGlobal(position))
 
@@ -883,6 +899,8 @@ class ResultsTableWidget(QTableView, ItemTooltipMixin):
     def reset_column_order(self) -> None:
         """Reset columns to their default order."""
         header = self.horizontalHeader()
+        if not header:
+            return
 
         # Move each column back to its original logical position
         for logical_idx in range(header.count()):
@@ -896,6 +914,8 @@ class ResultsTableWidget(QTableView, ItemTooltipMixin):
     def reset_column_config(self) -> None:
         """Reset all column settings to defaults (order, visibility, widths)."""
         header = self.horizontalHeader()
+        if not header:
+            return
 
         # Reset order
         for logical_idx in range(header.count()):
@@ -924,7 +944,9 @@ class ResultsTableWidget(QTableView, ItemTooltipMixin):
     def get_column_order(self) -> List[str]:
         """Get the current visual order of columns as a list of keys."""
         header = self.horizontalHeader()
-        order = []
+        order: List[str] = []
+        if not header:
+            return order
         for visual_idx in range(header.count()):
             logical_idx = header.logicalIndex(visual_idx)
             key = ResultsTableModel.COLUMNS[logical_idx][0]
