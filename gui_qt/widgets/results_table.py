@@ -961,6 +961,8 @@ class ResultsTableWidget(QTableView, ItemTooltipMixin):
             order: List of column keys in desired visual order
         """
         header = self.horizontalHeader()
+        if not header:
+            return
         key_to_logical = {
             col[0]: i for i, col in enumerate(ResultsTableModel.COLUMNS)
         }
