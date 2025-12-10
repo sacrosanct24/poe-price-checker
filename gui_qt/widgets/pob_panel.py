@@ -82,15 +82,15 @@ class PoBPanel(QWidget):
         layout.setSpacing(4)
 
         # Header with profile selector
-        header = QHBoxLayout()
-        header.addWidget(QLabel("Character:"))
+        header_layout = QHBoxLayout()
+        header_layout.addWidget(QLabel("Character:"))
 
         self.profile_combo = QComboBox()
         self.profile_combo.setMinimumWidth(150)
         self.profile_combo.currentTextChanged.connect(self._on_profile_changed)
-        header.addWidget(self.profile_combo, stretch=1)
+        header_layout.addWidget(self.profile_combo, stretch=1)
 
-        layout.addLayout(header)
+        layout.addLayout(header_layout)
 
         # Character info (compact)
         info_layout = QHBoxLayout()

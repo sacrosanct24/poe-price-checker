@@ -140,12 +140,13 @@ class BuildLibraryDialog(QDialog):
         self.build_table.customContextMenuRequested.connect(self._show_context_menu)
 
         header = self.build_table.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)  # Favorite star
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)  # Name
-        header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)  # Class
-        header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)  # Skill
-        header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)  # Category
-        header.setSectionResizeMode(5, QHeaderView.ResizeMode.Stretch)  # Tags
+        if header:
+            header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)  # Favorite star
+            header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)  # Name
+            header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)  # Class
+            header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)  # Skill
+            header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)  # Category
+            header.setSectionResizeMode(5, QHeaderView.ResizeMode.Stretch)  # Tags
         self.build_table.setColumnWidth(0, 30)
 
         self.build_table.itemSelectionChanged.connect(self._on_selection_changed)
@@ -430,7 +431,10 @@ class BuildLibraryDialog(QDialog):
 
         # Get profile name from first column
         row = selected[0].row()
-        profile_name = self.build_table.item(row, 0).data(Qt.ItemDataRole.UserRole)
+        first_item = self.build_table.item(row, 0)
+        if not first_item:
+            return
+        profile_name = first_item.data(Qt.ItemDataRole.UserRole)
         self._selected_profile = profile_name
         self._load_profile_details(profile_name)
 
@@ -443,7 +447,10 @@ class BuildLibraryDialog(QDialog):
     def _on_double_click(self, item: QTableWidgetItem) -> None:
         """Handle double-click on build."""
         row = item.row()
-        profile_name = self.build_table.item(row, 0).data(Qt.ItemDataRole.UserRole)
+        first_item = self.build_table.item(row, 0)
+        if not first_item:
+            return
+        profile_name = first_item.data(Qt.ItemDataRole.UserRole)
         self.profile_selected.emit(profile_name)
 
     def _load_profile_details(self, name: str) -> None:
@@ -735,7 +742,10 @@ class BuildLibraryDialog(QDialog):
             return
 
         row = item.row()
-        profile_name = self.build_table.item(row, 0).data(Qt.ItemDataRole.UserRole)
+        first_item = self.build_table.item(row, 0)
+        if not first_item:
+            return
+        profile_name = first_item.data(Qt.ItemDataRole.UserRole)
 
         menu = QMenu(self)
 
@@ -763,7 +773,9 @@ class BuildLibraryDialog(QDialog):
         delete_action.triggered.connect(lambda: self._delete_specific_build(profile_name))
         menu.addAction(delete_action)
 
-        menu.exec(self.build_table.viewport().mapToGlobal(position))
+        viewport = self.build_table.viewport()
+        if viewport:
+            menu.exec(viewport.mapToGlobal(position))
 
     def _set_profile_active(self, name: str) -> None:
         """Set a specific profile as active."""

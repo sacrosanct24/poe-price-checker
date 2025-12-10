@@ -326,28 +326,33 @@ class PrioritiesEditorDialog(QDialog):
         menu = QMenu(self)
 
         remove_action = menu.addAction("Remove")
-        remove_action.triggered.connect(lambda: self._remove_stat(item))
+        if remove_action:
+            remove_action.triggered.connect(lambda: self._remove_stat(item))
 
         # Move to different tier
         move_menu = menu.addMenu("Move to...")
 
-        if list_widget != self.critical_list:
-            to_critical = move_menu.addAction("Critical")
-            to_critical.triggered.connect(
-                lambda: self._move_stat(item, PriorityTier.CRITICAL)
-            )
+        if move_menu:
+            if list_widget != self.critical_list:
+                to_critical = move_menu.addAction("Critical")
+                if to_critical:
+                    to_critical.triggered.connect(
+                        lambda: self._move_stat(item, PriorityTier.CRITICAL)
+                    )
 
-        if list_widget != self.important_list:
-            to_important = move_menu.addAction("Important")
-            to_important.triggered.connect(
-                lambda: self._move_stat(item, PriorityTier.IMPORTANT)
-            )
+            if list_widget != self.important_list:
+                to_important = move_menu.addAction("Important")
+                if to_important:
+                    to_important.triggered.connect(
+                        lambda: self._move_stat(item, PriorityTier.IMPORTANT)
+                    )
 
-        if list_widget != self.nice_list:
-            to_nice = move_menu.addAction("Nice to Have")
-            to_nice.triggered.connect(
-                lambda: self._move_stat(item, PriorityTier.NICE_TO_HAVE)
-            )
+            if list_widget != self.nice_list:
+                to_nice = move_menu.addAction("Nice to Have")
+                if to_nice:
+                    to_nice.triggered.connect(
+                        lambda: self._move_stat(item, PriorityTier.NICE_TO_HAVE)
+                    )
 
         menu.exec(list_widget.mapToGlobal(pos))
 

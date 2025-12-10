@@ -302,9 +302,10 @@ class UpgradeAdvisorWindow(QDialog):
 
         # Column sizing
         header = self.equipment_tree.header()
-        header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+        if header:
+            header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+            header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+            header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
 
         self.equipment_tree.itemClicked.connect(self._on_slot_clicked)
         self.equipment_tree.itemDoubleClicked.connect(self._on_slot_double_clicked)

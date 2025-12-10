@@ -36,13 +36,14 @@ from PyQt6.QtWidgets import QWidget, QApplication
 
 # Note: QAccessible and QAccessibleEvent are available via QtGui in PyQt6
 # but may require specific compilation flags. We use a compatibility approach.
+HAS_QACCESSIBLE = False
+QAccessible: type = type(None)  # Placeholder type
+QAccessibleEvent: type = type(None)  # Placeholder type
 try:
-    from PyQt6.QtGui import QAccessible, QAccessibleEvent
+    from PyQt6.QtGui import QAccessible, QAccessibleEvent  # type: ignore[no-redef,attr-defined]
     HAS_QACCESSIBLE = True
 except ImportError:
-    HAS_QACCESSIBLE = False
-    QAccessible = None
-    QAccessibleEvent = None
+    pass
 
 
 class AnnouncePriority(Enum):

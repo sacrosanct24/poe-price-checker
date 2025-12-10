@@ -228,8 +228,8 @@ def should_reduce_motion() -> bool:
     """
     # Check app config first
     try:
-        from core.config import get_config
-        config = get_config()
+        from core.config import Config
+        config = Config()
         if hasattr(config, 'reduce_animations') and config.reduce_animations:
             return True
     except (ImportError, AttributeError):
@@ -345,8 +345,8 @@ class AnimationMixin:
         from PyQt6.QtWidgets import QGraphicsOpacityEffect
         from PyQt6.QtCore import QPropertyAnimation
 
-        effect = QGraphicsOpacityEffect(self)
-        self.setGraphicsEffect(effect)
+        effect = QGraphicsOpacityEffect(self)  # type: ignore[arg-type]
+        self.setGraphicsEffect(effect)  # type: ignore[attr-defined]
 
         anim = QPropertyAnimation(effect, b"opacity")
         anim.setDuration(duration or get_animation_duration(AnimationPreset.FADE_IN))
@@ -364,10 +364,10 @@ class AnimationMixin:
         from PyQt6.QtWidgets import QGraphicsOpacityEffect
         from PyQt6.QtCore import QPropertyAnimation
 
-        effect = self.graphicsEffect()
+        effect = self.graphicsEffect()  # type: ignore[attr-defined]
         if not isinstance(effect, QGraphicsOpacityEffect):
-            effect = QGraphicsOpacityEffect(self)
-            self.setGraphicsEffect(effect)
+            effect = QGraphicsOpacityEffect(self)  # type: ignore[arg-type]
+            self.setGraphicsEffect(effect)  # type: ignore[attr-defined]
 
         anim = QPropertyAnimation(effect, b"opacity")
         anim.setDuration(duration or get_animation_duration(AnimationPreset.FADE_OUT))
@@ -376,7 +376,7 @@ class AnimationMixin:
         anim.setEasingCurve(spring_curve(AnimationPreset.FADE_OUT))
 
         if delete_on_finish:
-            anim.finished.connect(self.deleteLater)
+            anim.finished.connect(self.deleteLater)  # type: ignore[attr-defined]
 
         anim.start()
         self._fade_animation = anim
