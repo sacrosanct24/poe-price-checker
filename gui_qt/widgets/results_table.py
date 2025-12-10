@@ -10,7 +10,7 @@ import html
 import json
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from PyQt6.QtCore import Qt, pyqtSignal, QAbstractTableModel, QModelIndex, QPoint
 from PyQt6.QtGui import QColor, QBrush
@@ -421,7 +421,7 @@ class ResultsTableWidget(QTableView, ItemTooltipMixin):
         super().__init__(parent)
 
         # AI analysis callback - set via set_ai_configured_callback
-        self._ai_configured_callback: Optional[callable] = None
+        self._ai_configured_callback: Optional[Callable[[], bool]] = None
 
         # Setup model
         self._model = ResultsTableModel(self)
@@ -440,16 +440,17 @@ class ResultsTableWidget(QTableView, ItemTooltipMixin):
 
         # Configure header
         header = self.horizontalHeader()
-        header.setStretchLastSection(True)
-        header.setSectionsMovable(True)
-        header.setSortIndicatorShown(True)
+        if header:
+            header.setStretchLastSection(True)
+            header.setSectionsMovable(True)
+            header.setSortIndicatorShown(True)
 
-        # Enable header context menu for column visibility
-        header.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        header.customContextMenuRequested.connect(self._show_header_context_menu)
+            # Enable header context menu for column visibility
+            header.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+            header.customContextMenuRequested.connect(self._show_header_context_menu)
 
-        # Connect to section moved for persistence
-        header.sectionMoved.connect(self._on_section_moved)
+            # Connect to section moved for persistence
+            header.sectionMoved.connect(self._on_section_moved)
 
         # Set default column widths
         for i, (key, name, width) in enumerate(ResultsTableModel.COLUMNS):
@@ -462,8 +463,10 @@ class ResultsTableWidget(QTableView, ItemTooltipMixin):
         self._load_column_config()
 
         # Connect selection
-        self.selectionModel().currentRowChanged.connect(self._on_row_changed)
-        self.selectionModel().selectionChanged.connect(self._on_selection_changed)
+        selection_model = self.selectionModel()
+        if selection_model:
+            selection_model.currentRowChanged.connect(self._on_row_changed)
+            selection_model.selectionChanged.connect(self._on_selection_changed)
 
         # Initialize Alt+hover tooltip support
         self._init_item_tooltip()
@@ -477,7 +480,7 @@ class ResultsTableWidget(QTableView, ItemTooltipMixin):
         """Set the current league for trend calculations."""
         self._model.set_league(league)
 
-    def set_ai_configured_callback(self, callback: Optional[callable]) -> None:
+    def set_ai_configured_callback(self, callback: Optional[Callable[[], bool]]) -> None:
         """Set callback to check if AI is configured.
 
         Args:
@@ -491,7 +494,10 @@ class ResultsTableWidget(QTableView, ItemTooltipMixin):
 
     def get_selected_row(self) -> Optional[Dict[str, Any]]:
         """Get the currently selected row data."""
-        indexes = self.selectionModel().selectedRows()
+        selection_model = self.selectionModel()
+        if not selection_model:
+            return None
+        indexes = selection_model.selectedRows()
         if indexes:
             return self._model.get_row(indexes[0].row())
         return None
@@ -517,7 +523,10 @@ class ResultsTableWidget(QTableView, ItemTooltipMixin):
 
     def get_selected_rows(self) -> List[Dict[str, Any]]:
         """Get all currently selected row data."""
-        indexes = self.selectionModel().selectedRows()
+        selection_model = self.selectionModel()
+        if not selection_model:
+            return []
+        indexes = selection_model.selectedRows()
         rows = []
         for index in indexes:
             row_data = self._model.get_row(index.row())
@@ -527,7 +536,10 @@ class ResultsTableWidget(QTableView, ItemTooltipMixin):
 
     def get_selection_count(self) -> int:
         """Get number of selected rows."""
-        return len(self.selectionModel().selectedRows())
+        selection_model = self.selectionModel()
+        if not selection_model:
+            return 0
+        return len(selection_model.selectedRows())
 
     def select_all(self) -> None:
         """Select all rows."""
@@ -579,67 +591,77 @@ class ResultsTableWidget(QTableView, ItemTooltipMixin):
         # Single item actions
         if count == 1:
             inspect_action = menu.addAction("Inspect Item")
-            inspect_action.triggered.connect(
-                lambda: self.row_selected.emit(selected_rows[0])
-            )
+            if inspect_action:
+                inspect_action.triggered.connect(
+                    lambda: self.row_selected.emit(selected_rows[0])
+                )
 
             # AI Analysis option (single item only)
             ai_configured = (
                 self._ai_configured_callback() if self._ai_configured_callback else False
             )
             ai_action = menu.addAction("Ask AI About This Item")
-            ai_action.setEnabled(ai_configured)
-            if not ai_configured:
-                ai_action.setToolTip("Configure AI in Settings > AI")
-            ai_action.triggered.connect(
-                lambda: self._trigger_ai_analysis(selected_rows[0])
-            )
+            if ai_action:
+                ai_action.setEnabled(ai_configured)
+                if not ai_configured:
+                    ai_action.setToolTip("Configure AI in Settings > AI")
+                ai_action.triggered.connect(
+                    lambda: self._trigger_ai_analysis(selected_rows[0])
+                )
 
         # Multi-item actions
         if count >= 2:
             compare_action = menu.addAction(f"Compare {count} Items")
-            compare_action.triggered.connect(
-                lambda: self.compare_requested.emit(selected_rows)
-            )
-            if count > 3:
-                compare_action.setEnabled(False)
-                compare_action.setText("Compare Items (max 3)")
+            if compare_action:
+                compare_action.triggered.connect(
+                    lambda: self.compare_requested.emit(selected_rows)
+                )
+                if count > 3:
+                    compare_action.setEnabled(False)
+                    compare_action.setText("Compare Items (max 3)")
 
         menu.addSeparator()
 
         # Pin action
         pin_action = menu.addAction(f"Pin {count} Item(s)")
-        pin_action.triggered.connect(
-            lambda: self.pin_requested.emit(selected_rows)
-        )
+        if pin_action:
+            pin_action.triggered.connect(
+                lambda: self.pin_requested.emit(selected_rows)
+            )
 
         # Copy actions
         copy_menu = menu.addMenu("Copy")
-        copy_names_action = copy_menu.addAction("Item Names")
-        copy_names_action.triggered.connect(
-            lambda: self._copy_to_clipboard([r.get("item_name", "") for r in selected_rows])
-        )
-        copy_prices_action = copy_menu.addAction("Prices (Chaos)")
-        copy_prices_action.triggered.connect(
-            lambda: self._copy_to_clipboard([str(r.get("chaos_value", "")) for r in selected_rows])
-        )
-        copy_all_action = copy_menu.addAction("Selected Rows (TSV)")
-        copy_all_action.triggered.connect(
-            lambda: self._copy_selected_tsv(selected_rows)
-        )
+        if copy_menu:
+            copy_names_action = copy_menu.addAction("Item Names")
+            if copy_names_action:
+                copy_names_action.triggered.connect(
+                    lambda: self._copy_to_clipboard([r.get("item_name", "") for r in selected_rows])
+                )
+            copy_prices_action = copy_menu.addAction("Prices (Chaos)")
+            if copy_prices_action:
+                copy_prices_action.triggered.connect(
+                    lambda: self._copy_to_clipboard([str(r.get("chaos_value", "")) for r in selected_rows])
+                )
+            copy_all_action = copy_menu.addAction("Selected Rows (TSV)")
+            if copy_all_action:
+                copy_all_action.triggered.connect(
+                    lambda: self._copy_selected_tsv(selected_rows)
+                )
 
         menu.addSeparator()
 
         # Export action
         export_action = menu.addAction(f"Export {count} Item(s)...")
-        export_action.triggered.connect(
-            lambda: self.export_selected_requested.emit(selected_rows)
-        )
+        if export_action:
+            export_action.triggered.connect(
+                lambda: self.export_selected_requested.emit(selected_rows)
+            )
 
         # Select all action
         menu.addSeparator()
         select_all_action = menu.addAction("Select All")
-        select_all_action.triggered.connect(self.select_all)
+        if select_all_action:
+            select_all_action.triggered.connect(self.select_all)
 
         menu.exec(self.viewport().mapToGlobal(position))
 

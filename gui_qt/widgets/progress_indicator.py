@@ -31,9 +31,9 @@ from PyQt6.QtCore import (
     QTimer,
     QPropertyAnimation,
     QEasingCurve,
-    pyqtProperty,
     QRectF,
 )
+from PyQt6.QtCore import pyqtProperty  # type: ignore[import-not-found,attr-defined]
 from PyQt6.QtGui import QPainter, QColor, QPen, QPaintEvent, QConicalGradient
 from PyQt6.QtWidgets import (
     QWidget,
@@ -393,6 +393,10 @@ class SmartLoadingIndicator(QWidget):
         self._progress = 0.0
         self._show_delay_timer: Optional[QTimer] = None
 
+        # Declare optional widgets
+        self._spinner: Optional[CircularProgress] = None
+        self._progress_label: Optional[QLabel] = None
+
         # Initially hidden
         self.hide()
 
@@ -405,8 +409,6 @@ class SmartLoadingIndicator(QWidget):
         if show_spinner:
             self._spinner = CircularProgress(size=24, stroke_width=3)
             layout.addWidget(self._spinner)
-        else:
-            self._spinner = None
 
         # Message label
         self._label = QLabel(message)
@@ -418,8 +420,6 @@ class SmartLoadingIndicator(QWidget):
             self._progress_label = QLabel("0%")
             self._progress_label.setStyleSheet("color: #8b5cf6; font-size: 13px; font-weight: 500;")
             layout.addWidget(self._progress_label)
-        else:
-            self._progress_label = None
 
         layout.addStretch()
 
@@ -574,8 +574,9 @@ class LoadingOverlay(QWidget):
 
     def show_overlay(self) -> None:
         """Show the overlay with animation."""
-        if self.parent():
-            self.setGeometry(self.parent().rect())
+        parent = self.parent()
+        if parent and isinstance(parent, QWidget):
+            self.setGeometry(parent.rect())
 
         self.raise_()
         self.show()
@@ -596,5 +597,6 @@ class LoadingOverlay(QWidget):
     def resizeEvent(self, event) -> None:
         """Resize with parent."""
         super().resizeEvent(event)
-        if self.parent():
-            self.setGeometry(self.parent().rect())
+        parent = self.parent()
+        if parent and isinstance(parent, QWidget):
+            self.setGeometry(parent.rect())

@@ -405,8 +405,10 @@ class DetailedRateLimitDisplay(QFrame):
         # Clear existing
         while self._limits_layout.count():
             item = self._limits_layout.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
+            if item and item.widget():
+                widget = item.widget()
+                if widget:
+                    widget.deleteLater()
 
         # Show/hide no data label
         self._no_data_label.setVisible(len(limits) == 0)

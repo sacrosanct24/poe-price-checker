@@ -32,8 +32,8 @@ from PyQt6.QtCore import (
     QParallelAnimationGroup,
     QEasingCurve,
     pyqtSignal,
-    pyqtProperty,
 )
+from PyQt6.QtCore import pyqtProperty  # type: ignore[import-not-found,attr-defined]
 from PyQt6.QtGui import QPainter, QColor, QPaintEvent, QRadialGradient
 from PyQt6.QtWidgets import QWidget, QGraphicsOpacityEffect, QPushButton
 
@@ -242,8 +242,9 @@ class RippleEffect(QWidget):
     def resizeEvent(self, event) -> None:
         """Resize with parent."""
         super().resizeEvent(event)
-        if self.parent():
-            self.setGeometry(self.parent().rect())
+        parent = self.parent()
+        if parent and isinstance(parent, QWidget):
+            self.setGeometry(parent.rect())
 
 
 class ButtonFeedback(QObject):
@@ -381,8 +382,9 @@ class SuccessFeedback(QWidget):
     def resizeEvent(self, event) -> None:
         """Resize with parent."""
         super().resizeEvent(event)
-        if self.parent():
-            self.setGeometry(self.parent().rect())
+        parent = self.parent()
+        if parent and isinstance(parent, QWidget):
+            self.setGeometry(parent.rect())
 
 
 class ErrorFeedback(QWidget):
@@ -494,8 +496,9 @@ class ErrorFeedback(QWidget):
     def resizeEvent(self, event) -> None:
         """Resize with parent."""
         super().resizeEvent(event)
-        if self.parent():
-            self.setGeometry(self.parent().rect())
+        parent = self.parent()
+        if parent and isinstance(parent, QWidget):
+            self.setGeometry(parent.rect())
 
 
 class HoverGlow(QWidget):
@@ -547,8 +550,9 @@ class HoverGlow(QWidget):
 
     def _update_geometry(self) -> None:
         """Update geometry to surround parent."""
-        if self.parent():
-            parent_rect = self.parent().rect()
+        parent = self.parent()
+        if parent and isinstance(parent, QWidget):
+            parent_rect = parent.rect()
             self.setGeometry(
                 -self._glow_size,
                 -self._glow_size,

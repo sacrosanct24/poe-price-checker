@@ -147,7 +147,7 @@ class StashGridCellItem(QGraphicsRectItem):
             # Emit signal through scene
             scene = self.scene()
             if scene and hasattr(scene, "cellClicked"):
-                scene.cellClicked.emit(self.cell)  # type: ignore[attr-defined]
+                scene.cellClicked.emit(self.cell)
         super().mousePressEvent(event)
 
 

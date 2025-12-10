@@ -25,7 +25,8 @@ Usage:
 
 from typing import Optional
 
-from PyQt6.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve, pyqtProperty  # type: ignore[attr-defined]
+from PyQt6.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve
+from PyQt6.QtCore import pyqtProperty  # type: ignore[import-not-found,attr-defined]
 from PyQt6.QtGui import QPainter, QColor, QLinearGradient, QPaintEvent
 from PyQt6.QtWidgets import QWidget, QGraphicsOpacityEffect
 
