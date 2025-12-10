@@ -121,9 +121,10 @@ class PinnedItemWidget(QFrame):
             # Add pinned item specific actions
             menu.addSeparator()
             unpin_action = menu.addAction("Unpin")
-            unpin_action.triggered.connect(
-                lambda: self.unpin_requested.emit(self._item_data)
-            )
+            if unpin_action:
+                unpin_action.triggered.connect(
+                    lambda: self.unpin_requested.emit(self._item_data)
+                )
 
             menu.exec(self.mapToGlobal(position))
         else:
@@ -131,23 +132,32 @@ class PinnedItemWidget(QFrame):
             menu = QMenu(self)
 
             inspect_action = menu.addAction("Inspect")
-            inspect_action.triggered.connect(
-                lambda: self.inspect_requested.emit(self._item_data)
-            )
+            if inspect_action:
+                inspect_action.triggered.connect(
+                    lambda: self.inspect_requested.emit(self._item_data)
+                )
 
             copy_action = menu.addAction("Copy Name")
-            copy_action.triggered.connect(
-                lambda: QApplication.clipboard().setText(self._item_data.get("item_name", ""))
-            )
+            if copy_action:
+                copy_action.triggered.connect(
+                    lambda: self._copy_name_to_clipboard()
+                )
 
             menu.addSeparator()
 
             unpin_action = menu.addAction("Unpin")
-            unpin_action.triggered.connect(
-                lambda: self.unpin_requested.emit(self._item_data)
-            )
+            if unpin_action:
+                unpin_action.triggered.connect(
+                    lambda: self.unpin_requested.emit(self._item_data)
+                )
 
             menu.exec(self.mapToGlobal(position))
+
+    def _copy_name_to_clipboard(self) -> None:
+        """Copy item name to clipboard."""
+        clipboard = QApplication.clipboard()
+        if clipboard:
+            clipboard.setText(self._item_data.get("item_name", ""))
 
     def _build_item_context(self) -> ItemContext:
         """Build ItemContext from the stored item data."""

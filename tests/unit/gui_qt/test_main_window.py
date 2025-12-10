@@ -410,7 +410,7 @@ class TestPriceCheckerWindowDatabase:
         with patch.object(QMessageBox, 'warning', return_value=QMessageBox.StandardButton.Yes):
             window._wipe_database()
 
-            mock_ctx.db.wipe.assert_called_once()
+            mock_ctx.db.wipe_all_data.assert_called_once()
             assert "wiped" in window.status_bar.currentMessage().lower()
 
     def test_wipe_database_cancelled(self, window, mock_ctx):
@@ -418,11 +418,11 @@ class TestPriceCheckerWindowDatabase:
         with patch.object(QMessageBox, 'warning', return_value=QMessageBox.StandardButton.No):
             window._wipe_database()
 
-            mock_ctx.db.wipe.assert_not_called()
+            mock_ctx.db.wipe_all_data.assert_not_called()
 
     def test_wipe_database_error(self, window, mock_ctx):
         """_wipe_database shows error on failure."""
-        mock_ctx.db.wipe.side_effect = Exception("DB error")
+        mock_ctx.db.wipe_all_data.side_effect = Exception("DB error")
 
         with patch.object(QMessageBox, 'warning', return_value=QMessageBox.StandardButton.Yes):
             with patch.object(QMessageBox, 'critical') as mock_critical:
