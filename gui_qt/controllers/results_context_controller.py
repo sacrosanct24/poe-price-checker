@@ -95,39 +95,44 @@ class ResultsContextController:
         selected = results_table.get_selected_row()
         if selected:
             copy_action = menu.addAction("Copy Row")
-            copy_action.triggered.connect(
-                lambda: self._copy_selected_row(results_table)
-            )
+            if copy_action:
+                copy_action.triggered.connect(
+                    lambda: self._copy_selected_row(results_table)
+                )
 
             copy_tsv_action = menu.addAction("Copy as TSV")
-            copy_tsv_action.triggered.connect(
-                lambda: self._copy_row_as_tsv(results_table)
-            )
+            if copy_tsv_action:
+                copy_tsv_action.triggered.connect(
+                    lambda: self._copy_row_as_tsv(results_table)
+                )
 
             menu.addSeparator()
 
             explain_action = menu.addAction("Why This Price?")
-            explain_action.triggered.connect(
-                lambda: self._explain_price(results_table)
-            )
+            if explain_action:
+                explain_action.triggered.connect(
+                    lambda: self._explain_price(results_table)
+                )
 
             menu.addSeparator()
 
             record_sale_action = menu.addAction("Record Sale...")
-            record_sale_action.triggered.connect(
-                lambda: self._record_sale(results_table)
-            )
+            if record_sale_action:
+                record_sale_action.triggered.connect(
+                    lambda: self._record_sale(results_table)
+                )
 
             # AI Analysis option
             if self._on_ai_analysis is not None:
                 menu.addSeparator()
                 ai_action = menu.addAction("Ask AI About This Item")
-                ai_action.setEnabled(self._ai_configured())
-                if not self._ai_configured():
-                    ai_action.setToolTip("Configure AI in Settings > AI")
-                ai_action.triggered.connect(
-                    lambda: self._ask_ai_about_item(results_table)
-                )
+                if ai_action:
+                    ai_action.setEnabled(self._ai_configured())
+                    if not self._ai_configured():
+                        ai_action.setToolTip("Configure AI in Settings > AI")
+                    ai_action.triggered.connect(
+                        lambda: self._ask_ai_about_item(results_table)
+                    )
 
         menu.exec(results_table.mapToGlobal(pos))
 
@@ -138,7 +143,9 @@ class ResultsContextController:
             text = " | ".join(
                 f"{k}: {v}" for k, v in row.items() if k != "price_explanation"
             )
-            QApplication.clipboard().setText(text)
+            clipboard = QApplication.clipboard()
+            if clipboard:
+                clipboard.setText(text)
             self._on_status("Row copied to clipboard")
 
     def _copy_row_as_tsv(self, results_table: "ResultsTableWidget") -> None:
@@ -150,7 +157,9 @@ class ResultsContextController:
                 for col in results_table.columns
                 if col != "price_explanation"
             ]
-            QApplication.clipboard().setText("\t".join(values))
+            clipboard = QApplication.clipboard()
+            if clipboard:
+                clipboard.setText("\t".join(values))
             self._on_status("Row copied as TSV")
 
     def _explain_price(self, results_table: "ResultsTableWidget") -> None:
@@ -251,14 +260,18 @@ class ResultsContextController:
         if dialog.exec() == QDialog.DialogCode.Accepted:
             price, notes = dialog.get_values()
             try:
-                self._ctx.db.record_sale(
-                    item_name=row.get("item_name", ""),
-                    chaos_value=price,
-                    source=row.get("source", ""),
-                    notes=notes,
-                )
+                # record_sale may not be on interface, use getattr
+                db_record = getattr(self._ctx.db, 'record_sale', None)
+                if db_record:
+                    db_record(
+                        item_name=row.get("item_name", ""),
+                        chaos_value=price,
+                        source=row.get("source", ""),
+                        notes=notes,
+                    )
                 self._on_status(f"Sale recorded: {row.get('item_name', '')} for {price}c")
-                self._on_toast_success(f"Sale recorded: {price:.0f}c")
+                if self._on_toast_success:
+                    self._on_toast_success(f"Sale recorded: {price:.0f}c")
             except Exception as e:
                 QMessageBox.critical(
                     self._parent, "Error", f"Failed to record sale: {e}"

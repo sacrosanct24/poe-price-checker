@@ -13,7 +13,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
 
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
@@ -391,8 +391,10 @@ class SessionTabWidget(QTabWidget):
         self.setCornerWidget(self._create_add_button(), Qt.Corner.TopRightCorner)
 
         # Context menu for tabs
-        self.tabBar().setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self.tabBar().customContextMenuRequested.connect(self._show_tab_context_menu)
+        tab_bar = self.tabBar()
+        if tab_bar:
+            tab_bar.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+            tab_bar.customContextMenuRequested.connect(self._show_tab_context_menu)
 
         # Create initial session
         self._add_session()
@@ -431,6 +433,8 @@ class SessionTabWidget(QTabWidget):
     def _show_tab_context_menu(self, pos) -> None:
         """Show context menu for tab."""
         tab_bar = self.tabBar()
+        if not tab_bar:
+            return
         index = tab_bar.tabAt(pos)
 
         if index < 0:
@@ -439,20 +443,24 @@ class SessionTabWidget(QTabWidget):
         menu = QMenu(self)
 
         rename_action = menu.addAction("Rename")
-        rename_action.triggered.connect(lambda: self._rename_tab(index))
+        if rename_action:
+            rename_action.triggered.connect(lambda: self._rename_tab(index))
 
         duplicate_action = menu.addAction("Duplicate")
-        duplicate_action.triggered.connect(lambda: self._duplicate_tab(index))
+        if duplicate_action:
+            duplicate_action.triggered.connect(lambda: self._duplicate_tab(index))
 
         menu.addSeparator()
 
         close_action = menu.addAction("Close")
-        close_action.triggered.connect(lambda: self._on_tab_close_requested(index))
-        close_action.setEnabled(self.count() > 1)
+        if close_action:
+            close_action.triggered.connect(lambda: self._on_tab_close_requested(index))
+            close_action.setEnabled(self.count() > 1)
 
         close_others_action = menu.addAction("Close Others")
-        close_others_action.triggered.connect(lambda: self._close_other_tabs(index))
-        close_others_action.setEnabled(self.count() > 1)
+        if close_others_action:
+            close_others_action.triggered.connect(lambda: self._close_other_tabs(index))
+            close_others_action.setEnabled(self.count() > 1)
 
         menu.exec(tab_bar.mapToGlobal(pos))
 
@@ -508,7 +516,7 @@ class SessionTabWidget(QTabWidget):
         if panel:
             panel.set_results(results)
 
-    def set_ai_configured_callback(self, callback: Optional[callable]) -> None:
+    def set_ai_configured_callback(self, callback: Optional[Callable[[], bool]]) -> None:
         """Set the AI configured callback on all session panels' results tables.
 
         Args:
@@ -521,7 +529,7 @@ class SessionTabWidget(QTabWidget):
         # Store for future sessions
         self._ai_configured_callback = callback
 
-    def _add_session(self, name: Optional[str] = None) -> SessionPanel:
+    def _add_session(self, name: Optional[str] = None) -> Optional[SessionPanel]:
         """Add a new session tab."""
         if self.count() >= self.MAX_SESSIONS:
             logger.warning(f"Maximum sessions ({self.MAX_SESSIONS}) reached")
