@@ -113,7 +113,7 @@ class FeedbackEntry:
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization."""
-        data = {
+        data: Dict[str, Any] = {
             "id": self.id,
             "type": self.type.value,
             "message": self.message,
@@ -231,7 +231,8 @@ class FeedbackCollector:
         try:
             if self._feedback_file.exists():
                 with open(self._feedback_file, "r", encoding="utf-8") as f:
-                    return json.load(f)
+                    data = json.load(f)
+                    return list(data) if isinstance(data, list) else []
         except Exception as e:
             logger.error(f"Failed to load feedback: {e}")
         return []

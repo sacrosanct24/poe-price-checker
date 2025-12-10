@@ -55,7 +55,7 @@ class IconCache:
 
         # Network manager for downloading icons
         self._network_manager = QNetworkAccessManager()
-        self._pending_downloads: Dict[str, List[callable]] = {}
+        self._pending_downloads: Dict[str, List[Callable[[QPixmap], None]]] = {}
 
     def _url_to_filename(self, url: str) -> str:
         """Convert URL to cache filename."""
@@ -63,7 +63,7 @@ class IconCache:
         url_hash = hashlib.md5(url.encode(), usedforsecurity=False).hexdigest()
         return f"{url_hash}.png"
 
-    def get_icon(self, url: str, callback: Optional[callable] = None) -> Optional[QPixmap]:
+    def get_icon(self, url: str, callback: Optional[Callable[[QPixmap], None]] = None) -> Optional[QPixmap]:
         """
         Get icon from cache or start download.
 
@@ -95,7 +95,7 @@ class IconCache:
 
         return None
 
-    def _download_icon(self, url: str, callback: callable) -> None:
+    def _download_icon(self, url: str, callback: Callable[[QPixmap], None]) -> None:
         """Download icon and call callback when ready."""
         # Add to pending callbacks
         if url in self._pending_downloads:
@@ -107,7 +107,8 @@ class IconCache:
         # Start download
         request = QNetworkRequest(QUrl(url))
         reply = self._network_manager.get(request)
-        reply.finished.connect(lambda: self._on_download_finished(url, reply))
+        if reply:
+            reply.finished.connect(lambda: self._on_download_finished(url, reply))
 
     def _on_download_finished(self, url: str, reply: QNetworkReply) -> None:
         """Handle download completion."""
@@ -688,7 +689,9 @@ class PriceRankingsWindow(QDialog):
             table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
             table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
             table.setAlternatingRowColors(True)
-            table.verticalHeader().setVisible(False)
+            v_header = table.verticalHeader()
+            if v_header:
+                v_header.setVisible(False)
 
             # Enable context menu
             table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -697,13 +700,16 @@ class PriceRankingsWindow(QDialog):
             )
 
             # Set row height for icons
-            table.verticalHeader().setDefaultSectionSize(RankingsTableModel.ICON_SIZE + 6)
+            v_header = table.verticalHeader()
+            if v_header:
+                v_header.setDefaultSectionSize(RankingsTableModel.ICON_SIZE + 6)
 
             # Set column widths
-            header = table.horizontalHeader()
-            for i, (_, _, width) in enumerate(RankingsTableModel.COLUMNS):
-                header.resizeSection(i, width)
-            header.setStretchLastSection(True)
+            h_header = table.horizontalHeader()
+            if h_header:
+                for i, (_, _, width) in enumerate(RankingsTableModel.COLUMNS):
+                    h_header.resizeSection(i, width)
+                h_header.setStretchLastSection(True)
 
             # Enable icon column to resize properly
             table.setIconSize(QSize(RankingsTableModel.ICON_SIZE, RankingsTableModel.ICON_SIZE))
@@ -756,11 +762,13 @@ class PriceRankingsWindow(QDialog):
         )
 
         # Show context menu
-        self._context_menu_manager.show_menu(
-            table.viewport().mapToGlobal(pos),
-            item_context,
-            table,
-        )
+        viewport = table.viewport()
+        if viewport:
+            self._context_menu_manager.show_menu(
+                viewport.mapToGlobal(pos),
+                item_context,
+                table,
+            )
 
     def _on_price_check_item(self, item_name: str) -> None:
         """Handle price check request from context menu."""

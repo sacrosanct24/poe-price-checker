@@ -429,6 +429,10 @@ class LootTrackingController(QObject):
             logger.warning("Diff already in progress")
             return
 
+        if self._before_snapshot is None:
+            logger.warning("No before snapshot available for diff")
+            return
+
         self.status_message.emit("Computing loot diff...")
 
         self._diff_worker = StashDiffWorker(

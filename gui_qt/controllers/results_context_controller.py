@@ -270,8 +270,7 @@ class ResultsContextController:
                         notes=notes,
                     )
                 self._on_status(f"Sale recorded: {row.get('item_name', '')} for {price}c")
-                if self._on_toast_success:
-                    self._on_toast_success(f"Sale recorded: {price:.0f}c")
+                self._on_toast_success(f"Sale recorded: {price:.0f}c")
             except Exception as e:
                 QMessageBox.critical(
                     self._parent, "Error", f"Failed to record sale: {e}"

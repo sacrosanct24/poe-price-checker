@@ -28,7 +28,7 @@ Usage:
 """
 
 from enum import Enum
-from typing import Optional, Callable
+from typing import Optional, Callable, cast
 from weakref import ref
 
 from PyQt6.QtCore import Qt, QPoint, QRect, QTimer, QPropertyAnimation, QEasingCurve, QSize
@@ -221,8 +221,9 @@ class FeatureSpotlight(QWidget):
             return
 
         # Get target rect in window coordinates
+        parent_widget = cast(QWidget, self.parent())
         target_rect = QRect(
-            target.mapTo(self.parent(), QPoint(0, 0)),
+            target.mapTo(parent_widget, QPoint(0, 0)),
             target.size()
         )
 

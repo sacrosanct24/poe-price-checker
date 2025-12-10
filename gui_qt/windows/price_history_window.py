@@ -281,7 +281,9 @@ class PriceHistoryWindow(QDialog):
         # Set column widths
         for i, (_, _, width) in enumerate(CurrencySummaryModel.COLUMNS):
             self._currency_table.setColumnWidth(i, width)
-        self._currency_table.horizontalHeader().setStretchLastSection(True)
+        currency_header = self._currency_table.horizontalHeader()
+        if currency_header:
+            currency_header.setStretchLastSection(True)
 
         currency_layout.addWidget(self._currency_table)
         splitter.addWidget(currency_group)
@@ -301,7 +303,9 @@ class PriceHistoryWindow(QDialog):
         # Set column widths
         for i, (_, _, width) in enumerate(TopItemsModel.COLUMNS):
             self._uniques_table.setColumnWidth(i, width)
-        self._uniques_table.horizontalHeader().setStretchLastSection(True)
+        uniques_header = self._uniques_table.horizontalHeader()
+        if uniques_header:
+            uniques_header.setStretchLastSection(True)
 
         uniques_layout.addWidget(self._uniques_table)
         splitter.addWidget(uniques_group)

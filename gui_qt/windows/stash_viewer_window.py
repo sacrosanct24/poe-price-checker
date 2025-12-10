@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
-from typing import Any, Callable, List, Optional, TYPE_CHECKING
+from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
 
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QAbstractTableModel, QModelIndex
 from PyQt6.QtGui import QColor
@@ -162,7 +162,7 @@ class ItemTableModel(QAbstractTableModel):
         self._min_value: float = 0.0
         self._search_text: str = ""
         self._verdict_calculator = QuickVerdictCalculator()
-        self._verdict_cache: dict = {}  # Cache verdicts by item id
+        self._verdict_cache: Dict[tuple, VerdictResult] = {}  # Cache verdicts by item id
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
         return len(self._filtered_items())
@@ -491,7 +491,9 @@ class StashItemDetailsDialog(QDialog):
 
     def _copy_name(self) -> None:
         """Copy item name to clipboard."""
-        QApplication.clipboard().setText(self.item.display_name)
+        clipboard = QApplication.clipboard()
+        if clipboard:
+            clipboard.setText(self.item.display_name)
         QMessageBox.information(self, "Copied", "Item name copied to clipboard.")
 
 
@@ -700,7 +702,8 @@ class StashViewerWindow(QDialog):
         header = self.item_table.horizontalHeader()
         for i, (_, _, width) in enumerate(ItemTableModel.COLUMNS):
             self.item_table.setColumnWidth(i, width)
-        header.setStretchLastSection(True)
+        if header:
+            header.setStretchLastSection(True)
 
         right_layout.addWidget(self.item_table)
 
@@ -1105,11 +1108,14 @@ class StashViewerWindow(QDialog):
         # Add stash-specific actions
         menu.addSeparator()
         details_action = menu.addAction("View Details...")
-        details_action.triggered.connect(
-            lambda: self._show_item_details(item)
-        )
+        if details_action:
+            details_action.triggered.connect(
+                lambda: self._show_item_details(item)
+            )
 
-        menu.exec(self.item_table.viewport().mapToGlobal(position))
+        viewport = self.item_table.viewport()
+        if viewport:
+            menu.exec(viewport.mapToGlobal(position))
 
     def _show_item_details(self, item: PricedItem) -> None:
         """Show details dialog for a stash item."""

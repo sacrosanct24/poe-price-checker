@@ -634,6 +634,9 @@ class BuildComparisonDialog(QDialog):
                     your_spec_idx, target_spec_idx
                 )
             elif your_from_code and not target_from_code:
+                if not self.character_manager:
+                    self._show_error("Character manager not available")
+                    return
                 profile = self.character_manager.get_profile(target_name)
                 if not profile or not profile.pob_code:
                     self._show_error(f"Profile '{target_name}' has no PoB code")
@@ -646,6 +649,9 @@ class BuildComparisonDialog(QDialog):
                     your_spec_idx, target_spec_idx
                 )
             elif not your_from_code and target_from_code:
+                if not self.character_manager:
+                    self._show_error("Character manager not available")
+                    return
                 profile = self.character_manager.get_profile(your_name)
                 if not profile or not profile.pob_code:
                     self._show_error(f"Profile '{your_name}' has no PoB code")
@@ -658,6 +664,9 @@ class BuildComparisonDialog(QDialog):
                     your_spec_idx, target_spec_idx
                 )
             else:
+                if not self.character_manager:
+                    self._show_error("Character manager not available")
+                    return
                 your_profile = self.character_manager.get_profile(your_name)
                 target_profile = self.character_manager.get_profile(target_name)
 

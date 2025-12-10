@@ -98,7 +98,7 @@ class TrayController:
 
         config = getattr(self._ctx, 'config', None)
         if config:
-            return config.minimize_to_tray
+            return bool(config.minimize_to_tray)
         return True
 
     def hide_to_tray(self) -> None:
@@ -140,7 +140,8 @@ class TrayController:
         if config and not config.show_tray_notifications:
             return
 
-        self._tray_manager.show_price_alert(item_name, price_chaos, price_divine)
+        if self._tray_manager:
+            self._tray_manager.show_price_alert(item_name, price_chaos, price_divine)
 
     def maybe_show_alert(self, data: Any) -> None:
         """
@@ -186,7 +187,9 @@ class TrayController:
         """Quit the application (from tray menu)."""
         if self._on_cleanup:
             self._on_cleanup()
-        QApplication.instance().quit()
+        app = QApplication.instance()
+        if app:
+            app.quit()
 
 
 def get_tray_controller(

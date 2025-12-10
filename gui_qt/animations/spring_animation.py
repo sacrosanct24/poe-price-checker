@@ -323,7 +323,7 @@ class SpringAnimation(QObject):
         if isinstance(self._current_value, (int, float)):
             pos_settled = abs(self._current_value - self._target_value) < self.POSITION_THRESHOLD
             vel_settled = abs(self._velocity) < self.VELOCITY_THRESHOLD
-            return pos_settled and vel_settled
+            return bool(pos_settled and vel_settled)
 
         elif isinstance(self._current_value, (QPoint, QPointF)):
             dx = abs(self._current_value.x() - self._target_value.x())
@@ -339,7 +339,7 @@ class SpringAnimation(QObject):
         elif isinstance(self._current_value, QSize):
             dw = abs(self._current_value.width() - self._target_value.width())
             dh = abs(self._current_value.height() - self._target_value.height())
-            return dw < self.POSITION_THRESHOLD and dh < self.POSITION_THRESHOLD
+            return bool(dw < self.POSITION_THRESHOLD and dh < self.POSITION_THRESHOLD)
 
         elif isinstance(self._current_value, (QRect, QRectF)):
             dx = abs(self._current_value.x() - self._target_value.x())

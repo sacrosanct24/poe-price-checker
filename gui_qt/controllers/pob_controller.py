@@ -160,6 +160,8 @@ class PoBController:
         try:
             from core.pob_integration import UpgradeChecker
 
+            if not self._character_manager:
+                return
             profile = self._character_manager.get_profile(profile_name)
             if profile and profile.build:
                 self._upgrade_checker = UpgradeChecker(profile.build)

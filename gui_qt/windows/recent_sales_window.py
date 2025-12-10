@@ -205,7 +205,8 @@ class RecentSalesWindow(QDialog):
         header = self.table.horizontalHeader()
         for i, (_, _, width) in enumerate(SalesTableModel.COLUMNS):
             self.table.setColumnWidth(i, width)
-        header.setStretchLastSection(True)
+        if header:
+            header.setStretchLastSection(True)
 
         layout.addWidget(self.table)
 
@@ -217,7 +218,12 @@ class RecentSalesWindow(QDialog):
         """Load sales from database."""
         try:
             limit = self.limit_spin.value()
-            self._all_sales = self.ctx.db.get_recent_sales(limit=limit)
+            raw_sales = self.ctx.db.get_recent_sales(limit=limit)
+            # Convert SQLAlchemy Row objects to dicts
+            self._all_sales = [
+                dict(s._mapping) if hasattr(s, '_mapping') else dict(s)
+                for s in raw_sales
+            ]
 
             # Update source filter
             self.source_combo.clear()
@@ -288,8 +294,10 @@ class RecentSalesWindow(QDialog):
         )
 
         # Show context menu
-        self._context_menu_manager.show_menu(
-            self.table.viewport().mapToGlobal(position),
-            item_context,
-            self.table,
-        )
+        viewport = self.table.viewport()
+        if viewport:
+            self._context_menu_manager.show_menu(
+                viewport.mapToGlobal(position),
+                item_context,
+                self.table,
+            )

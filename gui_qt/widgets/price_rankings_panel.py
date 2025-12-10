@@ -198,16 +198,19 @@ class PriceRankingsPanel(QFrame):
         self._table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self._table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self._table.setAlternatingRowColors(True)
-        self._table.verticalHeader().setVisible(False)
-        self._table.verticalHeader().setDefaultSectionSize(22)
+        v_header = self._table.verticalHeader()
+        if v_header:
+            v_header.setVisible(False)
+            v_header.setDefaultSectionSize(22)
         self._table.setShowGrid(False)
 
         # Set column widths
-        header = self._table.horizontalHeader()
-        for i, (_, _, width) in enumerate(CompactRankingsModel.COLUMNS):
-            header.resizeSection(i, width)
-        header.setStretchLastSection(True)
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        h_header = self._table.horizontalHeader()
+        if h_header:
+            for i, (_, _, width) in enumerate(CompactRankingsModel.COLUMNS):
+                h_header.resizeSection(i, width)
+            h_header.setStretchLastSection(True)
+            h_header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
 
         # Double-click to price check
         self._table.doubleClicked.connect(self._on_item_double_clicked)

@@ -165,7 +165,8 @@ class SalesDashboardWindow(QDialog):
         header = self.table.horizontalHeader()
         for i, (_, _, width) in enumerate(DailyStatsModel.COLUMNS):
             self.table.setColumnWidth(i, width)
-        header.setStretchLastSection(True)
+        if header:
+            header.setStretchLastSection(True)
 
         daily_layout.addWidget(self.table)
         layout.addWidget(daily_group, stretch=1)
@@ -174,11 +175,16 @@ class SalesDashboardWindow(QDialog):
         """Load dashboard data."""
         try:
             days = self.days_spin.value()
-            sales = self.ctx.db.get_recent_sales(limit=9999)
+            raw_sales = self.ctx.db.get_recent_sales(limit=9999)
+            # Convert SQLAlchemy Row objects to dicts
+            sales: List[Dict[str, Any]] = [
+                dict(s._mapping) if hasattr(s, '_mapping') else dict(s)
+                for s in raw_sales
+            ]
 
             # Filter by date range
             cutoff = datetime.now() - timedelta(days=days)
-            filtered_sales = []
+            filtered_sales: List[Dict[str, Any]] = []
             for sale in sales:
                 sold_at = sale.get("sold_at")
                 if sold_at:

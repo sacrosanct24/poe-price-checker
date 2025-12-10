@@ -249,7 +249,8 @@ class PriceCheckerWindow(QMainWindow):
         """Get current build stats from the active PoB profile."""
         stats = self._pob_controller.get_build_stats()
         if stats:
-            return stats[0]  # (BuildStats, DPSStats) tuple
+            build_stats: BuildStats = stats[0]  # (BuildStats, DPSStats) tuple
+            return build_stats
         return None
 
     def __getattr__(self, name: str) -> Any:
@@ -654,8 +655,8 @@ class PriceCheckerWindow(QMainWindow):
             ctx=self.ctx,
             parent=self,
             on_status=self._set_status,
-            on_toast_success=lambda msg: self._toast_manager.success(msg),
-            on_toast_error=lambda msg: self._toast_manager.error(msg),
+            on_toast_success=self._toast_success,
+            on_toast_error=self._toast_error,
             on_ai_analysis=self._on_ai_analysis_requested,
             ai_configured=self._is_ai_configured,
         )
@@ -689,6 +690,14 @@ class PriceCheckerWindow(QMainWindow):
     # AI Analysis
     # -------------------------------------------------------------------------
 
+    def _toast_success(self, msg: str) -> None:
+        """Show success toast notification (wrapper for type compatibility)."""
+        self._toast_manager.success(msg)
+
+    def _toast_error(self, msg: str) -> None:
+        """Show error toast notification (wrapper for type compatibility)."""
+        self._toast_manager.error(msg)
+
     def _init_ai_controller(self) -> None:
         """Initialize the AI analysis controller for the current session panel."""
         panel = self.session_tabs.get_current_panel()
@@ -697,8 +706,8 @@ class PriceCheckerWindow(QMainWindow):
                 config=self.ctx.config,
                 panel=panel.ai_panel,
                 on_status=self._set_status,
-                on_toast_success=lambda msg: self._toast_manager.success(msg),
-                on_toast_error=lambda msg: self._toast_manager.error(msg),
+                on_toast_success=self._toast_success,
+                on_toast_error=self._toast_error,
             )
 
         # Register AI callbacks with navigation controller for child windows
@@ -730,8 +739,8 @@ class PriceCheckerWindow(QMainWindow):
                 config=self.ctx.config,
                 panel=panel.ai_panel,
                 on_status=self._set_status,
-                on_toast_success=lambda msg: self._toast_manager.success(msg),
-                on_toast_error=lambda msg: self._toast_manager.error(msg),
+                on_toast_success=self._toast_success,
+                on_toast_error=self._toast_error,
             )
 
     def _is_ai_configured(self) -> bool:
@@ -1057,7 +1066,7 @@ class PriceCheckerWindow(QMainWindow):
         manager.register("show_shortcuts", self._show_shortcuts)
         manager.register("show_command_palette", self._show_command_palette)
         manager.register("show_tips", self._show_tips)
-        manager.register("exit", lambda: self.close())
+        manager.register("exit", lambda: (self.close(), None)[-1])
 
         # Price Checking
         manager.register("check_price", self._on_check_price)

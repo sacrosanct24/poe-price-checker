@@ -172,7 +172,7 @@ class StashGridDialog(QDialog):
         self.tab_combo.blockSignals(True)
         self.tab_combo.clear()
 
-        total_value = 0
+        total_value: float = 0
         for tab in self._result.tabs:
             item_count = len(tab.items)
             tab_value = sum(item.total_price for item in tab.items)
