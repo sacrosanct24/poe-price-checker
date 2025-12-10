@@ -313,7 +313,10 @@ class NavigationController:
 
         # If a slot was specified, trigger analysis for it
         if slot and window:
-            window.analyze_slot(slot)
+            # Use getattr since window is typed as QWidget but may have analyze_slot method
+            analyze_method = getattr(window, "analyze_slot", None)
+            if analyze_method:
+                analyze_method(slot)
 
 
 def get_navigation_controller(

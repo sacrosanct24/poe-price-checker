@@ -1516,8 +1516,14 @@ class PriceCheckerWindow(QMainWindow):
             return
 
         from gui_qt.dialogs.recent_items_dialog import RecentItemsDialog
+        from typing import cast, Union
 
-        dialog = RecentItemsDialog(self._history_manager.get_entries(), self)
+        # Cast to satisfy type checker - list[HistoryEntry] is compatible with List[Union[...]]
+        history_entries = cast(
+            "List[Union[HistoryEntry, Dict[str, Any]]]",
+            self._history_manager.get_entries()
+        )
+        dialog = RecentItemsDialog(history_entries, self)
         dialog.item_selected.connect(self._recheck_item_from_history)
         dialog.exec()
 
