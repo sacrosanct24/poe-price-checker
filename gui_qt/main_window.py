@@ -20,13 +20,14 @@ import os
 import random
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, Dict, List, Optional, TYPE_CHECKING, cast
 
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QAction, QIcon
 from PyQt6.QtWidgets import (
     QApplication,
     QMainWindow,
+    QMenu,
     QMenuBar,
     QWidget,
     QVBoxLayout,
@@ -74,6 +75,9 @@ from core.build_stat_calculator import BuildStats
 
 if TYPE_CHECKING:
     from core.app_context import AppContext
+    from core.rare_item_evaluator import RareItemEvaluator
+    from gui_qt.views.upgrade_advisor_view import UpgradeAdvisorView
+    from gui_qt.screens import AIAdvisorScreen as AIAdvisorScreenType
 
 
 class PriceCheckerWindow(QMainWindow):
@@ -87,12 +91,12 @@ class PriceCheckerWindow(QMainWindow):
 
         # State
         self._check_in_progress = False
-        self._upgrade_advisor_view = None  # Lazy-loaded full-screen advisor
+        self._upgrade_advisor_view: Optional["UpgradeAdvisorView"] = None  # Lazy-loaded
 
         # Screen navigation
         self._nav_bar: Optional[MainNavigationBar] = None
         self._screen_controller: Optional[ScreenController] = None
-        self._ai_advisor_screen = None  # AI Advisor screen reference
+        self._ai_advisor_screen: Optional["AIAdvisorScreenType"] = None  # AI Advisor screen
 
         # History manager for session history
         self._history_manager = get_history_manager()
@@ -102,7 +106,7 @@ class PriceCheckerWindow(QMainWindow):
         self._window_manager.set_main_window(self)
 
         # Rare item evaluator
-        self._rare_evaluator = None
+        self._rare_evaluator: Optional["RareItemEvaluator"] = None
         self._init_rare_evaluator()
 
         # PoB integration controller
@@ -286,7 +290,7 @@ class PriceCheckerWindow(QMainWindow):
 
             # Get current league and game version from config
             league = self.ctx.config.league or "Standard"
-            game_version = self.ctx.config.game_version or "poe1"
+            game_version = self.ctx.config.current_game.value
             session_date = datetime.now().strftime("%Y-%m-%d")
 
             # Convert VerdictStatistics to dict if needed
@@ -313,6 +317,8 @@ class PriceCheckerWindow(QMainWindow):
     def _create_menu_bar(self) -> None:
         """Create the application menu bar using declarative MenuBuilder."""
         menubar = self.menuBar()
+        if not menubar:
+            return
         builder = MenuBuilder(self)
 
         # Define static menus declaratively
@@ -389,7 +395,8 @@ class PriceCheckerWindow(QMainWindow):
 
         # Resources menu - use declarative config
         resources_menu = menubar.addMenu("&Resources")
-        builder._populate_menu(resources_menu, create_resources_menu())
+        if resources_menu:
+            builder._populate_menu(resources_menu, create_resources_menu())
 
         # Dev menu - dynamic content (sample items)
         self._create_dev_menu(menubar)
@@ -424,12 +431,15 @@ class PriceCheckerWindow(QMainWindow):
     def _create_dev_menu(self, menubar: QMenuBar) -> None:
         """Create Dev menu with dynamic sample items."""
         dev_menu = menubar.addMenu("&Dev")
+        if not dev_menu:
+            return
 
         paste_menu = dev_menu.addMenu("Paste &Sample")
-        for item_type in SAMPLE_ITEMS.keys():
-            action = QAction(item_type.title(), self)
-            action.triggered.connect(lambda checked, t=item_type: self._paste_sample(t))
-            paste_menu.addAction(action)
+        if paste_menu:
+            for item_type in SAMPLE_ITEMS.keys():
+                action = QAction(item_type.title(), self)
+                action.triggered.connect(lambda checked, t=item_type: self._paste_sample(t))
+                paste_menu.addAction(action)
 
         dev_menu.addSeparator()
 
@@ -604,17 +614,20 @@ class PriceCheckerWindow(QMainWindow):
     def _switch_to_evaluator(self) -> None:
         """Switch to Item Evaluator screen (Ctrl+1)."""
         self._on_screen_selected(ScreenType.ITEM_EVALUATOR.value)
-        self._nav_bar.set_active_screen(ScreenType.ITEM_EVALUATOR)
+        if self._nav_bar:
+            self._nav_bar.set_active_screen(ScreenType.ITEM_EVALUATOR)
 
     def _switch_to_advisor(self) -> None:
         """Switch to AI Advisor screen (Ctrl+2)."""
         self._on_screen_selected(ScreenType.AI_ADVISOR.value)
-        self._nav_bar.set_active_screen(ScreenType.AI_ADVISOR)
+        if self._nav_bar:
+            self._nav_bar.set_active_screen(ScreenType.AI_ADVISOR)
 
     def _switch_to_daytrader(self) -> None:
         """Switch to Daytrader screen (Ctrl+3)."""
         self._on_screen_selected(ScreenType.DAYTRADER.value)
-        self._nav_bar.set_active_screen(ScreenType.DAYTRADER)
+        if self._nav_bar:
+            self._nav_bar.set_active_screen(ScreenType.DAYTRADER)
 
     # -------------------------------------------------------------------------
     # Status Bar
@@ -641,8 +654,8 @@ class PriceCheckerWindow(QMainWindow):
             ctx=self.ctx,
             parent=self,
             on_status=self._set_status,
-            on_toast_success=self._toast_manager.success,
-            on_toast_error=self._toast_manager.error,
+            on_toast_success=lambda msg: self._toast_manager.success(msg),
+            on_toast_error=lambda msg: self._toast_manager.error(msg),
             on_ai_analysis=self._on_ai_analysis_requested,
             ai_configured=self._is_ai_configured,
         )
@@ -684,8 +697,8 @@ class PriceCheckerWindow(QMainWindow):
                 config=self.ctx.config,
                 panel=panel.ai_panel,
                 on_status=self._set_status,
-                on_toast_success=self._toast_manager.success,
-                on_toast_error=self._toast_manager.error,
+                on_toast_success=lambda msg: self._toast_manager.success(msg),
+                on_toast_error=lambda msg: self._toast_manager.error(msg),
             )
 
         # Register AI callbacks with navigation controller for child windows
@@ -717,8 +730,8 @@ class PriceCheckerWindow(QMainWindow):
                 config=self.ctx.config,
                 panel=panel.ai_panel,
                 on_status=self._set_status,
-                on_toast_success=self._toast_manager.success,
-                on_toast_error=self._toast_manager.error,
+                on_toast_success=lambda msg: self._toast_manager.success(msg),
+                on_toast_error=lambda msg: self._toast_manager.error(msg),
             )
 
     def _is_ai_configured(self) -> bool:
@@ -747,10 +760,13 @@ class PriceCheckerWindow(QMainWindow):
 
         Performs AI analysis and sends results back to the window.
         """
+        from gui_qt.windows.upgrade_advisor_window import UpgradeAdvisorWindow
+
         # Get the window to check its selected provider
-        window = self._window_manager.get_window("upgrade_advisor")
-        if not window:
+        window_widget = self._window_manager.get_window("upgrade_advisor")
+        if not window_widget or not isinstance(window_widget, UpgradeAdvisorWindow):
             return
+        window = window_widget
 
         # Check if the window's selected provider is configured
         selected_provider = window.get_selected_provider()
@@ -779,9 +795,15 @@ class PriceCheckerWindow(QMainWindow):
         if not self._ai_controller:
             self._init_ai_controller()
 
+        if not self._ai_controller:
+            window.show_analysis_error(slot, "Failed to initialize AI controller")
+            return
+
         # Set up the AI controller with database for stash access
         self._ai_controller.set_database(self.ctx.db)
-        self._ai_controller.set_character_manager(self._pob_controller.character_manager)
+        char_manager = self._pob_controller.character_manager
+        if char_manager:
+            self._ai_controller.set_character_manager(char_manager)
 
         # Get account name from config
         account_name = self.ctx.config.data.get("stash", {}).get("account_name", "")
@@ -796,14 +818,16 @@ class PriceCheckerWindow(QMainWindow):
         if success:
             # Connect to get results back (use a one-time connection)
             def on_result(response):
-                window = self._window_manager.get_window("upgrade_advisor")
-                if window:
-                    window.show_analysis_result(slot, response.content, selected_provider)
+                from gui_qt.windows.upgrade_advisor_window import UpgradeAdvisorWindow
+                w = self._window_manager.get_window("upgrade_advisor")
+                if w and isinstance(w, UpgradeAdvisorWindow):
+                    w.show_analysis_result(slot, response.content, selected_provider)
 
             def on_error(error_msg, traceback):
-                window = self._window_manager.get_window("upgrade_advisor")
-                if window:
-                    window.show_analysis_error(slot, error_msg)
+                from gui_qt.windows.upgrade_advisor_window import UpgradeAdvisorWindow
+                w = self._window_manager.get_window("upgrade_advisor")
+                if w and isinstance(w, UpgradeAdvisorWindow):
+                    w.show_analysis_error(slot, error_msg)
 
             # Reconnect signals for this specific request
             if self._ai_controller._worker:
@@ -900,8 +924,14 @@ class PriceCheckerWindow(QMainWindow):
         if not self._ai_controller:
             self._init_ai_controller()
 
+        if not self._ai_controller:
+            self._ai_advisor_screen.show_analysis_error(slot, "Failed to initialize AI")
+            return
+
         self._ai_controller.set_database(self.ctx.db)
-        self._ai_controller.set_character_manager(self._pob_controller.character_manager)
+        char_manager = self._pob_controller.character_manager
+        if char_manager:
+            self._ai_controller.set_character_manager(char_manager)
 
         account_name = None
         if include_stash:
@@ -927,7 +957,7 @@ class PriceCheckerWindow(QMainWindow):
                 if self._ai_advisor_screen:
                     self._ai_advisor_screen.show_analysis_error(slot, error_msg)
 
-            if self._ai_controller._worker:
+            if self._ai_controller and self._ai_controller._worker:
                 self._ai_controller._worker.result.connect(on_result)
                 self._ai_controller._worker.error.connect(on_error)
         else:
@@ -968,9 +998,15 @@ class PriceCheckerWindow(QMainWindow):
         if not self._ai_controller:
             self._init_ai_controller()
 
+        if not self._ai_controller:
+            self._upgrade_advisor_view.show_analysis_error(slot, "Failed to initialize AI")
+            return
+
         # Set up the AI controller with database for stash access
         self._ai_controller.set_database(self.ctx.db)
-        self._ai_controller.set_character_manager(self._pob_controller.character_manager)
+        char_manager = self._pob_controller.character_manager
+        if char_manager:
+            self._ai_controller.set_character_manager(char_manager)
 
         # Get account name from config (only needed if include_stash is True)
         account_name = None
@@ -1001,7 +1037,7 @@ class PriceCheckerWindow(QMainWindow):
                     self._upgrade_advisor_view.show_analysis_error(slot, error_msg)
 
             # Reconnect signals for this specific request
-            if self._ai_controller._worker:
+            if self._ai_controller and self._ai_controller._worker:
                 self._ai_controller._worker.result.connect(on_result)
                 self._ai_controller._worker.error.connect(on_error)
         else:
@@ -1021,7 +1057,7 @@ class PriceCheckerWindow(QMainWindow):
         manager.register("show_shortcuts", self._show_shortcuts)
         manager.register("show_command_palette", self._show_command_palette)
         manager.register("show_tips", self._show_tips)
-        manager.register("exit", self.close)
+        manager.register("exit", lambda: self.close())
 
         # Price Checking
         manager.register("check_price", self._on_check_price)
@@ -1080,7 +1116,8 @@ class PriceCheckerWindow(QMainWindow):
 
     def _cycle_theme(self) -> None:
         """Cycle through all available themes."""
-        self._theme_controller.cycle_theme(self)
+        if self._theme_controller:
+            self._theme_controller.cycle_theme(self)
 
     def _show_command_palette(self) -> None:
         """Show the command palette for quick access to all actions."""
@@ -1143,7 +1180,7 @@ class PriceCheckerWindow(QMainWindow):
             result = self._price_controller.check_price(item_text)
 
             if result.is_err():
-                self._set_status(result.error)
+                self._set_status(result.error or "Unknown error")
                 return
 
             # Unwrap the successful result
@@ -1221,10 +1258,11 @@ class PriceCheckerWindow(QMainWindow):
     def _paste_and_check(self) -> None:
         """Paste from clipboard and immediately check price."""
         clipboard = QApplication.clipboard()
-        text = clipboard.text()
-        if text:
-            self.input_text.setPlainText(text)
-            self._on_check_price()
+        if clipboard:
+            text = clipboard.text()
+            if text:
+                self.input_text.setPlainText(text)
+                self._on_check_price()
 
     # -------------------------------------------------------------------------
     # Results Context Menu
@@ -1232,7 +1270,8 @@ class PriceCheckerWindow(QMainWindow):
 
     def _show_results_context_menu(self, pos) -> None:
         """Show context menu for results table."""
-        self._results_context_controller.show_context_menu(pos, self.results_table)
+        if self._results_context_controller:
+            self._results_context_controller.show_context_menu(pos, self.results_table)
 
     def _on_result_selected(self, row_data: Dict[str, Any]) -> None:
         """Handle result row selection."""
@@ -1274,9 +1313,8 @@ class PriceCheckerWindow(QMainWindow):
             try:
                 from gui_qt.dialogs.item_comparison_dialog import ItemComparisonDialog
                 dialog = ItemComparisonDialog(
-                    parsed_items,
-                    build_stats=self._current_build_stats,
-                    parent=self
+                    parent=self,
+                    app_context=self.ctx,
                 )
                 dialog.exec()
             except ImportError:
@@ -1309,15 +1347,18 @@ class PriceCheckerWindow(QMainWindow):
 
     def _set_theme(self, theme: Theme) -> None:
         """Set the application theme."""
-        self._theme_controller.set_theme(theme, self)
+        if self._theme_controller:
+            self._theme_controller.set_theme(theme, self)
 
     def _toggle_theme(self) -> None:
         """Toggle between dark and light themes."""
-        self._theme_controller.toggle_theme(self)
+        if self._theme_controller:
+            self._theme_controller.toggle_theme(self)
 
     def _set_accent_color(self, accent_key: Optional[str]) -> None:
         """Set the application accent color."""
-        self._theme_controller.set_accent_color(accent_key, self)
+        if self._theme_controller:
+            self._theme_controller.set_accent_color(accent_key, self)
 
     # -------------------------------------------------------------------------
     # System Tray
@@ -1370,7 +1411,7 @@ class PriceCheckerWindow(QMainWindow):
 
             # Get current league and game version from config
             league = self.ctx.config.league or "Standard"
-            game_version = self.ctx.config.game_version or "poe1"
+            game_version = self.ctx.config.current_game.value
             session_date = datetime.now().strftime("%Y-%m-%d")
 
             # Try to load today's stats from database
@@ -1454,7 +1495,9 @@ class PriceCheckerWindow(QMainWindow):
     def _copy_all_as_tsv(self) -> None:
         """Copy all results as TSV."""
         tsv = self.results_table.to_tsv(include_header=True)
-        QApplication.clipboard().setText(tsv)
+        clipboard = QApplication.clipboard()
+        if clipboard:
+            clipboard.setText(tsv)
         self._set_status("All results copied as TSV")
 
     def _show_history(self) -> None:
@@ -1676,7 +1719,7 @@ class PriceCheckerWindow(QMainWindow):
 
         if result == QMessageBox.StandardButton.Yes:
             try:
-                self.ctx.db.wipe()
+                self.ctx.db.wipe_all_data()
                 self._set_status("Database wiped")
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"Failed to wipe database: {e}")

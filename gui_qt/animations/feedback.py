@@ -33,7 +33,7 @@ from PyQt6.QtCore import (
     QEasingCurve,
     pyqtSignal,
 )
-from PyQt6.QtCore import pyqtProperty  # type: ignore[import-not-found,attr-defined]
+from PyQt6.QtCore import pyqtProperty  # type: ignore[attr-defined]
 from PyQt6.QtGui import QPainter, QColor, QPaintEvent, QRadialGradient
 from PyQt6.QtWidgets import QWidget, QGraphicsOpacityEffect, QPushButton
 
