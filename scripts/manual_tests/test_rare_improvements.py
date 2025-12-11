@@ -9,7 +9,7 @@ Tests:
 """
 
 from core.item_parser import ItemParser
-from core.rare_item_evaluator import RareItemEvaluator
+from core.rare_evaluation import RareItemEvaluator
 
 
 def test_tier_detection():

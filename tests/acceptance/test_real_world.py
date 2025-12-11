@@ -1037,7 +1037,7 @@ Adds 1 to 4 Physical Damage to Attacks (implicit)
     def test_evaluate_good_rare(self):
         """A triple-res life ring should score well."""
         from core.item_parser import ItemParser
-        from core.rare_item_evaluator import RareItemEvaluator
+        from core.rare_evaluation import RareItemEvaluator
 
         parser = ItemParser()
         evaluator = RareItemEvaluator()
@@ -1089,7 +1089,7 @@ Adds 1 to 4 Physical Damage to Attacks (implicit)
     def test_good_rare_beats_mediocre(self):
         """A good rare should score higher than a mediocre one."""
         from core.item_parser import ItemParser
-        from core.rare_item_evaluator import RareItemEvaluator
+        from core.rare_evaluation import RareItemEvaluator
 
         parser = ItemParser()
         evaluator = RareItemEvaluator()

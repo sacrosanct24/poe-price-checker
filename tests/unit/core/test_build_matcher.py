@@ -18,7 +18,7 @@ from pathlib import Path
 from unittest.mock import Mock
 
 from core.build_matcher import BuildMatcher
-from core.rare_item_evaluator import AffixMatch
+from core.rare_evaluation import AffixMatch
 
 pytestmark = pytest.mark.unit
 

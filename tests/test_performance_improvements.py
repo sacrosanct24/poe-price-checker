@@ -9,7 +9,7 @@ import pytest
 from pathlib import Path
 
 from core.item_parser import ItemParser
-from core.rare_item_evaluator import RareItemEvaluator
+from core.rare_evaluation import RareItemEvaluator
 
 
 class TestRareItemEvaluatorPerformance:

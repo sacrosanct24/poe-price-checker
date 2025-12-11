@@ -75,7 +75,7 @@ from core.build_stat_calculator import BuildStats
 
 if TYPE_CHECKING:
     from core.app_context import AppContext
-    from core.rare_item_evaluator import RareItemEvaluator
+    from core.rare_evaluation import RareItemEvaluator
     from gui_qt.views.upgrade_advisor_view import UpgradeAdvisorView
     from gui_qt.screens import AIAdvisorScreen as AIAdvisorScreenType
 
@@ -216,7 +216,7 @@ class PriceCheckerWindow(QMainWindow):
     def _init_rare_evaluator(self) -> None:
         """Initialize the rare item evaluator."""
         try:
-            from core.rare_item_evaluator import RareItemEvaluator
+            from core.rare_evaluation import RareItemEvaluator
             data_dir = Path(__file__).parent.parent / "data"
             self._rare_evaluator = RareItemEvaluator(data_dir=data_dir)
         except Exception as e:

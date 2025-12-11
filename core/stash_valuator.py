@@ -16,7 +16,7 @@ from enum import Enum
 from typing import Any, Callable, Dict, List, Optional
 
 from core.item_parser import ParsedItem
-from core.rare_item_evaluator import RareItemEvaluator
+from core.rare_evaluation import RareItemEvaluator
 from data_sources.poe_ninja_client import (
     NinjaPriceDatabase,
     get_ninja_client,

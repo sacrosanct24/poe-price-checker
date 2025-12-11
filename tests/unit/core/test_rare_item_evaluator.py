@@ -15,7 +15,7 @@ Tests cover:
 import pytest
 import json
 
-from core.rare_item_evaluator import (
+from core.rare_evaluation import (
     RareItemEvaluator,
     AffixMatch
 )

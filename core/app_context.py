@@ -8,7 +8,7 @@ from core.config import Config
 from core.item_parser import ItemParser
 from core.database import Database
 from core.game_version import GameVersion, GameConfig
-from core.rare_item_evaluator import RareItemEvaluator
+from core.rare_evaluation import RareItemEvaluator
 from data_sources.pricing.poe_ninja import PoeNinjaAPI
 from data_sources.pricing.poe_watch import PoeWatchAPI
 from core.pricing import PriceService

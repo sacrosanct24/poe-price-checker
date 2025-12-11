@@ -12,7 +12,7 @@ from core.config import Config
 from core.item_parser import ItemParser, ParsedItem
 from core.database import Database
 from core.game_version import GameVersion
-from core.rare_item_evaluator import RareItemEvaluation
+from core.rare_evaluation import RareItemEvaluation
 
 
 # ============================================================================

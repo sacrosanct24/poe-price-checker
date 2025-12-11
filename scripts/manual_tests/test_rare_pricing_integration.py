@@ -15,7 +15,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from core.config import Config
 from core.item_parser import ItemParser
 from core.database import Database
-from core.rare_item_evaluator import RareItemEvaluator
+from core.rare_evaluation import RareItemEvaluator
 from core.pricing import PriceService
 
 

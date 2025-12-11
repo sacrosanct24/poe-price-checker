@@ -17,7 +17,7 @@ from functools import lru_cache
 from typing import Any, Dict, List, Optional, Tuple
 
 from core.item_parser import ParsedItem
-from core.rare_item_evaluator import RareItemEvaluation, RareItemEvaluator
+from core.rare_evaluation import RareItemEvaluation, RareItemEvaluator
 
 logger = logging.getLogger(__name__)
 

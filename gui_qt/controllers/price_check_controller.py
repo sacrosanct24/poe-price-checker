@@ -31,7 +31,7 @@ from core.result import Result, Ok, Err
 
 if TYPE_CHECKING:
     from core.interfaces import IItemParser, IPriceService
-    from core.rare_item_evaluator import RareItemEvaluator, RareItemEvaluation
+    from core.rare_evaluation import RareItemEvaluator, RareItemEvaluation
     from core.item_parser import ParsedItem
 
 logger = logging.getLogger(__name__)

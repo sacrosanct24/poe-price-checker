@@ -3,7 +3,7 @@ Test script for rare item evaluator and build matcher.
 """
 
 from core.item_parser import ItemParser
-from core.rare_item_evaluator import RareItemEvaluator
+from core.rare_evaluation import RareItemEvaluator
 from core.build_matcher import BuildMatcher
 
 
