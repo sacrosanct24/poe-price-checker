@@ -60,6 +60,13 @@ def reset_qt_singletons():
     except ImportError:
         pass
 
+    # Reset price cache between tests
+    try:
+        from core.pricing.cache import clear_item_price_cache
+        clear_item_price_cache()
+    except ImportError:
+        pass
+
 
 @pytest.fixture
 def temp_config(tmp_path):

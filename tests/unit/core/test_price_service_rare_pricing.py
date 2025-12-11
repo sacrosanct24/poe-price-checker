@@ -537,7 +537,8 @@ class TestRarePricingEdgeCases:
                 '_lookup_price_multi_source',
                 return_value=(0.0, 0, "not found", "none")
             ):
-                price_service_with_evaluator.check_item("Rarity: RARE\nTest")
+                # Disable cache to test each rarity variation independently
+                price_service_with_evaluator.check_item("Rarity: RARE\nTest", use_cache=False)
 
             # Should recognize as rare
             assert price_service_with_evaluator.rare_evaluator.evaluate.called

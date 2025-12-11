@@ -1065,6 +1065,53 @@ class Config:
         self.save()
 
     # ------------------------------------------------------------------
+    # Item Cache Settings
+    # ------------------------------------------------------------------
+
+    def _get_cache_bool(self, key: str, default: bool) -> bool:
+        """Get a boolean from the cache settings."""
+        return bool(self.data.get("cache", {}).get(key, default))
+
+    def _get_cache_int(self, key: str, default: int) -> int:
+        """Get an int from the cache settings."""
+        return int(self.data.get("cache", {}).get(key, default))
+
+    @property
+    def item_cache_enabled(self) -> bool:
+        """Whether item price caching is enabled."""
+        return self._get_cache_bool("enabled", True)
+
+    @item_cache_enabled.setter
+    def item_cache_enabled(self, value: bool) -> None:
+        """Enable/disable item price caching."""
+        self.data.setdefault("cache", {})["enabled"] = bool(value)
+        self.save()
+
+    @property
+    def item_cache_ttl_seconds(self) -> int:
+        """Time-to-live for cached item prices (60-600 seconds, default 300)."""
+        return self._get_cache_int("ttl_seconds", 300)
+
+    @item_cache_ttl_seconds.setter
+    def item_cache_ttl_seconds(self, value: int) -> None:
+        """Set cache TTL (min 60, max 600 seconds)."""
+        clamped = max(60, min(600, int(value)))
+        self.data.setdefault("cache", {})["ttl_seconds"] = clamped
+        self.save()
+
+    @property
+    def item_cache_max_size(self) -> int:
+        """Maximum number of items to cache (100-2000, default 500)."""
+        return self._get_cache_int("max_size", 500)
+
+    @item_cache_max_size.setter
+    def item_cache_max_size(self, value: int) -> None:
+        """Set maximum cache size (min 100, max 2000)."""
+        clamped = max(100, min(2000, int(value)))
+        self.data.setdefault("cache", {})["max_size"] = clamped
+        self.save()
+
+    # ------------------------------------------------------------------
     # Utility
     # ------------------------------------------------------------------
 

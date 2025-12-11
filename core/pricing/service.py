@@ -20,6 +20,7 @@ from data_sources.pricing.poe_watch import PoeWatchAPI
 from data_sources.pricing.trade_api import TradeApiSource
 from core.price_estimation import get_active_policy, round_to_step
 from core.pricing.models import PriceExplanation
+from core.pricing.cache import get_item_price_cache, ItemPriceCache
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +55,7 @@ class PriceService:
         trade_source: TradeApiSource | None = None,
         rare_evaluator: RareItemEvaluator | None = None,
         logger: logging.Logger | None = None,
+        cache: ItemPriceCache | None = None,
     ) -> None:
         self.config = config
         self.parser = parser
@@ -64,11 +66,65 @@ class PriceService:
         self.rare_evaluator = rare_evaluator
         self.logger = logger or logging.getLogger(__name__)
 
+        # Item price cache - use provided or get global instance
+        self._cache = cache or get_item_price_cache()
+        self._cache_enabled = bool(getattr(config, 'item_cache_enabled', True))
+
+        # Apply cache config if available (with defensive handling for mocks)
+        if self._cache:
+            try:
+                cache_ttl = getattr(config, 'item_cache_ttl_seconds', 300)
+                if isinstance(cache_ttl, (int, float)):
+                    self._cache.ttl_seconds = cache_ttl
+            except (TypeError, AttributeError):
+                pass  # Use default TTL if config value is invalid
+
+    # ------------------------------------------------------------------ #
+    # Cache Management
+    # ------------------------------------------------------------------ #
+
+    @property
+    def cache(self) -> ItemPriceCache | None:
+        """Get the item price cache."""
+        return self._cache
+
+    @property
+    def cache_enabled(self) -> bool:
+        """Check if caching is enabled."""
+        return self._cache_enabled
+
+    @cache_enabled.setter
+    def cache_enabled(self, value: bool) -> None:
+        """Enable or disable caching."""
+        self._cache_enabled = value
+
+    def clear_cache(self) -> int:
+        """Clear all cached items. Returns number of entries cleared."""
+        if self._cache:
+            return self._cache.clear()
+        return 0
+
+    def get_cache_stats(self) -> dict:
+        """Get cache performance statistics."""
+        if self._cache:
+            stats = self._cache.stats
+            return {
+                "hits": stats.hits,
+                "misses": stats.misses,
+                "hit_rate": f"{stats.hit_rate:.1%}",
+                "evictions": stats.evictions,
+                "expirations": stats.expirations,
+                "size": self._cache.size,
+                "max_size": self._cache.max_size,
+                "ttl_seconds": self._cache.ttl_seconds,
+            }
+        return {}
+
     # ------------------------------------------------------------------ #
     # Public API
     # ------------------------------------------------------------------ #
 
-    def check_item(self, item_text: str) -> list[dict[str, Any]]:
+    def check_item(self, item_text: str, use_cache: bool = True) -> list[dict[str, Any]]:
         """
         Main entrypoint for the GUI.
 
@@ -78,10 +134,21 @@ class PriceService:
         - Persist a price_check + price_quotes snapshot.
         - Compute a robust display price from recent stats.
         - Convert to the RESULT_COLUMNS shape used by the GUI.
+
+        Args:
+            item_text: Raw item text from clipboard.
+            use_cache: Whether to use cached results if available.
         """
         item_text = (item_text or "").strip()
         if not item_text:
             return []
+
+        # Check cache first (if enabled)
+        if use_cache and self._cache_enabled and self._cache:
+            cached_results = self._cache.get(item_text)
+            if cached_results is not None:
+                self.logger.debug("Returning cached price results")
+                return cached_results
 
         # Initialize explanation tracker
         explanation = PriceExplanation()
@@ -334,7 +401,13 @@ class PriceService:
             "upgrade": "",
             "price_explanation": explanation.to_json(),
         }
-        return [row]
+        results = [row]
+
+        # Cache results for future lookups
+        if self._cache_enabled and self._cache:
+            self._cache.put(item_text, results)
+
+        return results
 
     # ------------------------------------------------------------------ #
     # Rare item pricing helpers
