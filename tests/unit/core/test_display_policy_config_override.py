@@ -2,7 +2,7 @@ import math
 
 import pytest
 
-from core.price_service import PriceService
+from core.pricing import PriceService
 from core.price_estimation import set_active_policy_from_dict
 
 

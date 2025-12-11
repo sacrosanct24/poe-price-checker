@@ -11,7 +11,7 @@ from core.game_version import GameVersion, GameConfig
 from core.rare_item_evaluator import RareItemEvaluator
 from data_sources.pricing.poe_ninja import PoeNinjaAPI
 from data_sources.pricing.poe_watch import PoeWatchAPI
-from core.price_service import PriceService
+from core.pricing import PriceService
 from core.price_multi import (
     MultiSourcePriceService,
     ExistingServiceAdapter,

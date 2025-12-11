@@ -16,7 +16,7 @@ from core.config import Config
 from core.item_parser import ItemParser
 from core.database import Database
 from core.rare_item_evaluator import RareItemEvaluator
-from core.price_service import PriceService
+from core.pricing import PriceService
 
 
 def test_rare_pricing_integration():

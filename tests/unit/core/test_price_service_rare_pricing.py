@@ -7,7 +7,7 @@ including value parsing and divine rate conversion.
 
 import pytest
 from unittest.mock import Mock, patch
-from core.price_service import PriceService
+from core.pricing import PriceService
 from core.config import Config
 from core.item_parser import ItemParser, ParsedItem
 from core.database import Database

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from core.price_service import PriceService
+from core.pricing import PriceService
 
 
 pytestmark = pytest.mark.unit

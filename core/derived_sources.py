@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Any, Mapping
 
 from core.price_multi import PriceSource, RESULT_COLUMNS
-from core.price_service import PriceService
+from core.pricing import PriceService
 
 
 @dataclass

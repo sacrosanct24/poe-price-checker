@@ -164,7 +164,7 @@ class ResultsContextController:
 
     def _explain_price(self, results_table: "ResultsTableWidget") -> None:
         """Show price explanation dialog."""
-        from core.price_service import PriceExplanation
+        from core.pricing import PriceExplanation
         from gui_qt.styles import COLORS
 
         row = results_table.get_selected_row()

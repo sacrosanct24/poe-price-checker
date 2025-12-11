@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from core.price_service import PriceService
+from core.pricing import PriceService
 
 
 def test_stats_no_listings():

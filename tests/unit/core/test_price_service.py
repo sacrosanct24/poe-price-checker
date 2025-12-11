@@ -5,7 +5,7 @@ from typing import Any, Mapping
 
 import pytest
 
-from core.price_service import PriceService
+from core.pricing import PriceService
 from core.game_version import GameVersion
 
 pytestmark = pytest.mark.unit

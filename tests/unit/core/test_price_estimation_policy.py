@@ -1,6 +1,6 @@
 import math
 
-from core.price_service import PriceService
+from core.pricing import PriceService
 
 
 def test_compute_display_price_no_listings():
