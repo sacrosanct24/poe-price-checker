@@ -333,7 +333,7 @@ class LocalBuildsDialog(QDialog):
             build_data = self._scanner.import_to_app(build_info)
             if build_data:
                 # Add to CharacterManager
-                from core.pob_integration import CharacterManager
+                from core.pob import CharacterManager
                 from core.build_summarizer import BuildSummarizer, cache_build_summary
 
                 manager = CharacterManager()

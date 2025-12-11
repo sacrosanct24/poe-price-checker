@@ -31,7 +31,7 @@ from PyQt6.QtWidgets import (
 )
 
 from gui_qt.styles import COLORS, apply_window_icon
-from core.pob_integration import CharacterManager
+from core.pob import CharacterManager
 from core.upgrade_finder import (
     UpgradeFinderService,
     UpgradeFinderResult,

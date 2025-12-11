@@ -39,7 +39,7 @@ try:
         GuideBuildParser,
         MaxrollBuildFetcher,
     )
-    from core.pob_integration import PoBDecoder
+    from core.pob import PoBDecoder
     IMPORTS_AVAILABLE = True
 except ImportError as e:
     logger.warning(f"Build comparison imports not available: {e}")

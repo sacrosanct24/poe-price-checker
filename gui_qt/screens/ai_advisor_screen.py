@@ -28,7 +28,7 @@ from gui_qt.screens.base_screen import BaseScreen
 
 if TYPE_CHECKING:
     from core.app_context import AppContext
-    from core.pob_integration import CharacterManager
+    from core.pob import CharacterManager
     from gui_qt.views.upgrade_advisor_view import UpgradeAdvisorView
 
 logger = logging.getLogger(__name__)

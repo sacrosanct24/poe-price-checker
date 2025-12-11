@@ -6,7 +6,7 @@ search, export/import, and the new build library fields.
 """
 import pytest
 
-from core.pob_integration import (
+from core.pob import (
     CharacterManager,
     CharacterProfile,
     PoBBuild,

@@ -10,7 +10,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
-from core.pob_integration import PoBBuild, PoBItem, CharacterManager, PoBDecoder
+from core.pob import PoBBuild, PoBItem, CharacterManager, PoBDecoder
 
 import defusedxml.ElementTree as ET
 
@@ -608,7 +608,7 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
 
     # Test with a sample PoB item
-    from core.pob_integration import PoBBuild, PoBItem
+    from core.pob import PoBBuild, PoBItem
 
     # Create mock build with items
     build = PoBBuild(

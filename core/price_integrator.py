@@ -146,7 +146,7 @@ class PriceIntegrator:
         """Lazy-load character manager for PoB profiles."""
         if self._character_manager is None and self.enable_upgrade_check:
             try:
-                from core.pob_integration import CharacterManager
+                from core.pob import CharacterManager
                 self._character_manager = CharacterManager()
                 profiles = self._character_manager.list_profiles()
                 if profiles:
@@ -163,7 +163,7 @@ class PriceIntegrator:
         """Lazy-load upgrade checker."""
         if self._upgrade_checker is None and self.character_manager:
             try:
-                from core.pob_integration import UpgradeChecker
+                from core.pob import UpgradeChecker
                 self._upgrade_checker = UpgradeChecker(self.character_manager)
             except Exception as e:
                 logger.warning(f"Failed to load UpgradeChecker: {e}")

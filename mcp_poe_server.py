@@ -9,7 +9,7 @@ from core.database import Database
 from core.item_parser import ItemParser
 from core.config import Config
 from core.game_version import GameVersion
-from core.pob_integration import CharacterManager, UpgradeChecker
+from core.pob import CharacterManager, UpgradeChecker
 import json
 import subprocess
 import os

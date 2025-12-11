@@ -20,7 +20,7 @@ from core.affix_tier_calculator import (
 from core.guide_gear_extractor import (
     GuideGearExtractor
 )
-from core.pob_integration import PoBBuild, PoBItem
+from core.pob import PoBBuild, PoBItem
 
 
 class TestBuildPriorities:

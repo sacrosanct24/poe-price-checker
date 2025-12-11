@@ -13,7 +13,7 @@ import zlib
 
 import pytest
 
-from core.pob_integration import (
+from core.pob import (
     BuildCategory,
     CharacterManager,
     CharacterProfile,

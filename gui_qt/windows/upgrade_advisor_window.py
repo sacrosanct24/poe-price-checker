@@ -40,7 +40,7 @@ from gui_qt.styles import apply_window_icon, COLORS, get_rarity_color
 if TYPE_CHECKING:
     from core.config import Config
     from core.database import Database
-    from core.pob_integration import CharacterManager, CharacterProfile
+    from core.pob import CharacterManager, CharacterProfile
 
 logger = logging.getLogger(__name__)
 

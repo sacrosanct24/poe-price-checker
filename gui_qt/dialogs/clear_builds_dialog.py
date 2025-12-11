@@ -22,7 +22,7 @@ from gui_qt.styles import COLORS, apply_window_icon
 
 # Import BuildCategory
 try:
-    from core.pob_integration import BuildCategory
+    from core.pob import BuildCategory
     BUILD_CATEGORIES = list(BuildCategory)
     HAS_BUILD_CATEGORY = True
 except ImportError:

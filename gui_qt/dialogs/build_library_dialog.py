@@ -36,7 +36,7 @@ from PyQt6.QtGui import QAction, QDesktopServices
 from PyQt6.QtCore import QUrl
 
 from gui_qt.styles import COLORS, apply_window_icon
-from core.pob_integration import CharacterManager, BuildCategory
+from core.pob import CharacterManager, BuildCategory
 
 logger = logging.getLogger(__name__)
 

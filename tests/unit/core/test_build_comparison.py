@@ -172,7 +172,7 @@ class TestBuildComparatorEquipment:
     """Tests for equipment comparison."""
 
     def test_compare_equipment_matching_uniques(self):
-        from core.pob_integration import PoBItem
+        from core.pob import PoBItem
 
         comparator = BuildComparator()
 
@@ -201,7 +201,7 @@ class TestBuildComparatorEquipment:
         assert result.slot_deltas["Body Armour"].is_match is True
 
     def test_compare_equipment_missing_unique(self):
-        from core.pob_integration import PoBItem
+        from core.pob import PoBItem
 
         comparator = BuildComparator()
 

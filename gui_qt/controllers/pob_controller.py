@@ -24,7 +24,7 @@ from PyQt6.QtWidgets import QMainWindow
 
 if TYPE_CHECKING:
     from core.app_context import AppContext
-    from core.pob_integration import CharacterManager, UpgradeChecker
+    from core.pob import CharacterManager, UpgradeChecker
     from core.dps_impact_calculator import DPSStats
     from gui_qt.widgets.item_inspector import BuildStats
 
@@ -79,7 +79,7 @@ class PoBController:
             True if initialization succeeded.
         """
         try:
-            from core.pob_integration import CharacterManager
+            from core.pob import CharacterManager
 
             storage_path = Path(__file__).parent.parent.parent / "data" / "characters.json"
             self._character_manager = CharacterManager(storage_path=storage_path)
@@ -158,7 +158,7 @@ class PoBController:
             price_controller: PriceCheckController to update.
         """
         try:
-            from core.pob_integration import UpgradeChecker
+            from core.pob import UpgradeChecker
 
             if not self._character_manager:
                 return

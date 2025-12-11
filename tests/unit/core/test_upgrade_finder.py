@@ -11,7 +11,7 @@ from core.upgrade_finder import (
     SlotUpgradeResult,
     BIS_TO_POB_SLOT,
 )
-from core.pob_integration import CharacterProfile, PoBBuild, PoBItem
+from core.pob import CharacterProfile, PoBBuild, PoBItem
 from core.build_stat_calculator import BuildStats
 
 

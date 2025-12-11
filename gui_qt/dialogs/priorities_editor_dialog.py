@@ -33,7 +33,7 @@ from core.build_priorities import (
     AVAILABLE_STATS,
     suggest_priorities_from_build,
 )
-from core.pob_integration import CharacterManager
+from core.pob import CharacterManager
 
 logger = logging.getLogger(__name__)
 

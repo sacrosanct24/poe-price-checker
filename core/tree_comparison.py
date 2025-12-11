@@ -14,7 +14,7 @@ from core.build_comparison import (
     GuideBuildParser,
     BuildComparator,
 )
-from core.pob_integration import PoBDecoder, CharacterManager
+from core.pob import PoBDecoder, CharacterManager
 
 logger = logging.getLogger(__name__)
 

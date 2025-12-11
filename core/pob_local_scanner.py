@@ -279,7 +279,7 @@ class PoBLocalScanner:
         Returns:
             Dict with build data suitable for CharacterManager.
         """
-        from core.pob_integration import PoBDecoder
+        from core.pob import PoBDecoder
 
         xml_content = self.get_build_xml(build_info)
         if not xml_content:

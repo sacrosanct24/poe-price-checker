@@ -27,7 +27,7 @@ from PyQt6.QtWidgets import QWidget
 if TYPE_CHECKING:
     from core.config import Config
     from core.database import Database
-    from core.pob_integration import CharacterManager, CharacterProfile
+    from core.pob import CharacterManager, CharacterProfile
     from core.build_summarizer import BuildSummary
     from gui_qt.widgets.ai_analysis_panel import AIAnalysisPanelWidget
     from gui_qt.workers.ai_analysis_worker import AIAnalysisWorker

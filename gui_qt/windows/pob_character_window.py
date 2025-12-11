@@ -42,7 +42,7 @@ from gui_qt.dialogs.find_builds_dialog import FindBuildsDialog
 
 # Try to import BuildCategory
 try:
-    from core.pob_integration import BuildCategory
+    from core.pob import BuildCategory
     BUILD_CATEGORIES = list(BuildCategory)
 except ImportError:
     BUILD_CATEGORIES = []

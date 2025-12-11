@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Any
 from enum import Enum
 
-from core.pob_integration import CharacterProfile, PoBItem
+from core.pob import CharacterProfile, PoBItem
 from core.build_stat_calculator import BuildStats
 from core.bis_calculator import BiSCalculator, BiSRequirements, EQUIPMENT_SLOTS
 from core.upgrade_calculator import UpgradeCalculator, UpgradeImpact, ItemStatExtractor

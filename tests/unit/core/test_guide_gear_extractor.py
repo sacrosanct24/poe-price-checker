@@ -249,7 +249,7 @@ class TestGuideGearExtractor:
     @pytest.fixture
     def sample_pob_build(self):
         """Create sample PoBBuild for testing."""
-        from core.pob_integration import PoBBuild, PoBItem
+        from core.pob import PoBBuild, PoBItem
 
         build = PoBBuild(
             class_name="Slayer",
@@ -317,7 +317,7 @@ class TestGuideGearExtractor:
 
     def test_extract_from_build_empty_items(self, extractor):
         """Should handle build with no items."""
-        from core.pob_integration import PoBBuild
+        from core.pob import PoBBuild
 
         build = PoBBuild(class_name="Marauder", ascendancy="Juggernaut", level=90)
         build.items = {}
@@ -329,7 +329,7 @@ class TestGuideGearExtractor:
 
     def test_item_to_recommendation_unique(self, extractor):
         """Should create unique recommendation correctly."""
-        from core.pob_integration import PoBItem
+        from core.pob import PoBItem
 
         item = PoBItem(
             slot="Helmet",
@@ -347,7 +347,7 @@ class TestGuideGearExtractor:
 
     def test_item_to_recommendation_rare(self, extractor):
         """Should create rare recommendation correctly."""
-        from core.pob_integration import PoBItem
+        from core.pob import PoBItem
 
         item = PoBItem(
             slot="Ring 1",
@@ -364,7 +364,7 @@ class TestGuideGearExtractor:
 
     def test_item_to_recommendation_body_armour_priority(self, extractor):
         """Body armour rare should have high priority."""
-        from core.pob_integration import PoBItem
+        from core.pob import PoBItem
 
         item = PoBItem(
             slot="Body Armour",
@@ -379,7 +379,7 @@ class TestGuideGearExtractor:
 
     def test_item_to_recommendation_key_mods_priority(self, extractor):
         """Should prioritize important mods."""
-        from core.pob_integration import PoBItem
+        from core.pob import PoBItem
 
         item = PoBItem(
             slot="Boots",
@@ -410,7 +410,7 @@ class TestGuideGearExtractor:
 
     def test_compare_with_current_matching_unique(self, extractor, mock_char_manager):
         """Should detect matching unique item."""
-        from core.pob_integration import PoBBuild, PoBItem
+        from core.pob import PoBBuild, PoBItem
 
         # Guide gear
         summary = GuideGearSummary(profile_name="Guide", guide_name="Guide")
@@ -781,7 +781,7 @@ Implicits: 0
 
     def test_compare_with_current_empty_slot(self, extractor, mock_char_manager):
         """Should detect empty slot as upgrade needed."""
-        from core.pob_integration import PoBBuild
+        from core.pob import PoBBuild
 
         summary = GuideGearSummary(profile_name="Guide", guide_name="Guide")
         summary.recommendations["Helmet"] = GuideGearRecommendation(
@@ -805,7 +805,7 @@ Implicits: 0
 
     def test_compare_with_current_matching_rare(self, extractor, mock_char_manager):
         """Should detect matching rare by base type."""
-        from core.pob_integration import PoBBuild, PoBItem
+        from core.pob import PoBBuild, PoBItem
 
         summary = GuideGearSummary(profile_name="Guide", guide_name="Guide")
         summary.recommendations["Helmet"] = GuideGearRecommendation(
@@ -836,7 +836,7 @@ Implicits: 0
 
     def test_item_to_recommendation_prioritizes_life_mods(self, extractor):
         """Should prioritize life mods in key_mods."""
-        from core.pob_integration import PoBItem
+        from core.pob import PoBItem
 
         item = PoBItem(
             slot="Body Armour",
@@ -860,7 +860,7 @@ Implicits: 0
 
     def test_item_to_recommendation_limits_key_mods(self, extractor):
         """Should limit key_mods to 5."""
-        from core.pob_integration import PoBItem
+        from core.pob import PoBItem
 
         item = PoBItem(
             slot="Body Armour",

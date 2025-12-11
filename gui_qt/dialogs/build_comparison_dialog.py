@@ -32,7 +32,7 @@ from PyQt6.QtWidgets import (
 from gui_qt.styles import COLORS, apply_window_icon
 from gui_qt.widgets.build_filter_widget import BuildFilterWidget
 from core.tree_comparison import TreeComparisonService, TreeComparisonResult
-from core.pob_integration import CharacterManager, PoBDecoder
+from core.pob import CharacterManager, PoBDecoder
 from core.build_comparison import GuideBuildParser, TreeSpec
 from core.passive_tree_data import get_passive_tree_provider, PassiveNode
 

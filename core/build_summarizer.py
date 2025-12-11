@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from core.pob_integration import PoBBuild, CharacterProfile, PoBItem
+    from core.pob import PoBBuild, CharacterProfile, PoBItem
 
 logger = logging.getLogger(__name__)
 
@@ -587,7 +587,7 @@ def save_summary_to_file(summary: BuildSummary, path: Path, format: str = "json"
 # CLI for testing
 if __name__ == "__main__":
     import sys
-    from core.pob_integration import CharacterManager
+    from core.pob import CharacterManager
 
     logging.basicConfig(level=logging.INFO)
 

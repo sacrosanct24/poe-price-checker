@@ -35,7 +35,7 @@ from PyQt6.QtWidgets import (
 from gui_qt.styles import COLORS, apply_window_icon
 from core.bis_calculator import BiSCalculator, BiSRequirements, build_trade_query, EQUIPMENT_SLOTS
 from core.build_stat_calculator import BuildStats
-from core.pob_integration import CharacterManager
+from core.pob import CharacterManager
 from core.build_priorities import BuildPriorities
 from core.affix_tier_calculator import AffixTierCalculator
 from core.guide_gear_extractor import GuideGearExtractor, GuideGearSummary, ItemSetInfo

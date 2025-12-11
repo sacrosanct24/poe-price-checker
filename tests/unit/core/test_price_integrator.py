@@ -1222,7 +1222,7 @@ class TestLazyLoadingClients:
         integrator = PriceIntegrator(enable_upgrade_check=True)
         assert integrator._character_manager is None
 
-        with patch("core.pob_integration.CharacterManager") as mock_cm_class:
+        with patch("core.pob.CharacterManager") as mock_cm_class:
             mock_cm = MagicMock()
             mock_cm.list_profiles.return_value = ["Profile1", "Profile2"]
             mock_cm_class.return_value = mock_cm
@@ -1237,7 +1237,7 @@ class TestLazyLoadingClients:
 
         integrator = PriceIntegrator(enable_upgrade_check=True)
 
-        with patch("core.pob_integration.CharacterManager") as mock_cm_class:
+        with patch("core.pob.CharacterManager") as mock_cm_class:
             mock_cm = MagicMock()
             mock_cm.list_profiles.return_value = []  # No profiles
             mock_cm_class.return_value = mock_cm
@@ -1252,7 +1252,7 @@ class TestLazyLoadingClients:
 
         integrator = PriceIntegrator(enable_upgrade_check=True)
 
-        with patch.dict('sys.modules', {'core.pob_integration': None}):
+        with patch.dict('sys.modules', {'core.pob': None}):
             # Test fallback behavior
             pass
 
@@ -1266,7 +1266,7 @@ class TestLazyLoadingClients:
         mock_cm = MagicMock()
         integrator._character_manager = mock_cm
 
-        with patch("core.pob_integration.UpgradeChecker") as mock_uc_class:
+        with patch("core.pob.UpgradeChecker") as mock_uc_class:
             mock_uc = MagicMock()
             mock_uc_class.return_value = mock_uc
 

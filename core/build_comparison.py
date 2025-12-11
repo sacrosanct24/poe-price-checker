@@ -18,7 +18,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 import defusedxml.ElementTree as ET
 import requests
 
-from core.pob_integration import PoBBuild, PoBDecoder, PoBItem
+from core.pob import PoBBuild, PoBDecoder, PoBItem
 
 logger = logging.getLogger(__name__)
 

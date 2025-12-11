@@ -36,7 +36,7 @@ from gui_qt.widgets.upgrade_history_panel import UpgradeHistoryPanel
 
 if TYPE_CHECKING:
     from core.app_context import AppContext
-    from core.pob_integration import CharacterManager, CharacterProfile
+    from core.pob import CharacterManager, CharacterProfile
 
 logger = logging.getLogger(__name__)
 

@@ -35,7 +35,7 @@ from typing import Any, Dict, List, Optional, TYPE_CHECKING
 if TYPE_CHECKING:
     from core.database import Database
     from core.config import Config
-    from core.pob_integration import CharacterProfile, PoBItem
+    from core.pob import CharacterProfile, PoBItem
     from core.build_summarizer import BuildSummary
     from core.stash_storage import StashStorageService
     from core.stash_valuator import PricedItem
