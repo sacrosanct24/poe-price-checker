@@ -344,8 +344,6 @@ def get_item_price_cache(
 
 def clear_item_price_cache() -> None:
     """Clear and reset the global cache."""
-    global _item_price_cache
-
     if _item_price_cache is not None:
         _item_price_cache.clear()
         _item_price_cache.stats.reset()

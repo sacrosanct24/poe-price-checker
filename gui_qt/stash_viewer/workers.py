@@ -8,7 +8,7 @@ from typing import List, Optional
 
 from PyQt6.QtCore import QThread, pyqtSignal
 
-from core.stash_valuator import PricedItem, StashValuator
+from core.stash_valuator import PricedItem, StashValuator, ValuationResult
 from data_sources.poe_stash_api import PoEStashClient
 
 logger = logging.getLogger(__name__)
@@ -99,9 +99,9 @@ class FetchWorker(QThread):
             logger.exception("Stash fetch failed")
             self.error.emit(str(e))
 
-    def _valuate_incremental(self, valuator: StashValuator, snapshot) -> "ValuationResult":
+    def _valuate_incremental(self, valuator: StashValuator, snapshot) -> ValuationResult:
         """Valuate snapshot with incremental batch updates."""
-        from core.stash_valuator import PriceSource, ValuationResult
+        from core.stash_valuator import PriceSource
 
         result = ValuationResult(
             league=snapshot.league,
