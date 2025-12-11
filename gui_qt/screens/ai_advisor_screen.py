@@ -27,7 +27,7 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from gui_qt.screens.base_screen import BaseScreen
 
 if TYPE_CHECKING:
-    from core.interfaces import IAppContext
+    from core.app_context import AppContext
     from core.pob_integration import CharacterManager
     from gui_qt.views.upgrade_advisor_view import UpgradeAdvisorView
 
@@ -125,7 +125,7 @@ class AIAdvisorScreen(BaseScreen):
 
     def __init__(
         self,
-        ctx: "IAppContext",
+        ctx: "AppContext",
         character_manager: Optional["CharacterManager"] = None,
         on_status: Optional[Callable[[str], None]] = None,
         parent: Optional[QWidget] = None,

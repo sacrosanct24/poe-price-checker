@@ -14,7 +14,7 @@ from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import QWidget, QVBoxLayout
 
 if TYPE_CHECKING:
-    from core.interfaces import IAppContext
+    from core.app_context import AppContext
 
 
 class BaseScreen(QWidget):
@@ -50,7 +50,7 @@ class BaseScreen(QWidget):
 
     def __init__(
         self,
-        ctx: "IAppContext",
+        ctx: "AppContext",
         on_status: Optional[Callable[[str], None]] = None,
         parent: Optional[QWidget] = None,
     ):

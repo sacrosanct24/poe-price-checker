@@ -46,7 +46,7 @@ from gui_qt.workers.loot_tracking_worker import (
 )
 
 if TYPE_CHECKING:
-    from core.interfaces import IAppContext
+    from core.app_context import AppContext
     from data_sources.poe_stash_api import StashSnapshot
     from core.config import Config
     from core.database import Database
@@ -97,7 +97,7 @@ class LootTrackingController(QObject):
 
     def __init__(
         self,
-        ctx: "IAppContext",
+        ctx: "AppContext",
         parent: Optional[QObject] = None,
     ):
         """

@@ -29,7 +29,7 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from gui_qt.screens.base_screen import BaseScreen
 
 if TYPE_CHECKING:
-    from core.interfaces import IAppContext
+    from core.app_context import AppContext
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +41,7 @@ class QuickStatsPanel(QFrame):
     Displays key metrics like total revenue, items sold today, etc.
     """
 
-    def __init__(self, ctx: Optional["IAppContext"] = None, parent: Optional[QWidget] = None):
+    def __init__(self, ctx: Optional["AppContext"] = None, parent: Optional[QWidget] = None):
         super().__init__(parent)
         self.ctx = ctx
         self.setFrameShape(QFrame.Shape.StyledPanel)
@@ -168,7 +168,7 @@ class DaytraderScreen(BaseScreen):
 
     def __init__(
         self,
-        ctx: "IAppContext",
+        ctx: "AppContext",
         on_status: Optional[Callable[[str], None]] = None,
         parent: Optional[QWidget] = None,
     ):

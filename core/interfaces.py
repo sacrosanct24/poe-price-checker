@@ -36,14 +36,14 @@ class IPriceService(Protocol):
     This matches MultiSourcePriceService and PriceService.
     """
 
-    def check_item(self, item_text: str) -> List[Union[Dict[str, Any], "PriceRow"]]:
+    def check_item(self, item_text: str) -> List[Dict[str, Any]]:
         """Check prices for an item.
 
         Args:
             item_text: Raw item text from PoE.
 
         Returns:
-            List of normalized price rows (dicts or PriceRow instances).
+            List of normalized price rows as dictionaries.
         """
         ...
 
