@@ -39,7 +39,7 @@ class CompactRankingsModel(QAbstractTableModel):
         ("icon", "", 26),  # Icon column
         ("rank", "#", 18),  # Very compact rank
         ("name", "Item", 120),  # Stretches to fill
-        ("chaos_value", "Price", 50),
+        ("chaos_value", "Price", 55),
     ]
 
     ICON_SIZE = 24  # Smaller icons for sidebar
