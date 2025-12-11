@@ -9,6 +9,7 @@ Controllers coordinate between services and UI widgets:
 - TrayController: Manages system tray functionality
 - PoBController: Manages Path of Building integration
 - ViewMenuController: Manages View menu creation
+- UpgradeAnalysisController: Manages AI-powered upgrade analysis orchestration
 """
 
 from gui_qt.controllers.price_check_controller import PriceCheckController
@@ -33,6 +34,9 @@ from gui_qt.controllers.view_menu_controller import (
     ViewMenuController,
     get_view_menu_controller,
 )
+from gui_qt.controllers.upgrade_analysis_controller import (
+    UpgradeAnalysisController,
+)
 
 __all__ = [
     "PriceCheckController",
@@ -47,4 +51,5 @@ __all__ = [
     "get_pob_controller",
     "ViewMenuController",
     "get_view_menu_controller",
+    "UpgradeAnalysisController",
 ]
