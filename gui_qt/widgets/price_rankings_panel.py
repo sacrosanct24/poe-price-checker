@@ -9,8 +9,8 @@ from __future__ import annotations
 import logging
 from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
 
-from PyQt6.QtCore import Qt, QAbstractTableModel, QModelIndex, pyqtSignal
-from PyQt6.QtGui import QColor, QBrush
+from PyQt6.QtCore import Qt, QAbstractTableModel, QModelIndex, pyqtSignal, QSize, QTimer
+from PyQt6.QtGui import QColor, QBrush, QPixmap
 from PyQt6.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -36,14 +36,28 @@ class CompactRankingsModel(QAbstractTableModel):
     """Compact table model for sidebar rankings display."""
 
     COLUMNS = [
-        ("rank", "#", 30),
-        ("name", "Item", 160),
-        ("chaos_value", "Price", 60),
+        ("icon", "", 28),  # Icon column
+        ("rank", "#", 24),
+        ("name", "Item", 140),
+        ("chaos_value", "Price", 55),
     ]
+
+    ICON_SIZE = 24  # Smaller icons for sidebar
 
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
         self._data: List[Dict[str, Any]] = []
+        self._icon_cache: Optional[Any] = None
+
+    def _get_icon_cache(self):
+        """Lazy-load icon cache."""
+        if self._icon_cache is None:
+            try:
+                from gui_qt.windows.price_rankings_window import get_icon_cache
+                self._icon_cache = get_icon_cache()
+            except ImportError:
+                pass
+        return self._icon_cache
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
         return len(self._data)
@@ -60,6 +74,8 @@ class CompactRankingsModel(QAbstractTableModel):
         value = row_data.get(col_key, "")
 
         if role == Qt.ItemDataRole.DisplayRole:
+            if col_key == "icon":
+                return None  # Icon handled by DecorationRole
             if col_key == "chaos_value":
                 try:
                     return f"{float(value):,.0f}c" if value else ""
@@ -67,9 +83,30 @@ class CompactRankingsModel(QAbstractTableModel):
                     return ""
             return str(value) if value else ""
 
+        elif role == Qt.ItemDataRole.DecorationRole:
+            if col_key == "icon":
+                icon_url = row_data.get("icon", "")
+                if icon_url:
+                    cache = self._get_icon_cache()
+                    if cache:
+                        pixmap = cache.get_icon(
+                            icon_url,
+                            callback=lambda p: self._on_icon_loaded(index.row())
+                        )
+                        if pixmap:
+                            scaled = pixmap.scaled(
+                                self.ICON_SIZE, self.ICON_SIZE,
+                                Qt.AspectRatioMode.KeepAspectRatio,
+                                Qt.TransformationMode.SmoothTransformation
+                            )
+                            return scaled
+                return None
+
         elif role == Qt.ItemDataRole.TextAlignmentRole:
             if col_key in ("chaos_value", "rank"):
                 return Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+            elif col_key == "icon":
+                return Qt.AlignmentFlag.AlignCenter
 
         elif role == Qt.ItemDataRole.ForegroundRole:
             rarity = row_data.get("rarity", "normal")
@@ -82,7 +119,17 @@ class CompactRankingsModel(QAbstractTableModel):
                 return f"{row_data.get('name', '')} - {divine:.2f} divine"
             return row_data.get("name", "")
 
+        elif role == Qt.ItemDataRole.SizeHintRole:
+            if col_key == "icon":
+                return QSize(self.ICON_SIZE + 4, self.ICON_SIZE + 4)
+
         return None
+
+    def _on_icon_loaded(self, row: int) -> None:
+        """Called when an icon finishes downloading."""
+        if 0 <= row < len(self._data):
+            index = self.index(row, 0)  # Icon is column 0
+            self.dataChanged.emit(index, index, [Qt.ItemDataRole.DecorationRole])
 
     def headerData(
         self,
@@ -101,11 +148,12 @@ class CompactRankingsModel(QAbstractTableModel):
         self._data = []
         for item in items[:20]:  # Limit to top 20
             self._data.append({
+                "icon": getattr(item, "icon", "") or "",
                 "rank": item.rank,
                 "name": item.name,
                 "chaos_value": item.chaos_value,
-                "divine_value": item.divine_value,
-                "rarity": item.rarity or "normal",
+                "divine_value": getattr(item, "divine_value", 0),
+                "rarity": getattr(item, "rarity", "normal") or "normal",
             })
         self.endResetModel()
 
@@ -143,6 +191,7 @@ class PriceRankingsPanel(QFrame):
         self,
         ctx: Optional["AppContext"] = None,
         parent: Optional[QWidget] = None,
+        auto_load: bool = True,
     ):
         super().__init__(parent)
         self.ctx = ctx
@@ -151,6 +200,10 @@ class PriceRankingsPanel(QFrame):
 
         self.setFrameShape(QFrame.Shape.StyledPanel)
         self._setup_ui()
+
+        # Auto-load initial data after a short delay (allow UI to render first)
+        if auto_load:
+            QTimer.singleShot(500, self.load_initial_data)
 
     def _setup_ui(self) -> None:
         """Create the panel UI."""
@@ -201,7 +254,7 @@ class PriceRankingsPanel(QFrame):
         v_header = self._table.verticalHeader()
         if v_header:
             v_header.setVisible(False)
-            v_header.setDefaultSectionSize(22)
+            v_header.setDefaultSectionSize(CompactRankingsModel.ICON_SIZE + 4)  # Row height for icons
         self._table.setShowGrid(False)
 
         # Set column widths

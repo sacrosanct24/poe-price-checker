@@ -25,22 +25,24 @@ class TestCompactRankingsModel:
         """Model should start with no rows."""
         assert model.rowCount() == 0
 
-    def test_column_count_is_three(self, model):
-        """Model should have 3 columns."""
-        assert model.columnCount() == 3
+    def test_column_count_is_four(self, model):
+        """Model should have 4 columns (icon, rank, name, price)."""
+        assert model.columnCount() == 4
 
     def test_columns_defined(self, model):
-        """COLUMNS should define rank, name, chaos_value."""
+        """COLUMNS should define icon, rank, name, chaos_value."""
         column_keys = [col[0] for col in model.COLUMNS]
+        assert "icon" in column_keys
         assert "rank" in column_keys
         assert "name" in column_keys
         assert "chaos_value" in column_keys
 
     def test_header_data_returns_labels(self, model):
         """headerData should return column labels."""
-        assert model.headerData(0, Qt.Orientation.Horizontal) == "#"
-        assert model.headerData(1, Qt.Orientation.Horizontal) == "Item"
-        assert model.headerData(2, Qt.Orientation.Horizontal) == "Price"
+        assert model.headerData(0, Qt.Orientation.Horizontal) == ""  # Icon has no header
+        assert model.headerData(1, Qt.Orientation.Horizontal) == "#"
+        assert model.headerData(2, Qt.Orientation.Horizontal) == "Item"
+        assert model.headerData(3, Qt.Orientation.Horizontal) == "Price"
 
     def test_set_data_populates_model(self, model):
         """set_data should populate the model."""
@@ -70,16 +72,20 @@ class TestCompactRankingsModel:
         ]
         model.set_data(items)
 
-        # Rank
-        rank_index = model.index(0, 0)
+        # Icon (column 0) returns None for DisplayRole
+        icon_index = model.index(0, 0)
+        assert model.data(icon_index, Qt.ItemDataRole.DisplayRole) is None
+
+        # Rank (column 1)
+        rank_index = model.index(0, 1)
         assert model.data(rank_index, Qt.ItemDataRole.DisplayRole) == "1"
 
-        # Name
-        name_index = model.index(0, 1)
+        # Name (column 2)
+        name_index = model.index(0, 2)
         assert model.data(name_index, Qt.ItemDataRole.DisplayRole) == "Test Item"
 
-        # Chaos value
-        value_index = model.index(0, 2)
+        # Chaos value (column 3)
+        value_index = model.index(0, 3)
         assert "1,000" in model.data(value_index, Qt.ItemDataRole.DisplayRole)
 
     def test_data_returns_tooltip(self, model):
