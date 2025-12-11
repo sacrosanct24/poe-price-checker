@@ -9,6 +9,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.6.2] - 2025-12-10
+
+### Added
+
+#### Performance Enhancements
+- **Item Price Cache** - LRU cache for session-level price caching
+  - Avoids redundant API calls for repeated item checks
+  - Configurable TTL (default 5 min) and max size (default 500)
+  - Thread-safe with cache statistics
+- **Background Price Refresh** - Automatic periodic refresh of price caches
+  - Configurable refresh interval (default 30 min)
+  - Price change detection with toast notifications
+- **Lazy Stash Loading** - Incremental batch processing for large stash tabs
+  - `items_batch` signal for progressive UI updates
+  - Configurable batch size
+
+#### Rankings Panel Improvements
+- **Icons in Rankings** - Item icons now display in Top 20 rankings
+  - Fixed currency icons (joined from currencyDetails API)
+  - Shared IconCache between sidebar and window views
+- **Auto-load on Startup** - Rankings panel populates automatically
+- **Compact Sidebar Design** - Optimized column widths, hidden headers
+
+### Changed
+- Rankings table columns compressed for better space utilization
+- Sidebar rankings hide column headers for cleaner look
+- Name column now stretches to fill available space
+
+### Fixed
+- Currency icons missing from poe.ninja data (icons in separate array)
+- Rankings panel not loading on app startup
+- Focus rectangle appearing in sidebar rankings
+
+### Technical
+- All 4 phases of large file refactoring completed
+- Test coverage increased from ~60% to 72%
+- Updated ROADMAP.md with completed tech debt items
+
+---
+
 ## [1.6.0] - 2025-12-07
 
 ### Added
@@ -306,7 +346,8 @@ This is the initial public release (v1.0.0). The project was developed privately
 
 ---
 
-[Unreleased]: https://github.com/sacrosanct24/poe-price-checker/compare/v1.6.0...HEAD
+[Unreleased]: https://github.com/sacrosanct24/poe-price-checker/compare/v1.6.2...HEAD
+[1.6.2]: https://github.com/sacrosanct24/poe-price-checker/compare/v1.6.0...v1.6.2
 [1.6.0]: https://github.com/sacrosanct24/poe-price-checker/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/sacrosanct24/poe-price-checker/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/sacrosanct24/poe-price-checker/compare/v1.1.0...v1.4.0

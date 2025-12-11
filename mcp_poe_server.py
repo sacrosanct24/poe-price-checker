@@ -741,7 +741,7 @@ def get_project_structure() -> dict:
     """
     structure = {
         "project_name": "PoE Price Checker",
-        "version": "1.6.0",
+        "version": "1.6.2",
         "python_version": "3.10+",
         "framework": "PyQt6",
         "architecture": "3-Screen Architecture",
