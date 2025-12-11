@@ -36,10 +36,10 @@ class CompactRankingsModel(QAbstractTableModel):
     """Compact table model for sidebar rankings display."""
 
     COLUMNS = [
-        ("icon", "", 28),  # Icon column
-        ("rank", "#", 24),
-        ("name", "Item", 140),
-        ("chaos_value", "Price", 55),
+        ("icon", "", 26),  # Icon column
+        ("rank", "#", 18),  # Very compact rank
+        ("name", "Item", 120),  # Stretches to fill
+        ("chaos_value", "Price", 50),
     ]
 
     ICON_SIZE = 24  # Smaller icons for sidebar
@@ -251,19 +251,23 @@ class PriceRankingsPanel(QFrame):
         self._table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self._table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self._table.setAlternatingRowColors(True)
+        self._table.setShowGrid(False)
+        self._table.setFocusPolicy(Qt.FocusPolicy.NoFocus)  # Remove focus rectangle
+
+        # Hide vertical header (row numbers)
         v_header = self._table.verticalHeader()
         if v_header:
             v_header.setVisible(False)
-            v_header.setDefaultSectionSize(CompactRankingsModel.ICON_SIZE + 4)  # Row height for icons
-        self._table.setShowGrid(False)
+            v_header.setDefaultSectionSize(CompactRankingsModel.ICON_SIZE + 4)
 
-        # Set column widths
+        # Hide horizontal header (column labels) for compact look
         h_header = self._table.horizontalHeader()
         if h_header:
+            h_header.setVisible(False)
             for i, (_, _, width) in enumerate(CompactRankingsModel.COLUMNS):
                 h_header.resizeSection(i, width)
-            h_header.setStretchLastSection(True)
-            h_header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+            h_header.setStretchLastSection(False)
+            h_header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)  # Name column stretches
 
         # Double-click to price check
         self._table.doubleClicked.connect(self._on_item_double_clicked)
