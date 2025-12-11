@@ -83,9 +83,52 @@ review_frequency: monthly
 ## Technical Debt & Improvements
 
 ### Code Quality
+- [x] Complete type hints across all modules (mypy: 0 errors)
+- [x] Reduce `type: ignore` comments (28 → 20)
 - [ ] Increase test coverage to 80% (currently ~60%)
-- [ ] Complete type hints across all modules
-- [ ] Split large files (`main_window.py`, `item_parser.py`)
+
+### Large File Refactoring
+
+**Target:** Split files >500 lines into focused modules for better maintainability and testability.
+
+#### Phase 1: Low-Risk, High-Impact (Recommended First)
+
+| File | Lines | Proposed Split | Effort |
+|------|-------|----------------|--------|
+| `gui_qt/styles.py` | 1,317 | `gui_qt/themes/` package (colors, palettes, manager) | 1 day |
+| `core/price_rankings.py` | 1,324 | `core/rankings/` package (models, cache, calculator, history) | 1 day |
+| `gui_qt/windows/stash_viewer_window.py` | 1,136 | `gui_qt/windows/stash/` (worker, model, dialog, window) | 0.5 day |
+
+#### Phase 2: Medium Complexity
+
+| File | Lines | Proposed Split | Effort |
+|------|-------|----------------|--------|
+| `core/pob_integration.py` | 1,370 | `core/pob/` package (models, decoder, manager, checker) | 1.5 days |
+| `core/league_economy_history.py` | 1,246 | `core/economy/` package (models, importer, services) | 1 day |
+| `core/config.py` | 1,179 | `core/config/` package (defaults, config class) | 0.5 day |
+
+#### Phase 3: Core Infrastructure (High Risk)
+
+| File | Lines | Proposed Split | Effort |
+|------|-------|----------------|--------|
+| `core/database.py` | 2,519 | `core/database/` with repository pattern | 2.5 days |
+| `core/price_service.py` | 1,336 | `core/pricing/` package (models, converters, lookups) | 2 days |
+
+#### Phase 4: Complex Evaluation
+
+| File | Lines | Proposed Split | Effort |
+|------|-------|----------------|--------|
+| `core/rare_item_evaluator.py` | 1,358 | `core/rare_evaluation/` package (matcher, synergy, rules) | 2 days |
+| `gui_qt/main_window.py` | 1,817 | Extract remaining controllers (session, menu, settings) | 1.5 days |
+
+#### Refactoring Guidelines
+
+1. **Create package with `__init__.py`** - Re-export for backward compatibility
+2. **Extract bottom-up** - Start with dataclasses, then utilities, then main classes
+3. **Test at each step** - Run full test suite after each extraction
+4. **Target:** No file exceeds 500 lines
+
+See `docs/development/LARGE_FILE_REFACTORING.md` for detailed implementation plans.
 
 ### Performance
 - [ ] Lazy loading for large stash tabs
