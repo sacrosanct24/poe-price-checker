@@ -163,13 +163,13 @@ class RankingsTableModel(QAbstractTableModel):
     """Table model for price rankings with icon support."""
 
     COLUMNS = [
-        ("icon", "", 40),  # Icon column
-        ("rank", "#", 35),
-        ("name", "Item", 220),
-        ("base_type", "Base Type", 140),
-        ("chaos_value", "Chaos", 75),
-        ("divine_value", "Divine", 70),
-        ("trend_7d", "7d Trend", 75),
+        ("icon", "", 36),  # Icon column (compact)
+        ("rank", "#", 28),
+        ("name", "Item", 150),  # Compressed from 220
+        ("base_type", "Base Type", 120),  # Compressed from 140
+        ("chaos_value", "Chaos", 60),  # Compressed from 75
+        ("divine_value", "Divine", 55),  # Compressed from 70
+        ("trend_7d", "7d", 55),  # Compressed, shorter header
     ]
 
     ICON_SIZE = 32  # Icon size in pixels
