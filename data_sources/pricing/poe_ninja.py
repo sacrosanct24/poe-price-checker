@@ -240,19 +240,30 @@ class PoeNinjaAPI(BaseAPIClient):
         Get currency price overview for current league.
 
         Returns:
-            Dict with 'lines' (currency data) and 'currencyDetails'
+            Dict with 'lines' (currency data with icons) and 'currencyDetails'
         """
         data = self.get(
             "currencyoverview",
             params={"league": self.league, "type": "Currency"}
         )
 
+        # Build icon lookup from currencyDetails (icons are separate from lines)
+        icon_map: Dict[str, str] = {}
+        for detail in data.get("currencyDetails", []):
+            name = (detail.get("name") or "").strip().lower()
+            if name and detail.get("icon"):
+                icon_map[name] = detail["icon"]
+
         # Build indexed lookup for O(1) currency price queries
+        # Also inject icons into lines for rankings display
         self._currency_index.clear()
         for item in data.get("lines", []):
             name = (item.get("currencyTypeName") or "").strip().lower()
             if name:
                 self._currency_index[name] = item
+                # Inject icon from currencyDetails
+                if name in icon_map:
+                    item["icon"] = icon_map[name]
                 # Update divine/chaos conversion rate
                 if name == "divine orb":
                     self.divine_chaos_rate = item.get("chaosEquivalent", 1.0)
