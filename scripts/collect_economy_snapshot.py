@@ -24,7 +24,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from core.database import Database
-from core.league_economy_history import LeagueEconomyService
+from core.economy import LeagueEconomyService
 
 logging.basicConfig(
     level=logging.INFO,

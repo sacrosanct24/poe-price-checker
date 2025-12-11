@@ -5,7 +5,7 @@ from pathlib import Path
 import tempfile
 
 from core.database import Database
-from core.league_economy_history import (
+from core.economy import (
     LeagueEconomyService,
     LeagueMilestone,
     LeagueEconomySnapshot,

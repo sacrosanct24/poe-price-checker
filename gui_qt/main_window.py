@@ -1575,7 +1575,7 @@ class PriceCheckerWindow(QMainWindow):
 
     def _collect_economy_snapshot(self) -> None:
         """Collect economy snapshot from poe.ninja for current league."""
-        from core.league_economy_history import LeagueEconomyService
+        from core.economy import LeagueEconomyService
 
         league = self.ctx.config.league or "Keepers"
         self._set_status(f"Collecting economy snapshot for {league}...")

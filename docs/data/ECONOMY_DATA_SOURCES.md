@@ -101,7 +101,7 @@ data/
 ```python
 from pathlib import Path
 from core.database import Database
-from core.league_economy_history import LeagueEconomyService
+from core.economy import LeagueEconomyService
 
 db = Database()
 service = LeagueEconomyService(db)

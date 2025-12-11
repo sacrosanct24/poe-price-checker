@@ -226,7 +226,7 @@ class PriceHistoryWindow(QDialog):
     def _get_economy_service(self):
         """Get or create the economy service."""
         if self._economy_service is None:
-            from core.league_economy_history import LeagueEconomyService
+            from core.economy import LeagueEconomyService
             self._economy_service = LeagueEconomyService(self.ctx.db)
         return self._economy_service
 
