@@ -42,7 +42,7 @@ def window(qtbot, mock_ctx):
     """Create a PriceCheckerWindow for testing."""
     with patch('gui_qt.main_window.RankingsPopulationWorker'):
         with patch('gui_qt.services.SystemTrayManager'):
-            with patch('core.pob_integration.CharacterManager') as mock_char_mgr:
+            with patch('core.pob.CharacterManager') as mock_char_mgr:
                 # Ensure get_active_profile returns None to avoid UI setup issues
                 mock_char_mgr.return_value.get_active_profile.return_value = None
                 with patch('gui_qt.main_window.get_window_manager') as mock_wm:

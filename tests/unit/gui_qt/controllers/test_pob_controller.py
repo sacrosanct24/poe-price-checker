@@ -72,7 +72,7 @@ class TestPoBControllerInitialize:
 
     def test_initialize_creates_character_manager(self, controller):
         """Initialize should create CharacterManager."""
-        with patch("core.pob_integration.CharacterManager") as mock_cm_class:
+        with patch("core.pob.CharacterManager") as mock_cm_class:
             mock_cm = MagicMock()
             mock_cm_class.return_value = mock_cm
 
@@ -84,7 +84,7 @@ class TestPoBControllerInitialize:
 
     def test_initialize_returns_false_on_error(self, controller):
         """Initialize should return False on error."""
-        with patch("core.pob_integration.CharacterManager") as mock_cm_class:
+        with patch("core.pob.CharacterManager") as mock_cm_class:
             mock_cm_class.side_effect = Exception("Test error")
 
             result = controller.initialize()
@@ -194,7 +194,7 @@ class TestPoBControllerProfileSelection:
 
         mock_price_controller = MagicMock()
 
-        with patch("core.pob_integration.UpgradeChecker") as mock_uc_class:
+        with patch("core.pob.UpgradeChecker") as mock_uc_class:
             mock_checker = MagicMock()
             mock_uc_class.return_value = mock_checker
 
