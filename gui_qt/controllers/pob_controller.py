@@ -164,7 +164,8 @@ class PoBController:
                 return
             profile = self._character_manager.get_profile(profile_name)
             if profile and profile.build:
-                self._upgrade_checker = UpgradeChecker(profile.build)
+                # UpgradeChecker needs CharacterManager to look up profiles/items
+                self._upgrade_checker = UpgradeChecker(self._character_manager)
                 price_controller.set_upgrade_checker(self._upgrade_checker)
                 if self._on_status:
                     self._on_status(f"Upgrade checking enabled for: {profile_name}")

@@ -185,7 +185,7 @@ class TestPoBControllerProfileSelection:
     """Tests for profile selection handling."""
 
     def test_on_profile_selected_creates_upgrade_checker(self, controller, status_callback):
-        """on_profile_selected should create UpgradeChecker."""
+        """on_profile_selected should create UpgradeChecker with CharacterManager."""
         mock_cm = MagicMock()
         mock_profile = MagicMock()
         mock_profile.build = MagicMock()
@@ -200,7 +200,8 @@ class TestPoBControllerProfileSelection:
 
             controller.on_profile_selected("TestBuild", mock_price_controller)
 
-            mock_uc_class.assert_called_once_with(mock_profile.build)
+            # UpgradeChecker needs CharacterManager to look up profiles, not the build
+            mock_uc_class.assert_called_once_with(mock_cm)
             mock_price_controller.set_upgrade_checker.assert_called_once_with(mock_checker)
             status_callback.assert_called_once()
 
