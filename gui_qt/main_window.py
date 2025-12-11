@@ -1516,6 +1516,7 @@ class PriceCheckerWindow(QMainWindow):
             return
 
         from gui_qt.dialogs.recent_items_dialog import RecentItemsDialog
+        from gui_qt.services.history_manager import HistoryEntry
         from typing import cast, Union
 
         # Cast to satisfy type checker - list[HistoryEntry] is compatible with List[Union[...]]
