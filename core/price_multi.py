@@ -4,19 +4,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from typing import Any, Iterable, Protocol, runtime_checkable, Mapping, Union, Callable
 
-try:
-    # Arbitration (feature-flagged in service constructor)
-    from core.price_arbitration import arbitrate_rows
-except Exception:  # pragma: no cover - optional until wired
-    arbitrate_rows = None  # type: ignore
-
-try:
-    # Optional import for stronger typing; code works without it
-    from core.price_row import PriceRow, validate_and_normalize_row
-except Exception:  # pragma: no cover - typing convenience only
-    PriceRow = Any  # type: ignore
-    def validate_and_normalize_row(row):  # type: ignore
-        return dict(row)
+from core.price_arbitration import arbitrate_rows
+from core.price_row import PriceRow, validate_and_normalize_row
 
 logger = logging.getLogger(__name__)
 

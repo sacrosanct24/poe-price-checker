@@ -21,7 +21,7 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass, field
-from typing import Optional, List
+from typing import Any, Optional, List
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +83,9 @@ class ParsedItem:
 
     # PoE2 mod types
     rune_mods: List[str] = field(default_factory=list)  # Mods from socketed runes
+
+    # Attached during price checking (set by price_service)
+    _rare_evaluation: Optional[Any] = None
 
     def get_display_name(self) -> str:
         """

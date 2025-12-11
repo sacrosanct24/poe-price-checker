@@ -216,7 +216,7 @@ class PriceService:
                 rare_evaluation = self.rare_evaluator.evaluate(parsed)
 
                 # Attach evaluation to parsed item for trade API to use
-                parsed._rare_evaluation = rare_evaluation  # type: ignore[attr-defined]
+                parsed._rare_evaluation = rare_evaluation
 
                 # Populate explanation with rare evaluation details
                 explanation.is_rare_evaluation = True

@@ -29,18 +29,12 @@ logger = logging.getLogger(__name__)
 
 
 # Import scrapers
-try:
-    from data_sources.build_scrapers import (
-        PoBArchivesScraper,
-        BuildSourceProvider,
-        ScrapedBuild,
-    )
-    SCRAPERS_AVAILABLE = True
-except ImportError:
-    SCRAPERS_AVAILABLE = False
-    PoBArchivesScraper = None  # type: ignore[misc,assignment]
-    BuildSourceProvider = None  # type: ignore[misc,assignment]
-    ScrapedBuild = None  # type: ignore[misc,assignment]
+from data_sources.build_scrapers import (
+    PoBArchivesScraper,
+    BuildSourceProvider,
+    ScrapedBuild,
+)
+SCRAPERS_AVAILABLE = True
 
 
 class ScraperThread(QThread):

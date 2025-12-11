@@ -3,10 +3,7 @@ from __future__ import annotations
 from dataclasses import asdict
 from typing import Any, Iterable, Optional, Union
 
-try:
-    from core.price_row import PriceRow
-except Exception:  # pragma: no cover - avoid hard dependency
-    PriceRow = Any  # type: ignore
+from core.price_row import PriceRow
 
 ConfidenceRank = {"high": 3, "medium": 2, "low": 1, "none": 0, "unknown": 0}
 
