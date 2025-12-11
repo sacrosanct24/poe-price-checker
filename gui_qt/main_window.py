@@ -57,7 +57,12 @@ from gui_qt.widgets.pinned_items_widget import PinnedItemsWidget
 from gui_qt.widgets.price_rankings_panel import PriceRankingsPanel
 from gui_qt.widgets.session_tabs import SessionTabWidget, SessionPanel
 from gui_qt.workers import RankingsPopulationWorker
-from gui_qt.services import get_window_manager, get_history_manager
+from gui_qt.services import (
+    get_window_manager,
+    get_history_manager,
+    get_price_refresh_service,
+    shutdown_price_refresh_service,
+)
 from gui_qt.controllers import (
     PriceCheckController,
     ThemeController,
@@ -187,6 +192,9 @@ class PriceCheckerWindow(QMainWindow):
         # Start background rankings population check
         self._start_rankings_population()
 
+        # Start background price refresh service
+        self._start_price_refresh_service()
+
         # Initialize build stats for item inspector from active PoB profile
         self._pob_controller.update_inspector_stats(self.item_inspector)
 
@@ -216,6 +224,40 @@ class PriceCheckerWindow(QMainWindow):
         self.logger.warning(f"Rankings population failed: {error}")
         self.logger.debug(f"Traceback:\n{traceback}")
         self._rankings_worker = None
+
+    def _start_price_refresh_service(self) -> None:
+        """Start the background price refresh service."""
+        try:
+            service = get_price_refresh_service(self.ctx)
+            if service:
+                # Connect status updates to the summary label
+                service.status_update.connect(self._on_price_refresh_status)
+                service.price_changed.connect(self._on_price_changed)
+                service.start()
+                self.logger.info("Background price refresh service started")
+        except Exception as e:
+            self.logger.warning(f"Failed to start price refresh service: {e}")
+
+    def _on_price_refresh_status(self, message: str) -> None:
+        """Handle price refresh status update."""
+        self.logger.debug(f"Price refresh: {message}")
+        # Update summary label with last refresh time
+        if "refreshed at" in message.lower():
+            self.summary_label.setToolTip(message)
+
+    def _on_price_changed(self, item_name: str, old_price: float, new_price: float) -> None:
+        """Handle significant price change notification."""
+        direction = "up" if new_price > old_price else "down"
+        change_pct = abs(new_price - old_price) / old_price * 100 if old_price > 0 else 0
+        self.logger.info(
+            f"Price alert: {item_name} went {direction} "
+            f"({old_price:.1f}c -> {new_price:.1f}c, {change_pct:.1f}%)"
+        )
+        # Show toast notification for significant changes
+        if hasattr(self, '_toast_manager') and self._toast_manager:
+            self._toast_manager.info(
+                f"{item_name}: {old_price:.0f}c -> {new_price:.0f}c ({direction} {change_pct:.0f}%)"
+            )
 
     def _init_rare_evaluator(self) -> None:
         """Initialize the rare item evaluator."""
@@ -1250,6 +1292,9 @@ class PriceCheckerWindow(QMainWindow):
         if self._rankings_worker:
             self._rankings_worker.quit()
             self._rankings_worker.wait(1000)
+
+        # Stop price refresh service
+        shutdown_price_refresh_service()
 
         # Stop loot tracking
         if self._loot_controller:

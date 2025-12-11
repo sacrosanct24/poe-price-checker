@@ -1014,6 +1014,57 @@ class Config:
         self.save()
 
     # ------------------------------------------------------------------
+    # Background Refresh Settings
+    # ------------------------------------------------------------------
+
+    def _get_refresh_bool(self, key: str, default: bool) -> bool:
+        """Get a boolean from the refresh settings."""
+        return bool(self.data.get("refresh", {}).get(key, default))
+
+    def _get_refresh_int(self, key: str, default: int) -> int:
+        """Get an int from the refresh settings."""
+        return int(self.data.get("refresh", {}).get(key, default))
+
+    def _get_refresh_float(self, key: str, default: float) -> float:
+        """Get a float from the refresh settings."""
+        return float(self.data.get("refresh", {}).get(key, default))
+
+    @property
+    def background_refresh_enabled(self) -> bool:
+        """Whether background price refresh is enabled."""
+        return self._get_refresh_bool("enabled", True)
+
+    @background_refresh_enabled.setter
+    def background_refresh_enabled(self, value: bool) -> None:
+        """Enable/disable background price refresh."""
+        self.data.setdefault("refresh", {})["enabled"] = bool(value)
+        self.save()
+
+    @property
+    def price_refresh_interval_minutes(self) -> int:
+        """Interval between background price refreshes (5-240 minutes)."""
+        return self._get_refresh_int("interval_minutes", 30)
+
+    @price_refresh_interval_minutes.setter
+    def price_refresh_interval_minutes(self, value: int) -> None:
+        """Set the price refresh interval (min 5, max 240 minutes)."""
+        clamped = max(5, min(240, int(value)))
+        self.data.setdefault("refresh", {})["interval_minutes"] = clamped
+        self.save()
+
+    @property
+    def price_change_threshold(self) -> float:
+        """Threshold for price change notifications (0.0-1.0, default 0.10 = 10%)."""
+        return self._get_refresh_float("change_threshold", 0.10)
+
+    @price_change_threshold.setter
+    def price_change_threshold(self, value: float) -> None:
+        """Set the price change threshold (0.05-0.50)."""
+        clamped = max(0.05, min(0.50, float(value)))
+        self.data.setdefault("refresh", {})["change_threshold"] = clamped
+        self.save()
+
+    # ------------------------------------------------------------------
     # Utility
     # ------------------------------------------------------------------
 

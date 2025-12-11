@@ -452,6 +452,65 @@ class StashValuator:
             valuable_count=valuable_count,
         )
 
+    def valuate_tab_incremental(
+        self,
+        tab: StashTab,
+        batch_size: int = 50,
+        on_batch: Optional[Callable[[List[PricedItem], int, int], Any]] = None,
+    ) -> PricedTab:
+        """
+        Price all items in a stash tab incrementally with batch callbacks.
+
+        This method prices items in batches and calls the callback after each
+        batch, allowing the UI to update progressively.
+
+        Args:
+            tab: StashTab to price
+            batch_size: Number of items to process per batch
+            on_batch: Callback(priced_items, processed_count, total_count)
+
+        Returns:
+            PricedTab with all priced items
+        """
+        items: List[PricedItem] = []
+        total_value = 0.0
+        valuable_count = 0
+        total_items = len(tab.items)
+
+        for i, item_data in enumerate(tab.items):
+            priced = self._price_item(item_data, tab)
+            items.append(priced)
+            total_value += priced.total_price
+            if priced.is_valuable:
+                valuable_count += 1
+
+            # Emit batch callback every batch_size items
+            if on_batch and ((i + 1) % batch_size == 0 or i == total_items - 1):
+                # Send only the new items in this batch
+                batch_start = (i // batch_size) * batch_size
+                batch_items = items[batch_start:i + 1]
+                on_batch(batch_items, i + 1, total_items)
+
+        # Sort by value descending
+        def sort_key(x: PricedItem) -> tuple:
+            if x.total_price > 0:
+                return (1, x.total_price, 0)
+            elif x.eval_score > 0:
+                return (0, 0, x.eval_score)
+            return (-1, 0, 0)
+
+        items.sort(key=sort_key, reverse=True)
+
+        return PricedTab(
+            id=tab.id,
+            name=tab.name,
+            index=tab.index,
+            tab_type=tab.type,
+            items=items,
+            total_value=total_value,
+            valuable_count=valuable_count,
+        )
+
     def valuate_snapshot(
         self,
         snapshot: StashSnapshot,
