@@ -520,8 +520,8 @@ class TestStashItemDetailsDialogCopyName:
 class TestStashViewerWindowInit:
     """Tests for StashViewerWindow initialization."""
 
-    @patch('gui_qt.windows.stash_viewer_window.get_stash_storage')
-    @patch('gui_qt.windows.stash_viewer_window.get_available_leagues')
+    @patch('gui_qt.stash_viewer.get_stash_storage')
+    @patch('gui_qt.stash_viewer.get_available_leagues')
     def test_init_sets_title(self, mock_leagues, mock_storage, qtbot, mock_ctx):
         """Should set window title."""
         mock_leagues.return_value = ["Standard"]
@@ -533,8 +533,8 @@ class TestStashViewerWindowInit:
 
         assert "Stash" in window.windowTitle()
 
-    @patch('gui_qt.windows.stash_viewer_window.get_stash_storage')
-    @patch('gui_qt.windows.stash_viewer_window.get_available_leagues')
+    @patch('gui_qt.stash_viewer.get_stash_storage')
+    @patch('gui_qt.stash_viewer.get_available_leagues')
     def test_init_sets_minimum_size(self, mock_leagues, mock_storage, qtbot, mock_ctx):
         """Should set minimum size."""
         mock_leagues.return_value = ["Standard"]
@@ -547,8 +547,8 @@ class TestStashViewerWindowInit:
         assert window.minimumWidth() >= 900
         assert window.minimumHeight() >= 600
 
-    @patch('gui_qt.windows.stash_viewer_window.get_stash_storage')
-    @patch('gui_qt.windows.stash_viewer_window.get_available_leagues')
+    @patch('gui_qt.stash_viewer.get_stash_storage')
+    @patch('gui_qt.stash_viewer.get_available_leagues')
     def test_init_creates_widgets(self, mock_leagues, mock_storage, qtbot, mock_ctx):
         """Should create control widgets."""
         mock_leagues.return_value = ["Standard"]
@@ -563,8 +563,8 @@ class TestStashViewerWindowInit:
         assert window.tab_list is not None
         assert window.item_table is not None
 
-    @patch('gui_qt.windows.stash_viewer_window.get_stash_storage')
-    @patch('gui_qt.windows.stash_viewer_window.get_available_leagues')
+    @patch('gui_qt.stash_viewer.get_stash_storage')
+    @patch('gui_qt.stash_viewer.get_available_leagues')
     def test_init_has_signals(self, mock_leagues, mock_storage, qtbot, mock_ctx):
         """Should have required signals."""
         mock_leagues.return_value = ["Standard"]
@@ -581,8 +581,8 @@ class TestStashViewerWindowInit:
 class TestStashViewerWindowSetAiCallback:
     """Tests for AI callback setting."""
 
-    @patch('gui_qt.windows.stash_viewer_window.get_stash_storage')
-    @patch('gui_qt.windows.stash_viewer_window.get_available_leagues')
+    @patch('gui_qt.stash_viewer.get_stash_storage')
+    @patch('gui_qt.stash_viewer.get_available_leagues')
     def test_set_ai_configured_callback(self, mock_leagues, mock_storage, qtbot, mock_ctx):
         """Should set AI callback on context menu manager."""
         mock_leagues.return_value = ["Standard"]
@@ -602,8 +602,8 @@ class TestStashViewerWindowSetAiCallback:
 class TestStashViewerWindowProgress:
     """Tests for progress handling."""
 
-    @patch('gui_qt.windows.stash_viewer_window.get_stash_storage')
-    @patch('gui_qt.windows.stash_viewer_window.get_available_leagues')
+    @patch('gui_qt.stash_viewer.get_stash_storage')
+    @patch('gui_qt.stash_viewer.get_available_leagues')
     def test_on_progress_updates_status(self, mock_leagues, mock_storage, qtbot, mock_ctx):
         """Should update status label on progress."""
         mock_leagues.return_value = ["Standard"]
@@ -617,8 +617,8 @@ class TestStashViewerWindowProgress:
 
         assert "Loading" in window.status_label.text()
 
-    @patch('gui_qt.windows.stash_viewer_window.get_stash_storage')
-    @patch('gui_qt.windows.stash_viewer_window.get_available_leagues')
+    @patch('gui_qt.stash_viewer.get_stash_storage')
+    @patch('gui_qt.stash_viewer.get_available_leagues')
     def test_on_progress_updates_progress_bar(self, mock_leagues, mock_storage, qtbot, mock_ctx):
         """Should update progress bar."""
         mock_leagues.return_value = ["Standard"]
@@ -637,8 +637,8 @@ class TestStashViewerWindowProgress:
 class TestStashViewerWindowRateLimited:
     """Tests for rate limit handling."""
 
-    @patch('gui_qt.windows.stash_viewer_window.get_stash_storage')
-    @patch('gui_qt.windows.stash_viewer_window.get_available_leagues')
+    @patch('gui_qt.stash_viewer.get_stash_storage')
+    @patch('gui_qt.stash_viewer.get_available_leagues')
     def test_on_rate_limited_updates_status(self, mock_leagues, mock_storage, qtbot, mock_ctx):
         """Should update status with wait message."""
         mock_leagues.return_value = ["Standard"]
@@ -657,8 +657,8 @@ class TestStashViewerWindowRateLimited:
 class TestStashViewerWindowFetchError:
     """Tests for fetch error handling."""
 
-    @patch('gui_qt.windows.stash_viewer_window.get_stash_storage')
-    @patch('gui_qt.windows.stash_viewer_window.get_available_leagues')
+    @patch('gui_qt.stash_viewer.get_stash_storage')
+    @patch('gui_qt.stash_viewer.get_available_leagues')
     def test_on_fetch_error_updates_status(self, mock_leagues, mock_storage, qtbot, mock_ctx):
         """Should update status with error."""
         mock_leagues.return_value = ["Standard"]
@@ -677,8 +677,8 @@ class TestStashViewerWindowFetchError:
 class TestStashViewerWindowTabSelection:
     """Tests for tab selection."""
 
-    @patch('gui_qt.windows.stash_viewer_window.get_stash_storage')
-    @patch('gui_qt.windows.stash_viewer_window.get_available_leagues')
+    @patch('gui_qt.stash_viewer.get_stash_storage')
+    @patch('gui_qt.stash_viewer.get_available_leagues')
     def test_on_tab_selected_clears_items_if_invalid(
         self, mock_leagues, mock_storage, qtbot, mock_ctx
     ):
@@ -699,8 +699,8 @@ class TestStashViewerWindowTabSelection:
 class TestStashViewerWindowFilters:
     """Tests for filter functionality."""
 
-    @patch('gui_qt.windows.stash_viewer_window.get_stash_storage')
-    @patch('gui_qt.windows.stash_viewer_window.get_available_leagues')
+    @patch('gui_qt.stash_viewer.get_stash_storage')
+    @patch('gui_qt.stash_viewer.get_available_leagues')
     def test_on_min_value_changed_updates_model(
         self, mock_leagues, mock_storage, qtbot, mock_ctx
     ):
@@ -716,8 +716,8 @@ class TestStashViewerWindowFilters:
 
         assert window._item_model._min_value == 100.0
 
-    @patch('gui_qt.windows.stash_viewer_window.get_stash_storage')
-    @patch('gui_qt.windows.stash_viewer_window.get_available_leagues')
+    @patch('gui_qt.stash_viewer.get_stash_storage')
+    @patch('gui_qt.stash_viewer.get_available_leagues')
     def test_on_search_changed_updates_model(
         self, mock_leagues, mock_storage, qtbot, mock_ctx
     ):
@@ -737,8 +737,8 @@ class TestStashViewerWindowFilters:
 class TestStashViewerWindowCloseEvent:
     """Tests for window close."""
 
-    @patch('gui_qt.windows.stash_viewer_window.get_stash_storage')
-    @patch('gui_qt.windows.stash_viewer_window.get_available_leagues')
+    @patch('gui_qt.stash_viewer.get_stash_storage')
+    @patch('gui_qt.stash_viewer.get_available_leagues')
     def test_close_stops_worker(self, mock_leagues, mock_storage, qtbot, mock_ctx):
         """Should stop worker on close."""
         mock_leagues.return_value = ["Standard"]

@@ -1,0 +1,703 @@
+"""
+gui_qt.stash_viewer - Stash Viewer Window package.
+
+Displays stash tabs from Path of Exile with item valuations.
+Features:
+- League selector
+- Tab list with values (like in-game stash)
+- Item list sorted by value
+- Minimum value filter
+- POESESSID configuration
+"""
+from __future__ import annotations
+
+import logging
+from datetime import datetime
+from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
+
+from PyQt6.QtCore import Qt, QModelIndex, pyqtSignal
+from PyQt6.QtGui import QColor
+from PyQt6.QtWidgets import (
+    QWidget,
+    QDialog,
+    QVBoxLayout,
+    QHBoxLayout,
+    QSplitter,
+    QLabel,
+    QLineEdit,
+    QComboBox,
+    QSpinBox,
+    QPushButton,
+    QCheckBox,
+    QListWidget,
+    QListWidgetItem,
+    QTableView,
+    QAbstractItemView,
+    QProgressBar,
+    QFormLayout,
+    QMessageBox,
+)
+
+from gui_qt.styles import COLORS, apply_window_icon
+from gui_qt.widgets.item_context_menu import ItemContext, ItemContextMenuManager
+from core.stash_valuator import ValuationResult, PricedItem, PriceSource
+from core.stash_storage import get_stash_storage, StashStorageService
+from core.stash_diff_engine import StashDiffEngine, StashDiff
+from data_sources.poe_stash_api import PoEStashClient, StashSnapshot, get_available_leagues
+
+# Import from submodules
+from gui_qt.stash_viewer.workers import FetchWorker
+from gui_qt.stash_viewer.models import ItemTableModel
+from gui_qt.stash_viewer.dialogs import StashItemDetailsDialog
+
+if TYPE_CHECKING:
+    from core.app_context import AppContext
+
+logger = logging.getLogger(__name__)
+
+
+class StashViewerWindow(QDialog):
+    """Window for viewing and valuating stash tabs."""
+
+    # Signals for item actions
+    ai_analysis_requested = pyqtSignal(str, list)  # item_text, price_results
+    price_check_requested = pyqtSignal(str)  # item_text
+
+    def __init__(self, ctx: "AppContext", parent: Optional[QWidget] = None):
+        super().__init__(parent)
+
+        self.ctx = ctx
+        self._worker: Optional[FetchWorker] = None
+        self._result: Optional[ValuationResult] = None
+        self._current_snapshot: Optional[StashSnapshot] = None
+        self._ai_configured_callback: Optional[Callable[[], bool]] = None
+
+        # Storage service for persistence
+        self._storage: StashStorageService = get_stash_storage(ctx.db)
+
+        # Diff engine for detecting changes
+        self._diff_engine = StashDiffEngine()
+
+        # Context menu manager for item actions
+        self._context_menu_manager = ItemContextMenuManager(self)
+        self._context_menu_manager.set_options(
+            show_inspect=True,
+            show_price_check=False,  # Stash items don't have item text for price check
+            show_ai=True,
+            show_copy=True,
+        )
+        self._context_menu_manager.ai_analysis_requested.connect(self.ai_analysis_requested.emit)
+        self._context_menu_manager.inspect_requested.connect(self._on_inspect_item_context)
+
+        self.setWindowTitle("Stash Viewer")
+        self.setMinimumSize(900, 600)
+        self.resize(1100, 700)
+        self.setSizeGripEnabled(True)
+        apply_window_icon(self)
+
+        self._create_widgets()
+        self._load_settings()
+        self._load_cached_stash()
+
+    def set_ai_configured_callback(self, callback: Callable[[], bool]) -> None:
+        """Set callback to check if AI is configured.
+
+        Args:
+            callback: Function returning True if AI is ready to use.
+        """
+        self._ai_configured_callback = callback
+        self._context_menu_manager.set_ai_configured_callback(callback)
+
+    def set_meta_weights(self, meta_weights: dict) -> None:
+        """Set meta weights for Quick Verdict calculation.
+
+        Args:
+            meta_weights: Meta weight data from RareItemEvaluator.meta_weights
+        """
+        self._item_model.set_meta_weights(meta_weights)
+
+    def set_verdict_thresholds(self, vendor: float, keep: float) -> None:
+        """Set verdict thresholds for Quick Verdict calculation.
+
+        Args:
+            vendor: Threshold below which items are VENDOR
+            keep: Threshold above which items are KEEP
+        """
+        self._item_model.set_verdict_thresholds(vendor, keep)
+
+    def _create_widgets(self) -> None:
+        """Create all UI elements."""
+        layout = QVBoxLayout(self)
+        layout.setSpacing(8)
+
+        # Top toolbar
+        toolbar = QHBoxLayout()
+
+        # League selector
+        toolbar.addWidget(QLabel("League:"))
+        self.league_combo = QComboBox()
+        self.league_combo.setMinimumWidth(140)
+        self._update_league_combo()
+        toolbar.addWidget(self.league_combo)
+
+        # Include Standard checkbox
+        self.include_standard_cb = QCheckBox("Include Standard")
+        self.include_standard_cb.setChecked(False)
+        self.include_standard_cb.stateChanged.connect(self._on_include_standard_changed)
+        toolbar.addWidget(self.include_standard_cb)
+
+        toolbar.addSpacing(20)
+
+        # Account info (read-only display)
+        toolbar.addWidget(QLabel("Account:"))
+        self.account_label = QLabel("-")
+        self.account_label.setStyleSheet(f"color: {COLORS['accent']};")
+        toolbar.addWidget(self.account_label)
+
+        toolbar.addStretch()
+
+        # Total value display
+        self.total_label = QLabel("Total: -")
+        self.total_label.setStyleSheet(
+            f"font-size: 16px; font-weight: bold; color: {COLORS['high_value']};"
+        )
+        toolbar.addWidget(self.total_label)
+
+        toolbar.addSpacing(20)
+
+        # Grid View button
+        self.grid_view_btn = QPushButton("Grid View")
+        self.grid_view_btn.setToolTip("View stash as visual grid with heatmap")
+        self.grid_view_btn.clicked.connect(self._show_grid_view)
+        self.grid_view_btn.setEnabled(False)  # Enabled after fetch
+        toolbar.addWidget(self.grid_view_btn)
+
+        # Settings button
+        self.settings_btn = QPushButton("Settings")
+        self.settings_btn.clicked.connect(self._show_settings)
+        toolbar.addWidget(self.settings_btn)
+
+        # Refresh button
+        self.refresh_btn = QPushButton("Refresh")
+        self.refresh_btn.clicked.connect(self._refresh_stash)
+        toolbar.addWidget(self.refresh_btn)
+
+        layout.addLayout(toolbar)
+
+        # Progress bar (hidden by default)
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setTextVisible(True)
+        self.progress_bar.hide()
+        layout.addWidget(self.progress_bar)
+
+        # Status label
+        self.status_label = QLabel("")
+        self.status_label.setStyleSheet(f"color: {COLORS['text_secondary']};")
+        layout.addWidget(self.status_label)
+
+        # Main content splitter
+        splitter = QSplitter(Qt.Orientation.Horizontal)
+
+        # Left panel - Tab list
+        left_panel = QWidget()
+        left_layout = QVBoxLayout(left_panel)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+
+        left_layout.addWidget(QLabel("Stash Tabs"))
+
+        self.tab_list = QListWidget()
+        self.tab_list.setAlternatingRowColors(True)
+        self.tab_list.currentRowChanged.connect(self._on_tab_selected)
+        left_layout.addWidget(self.tab_list)
+
+        splitter.addWidget(left_panel)
+
+        # Right panel - Item table
+        right_panel = QWidget()
+        right_layout = QVBoxLayout(right_panel)
+        right_layout.setContentsMargins(0, 0, 0, 0)
+
+        # Filter row
+        filter_row = QHBoxLayout()
+
+        filter_row.addWidget(QLabel("Min Value:"))
+        self.min_value_spin = QSpinBox()
+        self.min_value_spin.setRange(0, 10000)
+        self.min_value_spin.setValue(1)
+        self.min_value_spin.setSuffix(" c")
+        self.min_value_spin.valueChanged.connect(self._on_min_value_changed)
+        filter_row.addWidget(self.min_value_spin)
+
+        filter_row.addSpacing(10)
+
+        filter_row.addWidget(QLabel("Search:"))
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("Filter items...")
+        self.search_input.textChanged.connect(self._on_search_changed)
+        filter_row.addWidget(self.search_input)
+
+        filter_row.addStretch()
+
+        self.item_count_label = QLabel("0 items")
+        filter_row.addWidget(self.item_count_label)
+
+        right_layout.addLayout(filter_row)
+
+        # Item table
+        self._item_model = ItemTableModel(self)
+        self.item_table = QTableView()
+        self.item_table.setModel(self._item_model)
+        self.item_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.item_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.item_table.setAlternatingRowColors(True)
+        self.item_table.setSortingEnabled(True)
+        self.item_table.doubleClicked.connect(self._on_item_double_click)
+
+        # Context menu for items
+        self.item_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.item_table.customContextMenuRequested.connect(self._show_item_context_menu)
+
+        # Column widths
+        header = self.item_table.horizontalHeader()
+        for i, (_, _, width) in enumerate(ItemTableModel.COLUMNS):
+            self.item_table.setColumnWidth(i, width)
+        if header:
+            header.setStretchLastSection(True)
+
+        right_layout.addWidget(self.item_table)
+
+        splitter.addWidget(right_panel)
+
+        # Set splitter sizes (30% tabs, 70% items)
+        splitter.setSizes([300, 700])
+
+        layout.addWidget(splitter)
+
+        # Bottom info
+        bottom_row = QHBoxLayout()
+        self.last_fetch_label = QLabel("")
+        self.last_fetch_label.setStyleSheet(f"color: {COLORS['text_secondary']};")
+        bottom_row.addWidget(self.last_fetch_label)
+
+        bottom_row.addStretch()
+
+        self.priced_label = QLabel("")
+        self.priced_label.setStyleSheet(f"color: {COLORS['text_secondary']};")
+        bottom_row.addWidget(self.priced_label)
+
+        layout.addLayout(bottom_row)
+
+    def _load_settings(self) -> None:
+        """Load settings from config."""
+        if self.ctx.config.account_name:
+            self.account_label.setText(self.ctx.config.account_name)
+
+        # Show last fetch time
+        last_fetch = self.ctx.config.stash_last_fetch
+        if last_fetch:
+            self.last_fetch_label.setText(f"Last fetched: {last_fetch}")
+
+        # Apply verdict thresholds from config
+        self.set_verdict_thresholds(
+            self.ctx.config.verdict_vendor_threshold,
+            self.ctx.config.verdict_keep_threshold,
+        )
+
+    def _load_cached_stash(self) -> None:
+        """Load the most recent cached stash snapshot on startup."""
+        if not self.ctx.config.account_name:
+            return
+
+        league = self.league_combo.currentText()
+        if not league:
+            return
+
+        try:
+            stored = self._storage.load_latest_snapshot(
+                self.ctx.config.account_name,
+                league,
+            )
+
+            if stored:
+                # Reconstruct valuation result
+                result = self._storage.reconstruct_valuation(stored)
+                if result:
+                    self._result = result
+                    self._display_valuation_result(result)
+
+                    # Also reconstruct snapshot for diff engine
+                    snapshot = self._storage.reconstruct_snapshot(stored)
+                    if snapshot:
+                        self._current_snapshot = snapshot
+                        self._diff_engine.set_before_snapshot(snapshot)
+
+                    # Update last fetch display
+                    fetch_time = stored.fetched_at.strftime("%Y-%m-%d %H:%M")
+                    self.last_fetch_label.setText(f"Last fetched: {fetch_time} (cached)")
+                    self.status_label.setText("Loaded from cache - click Refresh to update")
+
+                    logger.info(
+                        f"Loaded cached stash: {stored.total_items} items, "
+                        f"{stored.total_chaos_value:.0f}c"
+                    )
+
+        except Exception as e:
+            logger.warning(f"Failed to load cached stash: {e}")
+
+    def _update_league_combo(self) -> None:
+        """Update league combo based on include_standard checkbox."""
+        current = self.league_combo.currentText()
+        include_standard = (
+            hasattr(self, 'include_standard_cb') and
+            self.include_standard_cb.isChecked()
+        )
+
+        self.league_combo.clear()
+        for league in get_available_leagues(include_standard=include_standard):
+            self.league_combo.addItem(league)
+
+        # Try to restore previous selection
+        if current:
+            idx = self.league_combo.findText(current)
+            if idx >= 0:
+                self.league_combo.setCurrentIndex(idx)
+
+    def _on_include_standard_changed(self, state: int) -> None:
+        """Handle include standard checkbox change."""
+        self._update_league_combo()
+
+    def _show_grid_view(self) -> None:
+        """Show stash grid visualization dialog."""
+        if not self._result:
+            QMessageBox.warning(
+                self,
+                "No Data",
+                "Please fetch stash data first using the Refresh button."
+            )
+            return
+
+        from gui_qt.dialogs.stash_grid_dialog import StashGridDialog
+        dialog = StashGridDialog(self._result, self)
+        dialog.exec()
+
+    def _show_settings(self) -> None:
+        """Show settings dialog for POESESSID."""
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Stash Settings")
+        dialog.setMinimumWidth(400)
+
+        layout = QVBoxLayout(dialog)
+
+        # Instructions
+        info_label = QLabel(
+            "To access your stash, you need your POESESSID cookie.\n\n"
+            "To get it:\n"
+            "1. Log into pathofexile.com\n"
+            "2. Press F12 to open Developer Tools\n"
+            "3. Go to Application > Cookies\n"
+            "4. Find and copy the POESESSID value\n\n"
+            "WARNING: Keep your POESESSID private!"
+        )
+        info_label.setWordWrap(True)
+        info_label.setStyleSheet(f"color: {COLORS['text_secondary']};")
+        layout.addWidget(info_label)
+
+        # Form
+        form = QFormLayout()
+
+        self._account_input = QLineEdit()
+        self._account_input.setText(self.ctx.config.account_name)
+        self._account_input.setPlaceholderText("Your PoE account name")
+        form.addRow("Account Name:", self._account_input)
+
+        self._session_input = QLineEdit()
+        self._session_input.setEchoMode(QLineEdit.EchoMode.Password)
+        self._session_input.setText(self.ctx.config.poesessid)
+        self._session_input.setPlaceholderText("POESESSID cookie value")
+        form.addRow("POESESSID:", self._session_input)
+
+        layout.addLayout(form)
+
+        # Test button
+        test_btn = QPushButton("Test Connection")
+        test_btn.clicked.connect(lambda: self._test_connection(dialog))
+        layout.addWidget(test_btn)
+
+        # Buttons
+        btn_layout = QHBoxLayout()
+        save_btn = QPushButton("Save")
+        save_btn.clicked.connect(lambda: self._save_settings(dialog))
+        cancel_btn = QPushButton("Cancel")
+        cancel_btn.clicked.connect(dialog.reject)
+        btn_layout.addStretch()
+        btn_layout.addWidget(cancel_btn)
+        btn_layout.addWidget(save_btn)
+        layout.addLayout(btn_layout)
+
+        dialog.exec()
+
+    def _test_connection(self, dialog: QDialog) -> None:
+        """Test the POESESSID connection."""
+        poesessid = self._session_input.text().strip()
+        if not poesessid:
+            QMessageBox.warning(dialog, "Error", "Please enter a POESESSID")
+            return
+
+        try:
+            client = PoEStashClient(poesessid)
+            if client.verify_session():
+                chars = client.get_characters()
+                char_names = [c.get("name", "?") for c in chars[:3]]
+                QMessageBox.information(
+                    dialog,
+                    "Success",
+                    f"Connection successful!\n\nCharacters: {', '.join(char_names)}..."
+                )
+            else:
+                QMessageBox.warning(
+                    dialog,
+                    "Failed",
+                    "Connection failed - POESESSID may be invalid or expired"
+                )
+        except Exception as e:
+            QMessageBox.critical(dialog, "Error", f"Connection test failed:\n{e}")
+
+    def _save_settings(self, dialog: QDialog) -> None:
+        """Save settings and close dialog."""
+        account = self._account_input.text().strip()
+        poesessid = self._session_input.text().strip()
+
+        if account:
+            self.ctx.config.account_name = account
+            self.account_label.setText(account)
+
+        if poesessid:
+            self.ctx.config.poesessid = poesessid
+
+        dialog.accept()
+
+    def _refresh_stash(self) -> None:
+        """Fetch and valuate stash."""
+        if not self.ctx.config.has_stash_credentials():
+            QMessageBox.warning(
+                self,
+                "Configuration Required",
+                "Please configure your account name and POESESSID in Settings."
+            )
+            self._show_settings()
+            return
+
+        if self._worker and self._worker.isRunning():
+            return  # Already running
+
+        league = self.league_combo.currentText()
+        poesessid = self.ctx.config.poesessid
+        account_name = self.ctx.config.account_name
+
+        # Update UI
+        self.refresh_btn.setEnabled(False)
+        self.progress_bar.setValue(0)
+        self.progress_bar.show()
+        self.status_label.setText("Starting...")
+
+        # Create worker
+        self._worker = FetchWorker(poesessid, account_name, league)
+        self._worker.progress.connect(self._on_progress)
+        self._worker.finished.connect(self._on_fetch_complete)
+        self._worker.error.connect(self._on_fetch_error)
+        self._worker.rate_limited.connect(self._on_rate_limited)
+        self._worker.start()
+
+    def _on_progress(self, current: int, total: int, message: str) -> None:
+        """Handle progress updates."""
+        if total > 0:
+            self.progress_bar.setMaximum(total)
+            self.progress_bar.setValue(current)
+        else:
+            self.progress_bar.setMaximum(0)  # Indeterminate
+        self.status_label.setText(message)
+
+    def _on_rate_limited(self, wait_seconds: int, attempt: int) -> None:
+        """Handle rate limit notification - update UI to show wait status."""
+        self.progress_bar.setMaximum(0)  # Indeterminate mode during wait
+        self.status_label.setText(
+            f"Rate limited by GGG. Waiting {wait_seconds}s before retry "
+            f"(attempt {attempt}/3)..."
+        )
+
+    def _on_fetch_complete(
+        self,
+        result: ValuationResult,
+        snapshot: StashSnapshot,
+    ) -> None:
+        """Handle fetch completion - save to storage and display."""
+        self._result = result
+        self.refresh_btn.setEnabled(True)
+        self.grid_view_btn.setEnabled(True)  # Enable grid view
+        self.progress_bar.hide()
+
+        # Compute diff if we have a previous snapshot
+        diff: Optional[StashDiff] = None
+        if self._diff_engine.has_before_snapshot:
+            diff = self._diff_engine.compute_diff(snapshot)
+            if diff.has_changes:
+                self.status_label.setText(f"Changes: {diff.get_summary()}")
+                logger.info(f"Stash diff: {diff.get_summary()}")
+            else:
+                self.status_label.setText("No changes since last fetch")
+        else:
+            self.status_label.setText("")
+
+        # Update current snapshot and diff engine
+        self._current_snapshot = snapshot
+        self._diff_engine.set_before_snapshot(snapshot)
+
+        # Save to storage
+        try:
+            self._storage.save_snapshot(snapshot, result)
+            # Clean up old snapshots (keep last 5)
+            self._storage.delete_old_snapshots(
+                snapshot.account_name,
+                snapshot.league,
+                keep_count=5,
+            )
+        except Exception as e:
+            logger.error(f"Failed to save stash snapshot: {e}")
+
+        # Update last fetch time
+        now = datetime.now().strftime("%Y-%m-%d %H:%M")
+        self.ctx.config.stash_last_fetch = now
+        self.last_fetch_label.setText(f"Last fetched: {now}")
+
+        # Display the result
+        self._display_valuation_result(result)
+
+    def _display_valuation_result(self, result: ValuationResult) -> None:
+        """Display a valuation result in the UI."""
+        # Enable grid view if we have data
+        self.grid_view_btn.setEnabled(True)
+
+        # Update totals
+        self.total_label.setText(f"Total: {result.display_total}")
+        self.priced_label.setText(
+            f"{result.priced_items}/{result.total_items} priced"
+        )
+
+        # Populate tab list
+        self.tab_list.clear()
+        for tab in result.tabs:
+            item_text = f"{tab.name}  ({tab.display_value})"
+            list_item = QListWidgetItem(item_text)
+
+            # Color by value
+            if tab.total_value >= 1000:
+                list_item.setForeground(QColor(COLORS["high_value"]))
+            elif tab.total_value >= 100:
+                list_item.setForeground(QColor(COLORS["medium_value"]))
+
+            self.tab_list.addItem(list_item)
+
+        # Select first tab
+        if result.tabs:
+            self.tab_list.setCurrentRow(0)
+
+    def _on_fetch_error(self, error: str) -> None:
+        """Handle fetch error."""
+        self.refresh_btn.setEnabled(True)
+        self.progress_bar.hide()
+        self.status_label.setText(f"Error: {error}")
+
+        QMessageBox.critical(self, "Fetch Error", f"Failed to fetch stash:\n\n{error}")
+
+    def _on_tab_selected(self, row: int) -> None:
+        """Handle tab selection."""
+        if not self._result or row < 0 or row >= len(self._result.tabs):
+            self._item_model.set_items([])
+            return
+
+        tab = self._result.tabs[row]
+        self._item_model.set_items(tab.items)
+        self._update_item_count()
+
+    def _on_min_value_changed(self, value: int) -> None:
+        """Handle min value filter change."""
+        self._item_model.set_min_value(float(value))
+        self._update_item_count()
+
+    def _on_search_changed(self, text: str) -> None:
+        """Handle search filter change."""
+        self._item_model.set_search_text(text)
+        self._update_item_count()
+
+    def _update_item_count(self) -> None:
+        """Update item count label."""
+        count = self._item_model.rowCount()
+        self.item_count_label.setText(f"{count} items")
+
+    def _on_item_double_click(self, index: QModelIndex) -> None:
+        """Handle item double-click - show item details dialog."""
+        item = self._item_model.get_item(index.row())
+        if item:
+            dialog = StashItemDetailsDialog(item, self)
+            dialog.exec()
+
+    def _show_item_context_menu(self, position) -> None:
+        """Show context menu for stash items."""
+        index = self.item_table.indexAt(position)
+        if not index.isValid():
+            return
+
+        item = self._item_model.get_item(index.row())
+        if not item:
+            return
+
+        # Build item context from PricedItem
+        item_context = ItemContext(
+            item_name=item.display_name,
+            item_text="",  # Stash items don't have raw text
+            chaos_value=float(item.total_price),
+            divine_value=0,  # Convert if needed
+            source="poe.ninja" if item.price_source == PriceSource.POE_NINJA else "poeprices",
+            extra_data={"priced_item": item},
+        )
+
+        # Build and show menu with custom actions
+        menu = self._context_menu_manager.build_menu(item_context, self.item_table)
+
+        # Add stash-specific actions
+        menu.addSeparator()
+        details_action = menu.addAction("View Details...")
+        if details_action:
+            details_action.triggered.connect(
+                lambda: self._show_item_details(item)
+            )
+
+        viewport = self.item_table.viewport()
+        if viewport:
+            menu.exec(viewport.mapToGlobal(position))
+
+    def _show_item_details(self, item: PricedItem) -> None:
+        """Show details dialog for a stash item."""
+        dialog = StashItemDetailsDialog(item, self)
+        dialog.exec()
+
+    def _on_inspect_item_context(self, context: ItemContext) -> None:
+        """Handle inspect request from context menu."""
+        priced_item = context.extra_data.get("priced_item")
+        if priced_item:
+            self._show_item_details(priced_item)
+
+    def closeEvent(self, event) -> None:
+        """Handle window close."""
+        if self._worker and self._worker.isRunning():
+            self._worker.terminate()
+            self._worker.wait()
+        super().closeEvent(event)
+
+
+__all__ = [
+    "StashViewerWindow",
+    "FetchWorker",
+    "ItemTableModel",
+    "StashItemDetailsDialog",
+]
