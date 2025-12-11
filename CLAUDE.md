@@ -239,6 +239,8 @@ Key gates:
 | Type check | `mypy --config-file=mypy.ini` |
 | Format imports | `isort core/ gui_qt/` |
 | Security scan | `bandit -r core/ -ll` |
+| **Local CI** | `python scripts/local_ci.py` |
+| Local CI (quick) | `python scripts/local_ci.py --quick` |
 | Pre-PR check | `/check-pr` |
 | Full audit | `/audit-full <path>` |
 | Update meta builds | `/update-meta-builds` |

@@ -45,7 +45,10 @@ class RareItemEvaluator:
             data_dir: Directory containing valuable_affixes.json and valuable_bases.json
         """
         if data_dir is None:
-            data_dir = Path(__file__).parent.parent / "data"
+            # Data files are in project root's data/ directory
+            # __file__ is core/rare_evaluation/evaluator.py
+            # parent.parent.parent gets us to project root
+            data_dir = Path(__file__).parent.parent.parent / "data"
 
         self.data_dir = data_dir
         self.config = self._load_valuable_affixes()
