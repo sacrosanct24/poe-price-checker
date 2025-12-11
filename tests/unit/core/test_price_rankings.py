@@ -350,7 +350,7 @@ class TestConvenienceFunctions:
         assert "currency" in CONSUMABLE_CATEGORIES
         assert "scarabs" in CONSUMABLE_CATEGORIES
 
-    @patch("core.price_rankings.Top20Calculator")
+    @patch("core.rankings.Top20Calculator")
     def test_get_top20_rankings(self, mock_calculator_class):
         mock_instance = MagicMock()
         mock_instance.refresh_all.return_value = {"currency": MagicMock()}
@@ -362,7 +362,7 @@ class TestConvenienceFunctions:
         assert "currency" in result
         mock_instance.refresh_all.assert_called_once_with(force=False)
 
-    @patch("core.price_rankings.Top20Calculator")
+    @patch("core.rankings.Top20Calculator")
     def test_get_top20_for_category(self, mock_calculator_class):
         mock_instance = MagicMock()
         mock_instance.refresh_category.return_value = MagicMock(category="scarabs")
@@ -374,7 +374,7 @@ class TestConvenienceFunctions:
         assert result.category == "scarabs"
         mock_instance.refresh_category.assert_called_once_with("scarabs", force=False)
 
-    @patch("core.price_rankings.Top20Calculator")
+    @patch("core.rankings.Top20Calculator")
     def test_get_rankings_by_group_uniques(self, mock_calculator_class):
         mock_instance = MagicMock()
         mock_calculator_class.return_value = mock_instance
@@ -392,7 +392,7 @@ class TestConvenienceFunctions:
         for cat in result:
             assert cat in UNIQUE_CATEGORIES
 
-    @patch("core.price_rankings.Top20Calculator")
+    @patch("core.rankings.Top20Calculator")
     def test_get_rankings_by_group_all(self, mock_calculator_class):
         mock_instance = MagicMock()
         mock_instance.refresh_all.return_value = {"all": MagicMock()}
@@ -729,7 +729,7 @@ class TestEquipmentSlots:
             for key in rankings:
                 assert key.startswith("slot_")
 
-    @patch("core.price_rankings.Top20Calculator")
+    @patch("core.rankings.Top20Calculator")
     def test_get_top20_for_slot(self, mock_calculator_class):
         """get_top20_for_slot convenience function works."""
         mock_instance = MagicMock()
@@ -743,7 +743,7 @@ class TestEquipmentSlots:
         assert result.category == "slot_helmet"
         mock_instance.refresh_slot.assert_called_once_with("helmet", force=False)
 
-    @patch("core.price_rankings.Top20Calculator")
+    @patch("core.rankings.Top20Calculator")
     def test_get_all_slot_rankings(self, mock_calculator_class):
         """get_all_slot_rankings convenience function works."""
         mock_instance = MagicMock()
@@ -984,7 +984,7 @@ class TestTop20CalculatorEdgeCases:
 class TestGetRankingsByGroupEdgeCases:
     """Tests for get_rankings_by_group edge cases."""
 
-    @patch("core.price_rankings.Top20Calculator")
+    @patch("core.rankings.Top20Calculator")
     def test_consumables_group(self, mock_calculator_class):
         """Test consumables group fetches correct categories."""
         mock_instance = MagicMock()
@@ -999,7 +999,7 @@ class TestGetRankingsByGroupEdgeCases:
         for cat in result:
             assert cat in CONSUMABLE_CATEGORIES
 
-    @patch("core.price_rankings.Top20Calculator")
+    @patch("core.rankings.Top20Calculator")
     def test_cards_group(self, mock_calculator_class):
         """Test cards group fetches divination cards."""
         mock_instance = MagicMock()
@@ -1013,7 +1013,7 @@ class TestGetRankingsByGroupEdgeCases:
 
         assert "divination_cards" in result or len(result) >= 0
 
-    @patch("core.price_rankings.Top20Calculator")
+    @patch("core.rankings.Top20Calculator")
     def test_unknown_group_defaults_to_all(self, mock_calculator_class):
         """Unknown group defaults to all categories."""
         mock_instance = MagicMock()
@@ -1025,7 +1025,7 @@ class TestGetRankingsByGroupEdgeCases:
 
         mock_instance.refresh_all.assert_called_once()
 
-    @patch("core.price_rankings.Top20Calculator")
+    @patch("core.rankings.Top20Calculator")
     def test_equipment_group(self, mock_calculator_class):
         """Test equipment group is alias for uniques."""
         mock_instance = MagicMock()
