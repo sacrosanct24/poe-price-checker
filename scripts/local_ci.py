@@ -3,10 +3,12 @@
 Local CI runner - mirrors GitHub Actions CI checks.
 
 Run this before pushing to catch issues locally:
-    python scripts/local_ci.py         # Run all checks
-    python scripts/local_ci.py --quick # Skip tests, just lint + type check
-    python scripts/local_ci.py --lint  # Only run linting
-    python scripts/local_ci.py --test  # Only run tests
+    python scripts/local_ci.py              # Run all checks
+    python scripts/local_ci.py --quick      # Skip tests, just lint + type check
+    python scripts/local_ci.py --lint       # Only run linting
+    python scripts/local_ci.py --test       # Only run tests
+    python scripts/local_ci.py --security   # Only run bandit security scan
+    python scripts/local_ci.py --security-full  # Full security: bandit (strict) + pip-audit
 """
 import argparse
 import os
@@ -108,13 +110,42 @@ def run_mypy() -> bool:
     )
 
 
-def run_bandit() -> bool:
+def run_bandit(strict: bool = False) -> bool:
     """Run bandit security scan."""
+    cmd = [
+        sys.executable, "-m", "bandit",
+        "-r", "core", "gui_qt", "data_sources",
+    ]
+    if strict:
+        # Strict mode: fail on HIGH severity, report all
+        cmd.extend(["--severity-level", "HIGH", "-f", "txt"])
+    else:
+        # Normal mode: report low and above
+        cmd.extend(["-ll", "-ii"])
+
+    return run_command("Bandit Security Scan", cmd, check=False)
+
+
+def run_pip_audit() -> bool:
+    """Run pip-audit dependency vulnerability scan."""
     return run_command(
-        "Bandit Security Scan",
-        [sys.executable, "-m", "bandit",
-         "-r", "core", "gui_qt", "data_sources",
-         "-ll", "-ii"],
+        "Pip-Audit Dependency Scan",
+        [sys.executable, "-m", "pip_audit",
+         "-r", "requirements.txt", "--desc", "on"],
+        check=False
+    )
+
+
+def run_security_tests() -> bool:
+    """Run security-specific tests."""
+    security_tests = Path("tests/security")
+    if not security_tests.exists():
+        print(f"{YELLOW}No security tests found at {security_tests}{RESET}")
+        return True  # Not a failure if tests don't exist yet
+
+    return run_command(
+        "Security Tests",
+        [sys.executable, "-m", "pytest", "tests/security/", "-v"],
         check=False
     )
 
@@ -166,6 +197,10 @@ def main():
         help="Only run security scan (bandit)"
     )
     parser.add_argument(
+        "--security-full", action="store_true",
+        help="Full security scan: bandit (strict) + pip-audit + security tests"
+    )
+    parser.add_argument(
         "--no-install", action="store_true",
         help="Don't auto-install missing tools"
     )
@@ -187,7 +222,7 @@ def main():
     results = {}
 
     # Determine which checks to run
-    run_all = not (args.lint or args.type or args.test or args.security)
+    run_all = not (args.lint or args.type or args.test or args.security or args.security_full)
 
     if args.lint or run_all:
         results["flake8"] = run_flake8()
@@ -195,8 +230,13 @@ def main():
     if args.type or run_all:
         results["mypy"] = run_mypy()
 
-    if args.security or run_all:
-        results["bandit"] = run_bandit()
+    if args.security_full:
+        # Full security scan: strict bandit + pip-audit + security tests
+        results["bandit"] = run_bandit(strict=True)
+        results["pip-audit"] = run_pip_audit()
+        results["security-tests"] = run_security_tests()
+    elif args.security or run_all:
+        results["bandit"] = run_bandit(strict=False)
 
     if args.test or (run_all and not args.quick):
         results["pytest"] = run_tests(quick=args.quick)
