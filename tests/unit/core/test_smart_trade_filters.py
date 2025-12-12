@@ -526,6 +526,245 @@ class TestSmartFilterBuilderGetStatId:
         assert result is None
 
 
+class TestSmartFilterBuilderGapSummary:
+    """Tests for gap summary generation."""
+
+    def test_build_filters_generates_gap_summary(self):
+        """Test build_filters generates gap summary when gaps exist."""
+        from core.smart_trade_filters import SmartFilterBuilder
+
+        builder = SmartFilterBuilder()
+
+        # Mock upgrade calculator with gaps
+        mock_calc = MagicMock()
+        mock_gaps = MagicMock()
+        mock_gaps.has_gaps.return_value = True
+        mock_gaps.fire_gap = 20
+        mock_gaps.cold_gap = 15
+        mock_gaps.lightning_gap = 10
+        mock_gaps.chaos_gap = 30
+        mock_calc.calculate_resistance_gaps.return_value = mock_gaps
+        builder.upgrade_calculator = mock_calc
+
+        with patch.object(builder, '_get_stat_id', return_value="stat_id"):
+            result = builder.build_filters()
+
+        # Should have gap summary
+        assert "Fire: 20%" in result.gap_summary
+        assert "Cold: 15%" in result.gap_summary
+        assert "Lightning: 10%" in result.gap_summary
+        assert "Chaos: 30%" in result.gap_summary
+
+    def test_build_filters_no_gap_summary_when_no_gaps(self):
+        """Test build_filters has no gap summary when no gaps."""
+        from core.smart_trade_filters import SmartFilterBuilder
+
+        builder = SmartFilterBuilder()
+
+        mock_calc = MagicMock()
+        mock_gaps = MagicMock()
+        mock_gaps.has_gaps.return_value = False
+        # Set all gaps to 0 so comparisons work
+        mock_gaps.fire_gap = 0
+        mock_gaps.cold_gap = 0
+        mock_gaps.lightning_gap = 0
+        mock_gaps.chaos_gap = 0
+        mock_calc.calculate_resistance_gaps.return_value = mock_gaps
+        builder.upgrade_calculator = mock_calc
+
+        with patch.object(builder, '_get_stat_id', return_value="stat_id"):
+            result = builder.build_filters()
+
+        assert result.gap_summary == ""
+
+
+class TestSmartFilterBuilderHybridDefense:
+    """Tests for hybrid defense archetype filters."""
+
+    def test_add_archetype_filters_hybrid_build(self):
+        """Test _add_archetype_filters for hybrid life/ES build."""
+        from core.smart_trade_filters import SmartFilterBuilder, SmartFilterResult
+        from core.build_archetype import DefenseType, AttackType
+
+        mock_archetype = MagicMock()
+        mock_archetype.defense_type = DefenseType.HYBRID
+        mock_archetype.attack_type = AttackType.ATTACK
+        mock_archetype.is_crit = False
+        mock_archetype.needs_strength = False
+        mock_archetype.needs_dexterity = False
+        mock_archetype.needs_intelligence = False
+
+        builder = SmartFilterBuilder(archetype=mock_archetype)
+        result = SmartFilterResult()
+
+        with patch.object(builder, '_get_stat_id', return_value="stat_id"):
+            builder._add_archetype_filters(result)
+
+        # Should have both life and ES filters
+        assert any("life" in f.reason.lower() or "hybrid" in f.reason.lower() for f in result.filters)
+        assert any("es" in f.reason.lower() or "hybrid" in f.reason.lower() for f in result.filters)
+        assert "Hybrid build" in result.filter_reasons[0]
+
+
+class TestSmartFilterBuilderAttackTypeFilters:
+    """Tests for attack type specific filters."""
+
+    def test_add_archetype_filters_attack_speed(self):
+        """Test attack build gets attack speed filter."""
+        from core.smart_trade_filters import SmartFilterBuilder, SmartFilterResult
+        from core.build_archetype import DefenseType, AttackType
+
+        mock_archetype = MagicMock()
+        mock_archetype.defense_type = DefenseType.LIFE
+        mock_archetype.attack_type = AttackType.ATTACK
+        mock_archetype.is_crit = False
+        mock_archetype.needs_strength = False
+        mock_archetype.needs_dexterity = False
+        mock_archetype.needs_intelligence = False
+
+        builder = SmartFilterBuilder(archetype=mock_archetype)
+        result = SmartFilterResult()
+
+        with patch.object(builder, '_get_stat_id', return_value="as_stat"):
+            builder._add_archetype_filters(result)
+
+        # Should have attack speed filter
+        assert any("attack" in f.reason.lower() and "speed" in f.reason.lower() for f in result.filters)
+
+    def test_add_archetype_filters_cast_speed(self):
+        """Test spell build gets cast speed filter."""
+        from core.smart_trade_filters import SmartFilterBuilder, SmartFilterResult
+        from core.build_archetype import DefenseType, AttackType
+
+        mock_archetype = MagicMock()
+        mock_archetype.defense_type = DefenseType.LIFE
+        mock_archetype.attack_type = AttackType.SPELL
+        mock_archetype.is_crit = False
+        mock_archetype.needs_strength = False
+        mock_archetype.needs_dexterity = False
+        mock_archetype.needs_intelligence = False
+
+        builder = SmartFilterBuilder(archetype=mock_archetype)
+        result = SmartFilterResult()
+
+        with patch.object(builder, '_get_stat_id', return_value="cs_stat"):
+            builder._add_archetype_filters(result)
+
+        # Should have cast speed filter
+        assert any("cast" in f.reason.lower() and "speed" in f.reason.lower() for f in result.filters)
+
+
+class TestSmartFilterBuilderAttributeNeeds:
+    """Tests for attribute needs filters."""
+
+    def test_add_archetype_filters_needs_strength(self):
+        """Test build that needs strength gets strength filter."""
+        from core.smart_trade_filters import SmartFilterBuilder, SmartFilterResult
+        from core.build_archetype import DefenseType, AttackType
+
+        mock_archetype = MagicMock()
+        mock_archetype.defense_type = DefenseType.LIFE
+        mock_archetype.attack_type = AttackType.ATTACK
+        mock_archetype.is_crit = False
+        mock_archetype.needs_strength = True
+        mock_archetype.needs_dexterity = False
+        mock_archetype.needs_intelligence = False
+
+        builder = SmartFilterBuilder(archetype=mock_archetype)
+        result = SmartFilterResult()
+
+        with patch.object(builder, '_get_stat_id', return_value="str_stat"):
+            builder._add_archetype_filters(result)
+
+        # Should have strength filter
+        assert any("strength" in f.reason.lower() for f in result.filters)
+        assert any("strength" in r.lower() for r in result.filter_reasons)
+
+    def test_add_archetype_filters_needs_dexterity(self):
+        """Test build that needs dexterity gets dexterity filter."""
+        from core.smart_trade_filters import SmartFilterBuilder, SmartFilterResult
+        from core.build_archetype import DefenseType, AttackType
+
+        mock_archetype = MagicMock()
+        mock_archetype.defense_type = DefenseType.LIFE
+        mock_archetype.attack_type = AttackType.ATTACK
+        mock_archetype.is_crit = False
+        mock_archetype.needs_strength = False
+        mock_archetype.needs_dexterity = True
+        mock_archetype.needs_intelligence = False
+
+        builder = SmartFilterBuilder(archetype=mock_archetype)
+        result = SmartFilterResult()
+
+        with patch.object(builder, '_get_stat_id', return_value="dex_stat"):
+            builder._add_archetype_filters(result)
+
+        # Should have dexterity filter
+        assert any("dexterity" in f.reason.lower() for f in result.filters)
+        assert any("dexterity" in r.lower() for r in result.filter_reasons)
+
+
+class TestSmartFilterBuilderSlotFiltersGlovesNoArchetype:
+    """Tests for glove slot filters without archetype."""
+
+    def test_add_slot_filters_gloves_no_archetype(self):
+        """Test _add_slot_filters for gloves without archetype."""
+        from core.smart_trade_filters import SmartFilterBuilder, SmartFilterResult
+
+        builder = SmartFilterBuilder()  # No archetype
+        result = SmartFilterResult()
+
+        with patch.object(builder, '_get_stat_id', return_value="stat_id"):
+            builder._add_slot_filters(result, "Gloves")
+
+        # Should have no filters since no archetype to determine attack type
+        assert len(result.filters) == 0
+
+
+class TestSmartFilterBuilderDefaultFiltersNoStatId:
+    """Tests for default filters when stat ID lookup fails."""
+
+    def test_add_default_filters_no_life_stat(self):
+        """Test _add_default_filters when life stat not found."""
+        from core.smart_trade_filters import SmartFilterBuilder, SmartFilterResult
+
+        builder = SmartFilterBuilder()
+        result = SmartFilterResult()
+
+        # Return None for life, but stat_id for resistances
+        def side_effect(affix):
+            if affix == "life":
+                return None
+            return "res_id"
+
+        with patch.object(builder, '_get_stat_id', side_effect=side_effect):
+            builder._add_default_filters(result)
+
+        # Should still have resistance filter
+        assert len(result.filters) >= 1
+        assert any("resistance" in f.reason.lower() for f in result.filters)
+
+    def test_add_default_filters_no_res_stat(self):
+        """Test _add_default_filters when resistance stat not found."""
+        from core.smart_trade_filters import SmartFilterBuilder, SmartFilterResult
+
+        builder = SmartFilterBuilder()
+        result = SmartFilterResult()
+
+        # Return stat_id for life, but None for resistances
+        def side_effect(affix):
+            if affix == "resistances":
+                return None
+            return "life_id"
+
+        with patch.object(builder, '_get_stat_id', side_effect=side_effect):
+            builder._add_default_filters(result)
+
+        # Should still have life filter
+        assert len(result.filters) >= 1
+        assert any("life" in f.reason.lower() for f in result.filters)
+
+
 class TestBuildSmartFiltersFunction:
     """Tests for build_smart_filters convenience function."""
 
