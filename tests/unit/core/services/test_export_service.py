@@ -273,6 +273,159 @@ class TestGetExportableData:
         assert data == []
 
 
+class TestGetExportableSalesExtended:
+    """Additional tests for get_exportable_sales."""
+
+    def test_get_exportable_sales_with_limit(self, service, mock_db):
+        """Test getting sales with limit parameter."""
+        mock_cursor = Mock()
+        mock_cursor.description = [("id",), ("item_name",)]
+        mock_cursor.fetchall.return_value = []
+        mock_db.conn.execute.return_value = mock_cursor
+
+        service.get_exportable_sales(limit=100)
+
+        call_args = mock_db.conn.execute.call_args
+        query = call_args[0][0]
+        assert "LIMIT 100" in query
+
+
+class TestGetExportablePriceChecksExtended:
+    """Additional tests for get_exportable_price_checks."""
+
+    def test_get_exportable_price_checks_with_days(self, service, mock_db):
+        """Test getting price checks with days filter."""
+        mock_cursor = Mock()
+        mock_cursor.description = [("id",), ("item_name",)]
+        mock_cursor.fetchall.return_value = []
+        mock_db.conn.execute.return_value = mock_cursor
+
+        service.get_exportable_price_checks(days=30)
+
+        call_args = mock_db.conn.execute.call_args
+        query = call_args[0][0]
+        assert "WHERE" in query
+
+    def test_get_exportable_price_checks_with_limit(self, service, mock_db):
+        """Test getting price checks with limit parameter."""
+        mock_cursor = Mock()
+        mock_cursor.description = [("id",), ("item_name",)]
+        mock_cursor.fetchall.return_value = []
+        mock_db.conn.execute.return_value = mock_cursor
+
+        service.get_exportable_price_checks(limit=50)
+
+        call_args = mock_db.conn.execute.call_args
+        query = call_args[0][0]
+        assert "LIMIT 50" in query
+
+    def test_get_exportable_price_checks_error(self, service, mock_db):
+        """Test error handling in get_exportable_price_checks."""
+        mock_db.conn.execute.side_effect = Exception("Database error")
+
+        data = service.get_exportable_price_checks()
+
+        assert data == []
+
+
+class TestGetExportableLootSessionExtended:
+    """Additional tests for get_exportable_loot_session."""
+
+    def test_get_exportable_loot_latest_session(self, service, mock_db):
+        """Test getting latest loot session when no ID specified."""
+        # First call returns latest session ID
+        mock_cursor_session = Mock()
+        mock_cursor_session.fetchone.return_value = (99,)
+
+        # Second call returns items
+        mock_cursor_items = Mock()
+        mock_cursor_items.description = [("id",), ("item_name",), ("chaos_value",)]
+        mock_cursor_items.fetchall.return_value = [(1, "Item", 100.0)]
+
+        mock_db.conn.execute.side_effect = [mock_cursor_session, mock_cursor_items]
+
+        data = service.get_exportable_loot_session()
+
+        assert len(data) == 1
+        assert data[0]["item_name"] == "Item"
+
+    def test_get_exportable_loot_no_sessions(self, service, mock_db):
+        """Test getting loot when no sessions exist."""
+        mock_cursor = Mock()
+        mock_cursor.fetchone.return_value = None
+        mock_db.conn.execute.return_value = mock_cursor
+
+        data = service.get_exportable_loot_session()
+
+        assert data == []
+
+    def test_get_exportable_loot_session_error(self, service, mock_db):
+        """Test error handling in get_exportable_loot_session."""
+        mock_db.conn.execute.side_effect = Exception("Database error")
+
+        data = service.get_exportable_loot_session()
+
+        assert data == []
+
+
+class TestGetExportableRankings:
+    """Tests for get_exportable_rankings method."""
+
+    def test_get_exportable_rankings_no_db(self, service_no_db):
+        """Test getting rankings without database."""
+        data = service_no_db.get_exportable_rankings("Standard")
+        assert data == []
+
+    @patch('core.price_rankings.Top20Calculator')
+    @patch('core.price_rankings.PriceRankingCache')
+    @patch('data_sources.pricing.poe_ninja.PoeNinjaAPI')
+    def test_get_exportable_rankings_success(self, mock_api_cls, mock_cache_cls, mock_calc_cls, service):
+        """Test getting rankings successfully."""
+        # Setup mock ranking item
+        mock_item = Mock()
+        mock_item.rank = 1
+        mock_item.name = "Mirror of Kalandra"
+        mock_item.chaos_value = 50000
+        mock_item.divine_value = 200
+        mock_item.icon = "http://icon.url"
+        mock_item.rarity = "currency"
+
+        mock_ranking = Mock()
+        mock_ranking.items = [mock_item]
+
+        mock_calculator = Mock()
+        mock_calculator.get_category.return_value = mock_ranking
+        mock_calc_cls.return_value = mock_calculator
+
+        data = service.get_exportable_rankings("Standard", category="currency")
+
+        assert len(data) == 1
+        assert data[0]["name"] == "Mirror of Kalandra"
+        assert data[0]["rank"] == 1
+
+    @patch('core.price_rankings.Top20Calculator')
+    @patch('core.price_rankings.PriceRankingCache')
+    @patch('data_sources.pricing.poe_ninja.PoeNinjaAPI')
+    def test_get_exportable_rankings_no_data(self, mock_api_cls, mock_cache_cls, mock_calc_cls, service):
+        """Test getting rankings when no data available."""
+        mock_calculator = Mock()
+        mock_calculator.get_category.return_value = None
+        mock_calc_cls.return_value = mock_calculator
+
+        data = service.get_exportable_rankings("Standard")
+
+        assert data == []
+
+    @patch('data_sources.pricing.poe_ninja.PoeNinjaAPI')
+    def test_get_exportable_rankings_error(self, mock_api_cls, service):
+        """Test error handling in get_exportable_rankings."""
+        mock_api_cls.side_effect = Exception("API error")
+
+        data = service.get_exportable_rankings("Standard")
+
+        assert data == []
+
+
 class TestExportData:
     """Tests for high-level export_data method."""
 
@@ -297,6 +450,40 @@ class TestExportData:
 
         file_path = tmp_path / "checks.csv"
         result = service.export_data("price_checks", "csv", file_path)
+
+        assert result.success is True
+
+    def test_export_data_loot_json(self, service, mock_db, tmp_path):
+        """Test exporting loot session as JSON."""
+        mock_cursor = Mock()
+        mock_cursor.description = [("id",), ("item_name",)]
+        mock_cursor.fetchall.return_value = [(1, "Item")]
+        mock_db.conn.execute.return_value = mock_cursor
+
+        file_path = tmp_path / "loot.json"
+        result = service.export_data("loot", "json", file_path, session_id=1)
+
+        assert result.success is True
+
+    @patch('core.price_rankings.Top20Calculator')
+    @patch('core.price_rankings.PriceRankingCache')
+    @patch('data_sources.pricing.poe_ninja.PoeNinjaAPI')
+    def test_export_data_rankings_json(self, mock_api_cls, mock_cache_cls, mock_calc_cls, service, tmp_path):
+        """Test exporting rankings as JSON."""
+        mock_item = Mock()
+        mock_item.rank = 1
+        mock_item.name = "Test Item"
+        mock_item.chaos_value = 100
+
+        mock_ranking = Mock()
+        mock_ranking.items = [mock_item]
+
+        mock_calculator = Mock()
+        mock_calculator.get_category.return_value = mock_ranking
+        mock_calc_cls.return_value = mock_calculator
+
+        file_path = tmp_path / "rankings.json"
+        result = service.export_data("rankings", "json", file_path, league="Standard", category="currency")
 
         assert result.success is True
 
