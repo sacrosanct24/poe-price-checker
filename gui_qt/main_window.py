@@ -378,6 +378,8 @@ class PriceCheckerWindow(QMainWindow):
                              shortcut="Ctrl+E"),
                     MenuItem("Copy &All as TSV", handler=self._copy_all_as_tsv,
                              shortcut="Ctrl+Shift+C"),
+                    MenuItem("Export &Data...", handler=self._show_export_dialog,
+                             shortcut="Ctrl+Shift+E"),
                 ]),
                 MenuSection([
                     MenuItem("&Settings...", handler=self._show_settings,
@@ -1249,6 +1251,13 @@ class PriceCheckerWindow(QMainWindow):
             # Apply updated verdict thresholds
             self._apply_verdict_thresholds()
             self._set_status("Settings saved")
+
+    def _show_export_dialog(self) -> None:
+        """Show export data dialog."""
+        from gui_qt.dialogs.export_dialog import ExportDialog
+
+        dialog = ExportDialog(self.ctx, parent=self)
+        dialog.exec()
 
     def _apply_verdict_thresholds(self) -> None:
         """Apply verdict thresholds from config to session tabs."""
