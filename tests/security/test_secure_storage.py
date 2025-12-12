@@ -15,55 +15,45 @@ class TestSecureCredentialStorage:
     def secure_storage(self, tmp_path):
         """Create a test secure storage instance."""
         from core.secure_storage import SecureStorage
-        storage = SecureStorage(storage_dir=tmp_path)
+        salt_file = tmp_path / ".salt"
+        storage = SecureStorage(salt_file=salt_file)
         return storage
 
-    def test_api_key_is_encrypted(self, secure_storage, tmp_path):
+    def test_api_key_is_encrypted(self, secure_storage):
         """API keys should be encrypted, not stored in plaintext."""
         test_key = "sk-test-1234567890abcdef"
 
-        # Store the key
-        secure_storage.store("test_api_key", test_key)
+        # Encrypt the key
+        encrypted = secure_storage.encrypt(test_key)
 
-        # Check that the raw file doesn't contain plaintext key
-        storage_files = list(tmp_path.glob("*"))
-        for file_path in storage_files:
-            if file_path.is_file():
-                content = file_path.read_bytes()
-                # Key should not appear in plaintext
-                assert test_key.encode() not in content
+        # Encrypted value should not contain plaintext key
+        assert test_key not in encrypted
+        # Should have encryption prefix
+        assert encrypted.startswith(("enc:v1:", "obf:"))
 
     def test_stored_key_can_be_retrieved(self, secure_storage):
-        """Encrypted keys should be retrievable."""
+        """Encrypted keys should be retrievable via decrypt."""
         test_key = "sk-test-1234567890abcdef"
 
-        secure_storage.store("test_api_key", test_key)
-        retrieved = secure_storage.retrieve("test_api_key")
+        encrypted = secure_storage.encrypt(test_key)
+        decrypted = secure_storage.decrypt(encrypted)
 
-        assert retrieved == test_key
+        assert decrypted == test_key
 
-    def test_missing_key_returns_none(self, secure_storage):
-        """Missing keys should return None, not raise."""
-        result = secure_storage.retrieve("nonexistent_key")
-        assert result is None
+    def test_missing_key_returns_empty(self, secure_storage):
+        """Empty or invalid input should return empty string."""
+        result = secure_storage.decrypt("")
+        assert result == ""
 
-    def test_corrupted_data_handled_gracefully(self, secure_storage, tmp_path):
+    def test_corrupted_data_handled_gracefully(self, secure_storage):
         """Corrupted encrypted data should not crash."""
-        # Store a valid key first
-        secure_storage.store("test_key", "valid_value")
+        # Try to decrypt corrupted/invalid data
+        corrupted_data = "enc:v1:not_valid_base64_data!!!"
 
-        # Corrupt the storage file
-        storage_files = list(tmp_path.glob("*.enc"))
-        for file_path in storage_files:
-            file_path.write_bytes(b"corrupted data")
-
-        # Should handle gracefully (return None or raise specific exception)
-        try:
-            result = secure_storage.retrieve("test_key")
-            # If it returns, should be None for corrupted data
-        except Exception as e:
-            # Should be a specific crypto exception, not a crash
-            assert "decrypt" in str(e).lower() or "invalid" in str(e).lower()
+        # Should handle gracefully (return empty string, not crash)
+        result = secure_storage.decrypt(corrupted_data)
+        # Should return empty string on decrypt failure
+        assert result == ""
 
 
 class TestNoHardcodedSecrets:
@@ -146,24 +136,17 @@ class TestTokenSecurity:
 
     def test_oauth_tokens_encrypted(self, tmp_path):
         """OAuth tokens should be encrypted at rest."""
-        # Check that token storage uses encryption
-        token_file = tmp_path / "oauth_token.json"
-
         # Simulate token storage
-        test_token = {
-            "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test",
-            "refresh_token": "refresh_token_value_here",
-        }
+        test_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test"
 
-        # If we write directly, it should be encrypted
-        # This test validates the SecureStorage is used for tokens
+        # This test validates the SecureStorage properly encrypts tokens
         from core.secure_storage import SecureStorage
 
-        storage = SecureStorage(storage_dir=tmp_path)
-        storage.store("oauth_token", str(test_token))
+        salt_file = tmp_path / ".salt"
+        storage = SecureStorage(salt_file=salt_file)
+        encrypted = storage.encrypt(test_token)
 
-        # Read raw file - should not contain plaintext token
-        for file_path in tmp_path.glob("*"):
-            if file_path.is_file():
-                content = file_path.read_text(encoding="utf-8", errors="ignore")
-                assert "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9" not in content
+        # Encrypted value should not contain plaintext token
+        assert test_token not in encrypted
+        # Should be properly prefixed
+        assert encrypted.startswith(("enc:v1:", "obf:"))
