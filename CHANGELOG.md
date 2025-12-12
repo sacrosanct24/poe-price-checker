@@ -9,6 +9,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.7.0] - 2025-12-11
+
+### Added
+
+#### Security Hardening
+- **Bandit Security Scanning** - Now blocks PRs on HIGH/CRITICAL findings
+  - `exit_zero: false` enforces security gate
+  - Level: HIGH, Confidence: MEDIUM
+- **pip-audit Dependency Scan** - New CI job for vulnerability scanning
+  - Runs `pip-audit -r requirements.txt --strict --desc on`
+- **TruffleHog Secrets Detection** - Scans for exposed credentials
+  - Full git history scanning with `--only-verified`
+- **Security Documentation** - `docs/development/SECURITY.md`
+
+#### Testing & Quality Infrastructure
+- **Coverage Configuration** - `.coveragerc` with 80% threshold
+  - HTML report generation to `htmlcov/`
+  - Branch coverage enabled
+- **Integration Tests in CI** - Dedicated job after unit tests
+  - 15-minute timeout, pytest-timeout installed
+- **Code Complexity Analysis** - Radon complexity metrics in CI
+  - Warns on functions with complexity >= C (11-20)
+- **Local CI Script** - `scripts/local_ci.py` enhancements
+  - `--complexity` flag for radon analysis
+  - `--coverage` flag for coverage report
+
+#### Price History Charts
+- **PriceChartWidget** - matplotlib-based interactive chart
+  - Dark theme styling matching PoE aesthetic
+  - Time range selector (7d, 30d, 90d, All Time)
+  - Line chart with fill-under and statistics
+  - Graceful fallback when matplotlib unavailable
+- **ChartDataService** - Data aggregation for charts
+  - `get_item_price_series()` for item history
+  - `get_currency_rate_series()` for currency tracking
+  - Support for multiple data sources
+- **Price History Window** - New tabbed interface
+  - Tab 1: Summary Statistics (existing)
+  - Tab 2: Price Charts (new)
+  - Double-click rows to view chart
+
+#### Export Functionality
+- **ExportService** - CSV and JSON export support
+  - Export sales history, price checks, loot sessions, rankings
+  - Date range filtering (7d, 30d, 90d, all)
+  - Pretty JSON with datetime serialization
+- **ExportDialog** - User-friendly export options
+  - Data type selector
+  - Format selector (CSV/JSON)
+  - Category selector for rankings
+- **File → Export Data** - New menu item (Ctrl+Shift+E)
+
+### Technical
+- New `core/services/` package for business services
+- 42 new unit tests for chart and export functionality
+- Updated CLAUDE.md with new local CI commands
+
+---
+
 ## [1.6.2] - 2025-12-10
 
 ### Added
@@ -346,7 +405,8 @@ This is the initial public release (v1.0.0). The project was developed privately
 
 ---
 
-[Unreleased]: https://github.com/sacrosanct24/poe-price-checker/compare/v1.6.2...HEAD
+[Unreleased]: https://github.com/sacrosanct24/poe-price-checker/compare/v1.7.0...HEAD
+[1.7.0]: https://github.com/sacrosanct24/poe-price-checker/compare/v1.6.2...v1.7.0
 [1.6.2]: https://github.com/sacrosanct24/poe-price-checker/compare/v1.6.0...v1.6.2
 [1.6.0]: https://github.com/sacrosanct24/poe-price-checker/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/sacrosanct24/poe-price-checker/compare/v1.4.0...v1.5.0

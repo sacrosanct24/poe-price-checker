@@ -10,7 +10,7 @@ This file provides essential context for AI assistants working on this codebase.
 - AI-powered upgrade recommendations
 - Sales tracking and economy analytics
 
-**Current Version**: 1.6.2 (Performance & UI Polish)
+**Current Version**: 1.7.0 (Charts, Export & Security)
 
 ## Architecture
 
