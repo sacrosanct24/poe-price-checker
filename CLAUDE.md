@@ -241,6 +241,9 @@ Key gates:
 | Security scan | `bandit -r core/ -ll` |
 | **Local CI** | `python scripts/local_ci.py` |
 | Local CI (quick) | `python scripts/local_ci.py --quick` |
+| Local CI (security) | `python scripts/local_ci.py --security-full` |
+| Code complexity | `python scripts/local_ci.py --complexity` |
+| Coverage report | `python scripts/local_ci.py --coverage` |
 | Pre-PR check | `/check-pr` |
 | Full audit | `/audit-full <path>` |
 | Update meta builds | `/update-meta-builds` |

@@ -9,6 +9,8 @@ Run this before pushing to catch issues locally:
     python scripts/local_ci.py --test       # Only run tests
     python scripts/local_ci.py --security   # Only run bandit security scan
     python scripts/local_ci.py --security-full  # Full security: bandit (strict) + pip-audit
+    python scripts/local_ci.py --complexity # Run radon code complexity analysis
+    python scripts/local_ci.py --coverage   # Run tests with coverage + HTML report
 """
 import argparse
 import os
@@ -172,6 +174,74 @@ def run_tests(quick: bool = False) -> bool:
     return run_command("Pytest", cmd, check=False)
 
 
+def run_complexity() -> bool:
+    """Run radon complexity analysis."""
+    print(f"\n{BLUE}{BOLD}{'='*60}{RESET}")
+    print(f"{BLUE}{BOLD}Running: Code Complexity (radon){RESET}")
+    print(f"{BLUE}{'='*60}{RESET}\n")
+
+    try:
+        # Run radon for overall complexity
+        result = subprocess.run(
+            [sys.executable, "-m", "radon", "cc",
+             "core", "gui_qt", "data_sources",
+             "-a", "-s", "--total-average"],
+            check=False
+        )
+
+        # Check for high complexity functions (grade C or worse)
+        check_result = subprocess.run(
+            [sys.executable, "-m", "radon", "cc",
+             "core", "gui_qt", "data_sources",
+             "-a", "-nc", "--min", "C"],
+            capture_output=True,
+            text=True
+        )
+
+        high_complexity = check_result.stdout.strip()
+        if high_complexity:
+            line_count = len([l for l in high_complexity.splitlines() if l.strip()])
+            print(f"\n{YELLOW}Warning: {line_count} functions with complexity >= C (11-20){RESET}")
+            print(high_complexity)
+
+        print(f"\n{GREEN}{PASS_MARK} Code Complexity analysis complete{RESET}")
+        return True
+    except FileNotFoundError:
+        print(f"\n{YELLOW}radon not installed. Install with: pip install radon{RESET}")
+        return True  # Don't fail if radon isn't installed
+
+
+def run_coverage_check() -> bool:
+    """Run tests with coverage and check against threshold."""
+    print(f"\n{BLUE}{BOLD}{'='*60}{RESET}")
+    print(f"{BLUE}{BOLD}Running: Coverage Check{RESET}")
+    print(f"{BLUE}{'='*60}{RESET}\n")
+
+    # Check if .coveragerc exists
+    coveragerc = Path(".coveragerc")
+    if not coveragerc.exists():
+        print(f"{YELLOW}No .coveragerc found. Using default settings.{RESET}")
+
+    cmd = [
+        sys.executable, "-m", "pytest", "tests/",
+        "--ignore=tests/integration",
+        "--cov=core", "--cov=gui_qt", "--cov=data_sources",
+        "--cov-report=term-missing",
+        "--cov-report=html",
+        "-q", "--timeout=120"
+    ]
+
+    result = subprocess.run(cmd, check=False)
+
+    if result.returncode == 0:
+        print(f"\n{GREEN}{PASS_MARK} Coverage check passed{RESET}")
+        print(f"HTML report: htmlcov/index.html")
+        return True
+    else:
+        print(f"\n{RED}{FAIL_MARK} Coverage check failed{RESET}")
+        return False
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Run local CI checks before pushing"
@@ -201,6 +271,14 @@ def main():
         help="Full security scan: bandit (strict) + pip-audit + security tests"
     )
     parser.add_argument(
+        "--complexity", action="store_true",
+        help="Run code complexity analysis (radon)"
+    )
+    parser.add_argument(
+        "--coverage", action="store_true",
+        help="Run tests with coverage check and HTML report"
+    )
+    parser.add_argument(
         "--no-install", action="store_true",
         help="Don't auto-install missing tools"
     )
@@ -222,7 +300,8 @@ def main():
     results = {}
 
     # Determine which checks to run
-    run_all = not (args.lint or args.type or args.test or args.security or args.security_full)
+    run_all = not (args.lint or args.type or args.test or args.security
+                   or args.security_full or args.complexity or args.coverage)
 
     if args.lint or run_all:
         results["flake8"] = run_flake8()
@@ -238,7 +317,12 @@ def main():
     elif args.security or run_all:
         results["bandit"] = run_bandit(strict=False)
 
-    if args.test or (run_all and not args.quick):
+    if args.complexity:
+        results["complexity"] = run_complexity()
+
+    if args.coverage:
+        results["coverage"] = run_coverage_check()
+    elif args.test or (run_all and not args.quick):
         results["pytest"] = run_tests(quick=args.quick)
 
     # Summary

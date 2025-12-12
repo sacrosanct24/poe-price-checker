@@ -1,0 +1,66 @@
+# Coverage.py configuration
+# https://coverage.readthedocs.io/en/latest/config.html
+
+[run]
+# Source directories to measure
+source = core,gui_qt,data_sources
+
+# Files/directories to exclude from measurement
+omit =
+    */tests/*
+    */__pycache__/*
+    */venv/*
+    */.venv/*
+    */site-packages/*
+    setup.py
+
+# Enable branch coverage
+branch = True
+
+# Parallel execution support
+parallel = True
+
+[report]
+# Minimum coverage percentage required
+fail_under = 80
+
+# Show missing line numbers
+show_missing = True
+
+# Decimal precision
+precision = 2
+
+# Exclude lines from coverage
+exclude_lines =
+    # Standard exclusions
+    pragma: no cover
+
+    # Don't cover defensive assertions
+    raise AssertionError
+    raise NotImplementedError
+
+    # Don't cover abstract methods
+    @abstractmethod
+
+    # Don't cover type checking blocks
+    if TYPE_CHECKING:
+    if typing.TYPE_CHECKING:
+
+    # Don't cover debug-only code
+    if __name__ == .__main__.:
+    if self.debug:
+    if settings.DEBUG
+
+# Skip files with no executable code
+skip_empty = True
+
+[html]
+# HTML report output directory
+directory = htmlcov
+
+# Title for HTML report
+title = PoE Price Checker Coverage Report
+
+[xml]
+# XML report output file (for CI)
+output = coverage.xml
