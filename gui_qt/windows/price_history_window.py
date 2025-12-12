@@ -27,12 +27,15 @@ from PyQt6.QtWidgets import (
     QAbstractItemView,
     QSplitter,
     QMessageBox,
+    QTabWidget,
 )
 
 from gui_qt.styles import apply_window_icon
+from gui_qt.widgets.price_chart_widget import PriceChartWidget
 
 if TYPE_CHECKING:
     from core.app_context import AppContext
+    from core.services.chart_data_service import ChartDataService
 
 logger = logging.getLogger(__name__)
 
@@ -220,8 +223,16 @@ class PriceHistoryWindow(QDialog):
         super().__init__(parent)
         self.ctx = ctx
         self._economy_service = None
+        self._chart_service: Optional["ChartDataService"] = None
         self._setup_ui()
         self._load_leagues()
+
+    def _get_chart_service(self) -> "ChartDataService":
+        """Get or create the chart data service."""
+        if self._chart_service is None:
+            from core.services.chart_data_service import ChartDataService
+            self._chart_service = ChartDataService(self.ctx.db)
+        return self._chart_service
 
     def _get_economy_service(self):
         """Get or create the economy service."""
@@ -233,7 +244,7 @@ class PriceHistoryWindow(QDialog):
     def _setup_ui(self) -> None:
         """Set up the window UI."""
         self.setWindowTitle("Price History - Economy Analysis")
-        self.setMinimumSize(900, 600)
+        self.setMinimumSize(1000, 700)
         apply_window_icon(self)
 
         layout = QVBoxLayout(self)
@@ -263,6 +274,21 @@ class PriceHistoryWindow(QDialog):
 
         layout.addLayout(selector_layout)
 
+        # Tab widget for different views
+        self._tabs = QTabWidget()
+        layout.addWidget(self._tabs, 1)
+
+        # Tab 1: Summary Statistics
+        self._setup_summary_tab()
+
+        # Tab 2: Price Charts
+        self._setup_charts_tab()
+
+    def _setup_summary_tab(self) -> None:
+        """Set up the summary statistics tab."""
+        summary_widget = QWidget()
+        summary_layout = QVBoxLayout(summary_widget)
+
         # Splitter for two panels
         splitter = QSplitter(Qt.Orientation.Vertical)
 
@@ -284,6 +310,9 @@ class PriceHistoryWindow(QDialog):
         currency_header = self._currency_table.horizontalHeader()
         if currency_header:
             currency_header.setStretchLastSection(True)
+
+        # Double-click to show chart
+        self._currency_table.doubleClicked.connect(self._on_currency_double_clicked)
 
         currency_layout.addWidget(self._currency_table)
         splitter.addWidget(currency_group)
@@ -307,13 +336,50 @@ class PriceHistoryWindow(QDialog):
         if uniques_header:
             uniques_header.setStretchLastSection(True)
 
+        # Double-click to show chart
+        self._uniques_table.doubleClicked.connect(self._on_item_double_clicked)
+
         uniques_layout.addWidget(self._uniques_table)
         splitter.addWidget(uniques_group)
 
         # Set initial splitter sizes (60% currency, 40% uniques)
         splitter.setSizes([360, 240])
 
-        layout.addWidget(splitter)
+        summary_layout.addWidget(splitter)
+        self._tabs.addTab(summary_widget, "Summary Statistics")
+
+    def _setup_charts_tab(self) -> None:
+        """Set up the price charts tab."""
+        charts_widget = QWidget()
+        charts_layout = QVBoxLayout(charts_widget)
+
+        # Chart selector row
+        selector_row = QHBoxLayout()
+        selector_row.addWidget(QLabel("Chart:"))
+
+        self._chart_type_combo = QComboBox()
+        self._chart_type_combo.addItem("Currency", "currency")
+        self._chart_type_combo.addItem("Item", "item")
+        self._chart_type_combo.currentIndexChanged.connect(self._on_chart_type_changed)
+        selector_row.addWidget(self._chart_type_combo)
+
+        self._chart_item_combo = QComboBox()
+        self._chart_item_combo.setMinimumWidth(250)
+        self._chart_item_combo.currentTextChanged.connect(self._on_chart_item_changed)
+        selector_row.addWidget(self._chart_item_combo, 1)
+
+        self._chart_refresh_btn = QPushButton("Refresh")
+        self._chart_refresh_btn.clicked.connect(self._load_chart_data)
+        selector_row.addWidget(self._chart_refresh_btn)
+
+        charts_layout.addLayout(selector_row)
+
+        # Price chart widget
+        self._chart_widget = PriceChartWidget(self)
+        self._chart_widget.time_range_changed.connect(self._on_chart_range_changed)
+        charts_layout.addWidget(self._chart_widget, 1)
+
+        self._tabs.addTab(charts_widget, "Price Charts")
 
     def _load_leagues(self) -> None:
         """Load available leagues from database."""
@@ -345,6 +411,10 @@ class PriceHistoryWindow(QDialog):
         self._load_currency_data(league)
         self._load_uniques_data(league)
         self._update_aggregate_button(league)
+
+        # Update chart item selector
+        chart_type = self._chart_type_combo.currentData()
+        self._populate_chart_items(league, chart_type)
 
     def _update_aggregate_button(self, league: str) -> None:
         """Update aggregate button state based on league status."""
@@ -544,3 +614,130 @@ class PriceHistoryWindow(QDialog):
             })
 
         self._uniques_model.set_data(rows)
+
+    # --- Chart tab handlers ---
+
+    def _on_chart_type_changed(self, index: int) -> None:
+        """Handle chart type selector change."""
+        league = self._league_combo.currentText()
+        if not league:
+            return
+
+        chart_type = self._chart_type_combo.currentData()
+        self._populate_chart_items(league, chart_type)
+
+    def _populate_chart_items(self, league: str, chart_type: str) -> None:
+        """Populate the chart item selector based on type."""
+        self._chart_item_combo.clear()
+
+        if chart_type == "currency":
+            # Add tracked currencies
+            for currency in TRACKED_CURRENCIES:
+                self._chart_item_combo.addItem(
+                    CURRENCY_SHORT_NAMES.get(currency, currency),
+                    currency
+                )
+        else:
+            # Load available items from database
+            try:
+                service = self._get_chart_service()
+                items = service.get_available_items(league, limit=100)
+                for item in items:
+                    self._chart_item_combo.addItem(item, item)
+            except Exception as e:
+                logger.warning(f"Failed to load items for chart: {e}")
+
+    def _on_chart_item_changed(self, text: str) -> None:
+        """Handle chart item selection change."""
+        if text:
+            self._load_chart_data()
+
+    def _on_chart_range_changed(self, days: int) -> None:
+        """Handle chart time range change."""
+        self._load_chart_data()
+
+    def _load_chart_data(self) -> None:
+        """Load and display chart data for selected item."""
+        league = self._league_combo.currentText()
+        if not league:
+            return
+
+        item_name = self._chart_item_combo.currentData()
+        if not item_name:
+            item_name = self._chart_item_combo.currentText()
+        if not item_name:
+            return
+
+        chart_type = self._chart_type_combo.currentData()
+        days = self._chart_widget.get_current_days()
+
+        try:
+            service = self._get_chart_service()
+
+            if chart_type == "currency":
+                series = service.get_currency_rate_series(item_name, league, days)
+            else:
+                series = service.get_item_from_economy_items(item_name, league, days)
+
+            if series:
+                self._chart_widget.plot_series(series)
+            else:
+                self._chart_widget.clear()
+
+        except Exception as e:
+            logger.error(f"Failed to load chart data: {e}")
+            self._chart_widget.clear()
+
+    def _on_currency_double_clicked(self, index: QModelIndex) -> None:
+        """Handle double-click on currency row - show chart."""
+        if not index.isValid():
+            return
+
+        row = index.row()
+        if 0 <= row < len(self._currency_model._data):
+            currency_name = self._currency_model._data[row].get("currency_name", "")
+            if currency_name:
+                self._show_chart_for_currency(currency_name)
+
+    def _on_item_double_clicked(self, index: QModelIndex) -> None:
+        """Handle double-click on item row - show chart."""
+        if not index.isValid():
+            return
+
+        row = index.row()
+        if 0 <= row < len(self._uniques_model._data):
+            item_name = self._uniques_model._data[row].get("item_name", "")
+            if item_name:
+                self._show_chart_for_item(item_name)
+
+    def _show_chart_for_currency(self, currency: str) -> None:
+        """Switch to charts tab and show currency chart."""
+        # Switch to charts tab
+        self._tabs.setCurrentIndex(1)
+
+        # Set chart type to currency
+        self._chart_type_combo.setCurrentIndex(0)
+
+        # Find and select the currency
+        for i in range(self._chart_item_combo.count()):
+            if self._chart_item_combo.itemData(i) == currency:
+                self._chart_item_combo.setCurrentIndex(i)
+                break
+
+    def _show_chart_for_item(self, item_name: str) -> None:
+        """Switch to charts tab and show item chart."""
+        # Switch to charts tab
+        self._tabs.setCurrentIndex(1)
+
+        # Set chart type to item
+        self._chart_type_combo.setCurrentIndex(1)
+
+        # Find and select the item
+        for i in range(self._chart_item_combo.count()):
+            if self._chart_item_combo.itemData(i) == item_name:
+                self._chart_item_combo.setCurrentIndex(i)
+                return
+
+        # If not found, add it and select
+        self._chart_item_combo.addItem(item_name, item_name)
+        self._chart_item_combo.setCurrentIndex(self._chart_item_combo.count() - 1)
