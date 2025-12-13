@@ -27,6 +27,11 @@ from typing import Any, Dict, Iterator, List, Optional, cast
 
 from core.game_version import GameVersion
 
+from core.database.repositories.checked_items_repository import CheckedItemsRepository
+from core.database.repositories.currency_repository import CurrencyRepository
+from core.database.repositories.plugin_repository import PluginRepository
+from core.database.repositories.sales_repository import SalesRepository
+from core.database.repositories.stats_repository import StatsRepository
 from core.database.schema import (
     SCHEMA_VERSION,
     CREATE_SCHEMA_SQL,
@@ -89,6 +94,13 @@ class Database:
 
         # Initialize or migrate schema
         self._initialize_schema()
+
+        # Initialize repositories
+        self._checked_items_repo = CheckedItemsRepository(self.conn, self._lock)
+        self._currency_repo = CurrencyRepository(self.conn, self._lock)
+        self._plugin_repo = PluginRepository(self.conn, self._lock)
+        self._sales_repo = SalesRepository(self.conn, self._lock)
+        self._stats_repo = StatsRepository(self.conn, self._lock)
 
     # ----------------------------------------------------------------------
     # Context manager for transactions
@@ -387,16 +399,10 @@ class Database:
         chaos_value: float,
         item_base_type: Optional[str] = None,
     ) -> int:
-        """Insert a checked item and return its ID. Thread-safe."""
-        cursor = self._execute(
-            """
-            INSERT INTO checked_items
-                (game_version, league, item_name, item_base_type, chaos_value)
-            VALUES (?, ?, ?, ?, ?)
-            """,
-            (game_version.value, league, item_name, item_base_type, chaos_value),
+        """Insert a checked item and return its ID."""
+        return self._checked_items_repo.add_checked_item(
+            game_version, league, item_name, chaos_value, item_base_type
         )
-        return cursor.lastrowid or 0
 
     def get_checked_items(
         self,
@@ -404,29 +410,8 @@ class Database:
         league: Optional[str] = None,
         limit: int = 100,
     ) -> List[Dict[str, Any]]:
-        """
-        Return recent checked items. Thread-safe.
-
-        Results are ordered newest-first by:
-        1. checked_at DESC
-        2. id DESC   (tie-breaker for identical timestamps)
-        """
-        query = "SELECT * FROM checked_items WHERE 1=1"
-        params: List[Any] = []
-
-        if game_version:
-            query += " AND game_version = ?"
-            params.append(game_version.value)
-
-        if league:
-            query += " AND league = ?"
-            params.append(league)
-
-        query += " ORDER BY checked_at DESC, id DESC LIMIT ?"
-        params.append(limit)
-
-        rows = self._execute_fetchall(query, tuple(params))
-        return [dict(row) for row in rows]
+        """Return recent checked items, newest-first."""
+        return self._checked_items_repo.get_checked_items(game_version, league, limit)
 
     # ----------------------------------------------------------------------
     # Sales
@@ -440,16 +425,9 @@ class Database:
         item_id: Optional[int] = None,
     ) -> int:
         """Create a sale entry and return its ID."""
-        cursor = self.conn.execute(
-            """
-            INSERT INTO sales
-                (item_name, item_base_type, listed_price_chaos, item_id)
-            VALUES (?, ?, ?, ?)
-            """,
-            (item_name, item_base_type, listed_price_chaos, item_id),
+        return self._sales_repo.add_sale(
+            item_name, listed_price_chaos, item_base_type, item_id
         )
-        self.conn.commit()
-        return cursor.lastrowid or 0
 
     def record_instant_sale(
         self,
@@ -460,72 +438,15 @@ class Database:
         source: str | None = None,
         price_chaos: float | None = None,
     ) -> int:
-        """
-        Convenience helper: record a sale where listing and sale happen
-        at essentially the same time.
-
-        This:
-        - Inserts into `sales` with listed_at = sold_at = CURRENT_TIMESTAMP
-        - Sets listed_price_chaos = actual_price_chaos = effective chaos value
-        - Leaves item_id NULL (we're not linking to checked_items yet)
-        - Sets time_to_sale_hours = 0.0 and relisted = 0
-
-        Parameters:
-            item_name: item name
-            chaos_value: chaos value (legacy positional / keyword)
-            price_chaos: chaos value (new keyword used by GUI)
-            item_base_type: optional base type
-            notes: optional notes
-            source: where the sale came from (trade site, manual, loot, etc.)
-        """
-        # Support both chaos_value and price_chaos, prefer explicit chaos_value
-        effective_chaos = chaos_value if chaos_value is not None else price_chaos
-
-        if effective_chaos is None:
-            raise ValueError(
-                "record_instant_sale requires either chaos_value or price_chaos"
-            )
-
-        cursor = self.conn.execute(
-            """
-            INSERT INTO sales (
-                item_id,
-                item_name,
-                item_base_type,
-                source,
-                listed_price_chaos,
-                listed_at,
-                sold_at,
-                actual_price_chaos,
-                time_to_sale_hours,
-                relisted,
-                notes
-            )
-            VALUES (
-                NULL,
-                ?,
-                ?,
-                ?,
-                ?,
-                CURRENT_TIMESTAMP,
-                CURRENT_TIMESTAMP,
-                ?,
-                0.0,
-                0,
-                ?
-            )
-            """,
-            (
-                item_name,
-                item_base_type,
-                source,
-                effective_chaos,
-                effective_chaos,
-                notes,
-            ),
+        """Record a sale where listing and sale happen at essentially the same time."""
+        return self._sales_repo.record_instant_sale(
+            item_name=item_name,
+            chaos_value=chaos_value,
+            item_base_type=item_base_type,
+            notes=notes,
+            source=source,
+            price_chaos=price_chaos,
         )
-        self.conn.commit()
-        return cursor.lastrowid or 0
 
     def complete_sale(
         self,
@@ -533,80 +454,20 @@ class Database:
         actual_price_chaos: float,
         sold_at: Optional[datetime] = None,
     ) -> None:
-        """
-        Mark a sale as completed.
-
-        Normalizes timestamps to UTC to avoid negative durations when
-        SQLite uses UTC (CURRENT_TIMESTAMP) and Python uses local time.
-        """
-        if sold_at is None:
-            sold_at = datetime.now()
-
-        sold_at_utc = self._ensure_utc(sold_at)
-
-        # Retrieve listed_at
-        cursor = self.conn.execute(
-            "SELECT listed_at FROM sales WHERE id = ?", (sale_id,)
-        )
-        row = cursor.fetchone()
-        listed_at_str = row[0] if row else None
-
-        listed_at = self._parse_db_timestamp(listed_at_str) or sold_at_utc
-        listed_at_utc = self._ensure_utc(listed_at)
-
-        # Compute hours to sale, clamp negative to zero
-        time_to_sale = (
-            sold_at_utc - listed_at_utc
-        ).total_seconds() / 3600.0
-        if time_to_sale < 0:
-            time_to_sale = 0.0
-
-        self.conn.execute(
-            """
-            UPDATE sales
-            SET sold_at = ?, actual_price_chaos = ?, time_to_sale_hours = ?
-            WHERE id = ?
-            """,
-            (sold_at_utc.isoformat(), actual_price_chaos, time_to_sale, sale_id),
-        )
-        self.conn.commit()
-
-        logger.info(
-            f"Sale completed: ID {sale_id}, sold for {actual_price_chaos}c "
-            f"in {time_to_sale:.1f}h"
-        )
+        """Mark a sale as completed."""
+        return self._sales_repo.complete_sale(sale_id, actual_price_chaos, sold_at)
 
     def mark_sale_unsold(self, sale_id: int) -> None:
         """Mark a sale as unsold (notes only)."""
-        now_utc = self._ensure_utc(datetime.now())
-
-        self.conn.execute(
-            """
-            UPDATE sales
-            SET sold_at = ?, notes = 'Did not sell'
-            WHERE id = ?
-            """,
-            (now_utc.isoformat(), sale_id),
-        )
-        self.conn.commit()
+        return self._sales_repo.mark_sale_unsold(sale_id)
 
     def get_sales(
         self,
         sold_only: bool = False,
         limit: int = 100,
     ) -> List[Dict[str, Any]]:
-        """
-        Return sales entries, newest-first by listed_at DESC.
-        """
-        query = "SELECT * FROM sales WHERE 1=1"
-
-        if sold_only:
-            query += " AND sold_at IS NOT NULL"
-
-        query += " ORDER BY listed_at DESC LIMIT ?"
-
-        cursor = self.conn.execute(query, (limit,))
-        return [dict(row) for row in cursor.fetchall()]
+        """Return sales entries, newest-first by listed_at DESC."""
+        return self._sales_repo.get_sales(sold_only, limit)
 
     # ----------------------------------------------------------------------
     # Price History + Price Checks / Quotes
@@ -910,81 +771,27 @@ class Database:
 
     def set_plugin_enabled(self, plugin_name: str, enabled: bool) -> None:
         """Enable or disable a plugin."""
-        self.conn.execute(
-            """
-            INSERT INTO plugin_state (plugin_name, enabled)
-            VALUES (?, ?)
-            ON CONFLICT(plugin_name)
-            DO UPDATE SET enabled = ?
-            """,
-            (plugin_name, enabled, enabled),
-        )
-        self.conn.commit()
+        return self._plugin_repo.set_plugin_enabled(plugin_name, enabled)
 
     def is_plugin_enabled(self, plugin_name: str) -> bool:
         """Check if a plugin is enabled."""
-        cursor = self.conn.execute(
-            "SELECT enabled FROM plugin_state WHERE plugin_name = ?",
-            (plugin_name,),
-        )
-        row = cursor.fetchone()
-        return bool(row[0]) if row else False
+        return self._plugin_repo.is_plugin_enabled(plugin_name)
 
     def set_plugin_config(self, plugin_name: str, config_json: str) -> None:
-        """
-        Store plugin-specific JSON configuration.
-        """
-        self.conn.execute(
-            """
-            INSERT INTO plugin_state (plugin_name, config_json)
-            VALUES (?, ?)
-            ON CONFLICT(plugin_name)
-            DO UPDATE SET config_json = ?
-            """,
-            (plugin_name, config_json, config_json),
-        )
-        self.conn.commit()
+        """Store plugin-specific JSON configuration."""
+        return self._plugin_repo.set_plugin_config(plugin_name, config_json)
 
     def get_plugin_config(self, plugin_name: str) -> Optional[str]:
         """Return stored plugin configuration JSON, if any."""
-        cursor = self.conn.execute(
-            "SELECT config_json FROM plugin_state WHERE plugin_name = ?",
-            (plugin_name,),
-        )
-        row = cursor.fetchone()
-        return row[0] if row else None
+        return self._plugin_repo.get_plugin_config(plugin_name)
 
     # ----------------------------------------------------------------------
     # Statistics
     # ----------------------------------------------------------------------
 
     def get_stats(self) -> Dict[str, int]:
-        """
-        Return aggregate statistics from all tables.
-        """
-        stats: Dict[str, int] = {}
-
-        cursor = self.conn.execute("SELECT COUNT(*) FROM checked_items")
-        stats["checked_items"] = cursor.fetchone()[0]
-
-        cursor = self.conn.execute("SELECT COUNT(*) FROM sales")
-        stats["sales"] = cursor.fetchone()[0]
-
-        cursor = self.conn.execute(
-            "SELECT COUNT(*) FROM sales WHERE sold_at IS NOT NULL"
-        )
-        stats["completed_sales"] = cursor.fetchone()[0]
-
-        cursor = self.conn.execute("SELECT COUNT(*) FROM price_history")
-        stats["price_snapshots"] = cursor.fetchone()[0]
-
-        cursor = self.conn.execute("SELECT COUNT(*) FROM price_checks")
-        stats["price_checks"] = cursor.fetchone()[0]
-
-        cursor = self.conn.execute("SELECT COUNT(*) FROM price_quotes")
-        stats["price_quotes"] = cursor.fetchone()[0]
-
-        return stats
+        """Return aggregate statistics from all tables."""
+        return self._stats_repo.get_stats()
 
     def get_recent_sales(
         self,
@@ -992,179 +799,24 @@ class Database:
         search_text: str | None = None,
         source: str | None = None,
     ) -> List[sqlite3.Row]:
-        """
-        Return recent sales rows, ordered by most recent activity, with optional filters.
-
-        Filters:
-            search_text: case-insensitive substring match against
-                         item_name, item_base_type, source, notes
-            source: if provided and not blank/'All', filter by exact source
-
-        Fields returned:
-            id,
-            item_name,
-            item_base_type,
-            source,
-            listed_at,
-            sold_at,
-            listed_price_chaos,
-            actual_price_chaos,
-            price_chaos   (derived: COALESCE(actual, listed)),
-            time_to_sale_hours,
-            relisted,
-            notes
-        """
-        clauses: list[str] = []
-        params: list[Any] = []
-
-        # Search filter
-        if search_text:
-            like = f"%{search_text.strip().lower()}%"
-            clauses.append(
-                """
-                (
-                    LOWER(item_name) LIKE ?
-                    OR LOWER(COALESCE(item_base_type, '')) LIKE ?
-                    OR LOWER(COALESCE(source, '')) LIKE ?
-                    OR LOWER(COALESCE(notes, '')) LIKE ?
-                )
-                """
-            )
-            params.extend([like, like, like, like])
-
-        # Source filter
-        if source and source.strip() and source.strip().lower() != "all":
-            clauses.append("source = ?")
-            params.append(source.strip())
-
-        where_sql = ""
-        if clauses:
-            where_sql = "WHERE " + " AND ".join(clauses)
-
-        # where_sql is constructed from hardcoded clauses, all values use parameterized queries
-        sql = f"""  # nosec
-            SELECT
-                id,
-                item_name,
-                item_base_type,
-                source,
-                listed_at,
-                sold_at,
-                listed_price_chaos,
-                actual_price_chaos,
-                COALESCE(actual_price_chaos, listed_price_chaos) AS price_chaos,
-                time_to_sale_hours,
-                relisted,
-                notes
-            FROM sales
-            {where_sql}
-            ORDER BY COALESCE(sold_at, listed_at) DESC
-            LIMIT ?
-        """
-        params.append(limit)
-
-        cursor = self.conn.execute(sql, params)
-        return list(cursor.fetchall())
+        """Return recent sales rows with optional filters."""
+        return self._sales_repo.get_recent_sales(limit, search_text, source)
 
     def get_distinct_sale_sources(self) -> List[str]:
-        """
-        Return a list of distinct non-empty sources from the sales table,
-        sorted alphabetically.
-        """
-        cursor = self.conn.execute(
-            """
-            SELECT DISTINCT source
-            FROM sales
-            WHERE source IS NOT NULL AND TRIM(source) <> ''
-            ORDER BY source COLLATE NOCASE
-            """
-        )
-        return [row[0] for row in cursor.fetchall()]
+        """Return a list of distinct non-empty sources from the sales table."""
+        return self._sales_repo.get_distinct_sale_sources()
 
     # ----------------------------------------------------------------------
     # Maintenance
     # ----------------------------------------------------------------------
 
     def get_sales_summary(self) -> Dict[str, Any]:
-        """
-        Return overall sales summary:
-            - total_sales: number of sales rows
-            - total_chaos: sum of effective chaos price
-            - avg_chaos: average effective chaos price per sale
-
-        Effective chaos price is:
-            COALESCE(actual_price_chaos, listed_price_chaos)
-        """
-        cursor = self.conn.execute(
-            """
-            SELECT
-                COUNT(*) AS total_sales,
-                COALESCE(
-                    SUM(COALESCE(actual_price_chaos, listed_price_chaos)),
-                    0
-                ) AS total_chaos,
-                CASE
-                    WHEN COUNT(*) > 0 THEN
-                        COALESCE(
-                            AVG(COALESCE(actual_price_chaos, listed_price_chaos)),
-                            0
-                        )
-                    ELSE
-                        0
-                END AS avg_chaos
-            FROM sales
-            """
-        )
-        row = cursor.fetchone()
-        if row is None:
-            return {"total_sales": 0, "total_chaos": 0.0, "avg_chaos": 0.0}
-
-        return {
-            "total_sales": row["total_sales"],
-            "total_chaos": float(row["total_chaos"] or 0.0),
-            "avg_chaos": float(row["avg_chaos"] or 0.0),
-        }
+        """Return overall sales summary."""
+        return self._sales_repo.get_sales_summary()
 
     def get_daily_sales_summary(self, days: int = 30) -> List[sqlite3.Row]:
-        """
-        Return daily sales summary for the last `days` days (including today).
-
-        Each row has:
-            day (YYYY-MM-DD),
-            sale_count,
-            total_chaos,
-            avg_chaos
-
-        Effective chaos price is:
-            COALESCE(actual_price_chaos, listed_price_chaos)
-        The day is based on COALESCE(sold_at, listed_at).
-        """
-        cursor = self.conn.execute(
-            """
-            SELECT
-                DATE(COALESCE(sold_at, listed_at)) AS day,
-                COUNT(*) AS sale_count,
-                COALESCE(
-                    SUM(COALESCE(actual_price_chaos, listed_price_chaos)),
-                    0
-                ) AS total_chaos,
-                CASE
-                    WHEN COUNT(*) > 0 THEN
-                        COALESCE(
-                            AVG(COALESCE(actual_price_chaos, listed_price_chaos)),
-                            0
-                        )
-                    ELSE
-                        0
-                END AS avg_chaos
-            FROM sales
-            WHERE COALESCE(sold_at, listed_at) >= DATE('now', ?)
-            GROUP BY DATE(COALESCE(sold_at, listed_at))
-            ORDER BY DATE(COALESCE(sold_at, listed_at)) DESC
-            """,
-            (f"-{int(days)} days",),
-        )
-        return list(cursor.fetchall())
+        """Return daily sales summary for the last N days."""
+        return self._sales_repo.get_daily_sales_summary(days)
 
     # ----------------------------------------------------------------------
     # Currency Rate Tracking (v4)
@@ -1177,131 +829,30 @@ class Database:
         divine_to_chaos: float,
         exalt_to_chaos: Optional[float] = None,
     ) -> int:
-        """
-        Record a currency rate snapshot.
-
-        Args:
-            league: League name
-            game_version: "poe1" or "poe2"
-            divine_to_chaos: Divine orb value in chaos
-            exalt_to_chaos: Exalted orb value in chaos (optional)
-
-        Returns:
-            The row ID of the inserted record
-        """
-        cursor = self.conn.execute(
-            """
-            INSERT INTO currency_rates (league, game_version, divine_to_chaos, exalt_to_chaos)
-            VALUES (?, ?, ?, ?)
-            """,
-            (league, game_version, divine_to_chaos, exalt_to_chaos),
+        """Record a currency rate snapshot."""
+        return self._currency_repo.record_currency_rate(
+            league, game_version, divine_to_chaos, exalt_to_chaos
         )
-        self.conn.commit()
-        return cursor.lastrowid or 0
 
     def get_latest_currency_rate(
         self, league: str, game_version: str = "poe1"
     ) -> Optional[Dict[str, Any]]:
-        """
-        Get the most recent currency rate for a league.
-
-        Args:
-            league: League name
-            game_version: "poe1" or "poe2"
-
-        Returns:
-            Dict with divine_to_chaos, exalt_to_chaos, recorded_at or None
-        """
-        cursor = self.conn.execute(
-            """
-            SELECT divine_to_chaos, exalt_to_chaos, recorded_at
-            FROM currency_rates
-            WHERE league = ? AND game_version = ?
-            ORDER BY recorded_at DESC
-            LIMIT 1
-            """,
-            (league, game_version),
-        )
-        row = cursor.fetchone()
-        if row:
-            return {
-                "divine_to_chaos": row["divine_to_chaos"],
-                "exalt_to_chaos": row["exalt_to_chaos"],
-                "recorded_at": self._parse_db_timestamp(row["recorded_at"]),
-            }
-        return None
+        """Get the most recent currency rate for a league."""
+        return self._currency_repo.get_latest_currency_rate(league, game_version)
 
     def get_currency_rate_history(
         self, league: str, days: int = 30, game_version: str = "poe1"
     ) -> List[Dict[str, Any]]:
-        """
-        Get currency rate history for trend analysis.
-
-        Args:
-            league: League name
-            days: Number of days of history
-            game_version: "poe1" or "poe2"
-
-        Returns:
-            List of rate records ordered by time descending
-        """
-        cursor = self.conn.execute(
-            """
-            SELECT divine_to_chaos, exalt_to_chaos, recorded_at
-            FROM currency_rates
-            WHERE league = ? AND game_version = ?
-              AND recorded_at >= DATE('now', ?)
-            ORDER BY recorded_at DESC
-            """,
-            (league, game_version, f"-{days} days"),
-        )
-        return [
-            {
-                "divine_to_chaos": row["divine_to_chaos"],
-                "exalt_to_chaos": row["exalt_to_chaos"],
-                "recorded_at": self._parse_db_timestamp(row["recorded_at"]),
-            }
-            for row in cursor.fetchall()
-        ]
+        """Get currency rate history for trend analysis."""
+        return self._currency_repo.get_currency_rate_history(league, days, game_version)
 
     def wipe_all_data(self) -> None:
-        """
-        Delete all rows from the main data tables.
-
-        This preserves:
-            - schema_version entries
-            - table structure
-
-        Effectively resets the app's data: checked items, sales, price history,
-        price checks/quotes, plugin state, currency_rates.
-        """
-        logger.warning(
-            "Wiping all database data (checked_items, sales, price_history, "
-            "price_checks, price_quotes, plugin_state, currency_rates)."
-        )
-
-        with self.transaction() as conn:
-            conn.execute("DELETE FROM checked_items")
-            conn.execute("DELETE FROM sales")
-            conn.execute("DELETE FROM price_history")
-            conn.execute("DELETE FROM price_checks")
-            conn.execute("DELETE FROM price_quotes")
-            conn.execute("DELETE FROM plugin_state")
-            try:
-                conn.execute("DELETE FROM currency_rates")
-            except sqlite3.OperationalError:
-                pass  # Table may not exist in older schemas
-
-        # Optional: shrink file; safe but may be slow on huge DBs
-        try:
-            self.conn.execute("VACUUM")
-        except Exception as exc:  # non-fatal
-            logger.error(f"VACUUM after wipe_all_data failed: {exc}")
+        """Delete all rows from the main data tables."""
+        return self._stats_repo.wipe_all_data()
 
     def vacuum(self) -> None:
         """Perform SQLite VACUUM for file-size maintenance."""
-        self.conn.execute("VACUUM")
-        self.conn.commit()
+        return self._stats_repo.vacuum()
 
     # ----------------------------------------------------------------------
     # Upgrade Advice Cache
