@@ -599,7 +599,7 @@ class BuildComparator:
             extra_gems=sorted(extra),
             gem_level_gaps=level_gaps,
             gem_quality_gaps=quality_gaps,
-            missing_supports=[],  # TODO: analyze support gem links
+            missing_supports=[],  # Deferred: link analysis requires socket group data
             match_percent=round(match_percent, 1),
         )
 

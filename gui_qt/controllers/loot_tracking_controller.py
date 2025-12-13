@@ -457,13 +457,13 @@ class LootTrackingController(QObject):
         logger.info(f"Diff result: {diff.get_summary()}")
         self.status_message.emit(f"Diff: {diff.get_summary()}")
 
-        # Convert added items to LootDrops
+        # Price and convert added items to LootDrops using worker
         if diff.added_items:
-            self._process_loot_items(diff.added_items)
-
-        # Reset for next comparison
-        self._before_snapshot = None
-        self._diff_engine.clear()
+            self._start_valuation(diff.added_items)
+        else:
+            # Reset for next comparison
+            self._before_snapshot = None
+            self._diff_engine.clear()
 
     def _on_diff_error(self, message: str, traceback: str):
         """Handle diff error."""
@@ -471,22 +471,85 @@ class LootTrackingController(QObject):
         logger.error(f"Diff failed: {message}")
         self.status_message.emit(f"Diff error: {message}")
 
-    def _process_loot_items(self, items: List[Dict[str, Any]]):
+    def _start_valuation(self, items: List[Dict[str, Any]]):
         """
-        Convert raw items to LootDrops and add to session.
+        Start background valuation of items using price service.
 
         Args:
             items: Raw item dicts from stash API.
         """
+        # Cancel any existing valuation
+        if self._valuation_worker:
+            self._valuation_worker.cancel()
+            self._valuation_worker = None
+
+        # Get price service from context
+        try:
+            price_service = self._ctx.get_price_service()
+        except Exception as e:
+            logger.warning(f"Price service unavailable, using fallback: {e}")
+            # Fall back to synchronous processing without price service
+            self._process_loot_items_fallback(items)
+            return
+
+        # Get divine ratio from price service or use default
+        divine_ratio = 150.0
+        if hasattr(price_service, 'poe_ninja') and price_service.poe_ninja:
+            try:
+                rate = price_service.poe_ninja.ensure_divine_rate()
+                if rate > 10.0:
+                    divine_ratio = rate
+            except Exception:
+                pass  # Use default
+
+        self.status_message.emit(f"Pricing {len(items)} items...")
+
+        self._valuation_worker = LootValuationWorker(
+            items=items,
+            league=self._league,
+            price_service=price_service,
+            divine_ratio=divine_ratio,
+            parent=self,
+        )
+
+        self._valuation_worker.result.connect(self._on_valuation_result)
+        self._valuation_worker.error.connect(self._on_valuation_error)
+        self._valuation_worker.status.connect(self.status_message.emit)
+        self._valuation_worker.start()
+
+    def _on_valuation_result(self, priced_items: List[Dict[str, Any]]):
+        """Handle valuation worker result."""
+        self._valuation_worker = None
+        self._process_loot_items(priced_items)
+
+        # Reset for next comparison
+        self._before_snapshot = None
+        self._diff_engine.clear()
+
+    def _on_valuation_error(self, message: str, traceback: str):
+        """Handle valuation worker error."""
+        self._valuation_worker = None
+        logger.error(f"Valuation failed: {message}")
+        self.status_message.emit(f"Pricing error: {message}")
+
+        # Reset for next comparison
+        self._before_snapshot = None
+        self._diff_engine.clear()
+
+    def _process_loot_items(self, priced_items: List[Dict[str, Any]]):
+        """
+        Convert priced items to LootDrops and add to session.
+
+        Args:
+            priced_items: Item dicts with chaos_value and divine_value from valuation.
+        """
         drops: List[LootDrop] = []
         min_value = self._config.loot_min_value
 
-        for item in items:
+        for item in priced_items:
             extracted = extract_item_value(item)
-
-            # TODO: Look up actual prices from poe.ninja
-            # For now, assign placeholder values
-            chaos_value = self._estimate_item_value(item)
+            chaos_value = float(item.get("chaos_value", 0.0))
+            divine_value = float(item.get("divine_value", 0.0))
 
             if chaos_value < min_value:
                 continue
@@ -497,7 +560,7 @@ class LootTrackingController(QObject):
                 item_base_type=extracted["base_type"],
                 stack_size=extracted["stack_size"],
                 chaos_value=chaos_value,
-                divine_value=chaos_value / 150.0,  # Approximate
+                divine_value=divine_value,
                 rarity=get_rarity_name(extracted["rarity"]),
                 item_class=self._get_item_class(item),
                 detected_at=datetime.now(),
@@ -507,25 +570,59 @@ class LootTrackingController(QObject):
 
         if drops:
             self._session_manager.add_drops(drops)
+            priced_count = sum(1 for d in drops if d.chaos_value > 0)
+            self.status_message.emit(f"Added {len(drops)} drops ({priced_count} priced)")
 
-    def _estimate_item_value(self, item: Dict[str, Any]) -> float:
+    def _process_loot_items_fallback(self, items: List[Dict[str, Any]]):
         """
-        Estimate item value (placeholder until price service integration).
+        Fallback processing when price service unavailable.
 
-        Args:
-            item: Raw item dict.
-
-        Returns:
-            Estimated chaos value.
+        Uses basic heuristics for currency items only.
         """
-        # Basic heuristics based on rarity
+        drops: List[LootDrop] = []
+        min_value = self._config.loot_min_value
+
+        for item in items:
+            extracted = extract_item_value(item)
+            chaos_value = self._estimate_item_value_fallback(item)
+
+            if chaos_value < min_value:
+                continue
+
+            drop = LootDrop(
+                id=str(uuid4()),
+                item_name=extracted["display_name"],
+                item_base_type=extracted["base_type"],
+                stack_size=extracted["stack_size"],
+                chaos_value=chaos_value,
+                divine_value=chaos_value / 150.0,
+                rarity=get_rarity_name(extracted["rarity"]),
+                item_class=self._get_item_class(item),
+                detected_at=datetime.now(),
+                raw_item_data=item,
+            )
+            drops.append(drop)
+
+        if drops:
+            self._session_manager.add_drops(drops)
+            self.status_message.emit(f"Added {len(drops)} drops (fallback pricing)")
+
+        # Reset for next comparison
+        self._before_snapshot = None
+        self._diff_engine.clear()
+
+    def _estimate_item_value_fallback(self, item: Dict[str, Any]) -> float:
+        """
+        Fallback item valuation using basic heuristics.
+
+        Only provides rough estimates for common currency. Used when
+        price service is unavailable.
+        """
         frame_type = item.get("frameType", 0)
         stack_size = int(item.get("stackSize", 1))
 
-        if frame_type == 3:  # Unique
-            return 10.0
-        elif frame_type == 5:  # Currency
-            # Some basic currency values
+        # Only provide estimates for currency items
+        if frame_type == 5:  # Currency
             type_line = item.get("typeLine", "").lower()
             if "divine" in type_line:
                 return 150.0 * stack_size
@@ -537,12 +634,8 @@ class LootTrackingController(QObject):
                 return 20.0 * stack_size
             elif "annul" in type_line:
                 return 15.0 * stack_size
-            return 0.5 * stack_size
-        elif frame_type == 6:  # Divination Card
-            return 5.0 * stack_size
-        elif frame_type == 4:  # Gem
-            return 2.0
 
+        # Return 0 for non-currency items - they need actual pricing
         return 0.0
 
     def _get_item_class(self, item: Dict[str, Any]) -> str:

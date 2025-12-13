@@ -447,46 +447,46 @@ class TestLootTrackingControllerItemValue:
     """Tests for item value estimation."""
 
     def test_estimate_unique_item(self, controller):
-        """Should estimate unique items at base value."""
+        """Unique items return 0 in fallback mode (need price service)."""
         item = {"frameType": 3}  # Unique
-        value = controller._estimate_item_value(item)
-        assert value == 10.0
+        value = controller._estimate_item_value_fallback(item)
+        assert value == 0.0  # Non-currency items return 0 in fallback
 
     def test_estimate_divine_orb(self, controller):
-        """Should estimate divine orbs correctly."""
+        """Should estimate divine orbs correctly in fallback mode."""
         item = {"frameType": 5, "typeLine": "Divine Orb", "stackSize": 2}
-        value = controller._estimate_item_value(item)
+        value = controller._estimate_item_value_fallback(item)
         assert value == 300.0  # 150 * 2
 
     def test_estimate_exalted_orb(self, controller):
-        """Should estimate exalted orbs correctly."""
+        """Should estimate exalted orbs correctly in fallback mode."""
         item = {"frameType": 5, "typeLine": "Exalted Orb", "stackSize": 3}
-        value = controller._estimate_item_value(item)
+        value = controller._estimate_item_value_fallback(item)
         assert value == 120.0  # 40 * 3
 
     def test_estimate_chaos_orb(self, controller):
-        """Should estimate chaos orbs correctly."""
+        """Should estimate chaos orbs correctly in fallback mode."""
         item = {"frameType": 5, "typeLine": "Chaos Orb", "stackSize": 10}
-        value = controller._estimate_item_value(item)
+        value = controller._estimate_item_value_fallback(item)
         assert value == 10.0  # 1 * 10
 
     def test_estimate_divination_card(self, controller):
-        """Should estimate divination cards."""
+        """Divination cards return 0 in fallback mode (need price service)."""
         item = {"frameType": 6, "stackSize": 2}  # Divination Card
-        value = controller._estimate_item_value(item)
-        assert value == 10.0  # 5 * 2
+        value = controller._estimate_item_value_fallback(item)
+        assert value == 0.0  # Non-currency items return 0 in fallback
 
     def test_estimate_gem(self, controller):
-        """Should estimate gems."""
+        """Gems return 0 in fallback mode (need price service)."""
         item = {"frameType": 4}  # Gem
-        value = controller._estimate_item_value(item)
-        assert value == 2.0
+        value = controller._estimate_item_value_fallback(item)
+        assert value == 0.0  # Non-currency items return 0 in fallback
 
     def test_estimate_other_currency(self, controller):
-        """Should estimate other currency."""
+        """Unknown currency returns 0 in fallback mode."""
         item = {"frameType": 5, "typeLine": "Orb of Alteration", "stackSize": 20}
-        value = controller._estimate_item_value(item)
-        assert value == 10.0  # 0.5 * 20
+        value = controller._estimate_item_value_fallback(item)
+        assert value == 0.0  # Only known currency has fallback pricing
 
 
 # =============================================================================
