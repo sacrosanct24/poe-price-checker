@@ -3,14 +3,20 @@
 Local CI runner - mirrors GitHub Actions CI checks.
 
 Run this before pushing to catch issues locally:
-    python scripts/local_ci.py              # Run all checks
+    python scripts/local_ci.py              # Standard checks (lint, type, bandit, tests)
+    python scripts/local_ci.py --full       # FULL CI mirror (all checks + integration)
     python scripts/local_ci.py --quick      # Skip tests, just lint + type check
     python scripts/local_ci.py --lint       # Only run linting
-    python scripts/local_ci.py --test       # Only run tests
+    python scripts/local_ci.py --test       # Only run unit tests
+    python scripts/local_ci.py --integration  # Only run integration tests
+    python scripts/local_ci.py --no-qt      # Skip Qt/GUI tests (faster)
     python scripts/local_ci.py --security   # Only run bandit security scan
     python scripts/local_ci.py --security-full  # Full security: bandit (strict) + pip-audit
     python scripts/local_ci.py --complexity # Run radon code complexity analysis
     python scripts/local_ci.py --coverage   # Run tests with coverage + HTML report
+
+Recommended before pushing:
+    python scripts/local_ci.py --full       # Catches most CI failures locally
 """
 import argparse
 import os
@@ -152,8 +158,12 @@ def run_security_tests() -> bool:
     )
 
 
-def run_tests(quick: bool = False) -> bool:
+def run_tests(quick: bool = False, include_qt: bool = True) -> bool:
     """Run pytest tests."""
+    # Set Qt offscreen mode for headless testing
+    env = os.environ.copy()
+    env["QT_QPA_PLATFORM"] = "offscreen"
+
     cmd = [
         sys.executable, "-m", "pytest", "tests/",
         "--ignore=tests/integration",
@@ -161,7 +171,7 @@ def run_tests(quick: bool = False) -> bool:
     ]
 
     if quick:
-        # Just run unit tests without coverage
+        # Just run unit tests without coverage, skip Qt tests
         cmd.extend(["-m", "unit", "-q", "--ignore=tests/unit/gui_qt"])
     else:
         # Full test run with coverage
@@ -170,8 +180,55 @@ def run_tests(quick: bool = False) -> bool:
             "--cov-report=term-missing",
             "--timeout=120"
         ])
+        if not include_qt:
+            cmd.extend(["--ignore=tests/unit/gui_qt", "--ignore=tests/test_shortcuts.py"])
 
-    return run_command("Pytest", cmd, check=False)
+    print(f"\n{BLUE}{BOLD}{'='*60}{RESET}")
+    print(f"{BLUE}{BOLD}Running: Pytest{RESET}")
+    print(f"{BLUE}Command: {' '.join(cmd)}{RESET}")
+    print(f"{BLUE}{'='*60}{RESET}\n")
+
+    try:
+        result = subprocess.run(cmd, check=False, env=env)
+        if result.returncode == 0:
+            print(f"\n{GREEN}{PASS_MARK} Pytest passed{RESET}")
+            return True
+        else:
+            print(f"\n{RED}{FAIL_MARK} Pytest failed (exit code {result.returncode}){RESET}")
+            return False
+    except Exception as e:
+        print(f"\n{RED}{FAIL_MARK} Pytest failed: {e}{RESET}")
+        return False
+
+
+def run_integration_tests() -> bool:
+    """Run integration tests."""
+    env = os.environ.copy()
+    env["QT_QPA_PLATFORM"] = "offscreen"
+    env["PYTEST_DISABLE_PLUGIN_AUTOLOAD"] = "1"
+
+    cmd = [
+        sys.executable, "-m", "pytest", "tests/integration/",
+        "-v", "--timeout=300",
+        "--ignore=tests/integration/test_ai_connectivity.py"  # Skip flaky external API tests
+    ]
+
+    print(f"\n{BLUE}{BOLD}{'='*60}{RESET}")
+    print(f"{BLUE}{BOLD}Running: Integration Tests{RESET}")
+    print(f"{BLUE}Command: {' '.join(cmd)}{RESET}")
+    print(f"{BLUE}{'='*60}{RESET}\n")
+
+    try:
+        result = subprocess.run(cmd, check=False, env=env)
+        if result.returncode == 0:
+            print(f"\n{GREEN}{PASS_MARK} Integration tests passed{RESET}")
+            return True
+        else:
+            print(f"\n{RED}{FAIL_MARK} Integration tests failed (exit code {result.returncode}){RESET}")
+            return False
+    except Exception as e:
+        print(f"\n{RED}{FAIL_MARK} Integration tests failed: {e}{RESET}")
+        return False
 
 
 def run_complexity() -> bool:
@@ -244,7 +301,21 @@ def run_coverage_check() -> bool:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Run local CI checks before pushing"
+        description="Run local CI checks before pushing",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  python scripts/local_ci.py              # Standard checks (lint, type, bandit, unit tests)
+  python scripts/local_ci.py --full       # Full CI mirror (all checks + integration tests)
+  python scripts/local_ci.py --quick      # Fast check (lint + type only)
+  python scripts/local_ci.py --test       # Only run unit tests
+  python scripts/local_ci.py --integration  # Only run integration tests
+  python scripts/local_ci.py --coverage   # Tests with coverage report
+        """
+    )
+    parser.add_argument(
+        "--full", action="store_true",
+        help="Full CI mirror: lint, type, bandit, unit tests, integration tests, complexity"
     )
     parser.add_argument(
         "--quick", action="store_true",
@@ -260,7 +331,11 @@ def main():
     )
     parser.add_argument(
         "--test", action="store_true",
-        help="Only run tests"
+        help="Only run unit tests"
+    )
+    parser.add_argument(
+        "--integration", action="store_true",
+        help="Only run integration tests"
     )
     parser.add_argument(
         "--security", action="store_true",
@@ -282,6 +357,10 @@ def main():
         "--no-install", action="store_true",
         help="Don't auto-install missing tools"
     )
+    parser.add_argument(
+        "--no-qt", action="store_true",
+        help="Skip Qt/GUI tests (faster, matches CI unit-only job)"
+    )
 
     args = parser.parse_args()
 
@@ -300,30 +379,44 @@ def main():
     results = {}
 
     # Determine which checks to run
-    run_all = not (args.lint or args.type or args.test or args.security
-                   or args.security_full or args.complexity or args.coverage)
+    specific_check = (args.lint or args.type or args.test or args.security
+                      or args.security_full or args.complexity or args.coverage
+                      or args.integration)
+    run_all = not specific_check
+    run_full = args.full
 
-    if args.lint or run_all:
+    # Flake8 linting
+    if args.lint or run_all or run_full:
         results["flake8"] = run_flake8()
 
-    if args.type or run_all:
+    # Mypy type checking
+    if args.type or run_all or run_full:
         results["mypy"] = run_mypy()
 
+    # Security checks
     if args.security_full:
         # Full security scan: strict bandit + pip-audit + security tests
         results["bandit"] = run_bandit(strict=True)
         results["pip-audit"] = run_pip_audit()
         results["security-tests"] = run_security_tests()
-    elif args.security or run_all:
+    elif args.security or run_all or run_full:
         results["bandit"] = run_bandit(strict=False)
 
-    if args.complexity:
+    # Complexity analysis (only in full mode or explicitly requested)
+    if args.complexity or run_full:
         results["complexity"] = run_complexity()
 
+    # Tests
     if args.coverage:
         results["coverage"] = run_coverage_check()
-    elif args.test or (run_all and not args.quick):
-        results["pytest"] = run_tests(quick=args.quick)
+    elif args.test:
+        results["pytest"] = run_tests(quick=False, include_qt=not args.no_qt)
+    elif (run_all or run_full) and not args.quick:
+        results["pytest"] = run_tests(quick=False, include_qt=not args.no_qt)
+
+    # Integration tests (only in full mode or explicitly requested)
+    if args.integration or run_full:
+        results["integration"] = run_integration_tests()
 
     # Summary
     print(f"\n{BOLD}{'='*60}{RESET}")
