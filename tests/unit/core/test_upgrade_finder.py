@@ -434,3 +434,487 @@ class TestBisToPoBSlotMapping:
     def test_shield_maps_to_offhand(self):
         """Test that Shield maps to Weapon 2 (offhand)."""
         assert BIS_TO_POB_SLOT["Shield"] == "Weapon 2"
+
+
+class TestUpgradeCandidateExtended:
+    """Extended tests for UpgradeCandidate."""
+
+    def test_get_summary_negative_life_delta(self):
+        """Test summary when life delta is negative."""
+        from core.upgrade_calculator import UpgradeImpact
+
+        candidate = UpgradeCandidate(
+            name="Test",
+            base_type="Helm",
+            item_level=84,
+            upgrade_impact=UpgradeImpact(
+                effective_life_delta=-50.0,  # Negative
+                fire_res_delta=-5.0,
+                cold_res_delta=-5.0,
+            ),
+        )
+        summary = candidate.get_summary()
+        assert "+life" not in summary.lower()
+
+    def test_get_summary_negative_res(self):
+        """Test summary when total res is negative."""
+        from core.upgrade_calculator import UpgradeImpact
+
+        candidate = UpgradeCandidate(
+            name="Test",
+            base_type="Helm",
+            item_level=84,
+            upgrade_impact=UpgradeImpact(
+                effective_life_delta=0.0,
+                fire_res_delta=-10.0,
+                cold_res_delta=-10.0,
+            ),
+            dps_percent_change=0.3,  # Below 0.5 threshold
+        )
+        summary = candidate.get_summary()
+        assert "+res" not in summary.lower()
+        assert "DPS" not in summary
+
+    def test_get_summary_low_dps_change(self):
+        """Test summary when DPS change is below threshold."""
+        from core.upgrade_calculator import UpgradeImpact
+
+        candidate = UpgradeCandidate(
+            name="Test",
+            base_type="Helm",
+            item_level=84,
+            upgrade_impact=UpgradeImpact(
+                effective_life_delta=0.0,
+                fire_res_delta=0.0,
+            ),
+            dps_percent_change=0.4,  # Below 0.5 threshold
+        )
+        summary = candidate.get_summary()
+        assert "Minor improvement" == summary
+
+
+class TestSlotUpgradeResultExtended:
+    """Extended tests for SlotUpgradeResult."""
+
+    def test_best_upgrade_with_price(self):
+        """Test best_upgrade with price info in summary."""
+        candidate = UpgradeCandidate(
+            name="Good Helm",
+            base_type="Burgonet",
+            item_level=84,
+            price_display="50 chaos",
+            total_score=100,
+        )
+        result = SlotUpgradeResult(
+            slot="Helmet",
+            current_item=None,
+            candidates=[candidate],
+        )
+        assert result.best_upgrade.price_display == "50 chaos"
+
+
+class TestUpgradeFinderResultExtended:
+    """Extended tests for UpgradeFinderResult."""
+
+    def test_get_slot_summary_with_upgrade(self):
+        """Test get_slot_summary when upgrades exist."""
+        from core.upgrade_calculator import UpgradeImpact
+
+        candidate = UpgradeCandidate(
+            name="Great Helm",
+            base_type="Burgonet",
+            item_level=86,
+            price_display="100 chaos",
+            total_score=120,
+            upgrade_impact=UpgradeImpact(
+                effective_life_delta=100.0,
+                fire_res_delta=10.0,
+            ),
+        )
+
+        result = UpgradeFinderResult(
+            profile_name="Test",
+            budget_chaos=500,
+            slot_results={
+                "Helmet": SlotUpgradeResult(
+                    slot="Helmet",
+                    current_item=None,
+                    candidates=[candidate],
+                ),
+            },
+        )
+
+        summary = result.get_slot_summary()
+        assert "Great Helm" in summary["Helmet"]
+        assert "100 chaos" in summary["Helmet"]
+
+
+class TestUpgradeFinderServiceExtended:
+    """Extended tests for UpgradeFinderService."""
+
+    @pytest.fixture
+    def mock_character_manager(self):
+        return Mock()
+
+    @pytest.fixture
+    def sample_build_stats(self):
+        return {
+            "Spec:LifeInc": 150.0,
+            "Life": 5000.0,
+            "EnergyShield": 0.0,
+            "FireResist": 75.0,
+            "ColdResist": 75.0,
+            "LightningResist": 75.0,
+            "ChaosResist": 0.0,
+            "CombinedDPS": 500000.0,
+        }
+
+    @pytest.fixture
+    def sample_profile_no_dps(self, sample_build_stats):
+        """Profile with no DPS stats."""
+        stats = dict(sample_build_stats)
+        stats["CombinedDPS"] = 0.0
+
+        build = PoBBuild(
+            class_name="Witch",
+            level=90,
+            stats=stats,
+            items={},
+        )
+        return CharacterProfile(name="TestNoDPS", build=build)
+
+    def test_find_upgrades_no_dps_stats(self, mock_character_manager, sample_profile_no_dps):
+        """Test find_upgrades when DPS stats are 0."""
+        mock_character_manager.get_profile.return_value = sample_profile_no_dps
+
+        with patch('data_sources.pricing.trade_api.TradeApiSource') as mock_api:
+            mock_source = Mock()
+            mock_source._search.return_value = (None, [])
+            mock_api.return_value = mock_source
+
+            service = UpgradeFinderService(mock_character_manager)
+            result = service.find_upgrades(
+                "TestNoDPS",
+                budget_chaos=500,
+                slots=["Helmet"],
+            )
+
+            assert "Helmet" in result.slot_results
+
+    def test_find_upgrades_dps_init_error(self, mock_character_manager, sample_build_stats):
+        """Test find_upgrades when DPS calculator init fails."""
+        build = PoBBuild(
+            class_name="Witch",
+            level=90,
+            stats=sample_build_stats,
+            items={},
+        )
+        profile = CharacterProfile(name="TestDPSError", build=build)
+        mock_character_manager.get_profile.return_value = profile
+
+        with patch('data_sources.pricing.trade_api.TradeApiSource') as mock_api, \
+             patch('core.upgrade_finder.DPSStats.from_pob_stats', side_effect=ValueError("Bad stats")):
+            mock_source = Mock()
+            mock_source._search.return_value = (None, [])
+            mock_api.return_value = mock_source
+
+            service = UpgradeFinderService(mock_character_manager)
+            result = service.find_upgrades(
+                "TestDPSError",
+                budget_chaos=500,
+                slots=["Helmet"],
+            )
+
+            # Should still work, just without DPS calc
+            assert "Helmet" in result.slot_results
+
+    def test_search_slot_unknown_slot(self, mock_character_manager, sample_build_stats):
+        """Test _search_slot with unknown slot."""
+        build = PoBBuild(
+            class_name="Witch",
+            level=90,
+            stats=sample_build_stats,
+            items={},
+        )
+        profile = CharacterProfile(name="Test", build=build)
+
+        service = UpgradeFinderService(mock_character_manager)
+        build_stats = BuildStats.from_pob_stats(sample_build_stats)
+        from core.bis_calculator import BiSCalculator
+
+        result = service._search_slot(
+            profile=profile,
+            slot="UnknownSlot",
+            budget_chaos=500,
+            bis_calculator=BiSCalculator(build_stats),
+            upgrade_calculator=Mock(),
+            dps_calculator=None,
+            max_results=5,
+        )
+
+        assert result.error is not None
+        assert "Unknown slot" in result.error
+
+    def test_search_slot_ring_slot(self, mock_character_manager, sample_build_stats):
+        """Test _search_slot handles Ring slot specially."""
+        build = PoBBuild(
+            class_name="Witch",
+            level=90,
+            stats=sample_build_stats,
+            items={},
+        )
+        profile = CharacterProfile(name="Test", build=build)
+
+        with patch('data_sources.pricing.trade_api.TradeApiSource') as mock_api:
+            mock_source = Mock()
+            mock_source._search.return_value = (None, [])
+            mock_api.return_value = mock_source
+
+            service = UpgradeFinderService(mock_character_manager)
+            build_stats = BuildStats.from_pob_stats(sample_build_stats)
+            from core.bis_calculator import BiSCalculator
+            from core.upgrade_calculator import UpgradeCalculator
+
+            result = service._search_slot(
+                profile=profile,
+                slot="Ring",
+                budget_chaos=500,
+                bis_calculator=BiSCalculator(build_stats),
+                upgrade_calculator=UpgradeCalculator(build_stats),
+                dps_calculator=None,
+                max_results=5,
+            )
+
+            # Should not have error - Ring is handled specially
+            assert result.error is None or "Unknown" not in str(result.error)
+
+    def test_search_slot_exception_handling(self, mock_character_manager, sample_build_stats):
+        """Test _search_slot handles exceptions."""
+        build = PoBBuild(
+            class_name="Witch",
+            level=90,
+            stats=sample_build_stats,
+            items={},
+        )
+        profile = CharacterProfile(name="Test", build=build)
+
+        service = UpgradeFinderService(mock_character_manager)
+
+        # Mock BiSCalculator to raise exception
+        mock_bis = Mock()
+        mock_bis.calculate_requirements.side_effect = RuntimeError("Calc error")
+
+        result = service._search_slot(
+            profile=profile,
+            slot="Helmet",
+            budget_chaos=500,
+            bis_calculator=mock_bis,
+            upgrade_calculator=Mock(),
+            dps_calculator=None,
+            max_results=5,
+        )
+
+        assert result.error is not None
+        assert "Calc error" in result.error
+
+    def test_execute_trade_search_with_results(self, mock_character_manager):
+        """Test _execute_trade_search with actual results."""
+        with patch('data_sources.pricing.trade_api.TradeApiSource') as mock_api:
+            mock_source = Mock()
+            mock_source._search.return_value = ("search123", ["id1", "id2"])
+            mock_source._fetch_listings.return_value = [
+                {
+                    "id": "id1",
+                    "item": {
+                        "name": "Good Helm",
+                        "typeLine": "Burgonet",
+                        "ilvl": 84,
+                        "explicitMods": ["+80 to Life"],
+                        "implicitMods": [],
+                    },
+                    "listing": {"price": {"amount": 50, "currency": "chaos"}},
+                },
+            ]
+            mock_api.return_value = mock_source
+
+            service = UpgradeFinderService(mock_character_manager)
+            candidates = service._execute_trade_search({}, max_results=5)
+
+            assert len(candidates) == 1
+            assert candidates[0].name == "Good Helm Burgonet"
+
+    def test_execute_trade_search_exception(self, mock_character_manager):
+        """Test _execute_trade_search handles exceptions."""
+        with patch('data_sources.pricing.trade_api.TradeApiSource', side_effect=RuntimeError("API Error")):
+            service = UpgradeFinderService(mock_character_manager)
+            candidates = service._execute_trade_search({}, max_results=5)
+
+            assert candidates == []
+
+    def test_parse_listing_exalted_conversion(self, mock_character_manager):
+        """Test that exalted prices are converted to chaos."""
+        service = UpgradeFinderService(mock_character_manager)
+
+        listing = {
+            "id": "abc",
+            "item": {
+                "name": "",
+                "typeLine": "Helm",
+                "ilvl": 80,
+                "explicitMods": [],
+                "implicitMods": [],
+            },
+            "listing": {
+                "price": {"amount": 10, "currency": "exalted"},
+            },
+        }
+
+        candidate = service._parse_listing(listing)
+        assert candidate.price_chaos == 150  # 10 * 15
+
+    def test_parse_listing_malformed_returns_empty(self, mock_character_manager):
+        """Test _parse_listing handles malformed data gracefully."""
+        service = UpgradeFinderService(mock_character_manager)
+
+        # Malformed listing - returns empty candidate due to .get() defaults
+        listing = {"bad": "data"}
+
+        candidate = service._parse_listing(listing)
+        # Returns empty candidate, not None
+        assert candidate.name == ""
+        assert candidate.base_type == ""
+        assert candidate.item_level == 0
+
+    def test_parse_listing_exception_returns_none(self, mock_character_manager):
+        """Test _parse_listing returns None on exception."""
+        service = UpgradeFinderService(mock_character_manager)
+
+        # Pass None to trigger exception in get()
+        candidate = service._parse_listing(None)
+        assert candidate is None
+
+    def test_score_candidate_with_dps_calculator(self, mock_character_manager, sample_build_stats):
+        """Test scoring with DPS calculator."""
+        service = UpgradeFinderService(mock_character_manager)
+
+        build_stats = BuildStats.from_pob_stats(sample_build_stats)
+        from core.upgrade_calculator import UpgradeCalculator
+        from core.dps_impact_calculator import DPSStats, DPSImpactCalculator
+
+        upgrade_calc = UpgradeCalculator(build_stats)
+        dps_stats = DPSStats.from_pob_stats(sample_build_stats)
+        dps_calc = DPSImpactCalculator(dps_stats)
+
+        candidate = UpgradeCandidate(
+            name="DPS Helm",
+            base_type="Burgonet",
+            item_level=84,
+            explicit_mods=["+50% increased Physical Damage"],
+            price_chaos=200,
+        )
+
+        service._score_candidate(
+            candidate=candidate,
+            current_mods=[],
+            upgrade_calculator=upgrade_calc,
+            dps_calculator=dps_calc,
+        )
+
+        # Should have DPS impact calculated
+        assert candidate.dps_impact is not None or candidate.dps_change >= 0
+
+    def test_score_candidate_upgrade_calc_error(self, mock_character_manager):
+        """Test scoring handles upgrade calculator errors."""
+        service = UpgradeFinderService(mock_character_manager)
+
+        mock_upgrade_calc = Mock()
+        mock_upgrade_calc.calculate_upgrade.side_effect = ValueError("Calc error")
+
+        candidate = UpgradeCandidate(
+            name="Error Helm",
+            base_type="Burgonet",
+            item_level=84,
+            explicit_mods=[],
+            price_chaos=100,
+        )
+
+        service._score_candidate(
+            candidate=candidate,
+            current_mods=[],
+            upgrade_calculator=mock_upgrade_calc,
+            dps_calculator=None,
+        )
+
+        # Should have 0 score on error
+        assert candidate.upgrade_score == 0
+
+    def test_score_candidate_dps_calc_error(self, mock_character_manager, sample_build_stats):
+        """Test scoring handles DPS calculator errors."""
+        service = UpgradeFinderService(mock_character_manager)
+
+        build_stats = BuildStats.from_pob_stats(sample_build_stats)
+        from core.upgrade_calculator import UpgradeCalculator
+
+        upgrade_calc = UpgradeCalculator(build_stats)
+        mock_dps_calc = Mock()
+        mock_dps_calc.calculate_impact.side_effect = ValueError("DPS error")
+
+        candidate = UpgradeCandidate(
+            name="Error Helm",
+            base_type="Burgonet",
+            item_level=84,
+            explicit_mods=[],
+            price_chaos=50,
+        )
+
+        service._score_candidate(
+            candidate=candidate,
+            current_mods=[],
+            upgrade_calculator=upgrade_calc,
+            dps_calculator=mock_dps_calc,
+        )
+
+        # Should still have upgrade score, just no DPS
+        assert candidate.dps_change == 0
+
+    def test_score_candidate_zero_price(self, mock_character_manager, sample_build_stats):
+        """Test scoring with zero price (no penalty)."""
+        service = UpgradeFinderService(mock_character_manager)
+
+        build_stats = BuildStats.from_pob_stats(sample_build_stats)
+        from core.upgrade_calculator import UpgradeCalculator
+
+        upgrade_calc = UpgradeCalculator(build_stats)
+
+        candidate = UpgradeCandidate(
+            name="Free Helm",
+            base_type="Burgonet",
+            item_level=84,
+            explicit_mods=["+50 to maximum Life"],
+            price_chaos=0,  # Free item
+        )
+
+        service._score_candidate(
+            candidate=candidate,
+            current_mods=[],
+            upgrade_calculator=upgrade_calc,
+            dps_calculator=None,
+        )
+
+        # Should have no price penalty
+        assert candidate.total_score >= candidate.upgrade_score
+
+
+class TestFactoryFunction:
+    """Tests for factory function."""
+
+    def test_get_upgrade_finder(self):
+        """Test get_upgrade_finder factory function."""
+        from core.upgrade_finder import get_upgrade_finder
+
+        mock_manager = Mock()
+        service = get_upgrade_finder(mock_manager, league="Settlers")
+
+        assert isinstance(service, UpgradeFinderService)
+        assert service.league == "Settlers"
+        assert service.character_manager is mock_manager

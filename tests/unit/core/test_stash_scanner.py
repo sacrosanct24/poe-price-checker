@@ -630,3 +630,299 @@ class TestBuildItemText:
         item_text = scanner._build_item_text(item)
 
         assert "Corrupted" in item_text
+
+    @patch('core.stash_scanner.requests.get')
+    def test_build_item_text_without_name(self, mock_get, mock_oauth_client):
+        """Should handle items without name (just type_line)."""
+        account_response = Mock()
+        account_response.json.return_value = {"name": "TestAccount"}
+        account_response.raise_for_status = Mock()
+        mock_get.return_value = account_response
+
+        scanner = StashScanner(mock_oauth_client)
+
+        # Item with no name, just type_line (common for currency)
+        item = StashItem("", "Chaos Orb", "CURRENCY", "Tab", 0, 0, 0, 0, True, False, "")
+
+        item_text = scanner._build_item_text(item)
+
+        assert "Chaos Orb" in item_text
+        assert "Rarity: CURRENCY" in item_text
+
+    @patch('core.stash_scanner.requests.get')
+    def test_build_item_text_without_type_line(self, mock_get, mock_oauth_client):
+        """Should handle items without type_line."""
+        account_response = Mock()
+        account_response.json.return_value = {"name": "TestAccount"}
+        account_response.raise_for_status = Mock()
+        mock_get.return_value = account_response
+
+        scanner = StashScanner(mock_oauth_client)
+
+        # Item with name but no type_line
+        item = StashItem("Special Item", "", "UNIQUE", "Tab", 0, 0, 0, 50, True, False, "")
+
+        item_text = scanner._build_item_text(item)
+
+        assert "Special Item" in item_text
+
+
+# -------------------------
+# Stash Items API Error Tests
+# -------------------------
+
+class TestStashItemsApiErrors:
+    """Test error handling for stash items API."""
+
+    @patch('core.stash_scanner.requests.get')
+    def test_get_stash_items_raises_if_not_authenticated(self, mock_get, mock_oauth_client):
+        """Should raise error if not authenticated."""
+        account_response = Mock()
+        account_response.json.return_value = {"name": "TestAccount"}
+        account_response.raise_for_status = Mock()
+        mock_get.return_value = account_response
+
+        scanner = StashScanner(mock_oauth_client)
+
+        # Make OAuth return None (expired token)
+        mock_oauth_client.get_access_token.return_value = None
+
+        with pytest.raises(ValueError, match="Not authenticated"):
+            scanner.get_stash_items(tab_index=0)
+
+    @patch('core.stash_scanner.requests.get')
+    def test_get_stash_items_handles_api_error(self, mock_get, mock_oauth_client):
+        """Should raise error on API failure."""
+        account_response = Mock()
+        account_response.json.return_value = {"name": "TestAccount"}
+        account_response.raise_for_status = Mock()
+
+        mock_get.side_effect = [
+            account_response,
+            requests.RequestException("API error")
+        ]
+
+        scanner = StashScanner(mock_oauth_client)
+
+        with pytest.raises(requests.RequestException):
+            scanner.get_stash_items(tab_index=0)
+
+
+# -------------------------
+# Scan and Price Tests
+# -------------------------
+
+class TestScanAndPrice:
+    """Test scan_and_price integration."""
+
+    @patch('core.stash_scanner.requests.get')
+    def test_scan_and_price_prices_items(self, mock_get, mock_oauth_client):
+        """Should price check items during scan."""
+        # Setup mock responses
+        account_response = Mock()
+        account_response.json.return_value = {"name": "TestAccount"}
+        account_response.raise_for_status = Mock()
+
+        tabs_response = Mock()
+        tabs_response.json.return_value = {
+            "tabs": [
+                {"i": 0, "n": "Currency", "type": "CurrencyStash"},
+            ]
+        }
+        tabs_response.raise_for_status = Mock()
+
+        items_response = Mock()
+        items_response.json.return_value = {
+            "items": [
+                {"name": "", "typeLine": "Chaos Orb", "frameType": 5, "x": 0, "y": 0, "ilvl": 0, "identified": True, "corrupted": False, "icon": ""},
+                {"name": "", "typeLine": "Divine Orb", "frameType": 5, "x": 1, "y": 0, "ilvl": 0, "identified": True, "corrupted": False, "icon": ""},
+            ]
+        }
+        items_response.raise_for_status = Mock()
+
+        mock_get.side_effect = [account_response, tabs_response, items_response]
+
+        # Setup mock price service
+        mock_price_service = Mock()
+        mock_price_service.check_item.side_effect = [
+            [{"chaos_value": 1.0, "divine_value": 0.0, "source": "poe_ninja"}],
+            [{"chaos_value": 200.0, "divine_value": 1.0, "source": "poe_ninja"}],
+        ]
+
+        scanner = StashScanner(mock_oauth_client)
+        valuable = scanner.scan_and_price(mock_price_service, min_chaos_value=10.0)
+
+        # Should have 1 valuable item (Divine Orb >= 10c)
+        assert len(valuable) == 1
+        assert valuable[0][1].chaos_value == 200.0
+
+    @patch('core.stash_scanner.requests.get')
+    def test_scan_and_price_handles_pricing_errors(self, mock_get, mock_oauth_client):
+        """Should handle price service errors gracefully."""
+        account_response = Mock()
+        account_response.json.return_value = {"name": "TestAccount"}
+        account_response.raise_for_status = Mock()
+
+        tabs_response = Mock()
+        tabs_response.json.return_value = {
+            "tabs": [{"i": 0, "n": "Tab", "type": "NormalStash"}]
+        }
+        tabs_response.raise_for_status = Mock()
+
+        items_response = Mock()
+        items_response.json.return_value = {
+            "items": [
+                {"name": "Item", "typeLine": "Type", "frameType": 2, "x": 0, "y": 0, "ilvl": 80, "identified": True, "corrupted": False, "icon": ""},
+            ]
+        }
+        items_response.raise_for_status = Mock()
+
+        mock_get.side_effect = [account_response, tabs_response, items_response]
+
+        # Price service raises error
+        mock_price_service = Mock()
+        mock_price_service.check_item.side_effect = Exception("Price API error")
+
+        scanner = StashScanner(mock_oauth_client)
+
+        # Should not raise - error is logged, item stays at 0 value
+        # With min_chaos_value=1.0, items with 0 value are filtered out
+        valuable = scanner.scan_and_price(mock_price_service, min_chaos_value=1.0)
+        assert valuable == []
+
+    @patch('core.stash_scanner.requests.get')
+    def test_scan_and_price_handles_empty_results(self, mock_get, mock_oauth_client):
+        """Should handle empty price results."""
+        account_response = Mock()
+        account_response.json.return_value = {"name": "TestAccount"}
+        account_response.raise_for_status = Mock()
+
+        tabs_response = Mock()
+        tabs_response.json.return_value = {
+            "tabs": [{"i": 0, "n": "Tab", "type": "NormalStash"}]
+        }
+        tabs_response.raise_for_status = Mock()
+
+        items_response = Mock()
+        items_response.json.return_value = {
+            "items": [
+                {"name": "Item", "typeLine": "Type", "frameType": 2, "x": 0, "y": 0, "ilvl": 80, "identified": True, "corrupted": False, "icon": ""},
+            ]
+        }
+        items_response.raise_for_status = Mock()
+
+        mock_get.side_effect = [account_response, tabs_response, items_response]
+
+        # Price service returns empty list
+        mock_price_service = Mock()
+        mock_price_service.check_item.return_value = []
+
+        scanner = StashScanner(mock_oauth_client)
+        # Items with 0 value should be filtered out with min_chaos_value=1.0
+        valuable = scanner.scan_and_price(mock_price_service, min_chaos_value=1.0)
+
+        assert valuable == []
+
+    @patch('core.stash_scanner.requests.get')
+    def test_scan_and_price_handles_none_values(self, mock_get, mock_oauth_client):
+        """Should handle None chaos/divine values."""
+        account_response = Mock()
+        account_response.json.return_value = {"name": "TestAccount"}
+        account_response.raise_for_status = Mock()
+
+        tabs_response = Mock()
+        tabs_response.json.return_value = {
+            "tabs": [{"i": 0, "n": "Tab", "type": "NormalStash"}]
+        }
+        tabs_response.raise_for_status = Mock()
+
+        items_response = Mock()
+        items_response.json.return_value = {
+            "items": [
+                {"name": "Item", "typeLine": "Type", "frameType": 2, "x": 0, "y": 0, "ilvl": 80, "identified": True, "corrupted": False, "icon": ""},
+            ]
+        }
+        items_response.raise_for_status = Mock()
+
+        mock_get.side_effect = [account_response, tabs_response, items_response]
+
+        # Price service returns None values
+        mock_price_service = Mock()
+        mock_price_service.check_item.return_value = [
+            {"chaos_value": None, "divine_value": None, "source": "poe_ninja"}
+        ]
+
+        scanner = StashScanner(mock_oauth_client)
+        valuable = scanner.scan_and_price(mock_price_service, min_chaos_value=10.0)
+
+        # Should not crash, item gets 0 value
+        assert valuable == []
+
+    @patch('core.stash_scanner.requests.get')
+    def test_scan_and_price_accumulates_tab_totals(self, mock_get, mock_oauth_client):
+        """Should accumulate total tab values."""
+        account_response = Mock()
+        account_response.json.return_value = {"name": "TestAccount"}
+        account_response.raise_for_status = Mock()
+
+        tabs_response = Mock()
+        tabs_response.json.return_value = {
+            "tabs": [{"i": 0, "n": "Tab", "type": "NormalStash"}]
+        }
+        tabs_response.raise_for_status = Mock()
+
+        items_response = Mock()
+        items_response.json.return_value = {
+            "items": [
+                {"name": "Item1", "typeLine": "Type1", "frameType": 2, "x": 0, "y": 0, "ilvl": 80, "identified": True, "corrupted": False, "icon": ""},
+                {"name": "Item2", "typeLine": "Type2", "frameType": 2, "x": 1, "y": 0, "ilvl": 80, "identified": True, "corrupted": False, "icon": ""},
+            ]
+        }
+        items_response.raise_for_status = Mock()
+
+        mock_get.side_effect = [account_response, tabs_response, items_response]
+
+        mock_price_service = Mock()
+        mock_price_service.check_item.side_effect = [
+            [{"chaos_value": 100.0, "divine_value": 0.5, "source": "poe_ninja"}],
+            [{"chaos_value": 50.0, "divine_value": 0.25, "source": "poe_ninja"}],
+        ]
+
+        scanner = StashScanner(mock_oauth_client)
+        valuable = scanner.scan_and_price(mock_price_service, min_chaos_value=1.0)
+
+        # Both items should be valuable
+        assert len(valuable) == 2
+
+        # Tab totals should be accumulated (150c total)
+        tab = valuable[0][0]
+        assert tab.total_value_chaos == 150.0
+        assert tab.total_value_divine == 0.75
+
+
+# -------------------------
+# StashItem __str__ Tests
+# -------------------------
+
+class TestStashItemStr:
+    """Test StashItem string representation."""
+
+    def test_str_uses_type_line_when_name_empty(self):
+        """Should use type_line when name is empty."""
+        item = StashItem(
+            name="",
+            type_line="Chaos Orb",
+            rarity="CURRENCY",
+            stash_tab_name="Currency",
+            stash_tab_index=0,
+            position_x=0,
+            position_y=0,
+            ilvl=0,
+            identified=True,
+            corrupted=False,
+            icon=""
+        )
+
+        str_repr = str(item)
+        assert "Chaos Orb" in str_repr
+        assert "Currency" in str_repr

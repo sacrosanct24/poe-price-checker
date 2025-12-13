@@ -685,3 +685,360 @@ class TestMetaAnalyzerIntegration:
         assert 'movement_speed' in result
         assert result['movement_speed'].appearance_count == 5
         assert result['movement_speed'].popularity_percent == 50.0
+
+
+# =============================================================================
+# Meta Builds Knowledge Tests
+# =============================================================================
+
+
+class TestLoadMetaBuildsKnowledge:
+    """Tests for load_meta_builds_knowledge method."""
+
+    def test_load_missing_file(self):
+        """Test loading when file doesn't exist."""
+        from core.meta_analyzer import MetaAnalyzer
+
+        analyzer = MetaAnalyzer()
+        result = analyzer.load_meta_builds_knowledge(
+            game_version="poe1",
+            knowledge_dir=Path("/nonexistent/path")
+        )
+
+        assert result == {}
+
+    def test_load_valid_knowledge_file(self):
+        """Test loading valid knowledge file."""
+        from core.meta_analyzer import MetaAnalyzer
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            knowledge_dir = Path(tmpdir)
+            knowledge_file = knowledge_dir / "current_league.json"
+
+            knowledge_data = {
+                "league": "TestLeague",
+                "affix_meta_weights": {
+                    "life": {"base_weight": 5.0, "meta_multiplier": 1.2},
+                    "movement_speed": {"base_weight": 4.0, "meta_multiplier": 1.5},
+                },
+                "builds": [
+                    {
+                        "name": "Lightning Strike",
+                        "popularity_percent": 10,
+                        "tier": "S",
+                        "desired_affixes_global": [
+                            {"name": "attack_speed", "weight": 8},
+                        ]
+                    }
+                ]
+            }
+
+            with open(knowledge_file, 'w') as f:
+                json.dump(knowledge_data, f)
+
+            analyzer = MetaAnalyzer()
+            result = analyzer.load_meta_builds_knowledge(
+                game_version="poe1",
+                knowledge_dir=knowledge_dir
+            )
+
+            assert 'life' in result
+            assert result['life'] == 6.0  # 5.0 * 1.2
+            assert result['movement_speed'] == 6.0  # 4.0 * 1.5
+            assert 'attack_speed' in result
+
+    def test_load_knowledge_with_tier_multipliers(self):
+        """Test that tier multipliers affect affix weights."""
+        from core.meta_analyzer import MetaAnalyzer
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            knowledge_dir = Path(tmpdir)
+            knowledge_file = knowledge_dir / "current_league.json"
+
+            knowledge_data = {
+                "league": "TestLeague",
+                "affix_meta_weights": {},
+                "builds": [
+                    {
+                        "name": "S-Tier Build",
+                        "popularity_percent": 20,
+                        "tier": "S",  # 1.5 multiplier
+                        "desired_affixes_global": [
+                            {"name": "crit_chance", "weight": 10},
+                        ]
+                    },
+                    {
+                        "name": "D-Tier Build",
+                        "popularity_percent": 5,
+                        "tier": "D",  # 0.9 multiplier
+                        "desired_affixes_global": [
+                            {"name": "mana", "weight": 5},
+                        ]
+                    }
+                ]
+            }
+
+            with open(knowledge_file, 'w') as f:
+                json.dump(knowledge_data, f)
+
+            analyzer = MetaAnalyzer()
+            result = analyzer.load_meta_builds_knowledge(
+                game_version="poe1",
+                knowledge_dir=knowledge_dir
+            )
+
+            # S-tier with 20% popularity: 5.0 + 10 * (0.2 * 1.5) * 0.1 = 5.3
+            assert 'crit_chance' in result
+            # D-tier with 5% popularity: 5.0 + 5 * (0.05 * 0.9) * 0.1 ~ 5.02
+            assert 'mana' in result
+
+    def test_load_knowledge_invalid_json(self):
+        """Test loading with invalid JSON file."""
+        from core.meta_analyzer import MetaAnalyzer
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            knowledge_dir = Path(tmpdir)
+            knowledge_file = knowledge_dir / "current_league.json"
+            knowledge_file.write_text("{ invalid json")
+
+            analyzer = MetaAnalyzer()
+            result = analyzer.load_meta_builds_knowledge(
+                game_version="poe1",
+                knowledge_dir=knowledge_dir
+            )
+
+            assert result == {}
+
+    def test_load_knowledge_stores_internal_data(self):
+        """Test that loaded data is stored for later use."""
+        from core.meta_analyzer import MetaAnalyzer
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            knowledge_dir = Path(tmpdir)
+            knowledge_file = knowledge_dir / "current_league.json"
+
+            knowledge_data = {
+                "league": "TestLeague",
+                "affix_meta_weights": {"life": {"base_weight": 5.0, "meta_multiplier": 1.0}},
+                "builds": []
+            }
+
+            with open(knowledge_file, 'w') as f:
+                json.dump(knowledge_data, f)
+
+            analyzer = MetaAnalyzer()
+            analyzer.load_meta_builds_knowledge(
+                game_version="poe1",
+                knowledge_dir=knowledge_dir
+            )
+
+            assert hasattr(analyzer, '_meta_knowledge_weights')
+            assert hasattr(analyzer, '_meta_knowledge_data')
+
+
+class TestGetMetaBuildMatches:
+    """Tests for get_meta_build_matches method."""
+
+    def test_no_knowledge_loaded(self):
+        """Test when no knowledge data is loaded."""
+        from core.meta_analyzer import MetaAnalyzer
+
+        analyzer = MetaAnalyzer()
+        result = analyzer.get_meta_build_matches(["life", "resistances"])
+
+        assert result == []
+
+    def test_find_matching_builds(self):
+        """Test finding builds that match item affixes."""
+        from core.meta_analyzer import MetaAnalyzer
+
+        analyzer = MetaAnalyzer()
+        # Manually set up internal data
+        analyzer._meta_knowledge_data = {
+            "builds": [
+                {
+                    "name": "RF Jugg",
+                    "desired_affixes_global": [
+                        {"name": "life"},
+                        {"name": "fire_resistance"},
+                        {"name": "life_regen"},
+                    ]
+                },
+                {
+                    "name": "LS Champion",
+                    "desired_affixes_global": [
+                        {"name": "attack_speed"},
+                        {"name": "crit_chance"},
+                        {"name": "life"},
+                    ]
+                },
+                {
+                    "name": "ES Build",
+                    "desired_affixes_global": [
+                        {"name": "energy_shield"},
+                        {"name": "spell_damage"},
+                    ]
+                }
+            ]
+        }
+
+        # Item has life and fire_res - should match RF Jugg
+        result = analyzer.get_meta_build_matches(["life", "fire_resistance"])
+        assert "RF Jugg" in result
+
+        # Item has attack_speed and crit - should match LS Champion
+        result2 = analyzer.get_meta_build_matches(["attack_speed", "crit_chance", "life"])
+        assert "LS Champion" in result2
+
+        # Item has only ES - only 1 match, needs 2
+        result3 = analyzer.get_meta_build_matches(["energy_shield"])
+        assert "ES Build" not in result3
+
+    def test_overlap_threshold(self):
+        """Test that at least 2 affixes must match."""
+        from core.meta_analyzer import MetaAnalyzer
+
+        analyzer = MetaAnalyzer()
+        analyzer._meta_knowledge_data = {
+            "builds": [
+                {
+                    "name": "Test Build",
+                    "desired_affixes_global": [
+                        {"name": "life"},
+                        {"name": "resistances"},
+                        {"name": "movement_speed"},
+                    ]
+                }
+            ]
+        }
+
+        # Only 1 match - not enough
+        result = analyzer.get_meta_build_matches(["life"])
+        assert result == []
+
+        # 2 matches - enough
+        result = analyzer.get_meta_build_matches(["life", "resistances"])
+        assert "Test Build" in result
+
+
+class TestSaveCacheErrorHandling:
+    """Tests for _save_cache error handling."""
+
+    def test_save_cache_exception(self):
+        """Test save_cache handles exceptions gracefully."""
+        from core.meta_analyzer import MetaAnalyzer
+
+        analyzer = MetaAnalyzer(cache_file=Path("/invalid/path/cache.json"))
+        analyzer.affix_popularity = {}
+        analyzer.builds_analyzed = 10
+        analyzer.last_analysis = datetime.now()
+
+        # Should not raise - error is logged
+        analyzer._save_cache("Test")
+
+
+class TestPrintSummaryBranches:
+    """Tests for print_summary branch coverage."""
+
+    def test_print_summary_without_avg_value(self, capsys):
+        """Test print_summary when avg_value is None."""
+        from core.meta_analyzer import MetaAnalyzer, AffixPopularity
+
+        analyzer = MetaAnalyzer()
+        analyzer.builds_analyzed = 50
+        analyzer.affix_popularity = {
+            'life': AffixPopularity(
+                affix_pattern="+# Life",
+                affix_type="life",
+                appearance_count=40,
+                total_builds=50,
+                avg_value=None,  # No avg value
+                min_value=None,
+                max_value=None,
+                popular_with=[],  # No popular classes
+            )
+        }
+
+        analyzer.print_summary()
+
+        captured = capsys.readouterr()
+        assert "life" in captured.out
+        # Should NOT have "Avg Value" since it's None
+        assert "Avg Value" not in captured.out
+        # Should NOT have "Popular with" since list is empty
+        assert "Popular with" not in captured.out
+
+    def test_print_summary_with_popular_classes(self, capsys):
+        """Test print_summary shows popular_with when present."""
+        from core.meta_analyzer import MetaAnalyzer, AffixPopularity
+
+        analyzer = MetaAnalyzer()
+        analyzer.builds_analyzed = 50
+        analyzer.affix_popularity = {
+            'life': AffixPopularity(
+                affix_pattern="+# Life",
+                affix_type="life",
+                appearance_count=40,
+                total_builds=50,
+                avg_value=95.0,
+                min_value=70.0,
+                max_value=120.0,
+                popular_with=["Juggernaut", "Champion", "Berserker", "Slayer"],
+            )
+        }
+
+        analyzer.print_summary()
+
+        captured = capsys.readouterr()
+        assert "Popular with:" in captured.out
+        assert "Juggernaut" in captured.out
+
+
+class TestAnalyzeBuildsBranchCoverage:
+    """Tests for analyze_builds branch coverage."""
+
+    def test_analyze_build_without_name(self):
+        """Test analyzing build without build_name."""
+        from core.meta_analyzer import MetaAnalyzer
+
+        analyzer = MetaAnalyzer(cache_file=None)
+
+        mock_build = MagicMock()
+        mock_build.desired_affixes = ["Movement Speed"]
+        mock_build.required_life = 0
+        mock_build.required_es = 0
+        mock_build.required_resistances = {}
+        mock_build.build_name = ""  # Empty build name
+
+        result = analyzer.analyze_builds([mock_build])
+
+        assert 'movement_speed' in result
+        # Popular_with should be empty since no build name
+        assert result['movement_speed'].popular_with == []
+
+    def test_analyze_build_tracks_class_names(self):
+        """Test that build names are tracked in popular_with."""
+        from core.meta_analyzer import MetaAnalyzer
+
+        analyzer = MetaAnalyzer(cache_file=None)
+
+        mock_build1 = MagicMock()
+        mock_build1.desired_affixes = ["Attack Speed"]
+        mock_build1.required_life = 0
+        mock_build1.required_es = 0
+        mock_build1.required_resistances = {}
+        mock_build1.build_name = "Lightning Strike"
+
+        mock_build2 = MagicMock()
+        mock_build2.desired_affixes = ["Attack Speed"]
+        mock_build2.required_life = 0
+        mock_build2.required_es = 0
+        mock_build2.required_resistances = {}
+        mock_build2.build_name = "Cyclone"
+
+        result = analyzer.analyze_builds([mock_build1, mock_build2])
+
+        assert 'attack_speed' in result
+        # Should have both build names
+        assert "Lightning Strike" in result['attack_speed'].popular_with
+        assert "Cyclone" in result['attack_speed'].popular_with

@@ -317,3 +317,256 @@ class TestSlotAvailableAffixes:
         """All armor slots should have life."""
         for slot in ["Helmet", "Body Armour", "Gloves", "Boots", "Belt", "Ring", "Amulet", "Shield"]:
             assert "life" in SLOT_AVAILABLE_AFFIXES[slot]
+
+
+# =============================================================================
+# Additional Coverage Tests
+# =============================================================================
+
+
+class TestAffixTierCalculatorRePoE:
+    """Tests for RePoE integration in AffixTierCalculator."""
+
+    def test_use_repoe_loading_fails(self):
+        """Should fall back to hardcoded when RePoE fails to load."""
+        with patch(
+            "core.repoe_tier_provider.get_repoe_tier_provider",
+            side_effect=Exception("RePoE not available")
+        ):
+            calc = AffixTierCalculator(use_repoe=True)
+            assert calc.using_repoe is False
+
+    def test_use_repoe_not_requested(self):
+        """Should not use RePoE when use_repoe=False."""
+        calc = AffixTierCalculator(use_repoe=False)
+        assert calc.using_repoe is False
+
+    def test_use_repoe_success(self):
+        """Should use RePoE when it loads successfully."""
+        mock_provider = MagicMock()
+
+        with patch(
+            "core.repoe_tier_provider.get_repoe_tier_provider",
+            return_value=mock_provider
+        ):
+            calc = AffixTierCalculator(use_repoe=True)
+            assert calc.using_repoe is True
+
+    def test_get_best_tier_uses_repoe(self):
+        """Should use RePoE data when available."""
+        mock_provider = MagicMock()
+        mock_tier = MagicMock()
+        mock_tier.tier_number = 1
+        mock_tier.ilvl_required = 86
+        mock_tier.min_value = 100
+        mock_tier.max_value = 109
+        mock_tier.mod_name = "Superb"
+        mock_provider.get_best_tier_for_ilvl.return_value = mock_tier
+
+        with patch(
+            "core.repoe_tier_provider.get_repoe_tier_provider",
+            return_value=mock_provider
+        ):
+            calc = AffixTierCalculator(use_repoe=True)
+            tier = calc.get_best_tier_for_ilvl("life", 86)
+
+            assert tier is not None
+            assert tier.tier == 1
+            assert tier.mod_name == "Superb"
+            mock_provider.get_best_tier_for_ilvl.assert_called_with("life", 86)
+
+    def test_get_best_tier_repoe_returns_none(self):
+        """Should fall back to hardcoded if RePoE returns None."""
+        mock_provider = MagicMock()
+        mock_provider.get_best_tier_for_ilvl.return_value = None
+
+        with patch(
+            "core.repoe_tier_provider.get_repoe_tier_provider",
+            return_value=mock_provider
+        ):
+            calc = AffixTierCalculator(use_repoe=True)
+            tier = calc.get_best_tier_for_ilvl("life", 86)
+
+            # Should fall back to hardcoded data
+            assert tier is not None
+            assert tier.tier == 1  # T1 life from hardcoded
+
+    def test_get_all_tiers_uses_repoe(self):
+        """Should use RePoE data for get_all_tiers."""
+        mock_provider = MagicMock()
+        mock_tier1 = MagicMock(tier_number=1, ilvl_required=86, min_value=100, max_value=109, mod_name="T1")
+        mock_tier2 = MagicMock(tier_number=2, ilvl_required=82, min_value=90, max_value=99, mod_name="T2")
+        mock_provider.get_tiers_for_stat.return_value = [mock_tier1, mock_tier2]
+
+        with patch(
+            "core.repoe_tier_provider.get_repoe_tier_provider",
+            return_value=mock_provider
+        ):
+            calc = AffixTierCalculator(use_repoe=True)
+            tiers = calc.get_all_tiers("life")
+
+            assert len(tiers) == 2
+            assert tiers[0].tier == 1
+            assert tiers[1].tier == 2
+
+    def test_get_all_tiers_repoe_returns_none(self):
+        """Should fall back to hardcoded if RePoE returns None."""
+        mock_provider = MagicMock()
+        mock_provider.get_tiers_for_stat.return_value = None
+
+        with patch(
+            "core.repoe_tier_provider.get_repoe_tier_provider",
+            return_value=mock_provider
+        ):
+            calc = AffixTierCalculator(use_repoe=True)
+            tiers = calc.get_all_tiers("life")
+
+            # Should fall back to hardcoded
+            assert len(tiers) == 7  # Hardcoded has 7 life tiers
+
+
+class TestIdealRarePriorityBranches:
+    """Tests for priority iteration branches in calculate_ideal_rare."""
+
+    @pytest.fixture
+    def calculator(self):
+        """Create calculator without RePoE."""
+        return AffixTierCalculator(use_repoe=False)
+
+    def test_critical_priorities_fill_affixes(self, calculator):
+        """Critical priorities should fill affixes first."""
+        priorities = BuildPriorities()
+        priorities.add_priority("life", PriorityTier.CRITICAL)
+        priorities.add_priority("fire_resistance", PriorityTier.CRITICAL)
+        priorities.add_priority("cold_resistance", PriorityTier.CRITICAL)
+        priorities.add_priority("lightning_resistance", PriorityTier.IMPORTANT)
+
+        spec = calculator.calculate_ideal_rare("Helmet", priorities, max_affixes=3)
+
+        stat_types = [a.stat_type for a in spec.affixes]
+        # Should have all 3 critical, not important
+        assert "life" in stat_types
+        assert "fire_resistance" in stat_types
+        assert "cold_resistance" in stat_types
+        assert "lightning_resistance" not in stat_types  # Limit reached
+
+    def test_nice_to_have_fills_remaining(self, calculator):
+        """Nice-to-have priorities should fill remaining slots."""
+        priorities = BuildPriorities()
+        priorities.add_priority("life", PriorityTier.CRITICAL)
+        priorities.add_priority("attack_speed", PriorityTier.NICE_TO_HAVE)
+
+        spec = calculator.calculate_ideal_rare("Gloves", priorities, max_affixes=6)
+
+        stat_types = [a.stat_type for a in spec.affixes]
+        assert "life" in stat_types
+        assert "attack_speed" in stat_types
+
+    def test_is_life_build_adds_life(self, calculator):
+        """Life build should add life if room and not already added."""
+        priorities = BuildPriorities()
+        priorities.is_life_build = True
+        # Don't add life as priority
+
+        spec = calculator.calculate_ideal_rare("Helmet", priorities, max_affixes=6)
+
+        stat_types = [a.stat_type for a in spec.affixes]
+        assert "life" in stat_types
+
+    def test_is_es_build_adds_es(self, calculator):
+        """ES build should add energy_shield if room and not already added."""
+        priorities = BuildPriorities()
+        priorities.is_es_build = True
+        priorities.is_life_build = False
+
+        spec = calculator.calculate_ideal_rare("Helmet", priorities, max_affixes=6)
+
+        stat_types = [a.stat_type for a in spec.affixes]
+        assert "energy_shield" in stat_types
+
+    def test_max_affixes_stops_iteration(self, calculator):
+        """Should stop adding affixes when max reached."""
+        priorities = BuildPriorities()
+        for stat in ["life", "fire_resistance", "cold_resistance", "lightning_resistance", "chaos_resistance"]:
+            priorities.add_priority(stat, PriorityTier.CRITICAL)
+
+        spec = calculator.calculate_ideal_rare("Helmet", priorities, max_affixes=2)
+
+        # Should only have 2 affixes
+        assert len(spec.affixes) == 2
+
+    def test_stat_not_available_skipped(self, calculator):
+        """Should skip stats not available on slot."""
+        priorities = BuildPriorities()
+        priorities.add_priority("movement_speed", PriorityTier.CRITICAL)  # Not on Helmet
+        priorities.add_priority("life", PriorityTier.IMPORTANT)
+
+        spec = calculator.calculate_ideal_rare("Helmet", priorities, max_affixes=6)
+
+        stat_types = [a.stat_type for a in spec.affixes]
+        assert "movement_speed" not in stat_types
+        assert "life" in stat_types
+
+
+class TestIdealRareLowIlvlFallback:
+    """Tests for low ilvl fallback in get_best_tier_for_ilvl."""
+
+    @pytest.fixture
+    def calculator(self):
+        """Create calculator without RePoE."""
+        return AffixTierCalculator(use_repoe=False)
+
+    def test_very_low_ilvl_returns_lowest_tier(self, calculator):
+        """Should return lowest tier when ilvl is below all requirements."""
+        # ilvl 1 is below all tier requirements
+        tier = calculator.get_best_tier_for_ilvl("life", 1)
+
+        # Should return the lowest tier (T7)
+        assert tier is not None
+        assert tier.tier == 7  # Lowest tier
+
+
+class TestFormatIdealRareSummary:
+    """Tests for format_ideal_rare_summary."""
+
+    @pytest.fixture
+    def calculator(self):
+        """Create calculator without RePoE."""
+        return AffixTierCalculator(use_repoe=False)
+
+    def test_format_with_mod_names(self, calculator):
+        """Should include mod names when show_mod_names=True and mod_name present."""
+        spec = IdealRareSpec(slot="Helmet", target_ilvl=86)
+        spec.affixes = [
+            AffixTier("life", 1, 86, 100, 109, mod_name="Prime"),
+        ]
+
+        summary = calculator.format_ideal_rare_summary(spec, show_mod_names=True)
+
+        assert "Prime" in summary
+        assert "100-109" in summary
+
+    def test_format_without_mod_names(self, calculator):
+        """Should not include mod names when show_mod_names=False."""
+        spec = IdealRareSpec(slot="Helmet", target_ilvl=86)
+        spec.affixes = [
+            AffixTier("life", 1, 86, 100, 109, mod_name="Prime"),
+        ]
+
+        summary = calculator.format_ideal_rare_summary(spec, show_mod_names=False)
+
+        assert "Prime" not in summary
+        assert "100-109" in summary
+
+    def test_format_affix_without_mod_name(self, calculator):
+        """Should handle affixes without mod_name."""
+        spec = IdealRareSpec(slot="Helmet", target_ilvl=86)
+        spec.affixes = [
+            AffixTier("life", 1, 86, 100, 109),  # No mod_name
+        ]
+
+        summary = calculator.format_ideal_rare_summary(spec, show_mod_names=True)
+
+        # Should still work
+        assert "100-109" in summary
+        assert "T1" in summary

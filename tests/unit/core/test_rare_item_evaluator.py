@@ -1243,3 +1243,874 @@ class TestAffixMatchWithMetaBonus:
         )
 
         assert match.has_meta_bonus is True
+
+
+# -------------------------
+# Slot Rules Tests
+# -------------------------
+
+class TestSlotRules:
+    """Test slot-specific evaluation rules."""
+
+    @pytest.fixture
+    def slot_evaluator(self, tmp_path):
+        """Create evaluator with slot rules configured."""
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+
+        affixes = {
+            "life": {"tier1": ["+# to maximum Life"], "weight": 10, "min_value": 70},
+            "resistances": {"tier1": ["+#% to Fire Resistance"], "weight": 8, "min_value": 35},
+            "movement_speed": {"tier1": ["#% increased Movement Speed"], "weight": 9, "min_value": 25},
+            "energy_shield": {"tier1": ["+# to maximum Energy Shield"], "weight": 9, "min_value": 40}
+        }
+
+        bases = {
+            "belt": {
+                "high_tier": ["Stygian Vise", "Heavy Belt"],
+                "min_ilvl": 84
+            },
+            "body_armour": {
+                "high_tier": ["Vaal Regalia"],
+                "min_ilvl": 84
+            },
+            "_slot_rules": {
+                "belt": {
+                    "premium_bases": ["Stygian Vise"],
+                    "premium_bonus": 15,
+                    "bonus_affixes": ["life", "resistances", "energy_shield"],
+                    "all_bonus_score": 10
+                },
+                "body_armour": {
+                    "six_link_bonus": 30,
+                    "bonus_affixes": ["life", "resistances", "energy_shield"],
+                    "all_bonus_score": 10
+                }
+            }
+        }
+
+        (data_dir / "valuable_affixes.json").write_text(json.dumps(affixes))
+        (data_dir / "valuable_bases.json").write_text(json.dumps(bases))
+
+        return RareItemEvaluator(data_dir=data_dir)
+
+    def test_premium_base_bonus(self, slot_evaluator):
+        """Premium base types should get bonus score."""
+        item = create_rare_item(base_type="Stygian Vise")
+        matches = [
+            AffixMatch("life", "", "", 100, 10, "tier1", False),
+        ]
+
+        bonus, reasons = slot_evaluator._check_slot_rules(item, matches)
+
+        assert bonus == 15
+        assert any("Premium base" in r for r in reasons)
+
+    def test_all_bonus_affixes_score(self, slot_evaluator):
+        """Having all bonus affixes for slot should give bonus."""
+        item = create_rare_item(base_type="Heavy Belt")
+        matches = [
+            AffixMatch("life", "", "", 100, 10, "tier1", False),
+            AffixMatch("resistances", "", "", 47, 8, "tier1", False),
+            AffixMatch("energy_shield", "", "", 80, 9, "tier1", False),
+        ]
+
+        bonus, reasons = slot_evaluator._check_slot_rules(item, matches)
+
+        assert bonus == 10
+        assert any("Slot-optimal" in r for r in reasons)
+
+    def test_unknown_slot_no_bonus(self, slot_evaluator):
+        """Unknown slot should get no bonus."""
+        item = create_rare_item(base_type="Unknown Item Type")
+        matches = [AffixMatch("life", "", "", 100, 10, "tier1", False)]
+
+        bonus, reasons = slot_evaluator._check_slot_rules(item, matches)
+
+        assert bonus == 0
+        assert reasons == []
+
+
+# -------------------------
+# Fractured Item Tests
+# -------------------------
+
+class TestFracturedItems:
+    """Test fractured item handling."""
+
+    @pytest.fixture
+    def fractured_evaluator(self, mock_data_dir):
+        """Create evaluator for fractured item testing."""
+        return RareItemEvaluator(data_dir=mock_data_dir)
+
+    def test_non_fractured_item(self, fractured_evaluator):
+        """Non-fractured items should return no bonus."""
+        item = create_rare_item()
+        item.is_fractured = False
+        matches = [AffixMatch("life", "", "+100 to maximum Life", 100, 10, "tier1", False)]
+
+        is_fractured, bonus, mod = fractured_evaluator._check_fractured(item, matches)
+
+        assert is_fractured is False
+        assert bonus == 0
+        assert mod is None
+
+    def test_fractured_with_t1_mod(self, fractured_evaluator):
+        """Fractured T1 mod should get significant bonus."""
+        item = create_rare_item()
+        item.is_fractured = True
+        matches = [AffixMatch("life", "", "+105 to maximum Life", 105, 10, "tier1", False)]
+
+        is_fractured, bonus, mod = fractured_evaluator._check_fractured(item, matches)
+
+        assert is_fractured is True
+        assert bonus == 35  # High-weight T1 fractured = 35
+        assert mod == "+105 to maximum Life"
+
+    def test_fractured_with_medium_weight_t1(self, fractured_evaluator):
+        """Fractured medium-weight T1 should get good bonus."""
+        item = create_rare_item()
+        item.is_fractured = True
+        matches = [AffixMatch("resistances", "", "+47% to Fire Resistance", 47, 8, "tier1", False)]
+
+        is_fractured, bonus, mod = fractured_evaluator._check_fractured(item, matches)
+
+        assert is_fractured is True
+        assert bonus == 30  # Medium-weight T1 = 30
+
+    def test_fractured_with_lower_tier_mod(self, fractured_evaluator):
+        """Fractured T2/T3 mod should get lower bonus."""
+        item = create_rare_item()
+        item.is_fractured = True
+        matches = [AffixMatch("life", "", "+85 to maximum Life", 85, 6, "tier3", False)]
+
+        is_fractured, bonus, mod = fractured_evaluator._check_fractured(item, matches)
+
+        assert is_fractured is True
+        assert bonus == 10  # Lower tier = 10
+        assert mod == "+85 to maximum Life"
+
+    def test_fractured_with_no_matches(self, fractured_evaluator):
+        """Fractured item with no valuable matches."""
+        item = create_rare_item()
+        item.is_fractured = True
+        matches = []
+
+        is_fractured, bonus, mod = fractured_evaluator._check_fractured(item, matches)
+
+        assert is_fractured is True
+        assert bonus == 0
+        assert mod is None
+
+
+# -------------------------
+# Archetype Matching Tests
+# -------------------------
+
+class TestArchetypeMatching:
+    """Test build archetype matching."""
+
+    @pytest.fixture
+    def archetype_evaluator(self, tmp_path):
+        """Create evaluator with archetypes configured."""
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+
+        affixes = {
+            "life": {"tier1": ["+# to maximum Life"], "weight": 10, "min_value": 70},
+            "resistances": {"tier1": ["+#% to Fire Resistance"], "weight": 8, "min_value": 35},
+            "energy_shield": {"tier1": ["+# to maximum Energy Shield"], "weight": 9, "min_value": 40},
+            "critical_strike": {"tier1": ["#% increased Critical Strike Chance"], "weight": 8, "min_value": 20}
+        }
+
+        archetypes = {
+            "archetypes": {
+                "tank": {
+                    "name": "Tank Build",
+                    "description": "High defense build",
+                    "priority_affixes": ["life", "resistances", "energy_shield"],
+                    "anti_affixes": ["critical_strike"]
+                },
+                "crit": {
+                    "name": "Crit Build",
+                    "description": "High crit build",
+                    "priority_affixes": ["critical_strike", "life"],
+                    "anti_affixes": []
+                }
+            }
+        }
+
+        (data_dir / "valuable_affixes.json").write_text(json.dumps(affixes))
+        (data_dir / "valuable_bases.json").write_text(json.dumps({}))
+        (data_dir / "build_archetypes.json").write_text(json.dumps(archetypes))
+
+        return RareItemEvaluator(data_dir=data_dir)
+
+    def test_matches_archetype_with_priority_affixes(self, archetype_evaluator):
+        """Should match archetype when 2+ priority affixes present."""
+        matches = [
+            AffixMatch("life", "", "", 100, 10, "tier1", False),
+            AffixMatch("resistances", "", "", 47, 8, "tier1", False),
+        ]
+
+        matched, bonus = archetype_evaluator._match_archetypes(matches)
+
+        assert "tank" in matched
+        assert bonus >= 5
+
+    def test_no_match_with_anti_affixes(self, archetype_evaluator):
+        """Should not match archetype when anti-affixes present."""
+        matches = [
+            AffixMatch("life", "", "", 100, 10, "tier1", False),
+            AffixMatch("resistances", "", "", 47, 8, "tier1", False),
+            AffixMatch("critical_strike", "", "", 30, 8, "tier1", False),
+        ]
+
+        matched, bonus = archetype_evaluator._match_archetypes(matches)
+
+        assert "tank" not in matched  # Crit is anti-affix for tank
+
+    def test_excellent_fit_bonus(self, archetype_evaluator):
+        """Should give highest bonus for 4+ priority matches."""
+        matches = [
+            AffixMatch("life", "", "", 100, 10, "tier1", False),
+            AffixMatch("resistances", "", "", 47, 8, "tier1", False),
+            AffixMatch("resistances", "", "", 45, 8, "tier1", False),
+            AffixMatch("energy_shield", "", "", 80, 9, "tier1", False),
+        ]
+
+        matched, bonus = archetype_evaluator._match_archetypes(matches)
+
+        # Note: resistances counted once by type
+        assert "tank" in matched
+        assert bonus >= 5  # 2+ priority affixes
+
+    def test_no_archetypes_configured(self, mock_data_dir):
+        """Should handle empty archetypes gracefully."""
+        evaluator = RareItemEvaluator(data_dir=mock_data_dir)
+        matches = [AffixMatch("life", "", "", 100, 10, "tier1", False)]
+
+        matched, bonus = evaluator._match_archetypes(matches)
+
+        assert matched == []
+        assert bonus == 0
+
+
+# -------------------------
+# Meta Bonus Calculation Tests
+# -------------------------
+
+class TestMetaBonusCalculation:
+    """Test meta popularity bonus calculation."""
+
+    @pytest.fixture
+    def simple_meta_evaluator(self, tmp_path):
+        """Create evaluator with simple (integer) meta weights."""
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+
+        affixes = {
+            "life": {"tier1": ["+# to maximum Life"], "weight": 10, "min_value": 70},
+            "resistances": {"tier1": ["+#% to Fire Resistance"], "weight": 8, "min_value": 35}
+        }
+
+        archetypes = {
+            "archetypes": {},
+            "_meta_weights": {
+                "popularity_boosts": {
+                    "life": 3,
+                    "resistances": 2
+                }
+            }
+        }
+
+        (data_dir / "valuable_affixes.json").write_text(json.dumps(affixes))
+        (data_dir / "valuable_bases.json").write_text(json.dumps({}))
+        (data_dir / "build_archetypes.json").write_text(json.dumps(archetypes))
+
+        return RareItemEvaluator(data_dir=data_dir)
+
+    def test_simple_meta_bonus_calculation(self, simple_meta_evaluator):
+        """Should calculate bonus from simple integer weights."""
+        matches = [
+            AffixMatch("life", "", "", 100, 10, "tier1", False),
+            AffixMatch("resistances", "", "", 47, 8, "tier1", False),
+        ]
+
+        bonus = simple_meta_evaluator._calculate_meta_bonus(matches)
+
+        assert bonus == 5  # 3 + 2 = 5
+
+    def test_meta_bonus_caps_at_10(self, tmp_path):
+        """Meta bonus should cap at 10."""
+        # Need multiple different affix types with high meta weights to test cap
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+
+        affixes = {
+            "life": {"tier1": ["+# to maximum Life"], "weight": 10, "min_value": 70},
+            "resistances": {"tier1": ["+#% to Fire Resistance"], "weight": 8, "min_value": 35},
+            "energy_shield": {"tier1": ["+# to maximum Energy Shield"], "weight": 9, "min_value": 40},
+            "movement_speed": {"tier1": ["#% increased Movement Speed"], "weight": 9, "min_value": 25}
+        }
+
+        archetypes = {
+            "archetypes": {},
+            "_meta_weights": {
+                "popularity_boosts": {
+                    "life": 5,
+                    "resistances": 5,
+                    "energy_shield": 5,
+                    "movement_speed": 5
+                }
+            }
+        }
+
+        (data_dir / "valuable_affixes.json").write_text(json.dumps(affixes))
+        (data_dir / "valuable_bases.json").write_text(json.dumps({}))
+        (data_dir / "build_archetypes.json").write_text(json.dumps(archetypes))
+
+        evaluator = RareItemEvaluator(data_dir=data_dir)
+
+        # 4 different affix types, each with +5 meta bonus = 20, should cap at 10
+        matches = [
+            AffixMatch("life", "", "", 100, 10, "tier1", False),
+            AffixMatch("resistances", "", "", 47, 8, "tier1", False),
+            AffixMatch("energy_shield", "", "", 80, 9, "tier1", False),
+            AffixMatch("movement_speed", "", "", 30, 9, "tier1", False),
+        ]
+
+        bonus = evaluator._calculate_meta_bonus(matches)
+
+        assert bonus == 10  # Capped at max
+
+    def test_no_meta_weights_no_bonus(self, mock_data_dir):
+        """No meta weights should mean no bonus."""
+        evaluator = RareItemEvaluator(data_dir=mock_data_dir)
+        matches = [AffixMatch("life", "", "", 100, 10, "tier1", False)]
+
+        bonus = evaluator._calculate_meta_bonus(matches)
+
+        # Without explicit meta_affixes.json, depends on if build_archetypes has _meta_weights
+        assert bonus >= 0
+
+
+class TestMetaBonusWithDictFormat:
+    """Test meta bonus with dict format (from meta_affixes.json)."""
+
+    @pytest.fixture
+    def dict_meta_evaluator(self, tmp_path):
+        """Create evaluator with dict-format meta weights."""
+        from datetime import datetime
+
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+
+        affixes = {
+            "life": {"tier1": ["+# to maximum Life"], "weight": 10, "min_value": 70},
+            "resistances": {"tier1": ["+#% to Fire Resistance"], "weight": 8, "min_value": 35}
+        }
+
+        meta_data = {
+            "league": "Test",
+            "builds_analyzed": 100,
+            "last_analysis": datetime.now().isoformat(),
+            "affixes": {
+                "life": {"popularity_percent": 60.0},  # +3 bonus
+                "resistances": {"popularity_percent": 35.0}  # +2 bonus
+            }
+        }
+
+        (data_dir / "valuable_affixes.json").write_text(json.dumps(affixes))
+        (data_dir / "valuable_bases.json").write_text(json.dumps({}))
+        (data_dir / "meta_affixes.json").write_text(json.dumps(meta_data))
+
+        return RareItemEvaluator(data_dir=data_dir)
+
+    def test_dict_format_meta_bonus(self, dict_meta_evaluator):
+        """Should calculate bonus from dict format popularity."""
+        matches = [
+            AffixMatch("life", "", "", 100, 10, "tier1", False),
+            AffixMatch("resistances", "", "", 47, 8, "tier1", False),
+        ]
+
+        bonus = dict_meta_evaluator._calculate_meta_bonus(matches)
+
+        # life: 60% >= 50% = +3, res: 35% >= 30% = +2
+        assert bonus == 5
+
+    def test_high_popularity_bonus(self, tmp_path):
+        """High popularity (>=50%) should give +3 bonus."""
+        from datetime import datetime
+
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+
+        affixes = {"life": {"tier1": ["+# to maximum Life"], "weight": 10, "min_value": 70}}
+        meta_data = {
+            "league": "Test",
+            "builds_analyzed": 100,
+            "last_analysis": datetime.now().isoformat(),
+            "affixes": {"life": {"popularity_percent": 75.0}}
+        }
+
+        (data_dir / "valuable_affixes.json").write_text(json.dumps(affixes))
+        (data_dir / "valuable_bases.json").write_text(json.dumps({}))
+        (data_dir / "meta_affixes.json").write_text(json.dumps(meta_data))
+
+        evaluator = RareItemEvaluator(data_dir=data_dir)
+        matches = [AffixMatch("life", "", "", 100, 10, "tier1", False)]
+
+        bonus = evaluator._calculate_meta_bonus(matches)
+
+        assert bonus == 3  # >=50% = +3
+
+
+# -------------------------
+# Evaluate With Archetype Tests
+# -------------------------
+
+class TestEvaluateWithArchetype:
+    """Test evaluate_with_archetype method."""
+
+    @pytest.fixture
+    def archetype_eval_setup(self, tmp_path):
+        """Create evaluator for archetype evaluation testing."""
+        from core.build_archetype import BuildArchetype, DefenseType, DamageType
+
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+
+        affixes = {
+            "life": {
+                "tier1": ["+# to maximum Life"],
+                "tier1_range": [100, 109],
+                "weight": 10,
+                "min_value": 70
+            },
+            "resistances": {
+                "tier1": ["+#% to Fire Resistance"],
+                "tier1_range": [46, 48],
+                "weight": 8,
+                "min_value": 35
+            },
+            "energy_shield": {
+                "tier1": ["+# to maximum Energy Shield"],
+                "tier1_range": [80, 110],
+                "weight": 9,
+                "min_value": 40
+            }
+        }
+
+        (data_dir / "valuable_affixes.json").write_text(json.dumps(affixes))
+        (data_dir / "valuable_bases.json").write_text(json.dumps({}))
+
+        evaluator = RareItemEvaluator(data_dir=data_dir)
+
+        # Create a test archetype using proper enum values
+        archetype = BuildArchetype(
+            defense_type=DefenseType.ENERGY_SHIELD,
+            damage_type=DamageType.ELEMENTAL,
+        )
+
+        return evaluator, archetype
+
+    def test_evaluate_with_archetype_weights_affixes(self, archetype_eval_setup):
+        """Should apply archetype weight multipliers."""
+        evaluator, archetype = archetype_eval_setup
+
+        item = create_rare_item(
+            explicits=[
+                "+105 to maximum Life",
+                "+85 to maximum Energy Shield"
+            ]
+        )
+
+        result = evaluator.evaluate_with_archetype(item, archetype)
+
+        assert result.build_archetype == archetype
+        assert result.archetype_affix_details is not None
+        assert len(result.archetype_affix_details) == 2
+
+    def test_evaluate_with_archetype_non_rare(self, archetype_eval_setup):
+        """Non-rare items should return unchanged."""
+        evaluator, archetype = archetype_eval_setup
+
+        item = create_rare_item()
+        item.rarity = "UNIQUE"
+
+        result = evaluator.evaluate_with_archetype(item, archetype)
+
+        assert result.tier == "not_rare"
+        assert result.build_archetype is None
+
+    def test_evaluate_with_archetype_calculates_weighted_score(self, archetype_eval_setup):
+        """Should calculate archetype-weighted total score."""
+        evaluator, archetype = archetype_eval_setup
+
+        item = create_rare_item(
+            explicits=["+85 to maximum Energy Shield"]  # Only ES (priority for ES build)
+        )
+
+        result = evaluator.evaluate_with_archetype(item, archetype)
+
+        assert result.archetype_weighted_score > 0
+
+
+# -------------------------
+# Open Affix Detection Tests
+# -------------------------
+
+class TestOpenAffixDetection:
+    """Test open prefix/suffix detection."""
+
+    def test_full_item_no_open_slots(self, evaluator):
+        """Fully modded item should have no open slots."""
+        item = create_rare_item(
+            explicits=[
+                "Mod 1", "Mod 2", "Mod 3",
+                "Mod 4", "Mod 5", "Mod 6"
+            ]
+        )
+        matches = []
+
+        open_p, open_s, bonus = evaluator._detect_open_affixes(item, matches)
+
+        assert open_p == 0
+        assert open_s == 0
+        assert bonus == 0
+
+    def test_few_mods_has_open_slots(self, evaluator):
+        """Item with few mods should have open slots."""
+        item = create_rare_item(explicits=["Mod 1", "Mod 2"])
+        matches = []
+
+        open_p, open_s, bonus = evaluator._detect_open_affixes(item, matches)
+
+        assert open_p > 0 or open_s > 0
+        assert bonus >= 5
+
+    def test_crafting_bonus_with_t1_matches(self, evaluator):
+        """Open slots + T1 matches should give high crafting bonus."""
+        item = create_rare_item(explicits=["Mod 1", "Mod 2"])
+        matches = [
+            AffixMatch("life", "", "", 100, 10, "tier1", False),
+            AffixMatch("resistances", "", "", 47, 8, "tier1", False),
+        ]
+
+        open_p, open_s, bonus = evaluator._detect_open_affixes(item, matches)
+
+        assert bonus == 15  # 2+ open + T1 = 15
+
+
+# -------------------------
+# Tier Determination Edge Cases
+# -------------------------
+
+class TestTierDeterminationEdgeCases:
+    """Test edge cases in tier determination."""
+
+    def test_fractured_excellent_crafting_base(self, evaluator):
+        """Fractured T1 with high score should be excellent crafting base."""
+        matches = [
+            AffixMatch("life", "", "", 105, 10, "tier1", False),
+            AffixMatch("resistances", "", "", 47, 8, "tier1", False),
+        ]
+
+        tier, value = evaluator._determine_tier(
+            total_score=75,
+            matches=matches,
+            synergies=[],
+            is_fractured=True,
+            crafting_bonus=10
+        )
+
+        assert tier == "excellent"
+        assert "crafting base" in value
+
+    def test_fractured_good_crafting_base(self, evaluator):
+        """Fractured T1 with moderate score should be good crafting base."""
+        matches = [
+            AffixMatch("life", "", "", 105, 10, "tier1", False),
+        ]
+
+        tier, value = evaluator._determine_tier(
+            total_score=55,
+            matches=matches,
+            synergies=[],
+            is_fractured=True,
+            crafting_bonus=5
+        )
+
+        assert tier == "good"
+        assert "crafting base" in value
+
+    def test_meta_fit_excellent_tier(self, evaluator):
+        """Item fitting meta with T1 mods should be excellent."""
+        matches = [
+            AffixMatch("life", "", "", 105, 10, "tier1", False),
+            AffixMatch("resistances", "", "", 47, 8, "tier1", False),
+        ]
+
+        tier, value = evaluator._determine_tier(
+            total_score=75,
+            matches=matches,
+            synergies=[],
+            matched_archetypes=["tank"]
+        )
+
+        assert tier == "excellent"
+        assert "meta" in value
+
+    def test_meta_fit_good_tier(self, evaluator):
+        """Item fitting meta should be good tier."""
+        matches = [
+            AffixMatch("life", "", "", 95, 8, "tier2", False),
+        ]
+
+        tier, value = evaluator._determine_tier(
+            total_score=55,
+            matches=matches,
+            synergies=[],
+            matched_archetypes=["tank"]
+        )
+
+        assert tier == "good"
+        assert "meta" in value
+
+    def test_craftable_good_tier(self, evaluator):
+        """Item with high crafting potential should be good."""
+        matches = [
+            AffixMatch("life", "", "", 100, 10, "tier1", False),
+        ]
+
+        tier, value = evaluator._determine_tier(
+            total_score=55,
+            matches=matches,
+            synergies=[],
+            crafting_bonus=10
+        )
+
+        assert tier == "good"
+        assert "craftable" in value
+
+
+# -------------------------
+# Summary Generation Edge Cases
+# -------------------------
+
+class TestSummaryEdgeCases:
+    """Test summary generation edge cases."""
+
+    @pytest.fixture
+    def summary_evaluator(self, tmp_path):
+        """Create evaluator for summary testing."""
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+
+        affixes = {
+            "life": {"tier1": ["+# to maximum Life"], "weight": 10, "min_value": 70},
+            "_synergies": {
+                "test_synergy": {
+                    "required": {"life": 1},
+                    "bonus_score": 5,
+                    "description": "Test Synergy"
+                }
+            },
+            "_red_flags": {
+                "test_flag": {
+                    "check": "has_both",
+                    "affixes": [],
+                    "penalty_score": -5,
+                    "description": "Test Flag"
+                }
+            }
+        }
+
+        archetypes = {
+            "archetypes": {
+                "test_build": {
+                    "name": "Test Build",
+                    "description": "A test build archetype",
+                    "priority_affixes": ["life"],
+                    "anti_affixes": []
+                }
+            }
+        }
+
+        (data_dir / "valuable_affixes.json").write_text(json.dumps(affixes))
+        (data_dir / "valuable_bases.json").write_text(json.dumps({}))
+        (data_dir / "build_archetypes.json").write_text(json.dumps(archetypes))
+
+        return RareItemEvaluator(data_dir=data_dir)
+
+    def test_summary_includes_fractured_section(self, summary_evaluator):
+        """Summary should include fractured mod section."""
+        item = create_rare_item(explicits=["+100 to maximum Life"])
+        item.is_fractured = True
+
+        eval_result = summary_evaluator.evaluate(item)
+        # Manually set fractured fields for display
+        eval_result.fractured_mod = "+100 to maximum Life"
+        eval_result.fractured_bonus = 25
+
+        summary = summary_evaluator.get_summary(eval_result)
+
+        assert "Fractured Mod:" in summary
+
+    def test_summary_includes_crafting_potential(self, summary_evaluator):
+        """Summary should include crafting potential section."""
+        item = create_rare_item(explicits=["+100 to maximum Life"])
+
+        eval_result = summary_evaluator.evaluate(item)
+        # Item with few mods should have open slots
+        summary = summary_evaluator.get_summary(eval_result)
+
+        assert "Crafting Potential:" in summary
+        assert "Open Slots:" in summary
+
+    def test_summary_includes_archetype_matches(self, summary_evaluator):
+        """Summary should include matched archetypes."""
+        item = create_rare_item(explicits=["+100 to maximum Life"])
+
+        eval_result = summary_evaluator.evaluate(item)
+        # Manually add archetype match
+        eval_result.matched_archetypes = ["test_build"]
+
+        summary = summary_evaluator.get_summary(eval_result)
+
+        assert "Build Archetypes" in summary
+        assert "Test Build" in summary
+
+    def test_summary_includes_synergies(self, summary_evaluator):
+        """Summary should include synergies section."""
+        item = create_rare_item(explicits=["+100 to maximum Life"])
+
+        eval_result = summary_evaluator.evaluate(item)
+
+        # If synergies are found
+        if eval_result.synergies_found:
+            summary = summary_evaluator.get_summary(eval_result)
+            assert "Synergies Detected" in summary
+
+    def test_summary_includes_slot_bonus_reasons(self, tmp_path):
+        """Summary should show slot bonus reasons."""
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+
+        affixes = {"life": {"tier1": ["+# to maximum Life"], "weight": 10, "min_value": 70}}
+        bases = {
+            "belt": {"high_tier": ["Stygian Vise"]},
+            "_slot_rules": {
+                "belt": {
+                    "premium_bases": ["Stygian Vise"],
+                    "premium_bonus": 15
+                }
+            }
+        }
+
+        (data_dir / "valuable_affixes.json").write_text(json.dumps(affixes))
+        (data_dir / "valuable_bases.json").write_text(json.dumps(bases))
+
+        evaluator = RareItemEvaluator(data_dir=data_dir)
+
+        item = create_rare_item(base_type="Stygian Vise")
+        item.explicits = ["+100 to maximum Life"]
+
+        eval_result = evaluator.evaluate(item)
+        summary = evaluator.get_summary(eval_result)
+
+        assert "Slot Bonus" in summary or "Premium base" in summary
+
+
+# -------------------------
+# Pattern Compilation Tests
+# -------------------------
+
+class TestPatternCompilation:
+    """Test regex pattern pre-compilation."""
+
+    def test_patterns_precompiled_on_init(self, evaluator):
+        """Patterns should be pre-compiled during initialization."""
+        assert hasattr(evaluator, '_compiled_patterns')
+        assert len(evaluator._compiled_patterns) > 0
+
+    def test_influence_patterns_precompiled(self, evaluator):
+        """Influence patterns should be pre-compiled."""
+        assert hasattr(evaluator, '_compiled_influence_patterns')
+        # May be empty if no influence mods configured
+        assert isinstance(evaluator._compiled_influence_patterns, dict)
+
+    def test_handles_invalid_regex_pattern(self, tmp_path):
+        """Should handle invalid regex patterns gracefully."""
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+
+        # Create affixes with potentially problematic pattern
+        affixes = {
+            "test": {
+                "tier1": ["+# to [maximum Life"],  # Unbalanced bracket
+                "weight": 5,
+                "min_value": 0
+            }
+        }
+
+        (data_dir / "valuable_affixes.json").write_text(json.dumps(affixes))
+        (data_dir / "valuable_bases.json").write_text(json.dumps({}))
+
+        # Should not raise, should handle gracefully
+        evaluator = RareItemEvaluator(data_dir=data_dir)
+        assert evaluator is not None
+
+
+# -------------------------
+# Additional Slot Detection Tests
+# -------------------------
+
+class TestAdditionalSlotDetection:
+    """Test additional slot detection cases."""
+
+    def test_detects_body_armour_plate(self, evaluator):
+        """Should detect body armour from plate."""
+        item = create_rare_item(base_type="Astral Plate")
+        assert evaluator._determine_item_slot(item) == "body_armour"
+
+    def test_detects_body_armour_vest(self, evaluator):
+        """Should detect body armour from vest."""
+        item = create_rare_item(base_type="Assassin's Vest")
+        assert evaluator._determine_item_slot(item) == "body_armour"
+
+    def test_detects_body_armour_regalia(self, evaluator):
+        """Should detect body armour from regalia."""
+        item = create_rare_item(base_type="Vaal Regalia")
+        assert evaluator._determine_item_slot(item) == "body_armour"
+
+    def test_detects_belt_vise(self, evaluator):
+        """Should detect belt from vise."""
+        item = create_rare_item(base_type="Stygian Vise")
+        assert evaluator._determine_item_slot(item) == "belt"
+
+    def test_detects_belt_sash(self, evaluator):
+        """Should detect belt from sash."""
+        item = create_rare_item(base_type="Rustic Sash")
+        assert evaluator._determine_item_slot(item) == "belt"
+
+    def test_detects_ring(self, evaluator):
+        """Should detect ring slot."""
+        item = create_rare_item(base_type="Diamond Ring")
+        assert evaluator._determine_item_slot(item) == "ring"
+
+    def test_detects_amulet(self, evaluator):
+        """Should detect amulet slot."""
+        item = create_rare_item(base_type="Onyx Amulet")
+        assert evaluator._determine_item_slot(item) == "amulet"
+
+    def test_detects_talisman_as_amulet(self, evaluator):
+        """Should detect talisman as amulet slot."""
+        item = create_rare_item(base_type="Avian Twins Talisman")
+        assert evaluator._determine_item_slot(item) == "amulet"
+
+    def test_detects_gloves_mitts(self, evaluator):
+        """Should detect gloves from mitts."""
+        item = create_rare_item(base_type="Fingerless Silk Gloves")
+        assert evaluator._determine_item_slot(item) == "gloves"

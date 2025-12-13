@@ -262,3 +262,158 @@ class TestEdgeCases:
         storage = SecureStorage(salt_file=temp_salt_file)
         # Should still work (creates new salt or handles error)
         assert storage is not None
+
+
+class TestSaltFileErrorHandling:
+    """Tests for salt file error handling."""
+
+    @pytest.fixture
+    def temp_salt_file(self, tmp_path):
+        return tmp_path / ".salt"
+
+    def test_salt_file_read_error(self, temp_salt_file):
+        """Salt file read error should create new salt."""
+        temp_salt_file.parent.mkdir(parents=True, exist_ok=True)
+        temp_salt_file.write_bytes(b"existing_salt_data_here_")
+
+        with patch.object(temp_salt_file.__class__, 'read_bytes', side_effect=PermissionError("Access denied")):
+            storage = SecureStorage(salt_file=temp_salt_file)
+            # Should still work by creating new salt
+            assert storage._salt is not None
+            assert len(storage._salt) == 32
+
+    def test_salt_file_write_error(self, temp_salt_file):
+        """Salt file write error should be handled gracefully."""
+        # Don't create the file - let it try to create
+        with patch.object(temp_salt_file.__class__, 'write_bytes', side_effect=PermissionError("Cannot write")):
+            storage = SecureStorage(salt_file=temp_salt_file)
+            # Should still work with generated salt
+            assert storage._salt is not None
+            assert len(storage._salt) == 32
+
+
+class TestPermissionErrorHandling:
+    """Tests for file permission error handling."""
+
+    @pytest.fixture
+    def temp_salt_file(self, tmp_path):
+        return tmp_path / ".salt"
+
+    @patch('platform.system', return_value='Windows')
+    def test_windows_no_username_env(self, mock_system, temp_salt_file):
+        """Windows without USERNAME env should skip icacls."""
+        with patch.dict(os.environ, {}, clear=True):
+            # Clear USERNAME from environment
+            if 'USERNAME' in os.environ:
+                del os.environ['USERNAME']
+
+            storage = SecureStorage(salt_file=temp_salt_file)
+            # Should not raise - just skip permission setting
+            assert storage is not None
+
+    @patch('platform.system', return_value='Linux')
+    def test_unix_chmod_error(self, mock_system, temp_salt_file):
+        """Unix chmod error should be handled gracefully."""
+        with patch('os.chmod', side_effect=PermissionError("Cannot chmod")):
+            storage = SecureStorage(salt_file=temp_salt_file)
+            # Should handle gracefully
+            assert storage is not None
+
+
+class TestEncryptionErrorHandling:
+    """Tests for encryption error handling."""
+
+    @pytest.fixture
+    def temp_salt_file(self, tmp_path):
+        return tmp_path / ".salt"
+
+    @pytest.mark.skipif(not CRYPTO_AVAILABLE, reason="cryptography not installed")
+    def test_encrypt_fernet_error_falls_back(self, temp_salt_file):
+        """Fernet encryption error should fall back to obfuscation."""
+        storage = SecureStorage(salt_file=temp_salt_file)
+
+        # Mock Fernet to raise exception
+        storage._fernet.encrypt = lambda x: (_ for _ in ()).throw(Exception("Encrypt error"))
+
+        encrypted = storage.encrypt("test_value")
+        # Should fall back to obfuscation
+        assert encrypted.startswith("obf:")
+        # Should still be decodable
+        assert storage.decrypt(encrypted) == "test_value"
+
+
+class TestDecryptionErrorHandling:
+    """Tests for decryption error handling."""
+
+    @pytest.fixture
+    def temp_salt_file(self, tmp_path):
+        return tmp_path / ".salt"
+
+    @pytest.mark.skipif(not CRYPTO_AVAILABLE, reason="cryptography not installed")
+    def test_decrypt_without_crypto_returns_empty(self, temp_salt_file):
+        """Decrypt of encrypted value without crypto should return empty."""
+        storage = SecureStorage(salt_file=temp_salt_file)
+        encrypted = storage.encrypt("test")
+
+        # Simulate crypto unavailable on decrypt
+        original_fernet = storage._fernet
+        storage._fernet = None
+
+        with patch('core.secure_storage.CRYPTO_AVAILABLE', False):
+            result = storage.decrypt(encrypted)
+            assert result == ""
+
+        storage._fernet = original_fernet
+
+    @pytest.mark.skipif(not CRYPTO_AVAILABLE, reason="cryptography not installed")
+    def test_decrypt_general_exception(self, temp_salt_file):
+        """General exception during decrypt should return empty."""
+        storage = SecureStorage(salt_file=temp_salt_file)
+        encrypted = storage.encrypt("test")
+
+        # Mock Fernet to raise unexpected exception
+        original_decrypt = storage._fernet.decrypt
+        storage._fernet.decrypt = lambda x: (_ for _ in ()).throw(RuntimeError("Unexpected error"))
+
+        result = storage.decrypt(encrypted)
+        assert result == ""
+
+        storage._fernet.decrypt = original_decrypt
+
+    def test_decrypt_unknown_enc_prefix(self, temp_salt_file):
+        """Value with enc: prefix but not enc:v1: should return empty."""
+        storage = SecureStorage(salt_file=temp_salt_file)
+
+        # This is technically an "enc:" prefix but not recognized
+        result = storage.decrypt("enc:v2:somedata")
+        # The code checks for ENCRYPTED_PREFIX which is "enc:v1:"
+        # So "enc:v2:" would fall through all conditions and return ""
+        assert result == ""
+
+    def test_decrypt_empty_enc_prefix(self, temp_salt_file):
+        """Value starting with enc: but not v1 should return empty."""
+        storage = SecureStorage(salt_file=temp_salt_file)
+
+        # Just "enc:" alone should return empty
+        result = storage.decrypt("enc:")
+        assert result == ""
+
+
+class TestGlobalSingletonReset:
+    """Tests for global singleton reset."""
+
+    def test_singleton_reset(self):
+        """Singleton can be reset for testing."""
+        import core.secure_storage as module
+
+        # Reset singleton
+        old_storage = module._storage
+        module._storage = None
+
+        storage1 = get_secure_storage()
+        storage2 = get_secure_storage()
+        assert storage1 is storage2
+
+        # Restore for other tests
+        if old_storage:
+            module._storage = old_storage
