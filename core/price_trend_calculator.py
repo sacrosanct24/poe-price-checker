@@ -54,28 +54,53 @@ class PriceTrend:
 
 
 class TrendCache:
-    """Simple in-memory cache for trend calculations."""
+    """LRU cache for trend calculations with size bounds and TTL."""
 
-    def __init__(self, ttl_seconds: int = 3600):
+    DEFAULT_MAX_SIZE = 1000
+
+    def __init__(self, ttl_seconds: int = 3600, max_size: int = DEFAULT_MAX_SIZE):
         self._cache: Dict[str, tuple[PriceTrend, float]] = {}
         self._ttl = ttl_seconds
+        self._max_size = max_size
+        self._access_order: List[str] = []  # Track LRU order
 
     def get(self, key: str) -> Optional[PriceTrend]:
         """Get cached trend if still valid."""
         if key in self._cache:
             trend, timestamp = self._cache[key]
             if time.time() - timestamp < self._ttl:
+                # Update LRU order
+                if key in self._access_order:
+                    self._access_order.remove(key)
+                self._access_order.append(key)
                 return trend
+            # Expired - remove
             del self._cache[key]
+            if key in self._access_order:
+                self._access_order.remove(key)
         return None
 
     def set(self, key: str, trend: PriceTrend) -> None:
-        """Cache a trend calculation."""
+        """Cache a trend calculation with LRU eviction."""
+        # Evict oldest if at capacity
+        while len(self._cache) >= self._max_size and self._access_order:
+            oldest = self._access_order.pop(0)
+            self._cache.pop(oldest, None)
+
         self._cache[key] = (trend, time.time())
+        if key in self._access_order:
+            self._access_order.remove(key)
+        self._access_order.append(key)
 
     def clear(self) -> None:
         """Clear the cache."""
         self._cache.clear()
+        self._access_order.clear()
+
+    @property
+    def size(self) -> int:
+        """Current cache size."""
+        return len(self._cache)
 
 
 class PriceTrendCalculator:

@@ -3,12 +3,23 @@ PoE.ninja API client for Path of Exile 1 pricing data.
 Inherits from BaseAPIClient for rate limiting and caching.
 """
 import logging
+from functools import lru_cache
 from typing import Any, Dict, List, Optional
 
 from core.constants import API_TIMEOUT_DEFAULT
 from data_sources.base_api import BaseAPIClient
 
 logger = logging.getLogger(__name__)
+
+
+@lru_cache(maxsize=512)
+def _normalize_currency_name(name: str) -> str:
+    """
+    Normalize currency name for cache key lookups.
+
+    Cached to avoid repeated string operations for common currencies.
+    """
+    return (name or "").strip().lower()
 
 
 class PoeNinjaAPI(BaseAPIClient):
@@ -280,7 +291,7 @@ class PoeNinjaAPI(BaseAPIClient):
         Returns:
             Tuple of (chaos_value, source_info) or (0.0, "not found")
         """
-        key = (currency_name or "").strip().lower()
+        key = _normalize_currency_name(currency_name)
         if not key:
             return 0.0, "empty name"
 

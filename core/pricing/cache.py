@@ -13,9 +13,29 @@ import threading
 import time
 from collections import OrderedDict
 from dataclasses import dataclass, field
+from functools import lru_cache
 from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
+
+
+@lru_cache(maxsize=256)
+def _normalize_item_text_cached(item_text: str) -> str:
+    """
+    Normalize item text for consistent cache keys (cached).
+
+    Removes whitespace variations and normalizes line endings.
+    Uses lru_cache for repeated lookups of the same item text.
+    """
+    # Strip and normalize line endings
+    text = item_text.strip()
+    text = text.replace('\r\n', '\n').replace('\r', '\n')
+
+    # Remove excessive whitespace within lines
+    lines = [' '.join(line.split()) for line in text.split('\n')]
+
+    # Join back with single newlines
+    return '\n'.join(lines)
 
 
 @dataclass
@@ -129,17 +149,9 @@ class ItemPriceCache:
         """
         Normalize item text for consistent cache keys.
 
-        Removes whitespace variations and normalizes line endings.
+        Delegates to module-level cached function for performance.
         """
-        # Strip and normalize line endings
-        text = item_text.strip()
-        text = text.replace('\r\n', '\n').replace('\r', '\n')
-
-        # Remove excessive whitespace within lines
-        lines = [' '.join(line.split()) for line in text.split('\n')]
-
-        # Join back with single newlines
-        return '\n'.join(lines)
+        return _normalize_item_text_cached(item_text)
 
     def _hash_item(self, item_text: str) -> str:
         """Generate hash key for item text."""
