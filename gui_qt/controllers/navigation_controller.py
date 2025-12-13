@@ -122,7 +122,7 @@ class NavigationController:
     # -------------------------------------------------------------------------
 
     def show_pob_characters(self) -> Optional[Any]:
-        """Show PoB character manager window."""
+        """Show PoB character manager window (deprecated - use show_build_manager)."""
         from PyQt6.QtWidgets import QMessageBox
         from gui_qt.windows.pob_character_window import PoBCharacterWindow
 
@@ -146,6 +146,42 @@ class NavigationController:
             )
 
         window = self._wm.show_window("pob_characters")
+        if window:
+            window.activateWindow()
+        return window
+
+    def show_build_manager(self) -> Optional[Any]:
+        """Show unified Build Manager window.
+
+        Combines Build Library and PoB Characters into a single interface.
+        """
+        from PyQt6.QtWidgets import QMessageBox
+        from gui_qt.windows.build_manager_window import BuildManagerWindow
+
+        if self._character_manager is None:
+            QMessageBox.warning(
+                self._main_window,
+                "Build Manager",
+                "Character manager not initialized."
+            )
+            return None
+
+        if "build_manager" not in self._wm._factories:
+            def create_build_manager():
+                window = BuildManagerWindow(
+                    character_manager=self._character_manager,
+                    parent=self._main_window,
+                )
+                # Wire up price check callback
+                if "on_pob_price_check" in self._callbacks:
+                    window.price_check_requested.connect(
+                        self._callbacks["on_pob_price_check"]
+                    )
+                return window
+
+            self._wm.register_factory("build_manager", create_build_manager)
+
+        window = self._wm.show_window("build_manager")
         if window:
             window.activateWindow()
         return window

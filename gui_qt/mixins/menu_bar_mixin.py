@@ -70,15 +70,11 @@ class MenuBarMixin:
                 MenuSection([
                     MenuItem("Go to &AI Advisor Screen", handler=self._switch_to_advisor),
                 ]),
-                MenuItem("&PoB Characters", handler=self._show_pob_characters,
+                MenuItem("My &Builds...", handler=self._show_build_manager,
                          shortcut="Ctrl+B"),
                 MenuItem("&Compare Build Trees...", handler=self._show_build_comparison),
-                MenuItem("Build &Library...", handler=self._show_build_library,
-                         shortcut="Ctrl+Alt+B"),
                 MenuSection([
-                    MenuItem("Find &BiS Item...", handler=self._show_bis_search,
-                             shortcut="Ctrl+I"),
-                    MenuItem("&Upgrade Finder...", handler=self._show_upgrade_finder,
+                    MenuItem("&Item Planning Hub...", handler=self._show_item_planning_hub,
                              shortcut="Ctrl+U"),
                     MenuItem("Compare &Items...", handler=self._show_item_comparison,
                              shortcut="Ctrl+Shift+I"),

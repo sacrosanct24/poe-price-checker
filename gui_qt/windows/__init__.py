@@ -9,6 +9,7 @@ from gui_qt.windows.rare_eval_config_window import RareEvalConfigWindow
 from gui_qt.windows.price_rankings_window import PriceRankingsWindow
 from gui_qt.windows.stash_viewer_window import StashViewerWindow
 from gui_qt.windows.upgrade_advisor_window import UpgradeAdvisorWindow
+from gui_qt.windows.build_manager_window import BuildManagerWindow
 
 __all__ = [
     "RecentSalesWindow",
@@ -18,4 +19,5 @@ __all__ = [
     "PriceRankingsWindow",
     "StashViewerWindow",
     "UpgradeAdvisorWindow",
+    "BuildManagerWindow",
 ]

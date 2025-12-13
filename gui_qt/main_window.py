@@ -1096,9 +1096,19 @@ class PriceCheckerWindow(BackgroundServicesMixin, MenuBarMixin, ShortcutsMixin, 
             self._menu_actions.show_price_history()
 
     def _show_pob_characters(self) -> None:
-        """Show PoB character manager window."""
+        """Show PoB character manager window (deprecated - use _show_build_manager)."""
         if self._menu_actions:
             self._menu_actions.show_pob_characters()
+
+    def _show_build_manager(self) -> None:
+        """Show unified Build Manager window."""
+        if self._menu_actions:
+            self._menu_actions.show_build_manager()
+
+    def _show_item_planning_hub(self) -> None:
+        """Show unified Item Planning Hub dialog."""
+        if self._menu_actions:
+            self._menu_actions.show_item_planning_hub()
 
     def _on_pob_profile_selected(self, profile_name: str) -> None:
         """Handle PoB profile selection."""

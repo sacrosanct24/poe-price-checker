@@ -61,10 +61,8 @@ DEFAULT_SHORTCUTS: List[ShortcutDef] = [
     ShortcutDef("focus_filter", "Focus Filter", "Focus the results filter", "Ctrl+F", ShortcutCategory.PRICE_CHECK),
 
     # Build & PoB
-    ShortcutDef("show_pob_characters", "PoB Characters", "Open PoB character manager", "Ctrl+B", ShortcutCategory.BUILD),
-    ShortcutDef("show_bis_search", "BiS Item Search", "Find best-in-slot items", "Ctrl+I", ShortcutCategory.BUILD),
-    ShortcutDef("show_upgrade_finder", "Upgrade Finder", "Find gear upgrades within budget", "Ctrl+U", ShortcutCategory.BUILD),
-    ShortcutDef("show_build_library", "Build Library", "Manage saved build profiles", "Ctrl+Alt+B", ShortcutCategory.BUILD),
+    ShortcutDef("show_build_manager", "My Builds", "Open unified build manager", "Ctrl+B", ShortcutCategory.BUILD),
+    ShortcutDef("show_item_planning_hub", "Item Planning", "Upgrade finder and BiS search", "Ctrl+U", ShortcutCategory.BUILD),
     ShortcutDef("show_build_comparison", "Compare Builds", "Compare passive tree builds", "Ctrl+Shift+B", ShortcutCategory.BUILD),
     ShortcutDef("show_item_comparison", "Compare Items", "Side-by-side item comparison", "Ctrl+Shift+I", ShortcutCategory.BUILD),
     ShortcutDef("show_rare_eval_config", "Rare Item Settings", "Configure rare item evaluation", "Ctrl+Shift+R", ShortcutCategory.BUILD),

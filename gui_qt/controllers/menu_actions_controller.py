@@ -260,8 +260,12 @@ class MenuActionsController:
     # -------------------------------------------------------------------------
 
     def show_pob_characters(self) -> None:
-        """Show PoB character manager window."""
+        """Show PoB character manager window (deprecated - use show_build_manager)."""
         self._nav_controller.show_pob_characters()
+
+    def show_build_manager(self) -> None:
+        """Show unified Build Manager window."""
+        self._nav_controller.show_build_manager()
 
     def show_rare_eval_config(self) -> None:
         """Show rare evaluation config window."""
