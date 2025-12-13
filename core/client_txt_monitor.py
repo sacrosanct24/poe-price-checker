@@ -493,7 +493,7 @@ if __name__ == "__main__":
             while True:
                 time.sleep(1)
         except KeyboardInterrupt:
-            pass
+            pass  # User requested exit, continue to cleanup
         monitor.stop_monitoring()
     else:
         print("\nClient.txt not found - skipping live test")

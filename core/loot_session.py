@@ -474,8 +474,8 @@ class LootSessionManager:
             self._set_state(SessionState.PAUSED)
 
         elif zone_type == "town":
-            # In town - pause but don't end map (might be quick visit)
-            pass
+            # In town - no action needed, might be quick visit before returning to map
+            pass  # Intentional no-op: preserve state while in town
 
     def _end_current_map(self):
         """End the current map run and add it to the session."""

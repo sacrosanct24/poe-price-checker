@@ -472,7 +472,7 @@ Item Level: 86
             try:
                 time.sleep(5)
             except KeyboardInterrupt:
-                pass
+                pass  # User requested exit, continue to cleanup
             monitor.unregister_hotkey("ctrl+shift+t")
     else:
         print("\nHotkey test skipped (keyboard module not available)")
