@@ -15,7 +15,7 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-# Try to import cryptography, fall back to basic obfuscation if unavailable
+# Import cryptography - this is a required dependency for secure credential storage
 try:
     from cryptography.fernet import Fernet, InvalidToken
     from cryptography.hazmat.primitives import hashes
@@ -23,9 +23,10 @@ try:
     CRYPTO_AVAILABLE = True
 except ImportError:
     CRYPTO_AVAILABLE = False
-    logger.warning(
-        "cryptography package not available. "
-        "Credentials will use basic obfuscation only."
+    # Log error - this is a required dependency, not optional
+    logger.error(
+        "cryptography package not installed. Secure credential storage is disabled. "
+        "Install with: pip install cryptography>=41.0.0"
     )
 
 
@@ -148,23 +149,25 @@ class SecureStorage:
             plaintext: The credential to encrypt
 
         Returns:
-            Encrypted string with prefix, or obfuscated string if
-            cryptography is unavailable.
+            Encrypted string with prefix.
+
+        Raises:
+            RuntimeError: If cryptography is not available.
         """
         if not plaintext:
             return ""
 
-        if CRYPTO_AVAILABLE and self._fernet:
-            try:
-                encrypted = self._fernet.encrypt(plaintext.encode("utf-8"))
-                return f"{self.ENCRYPTED_PREFIX}{encrypted.decode('utf-8')}"
-            except Exception as e:
-                logger.error(f"Encryption failed: {e}")
-                # Fall through to obfuscation
+        if not CRYPTO_AVAILABLE or not self._fernet:
+            raise RuntimeError(
+                "Cannot encrypt credential: cryptography package not available. "
+                "Install with: pip install cryptography>=41.0.0"
+            )
 
-        # Basic obfuscation fallback (NOT secure, just obscures casual viewing)
-        obfuscated = base64.b64encode(plaintext.encode("utf-8")).decode("utf-8")
-        return f"obf:{obfuscated}"
+        try:
+            encrypted = self._fernet.encrypt(plaintext.encode("utf-8"))
+            return f"{self.ENCRYPTED_PREFIX}{encrypted.decode('utf-8')}"
+        except Exception as e:
+            raise RuntimeError(f"Encryption failed: {e}") from e
 
     def decrypt(self, ciphertext: str) -> str:
         """
@@ -221,10 +224,15 @@ class SecureStorage:
         return ""
 
     def is_encrypted(self, value: str) -> bool:
-        """Check if a value is already encrypted."""
+        """
+        Check if a value is properly encrypted.
+
+        Note: obf: values are legacy obfuscated values that should be
+        re-encrypted. They are NOT considered properly encrypted.
+        """
         if not value:
             return True  # Empty is "safe"
-        return value.startswith((self.ENCRYPTED_PREFIX, "obf:"))
+        return value.startswith(self.ENCRYPTED_PREFIX)
 
 
 # Module-level singleton for convenience

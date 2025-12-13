@@ -187,7 +187,8 @@ class LootValuationWorker(BaseThreadWorker):
     """
     Worker that prices a list of items in the background.
 
-    Uses poe.ninja price data to value items found in stash diff.
+    Uses the price service to value items found in stash diff.
+    Requires a price_service to function - will raise an error if not provided.
 
     Signals:
         result(List[Dict]): Emitted with priced items on success.
@@ -199,7 +200,8 @@ class LootValuationWorker(BaseThreadWorker):
         self,
         items: List[Dict[str, Any]],
         league: str,
-        ninja_api: Optional[Any] = None,
+        price_service: Optional[Any] = None,
+        divine_ratio: float = 180.0,
         parent: Optional[Any] = None,
     ):
         """
@@ -208,13 +210,23 @@ class LootValuationWorker(BaseThreadWorker):
         Args:
             items: List of items to price (from StashDiff.added_items).
             league: League for pricing lookup.
-            ninja_api: Optional poe.ninja API client.
+            price_service: Price service for item valuation (required).
+            divine_ratio: Chaos per divine for conversion (default 180).
             parent: Optional parent QObject.
+
+        Raises:
+            ValueError: If price_service is not provided.
         """
         super().__init__(parent)
+        if price_service is None:
+            raise ValueError(
+                "LootValuationWorker requires a price_service. "
+                "Loot tracking valuation is disabled without a configured price service."
+            )
         self._items = items
         self._league = league
-        self._ninja_api = ninja_api
+        self._price_service = price_service
+        self._divine_ratio = divine_ratio
 
     def _execute(self) -> List[Dict[str, Any]]:
         """
@@ -226,6 +238,8 @@ class LootValuationWorker(BaseThreadWorker):
         self.emit_status(f"Pricing {len(self._items)} items...")
 
         priced_items = []
+        total_chaos = 0.0
+
         for i, item in enumerate(self._items):
             if self.is_cancelled:
                 raise InterruptedError("Valuation cancelled")
@@ -233,25 +247,104 @@ class LootValuationWorker(BaseThreadWorker):
             if i % 10 == 0:
                 self.emit_status(f"Pricing item {i + 1}/{len(self._items)}...")
 
-            # Add pricing (TODO: integrate with actual price service)
             priced_item = item.copy()
-            priced_item["chaos_value"] = self._lookup_price(item)
-            priced_item["divine_value"] = 0.0  # TODO: divine conversion
+            chaos_value = self._lookup_price(item)
+            priced_item["chaos_value"] = chaos_value
+            priced_item["divine_value"] = chaos_value / self._divine_ratio if self._divine_ratio > 0 else 0.0
+            priced_item["priced"] = chaos_value > 0
             priced_items.append(priced_item)
+            total_chaos += chaos_value
 
-        self.emit_status(f"Priced {len(priced_items)} items")
+        priced_count = sum(1 for p in priced_items if p.get("priced", False))
+        self.emit_status(
+            f"Priced {priced_count}/{len(priced_items)} items, "
+            f"total value: {total_chaos:.0f}c"
+        )
         return priced_items
 
     def _lookup_price(self, item: Dict[str, Any]) -> float:
         """
-        Look up price for an item.
+        Look up price for an item using the price service.
 
         Args:
-            item: Raw item data.
+            item: Raw item data from stash API.
 
         Returns:
-            Chaos value estimate.
+            Chaos value estimate, or 0.0 if not found.
         """
-        # TODO: Implement actual price lookup
-        # For now, return 0 - will be integrated with price service
-        return 0.0
+        try:
+            # Convert stash item to text format for price lookup
+            item_text = self._item_to_text(item)
+            if not item_text:
+                return 0.0
+
+            # Use price service to check item
+            results = self._price_service.check_item(item_text)
+            if results:
+                # Return the first result's chaos value
+                return float(results[0].get("chaos_value", 0.0))
+            return 0.0
+        except Exception as e:
+            logger.debug(f"Price lookup failed for {item.get('typeLine', 'unknown')}: {e}")
+            return 0.0
+
+    def _item_to_text(self, item: Dict[str, Any]) -> str:
+        """
+        Convert a stash API item to text format for price lookup.
+
+        Args:
+            item: Raw item data from stash API.
+
+        Returns:
+            Item text in clipboard format, or empty string if conversion fails.
+        """
+        lines = []
+
+        # Rarity mapping (frameType in API)
+        rarity_map = {0: "Normal", 1: "Magic", 2: "Rare", 3: "Unique", 4: "Gem", 5: "Currency"}
+        frame_type = item.get("frameType", 0)
+        rarity = rarity_map.get(frame_type, "Normal")
+        lines.append(f"Rarity: {rarity}")
+
+        # Item name and base type
+        name = item.get("name", "")
+        base_type = item.get("typeLine", "")
+        if name:
+            lines.append(name)
+        if base_type:
+            lines.append(base_type)
+
+        # Item level
+        ilvl = item.get("ilvl")
+        if ilvl:
+            lines.append(f"Item Level: {ilvl}")
+
+        # Stack size for currency/stackables
+        stack_size = item.get("stackSize", 1)
+        if stack_size > 1:
+            lines.append(f"Stack Size: {stack_size}")
+
+        # Sockets
+        sockets = item.get("sockets", [])
+        if sockets:
+            groups = {}
+            for s in sockets:
+                g = s.get("group", 0)
+                c = s.get("sColour", "R")
+                groups.setdefault(g, []).append(c)
+            socket_str = " ".join("-".join(g) for g in groups.values())
+            lines.append(f"Sockets: {socket_str}")
+
+        # Implicit mods
+        for mod in item.get("implicitMods", []):
+            lines.append(mod)
+
+        # Explicit mods
+        for mod in item.get("explicitMods", []):
+            lines.append(mod)
+
+        # Crafted mods
+        for mod in item.get("craftedMods", []):
+            lines.append(f"{mod} (crafted)")
+
+        return "\n".join(lines)

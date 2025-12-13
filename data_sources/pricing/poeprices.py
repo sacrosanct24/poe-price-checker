@@ -8,16 +8,8 @@ from __future__ import annotations
 
 import base64
 import logging
-import sys
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any, Dict, List, Optional
-
-# Add parent directory to path for imports when running as script
-_script_dir = Path(__file__).parent
-_project_root = _script_dir.parent.parent
-if str(_project_root) not in sys.path:
-    sys.path.insert(0, str(_project_root))
 
 from data_sources.base_api import BaseAPIClient
 
@@ -319,7 +311,7 @@ class PoePricesAPI(BaseAPIClient):
         return sorted_mods[:top_n]
 
 
-# Testing
+# Testing - run from project root: python -m data_sources.pricing.poeprices
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
 

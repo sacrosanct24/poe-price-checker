@@ -62,9 +62,9 @@ class TestSecureStorage:
         assert decrypted == original
 
     def test_encrypted_value_has_prefix(self, storage):
-        """Encrypted values should have appropriate prefix."""
+        """Encrypted values should have enc:v1: prefix."""
         encrypted = storage.encrypt("test_value")
-        assert encrypted.startswith("enc:v1:") or encrypted.startswith("obf:")
+        assert encrypted.startswith("enc:v1:")
 
     def test_different_values_different_ciphertext(self, storage):
         """Different values should produce different ciphertext."""
@@ -91,8 +91,8 @@ class TestSecureStorage:
         assert storage.is_encrypted("enc:v1:someciphertext") is True
 
     def test_is_encrypted_with_obf_prefix(self, storage):
-        """Value with obf: prefix is encrypted."""
-        assert storage.is_encrypted("obf:c29tZXRoaW5n") is True
+        """Value with obf: prefix is NOT properly encrypted (legacy obfuscation)."""
+        assert storage.is_encrypted("obf:c29tZXRoaW5n") is False
 
     def test_is_encrypted_plaintext(self, storage):
         """Plaintext is not encrypted."""
@@ -151,24 +151,28 @@ class TestSecureStorage:
 
 
 class TestSecureStorageFallback:
-    """Tests for obfuscation fallback when cryptography unavailable."""
+    """Tests for behavior when cryptography unavailable."""
 
     @pytest.fixture
     def temp_salt_file(self, tmp_path):
         return tmp_path / ".salt"
 
-    def test_obfuscation_fallback(self, temp_salt_file):
-        """When crypto unavailable, should use obfuscation."""
+    def test_encrypt_raises_without_crypto(self, temp_salt_file):
+        """When crypto unavailable, encrypt should raise RuntimeError."""
         with patch('core.secure_storage.CRYPTO_AVAILABLE', False):
-            # Need to create storage without Fernet
             storage = SecureStorage(salt_file=temp_salt_file)
             storage._fernet = None  # Force no Fernet
 
-            original = "test_secret"
-            encrypted = storage.encrypt(original)
+            with pytest.raises(RuntimeError, match="cryptography package not available"):
+                storage.encrypt("test_secret")
 
-            assert encrypted.startswith("obf:")
-            assert storage.decrypt(encrypted) == original
+    def test_decrypt_legacy_obfuscated_still_works(self, temp_salt_file):
+        """Legacy obfuscated values should still be decodable."""
+        storage = SecureStorage(salt_file=temp_salt_file)
+        original = "test_secret"
+        # Simulate legacy obfuscated value
+        obfuscated = "obf:" + base64.b64encode(original.encode()).decode()
+        assert storage.decrypt(obfuscated) == original
 
 
 class TestConvenienceFunctions:
@@ -183,7 +187,7 @@ class TestConvenienceFunctions:
     def test_encrypt_credential_function(self):
         """encrypt_credential should work via singleton."""
         encrypted = encrypt_credential("test")
-        assert encrypted.startswith("enc:v1:") or encrypted.startswith("obf:")
+        assert encrypted.startswith("enc:v1:")
 
     def test_decrypt_credential_function(self):
         """decrypt_credential should work via singleton."""
@@ -328,18 +332,15 @@ class TestEncryptionErrorHandling:
         return tmp_path / ".salt"
 
     @pytest.mark.skipif(not CRYPTO_AVAILABLE, reason="cryptography not installed")
-    def test_encrypt_fernet_error_falls_back(self, temp_salt_file):
-        """Fernet encryption error should fall back to obfuscation."""
+    def test_encrypt_fernet_error_raises_runtime_error(self, temp_salt_file):
+        """Fernet encryption error should raise RuntimeError."""
         storage = SecureStorage(salt_file=temp_salt_file)
 
         # Mock Fernet to raise exception
         storage._fernet.encrypt = lambda x: (_ for _ in ()).throw(Exception("Encrypt error"))
 
-        encrypted = storage.encrypt("test_value")
-        # Should fall back to obfuscation
-        assert encrypted.startswith("obf:")
-        # Should still be decodable
-        assert storage.decrypt(encrypted) == "test_value"
+        with pytest.raises(RuntimeError, match="Encryption failed"):
+            storage.encrypt("test_value")
 
 
 class TestDecryptionErrorHandling:
