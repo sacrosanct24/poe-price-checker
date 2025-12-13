@@ -371,53 +371,70 @@ class TestStashDiffWorkerExecute:
 # =============================================================================
 
 
+@pytest.fixture
+def mock_price_service():
+    """Create a mock price service for testing."""
+    service = MagicMock()
+    service.check_item.return_value = [{"chaos_value": 100.0}]
+    return service
+
+
 class TestLootValuationWorkerInit:
     """Tests for LootValuationWorker initialization."""
 
-    def test_init_stores_items(self):
+    def test_init_stores_items(self, mock_price_service):
         """Should store items list."""
         items = [{"name": "Item1"}, {"name": "Item2"}]
 
         worker = LootValuationWorker(
             items=items,
             league="Test",
+            price_service=mock_price_service,
         )
 
         assert worker._items == items
 
-    def test_init_stores_league(self):
+    def test_init_stores_league(self, mock_price_service):
         """Should store league."""
         worker = LootValuationWorker(
             items=[],
             league="Settlers",
+            price_service=mock_price_service,
         )
 
         assert worker._league == "Settlers"
 
-    def test_init_stores_ninja_api(self):
-        """Should store optional ninja API client."""
-        ninja_api = MagicMock()
-
+    def test_init_stores_price_service(self, mock_price_service):
+        """Should store price service."""
         worker = LootValuationWorker(
             items=[],
             league="Test",
-            ninja_api=ninja_api,
+            price_service=mock_price_service,
         )
 
-        assert worker._ninja_api is ninja_api
+        assert worker._price_service is mock_price_service
+
+    def test_init_requires_price_service(self):
+        """Should raise ValueError when price_service is None."""
+        with pytest.raises(ValueError, match="requires a price_service"):
+            LootValuationWorker(
+                items=[],
+                league="Test",
+                price_service=None,
+            )
 
 
 class TestLootValuationWorkerExecute:
     """Tests for LootValuationWorker._execute()."""
 
-    def test_execute_returns_priced_items(self):
+    def test_execute_returns_priced_items(self, mock_price_service):
         """Should return items with price fields added."""
         items = [
-            {"name": "Exalted Orb", "stack_size": 1},
-            {"name": "Chaos Orb", "stack_size": 10},
+            {"typeLine": "Exalted Orb", "stackSize": 1, "frameType": 5},
+            {"typeLine": "Chaos Orb", "stackSize": 10, "frameType": 5},
         ]
 
-        worker = LootValuationWorker(items=items, league="Test")
+        worker = LootValuationWorker(items=items, league="Test", price_service=mock_price_service)
         result = worker._execute()
 
         assert len(result) == 2
@@ -425,35 +442,35 @@ class TestLootValuationWorkerExecute:
             assert "chaos_value" in item
             assert "divine_value" in item
 
-    def test_execute_preserves_original_item_data(self):
+    def test_execute_preserves_original_item_data(self, mock_price_service):
         """Should preserve original item fields."""
         items = [
-            {"name": "Test Item", "stack_size": 5, "rarity": "rare"},
+            {"typeLine": "Test Item", "stackSize": 5, "frameType": 2},
         ]
 
-        worker = LootValuationWorker(items=items, league="Test")
+        worker = LootValuationWorker(items=items, league="Test", price_service=mock_price_service)
         result = worker._execute()
 
-        assert result[0]["name"] == "Test Item"
-        assert result[0]["stack_size"] == 5
-        assert result[0]["rarity"] == "rare"
+        assert result[0]["typeLine"] == "Test Item"
+        assert result[0]["stackSize"] == 5
+        assert result[0]["frameType"] == 2
 
-    def test_execute_does_not_modify_original(self):
+    def test_execute_does_not_modify_original(self, mock_price_service):
         """Should not modify original items list."""
-        items = [{"name": "Test", "value": 100}]
+        items = [{"typeLine": "Test", "frameType": 0}]
         original_item = items[0].copy()
 
-        worker = LootValuationWorker(items=items, league="Test")
+        worker = LootValuationWorker(items=items, league="Test", price_service=mock_price_service)
         worker._execute()
 
         assert items[0] == original_item
         assert "chaos_value" not in items[0]
 
-    def test_execute_emits_status_updates(self):
+    def test_execute_emits_status_updates(self, mock_price_service):
         """Should emit status during pricing."""
-        items = [{"name": f"Item{i}"} for i in range(15)]
+        items = [{"typeLine": f"Item{i}", "frameType": 0} for i in range(15)]
 
-        worker = LootValuationWorker(items=items, league="Test")
+        worker = LootValuationWorker(items=items, league="Test", price_service=mock_price_service)
 
         status_updates = []
         worker.status.connect(lambda msg: status_updates.append(msg))
@@ -463,19 +480,19 @@ class TestLootValuationWorkerExecute:
         # Should have status updates for batch progress
         assert len(status_updates) >= 2
 
-    def test_execute_checks_cancellation(self):
+    def test_execute_checks_cancellation(self, mock_price_service):
         """Should check cancellation during iteration."""
-        items = [{"name": f"Item{i}"} for i in range(100)]
+        items = [{"typeLine": f"Item{i}", "frameType": 0} for i in range(100)]
 
-        worker = LootValuationWorker(items=items, league="Test")
+        worker = LootValuationWorker(items=items, league="Test", price_service=mock_price_service)
         worker._cancelled = True
 
         with pytest.raises(InterruptedError, match="cancelled"):
             worker._execute()
 
-    def test_execute_empty_items(self):
+    def test_execute_empty_items(self, mock_price_service):
         """Should handle empty items list."""
-        worker = LootValuationWorker(items=[], league="Test")
+        worker = LootValuationWorker(items=[], league="Test", price_service=mock_price_service)
         result = worker._execute()
 
         assert result == []
@@ -484,17 +501,35 @@ class TestLootValuationWorkerExecute:
 class TestLootValuationWorkerLookupPrice:
     """Tests for LootValuationWorker._lookup_price()."""
 
-    def test_lookup_price_returns_float(self):
+    def test_lookup_price_returns_float(self, mock_price_service):
         """Should return a float value."""
-        worker = LootValuationWorker(items=[], league="Test")
-        result = worker._lookup_price({"name": "Test"})
+        worker = LootValuationWorker(items=[], league="Test", price_service=mock_price_service)
+        result = worker._lookup_price({"typeLine": "Exalted Orb", "frameType": 5})
 
         assert isinstance(result, float)
 
-    def test_lookup_price_default_zero(self):
-        """Should return 0.0 as default (not yet implemented)."""
-        worker = LootValuationWorker(items=[], league="Test")
-        result = worker._lookup_price({"name": "Test"})
+    def test_lookup_price_uses_price_service(self, mock_price_service):
+        """Should use price service to get value."""
+        mock_price_service.check_item.return_value = [{"chaos_value": 150.0}]
+        worker = LootValuationWorker(items=[], league="Test", price_service=mock_price_service)
+        result = worker._lookup_price({"typeLine": "Exalted Orb", "frameType": 5})
+
+        assert result == 150.0
+        mock_price_service.check_item.assert_called_once()
+
+    def test_lookup_price_returns_zero_on_no_results(self, mock_price_service):
+        """Should return 0.0 when price service returns empty results."""
+        mock_price_service.check_item.return_value = []
+        worker = LootValuationWorker(items=[], league="Test", price_service=mock_price_service)
+        result = worker._lookup_price({"typeLine": "Unknown Item", "frameType": 0})
+
+        assert result == 0.0
+
+    def test_lookup_price_returns_zero_on_exception(self, mock_price_service):
+        """Should return 0.0 on price service exception."""
+        mock_price_service.check_item.side_effect = Exception("API error")
+        worker = LootValuationWorker(items=[], league="Test", price_service=mock_price_service)
+        result = worker._lookup_price({"typeLine": "Test", "frameType": 0})
 
         assert result == 0.0
 
@@ -530,9 +565,9 @@ class TestWorkerSignals:
         assert hasattr(worker, 'error')
         assert hasattr(worker, 'status')
 
-    def test_valuation_worker_has_required_signals(self):
+    def test_valuation_worker_has_required_signals(self, mock_price_service):
         """Should have result, error, and status signals."""
-        worker = LootValuationWorker(items=[], league="Test")
+        worker = LootValuationWorker(items=[], league="Test", price_service=mock_price_service)
 
         assert hasattr(worker, 'result')
         assert hasattr(worker, 'error')
@@ -565,9 +600,9 @@ class TestWorkerCancellation:
 
         assert worker.is_cancelled
 
-    def test_valuation_worker_cancel(self):
+    def test_valuation_worker_cancel(self, mock_price_service):
         """Should set cancelled flag."""
-        worker = LootValuationWorker(items=[], league="Test")
+        worker = LootValuationWorker(items=[], league="Test", price_service=mock_price_service)
 
         worker.cancel()
 
