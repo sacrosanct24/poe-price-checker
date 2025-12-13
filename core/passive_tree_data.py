@@ -14,6 +14,8 @@ from typing import Any, Dict, List, Optional, cast
 
 import requests
 
+from core.constants import API_TIMEOUT_EXTENDED
+
 logger = logging.getLogger(__name__)
 
 # Passive tree data URLs
@@ -93,7 +95,7 @@ class PassiveTreeDataProvider:
             headers = {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
             }
-            response = requests.get(SKILLTREE_DATA_URL, headers=headers, timeout=60)
+            response = requests.get(SKILLTREE_DATA_URL, headers=headers, timeout=API_TIMEOUT_EXTENDED)
             response.raise_for_status()
             data: Dict[str, Any] = response.json()
 

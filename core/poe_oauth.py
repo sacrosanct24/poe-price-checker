@@ -18,6 +18,7 @@ import json
 from pathlib import Path
 from datetime import datetime, timedelta
 
+from core.constants import API_TIMEOUT_STASH
 from core.secure_storage import get_secure_storage
 
 
@@ -318,7 +319,7 @@ class PoeOAuthClient:
             data['client_secret'] = self.client_secret
 
         try:
-            response = requests.post(self.TOKEN_URL, data=data, timeout=30)
+            response = requests.post(self.TOKEN_URL, data=data, timeout=API_TIMEOUT_STASH)
             response.raise_for_status()
 
             token_data = response.json()
@@ -367,7 +368,7 @@ class PoeOAuthClient:
             data['client_secret'] = self.client_secret
 
         try:
-            response = requests.post(self.TOKEN_URL, data=data, timeout=30)
+            response = requests.post(self.TOKEN_URL, data=data, timeout=API_TIMEOUT_STASH)
             response.raise_for_status()
 
             token_data = response.json()

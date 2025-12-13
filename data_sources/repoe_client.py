@@ -23,6 +23,8 @@ from typing import Any, Dict, List, Optional
 
 import requests
 
+from core.constants import API_TIMEOUT_EXTENDED
+
 logger = logging.getLogger(__name__)
 
 # RePoE raw GitHub URLs
@@ -135,7 +137,7 @@ class RePoEClient:
         logger.info(f"Downloading RePoE data: {url}")
 
         try:
-            response = requests.get(url, timeout=60)
+            response = requests.get(url, timeout=API_TIMEOUT_EXTENDED)
             response.raise_for_status()
             data: Dict[str, Any] = response.json()
 

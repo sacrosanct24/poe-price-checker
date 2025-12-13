@@ -13,6 +13,8 @@ from typing import Any, Dict, List, Optional
 
 import requests
 
+from core.constants import API_TIMEOUT_STASH
+
 logger = logging.getLogger(__name__)
 
 
@@ -203,7 +205,7 @@ class CargoAPIClient:
 
         try:
             logger.debug(f"Cargo API query: tables={tables}, limit={limit}, offset={offset}")
-            response = self.session.get(self.base_url, params=params, timeout=30)
+            response = self.session.get(self.base_url, params=params, timeout=API_TIMEOUT_STASH)
             response.raise_for_status()
 
             data = response.json()

@@ -8,6 +8,8 @@ import logging
 import requests
 from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass
+
+from core.constants import API_TIMEOUT_STASH
 from core.poe_oauth import PoeOAuthClient
 
 
@@ -100,7 +102,7 @@ class StashScanner:
             response = requests.get(
                 "https://www.pathofexile.com/api/profile",
                 headers=headers,
-                timeout=30,
+                timeout=API_TIMEOUT_STASH,
             )
             response.raise_for_status()
 
@@ -145,7 +147,7 @@ class StashScanner:
                 self.STASH_TABS_URL,
                 headers=headers,
                 params=params,
-                timeout=30,
+                timeout=API_TIMEOUT_STASH,
             )
             response.raise_for_status()
 
@@ -193,7 +195,7 @@ class StashScanner:
                 self.STASH_ITEMS_URL,
                 headers=headers,
                 params=params,
-                timeout=30,
+                timeout=API_TIMEOUT_STASH,
             )
             response.raise_for_status()
 

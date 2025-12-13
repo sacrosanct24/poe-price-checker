@@ -16,6 +16,8 @@ from typing import Any, Callable, Dict, List, Optional, cast
 
 import requests
 
+from core.constants import API_TIMEOUT_STASH
+
 logger = logging.getLogger(__name__)
 
 
@@ -135,7 +137,7 @@ class PoEStashClient:
 
         for attempt in range(max_retries + 1):
             try:
-                response = self.session.get(url, params=params, timeout=30)
+                response = self.session.get(url, params=params, timeout=API_TIMEOUT_STASH)
                 response.raise_for_status()
                 return cast(Dict[str, Any], response.json())
             except requests.exceptions.HTTPError:

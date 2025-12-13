@@ -18,6 +18,7 @@ from typing import Optional
 import requests
 import logging
 
+from core.constants import API_TIMEOUT_HEALTH_CHECK, API_TIMEOUT_DEFAULT, API_TIMEOUT_LOCAL_AI
 from core.result import Result, Ok, Err
 from data_sources.ai.base_ai_client import BaseAIClient, AIResponse
 
@@ -100,7 +101,7 @@ class OllamaClient(BaseAIClient):
         try:
             response = self._session.get(
                 f"{self._host}/api/tags",
-                timeout=5,
+                timeout=API_TIMEOUT_HEALTH_CHECK,
             )
             self._available = response.ok
             if self._available:
@@ -120,7 +121,7 @@ class OllamaClient(BaseAIClient):
         try:
             response = self._session.get(
                 f"{self._host}/api/tags",
-                timeout=10,
+                timeout=API_TIMEOUT_DEFAULT,
             )
             if not response.ok:
                 return Err(f"Failed to list models: HTTP {response.status_code}")

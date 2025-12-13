@@ -15,6 +15,8 @@ from urllib.parse import urlparse
 
 import requests
 
+from core.constants import API_TIMEOUT_DEFAULT
+
 # Use defusedxml to prevent XXE (XML External Entity) attacks
 # PoB codes from untrusted sources could contain malicious XML
 import defusedxml.ElementTree as ET
@@ -168,7 +170,7 @@ class PoBDecoder:
             url = f"https://pastebin.com/raw/{paste_id}"
 
         try:
-            response = requests.get(url, timeout=10)
+            response = requests.get(url, timeout=API_TIMEOUT_DEFAULT)
             response.raise_for_status()
             return response.text.strip()
         except Exception as e:
@@ -190,7 +192,7 @@ class PoBDecoder:
         raw_url = f"https://pobb.in/{paste_id}/raw"
 
         try:
-            response = requests.get(raw_url, timeout=10)
+            response = requests.get(raw_url, timeout=API_TIMEOUT_DEFAULT)
             response.raise_for_status()
             return response.text.strip()
         except Exception as e:
@@ -198,7 +200,7 @@ class PoBDecoder:
             logger.debug(f"pobb.in raw endpoint failed, trying API: {e}")
             api_url = f"https://pobb.in/api/v1/paste/{paste_id}"
             try:
-                response = requests.get(api_url, timeout=10)
+                response = requests.get(api_url, timeout=API_TIMEOUT_DEFAULT)
                 response.raise_for_status()
                 data = response.json()
                 # The API returns the code in a 'code' or 'content' field

@@ -19,6 +19,8 @@ from urllib.parse import urlparse
 import requests
 from bs4 import BeautifulSoup
 
+from core.constants import API_TIMEOUT_DEFAULT, API_TIMEOUT_STANDARD
+
 # Allowed hosts for PoB code links
 ALLOWED_POB_HOSTS = frozenset({
     'pastebin.com',
@@ -154,7 +156,7 @@ class PoeNinjaBuildScraper:
 
         try:
             logger.info(f"Fetching top {limit} builds from poe.ninja (sort={sort_by})")
-            response = self.session.get(url, params=params, timeout=15)
+            response = self.session.get(url, params=params, timeout=API_TIMEOUT_STANDARD)
             response.raise_for_status()
 
             # Parse HTML
@@ -184,7 +186,7 @@ class PoeNinjaBuildScraper:
             }
 
             logger.info(f"Trying poe.ninja API: {api_url}")
-            api_response = self.session.get(api_url, params=api_params, timeout=15)
+            api_response = self.session.get(api_url, params=api_params, timeout=API_TIMEOUT_STANDARD)
 
             if api_response.status_code == 200:
                 data = api_response.json()
@@ -231,7 +233,7 @@ class PoeNinjaBuildScraper:
 
         try:
             logger.info(f"Fetching PoB from profile: {profile_url}")
-            response = self.session.get(profile_url, timeout=15)
+            response = self.session.get(profile_url, timeout=API_TIMEOUT_STANDARD)
             response.raise_for_status()
 
             soup = BeautifulSoup(response.text, 'html.parser')
@@ -309,7 +311,7 @@ class PobbinScraper:
 
         try:
             logger.info(f"Fetching PoB code from pobb.in: {pobb_id}")
-            response = self.session.get(url, timeout=10)
+            response = self.session.get(url, timeout=API_TIMEOUT_DEFAULT)
             response.raise_for_status()
 
             pob_code = response.text.strip()
@@ -448,7 +450,7 @@ class PoBArchivesScraper:
 
         try:
             logger.info(f"Fetching {category} builds from pobarchives.com")
-            response = self.session.get(url, params=params, timeout=15)
+            response = self.session.get(url, params=params, timeout=API_TIMEOUT_STANDARD)
             response.raise_for_status()
 
             # Parse HTML to find build data
@@ -589,7 +591,7 @@ class PoBArchivesScraper:
         self._wait_for_rate_limit()
 
         try:
-            response = self.session.get(internal_url, timeout=15)
+            response = self.session.get(internal_url, timeout=API_TIMEOUT_STANDARD)
             response.raise_for_status()
 
             soup = BeautifulSoup(response.text, 'html.parser')
@@ -683,7 +685,7 @@ class PastebinScraper:
 
         try:
             logger.info(f"Fetching PoB code from pastebin: {paste_id}")
-            response = self.session.get(url, timeout=10)
+            response = self.session.get(url, timeout=API_TIMEOUT_DEFAULT)
             response.raise_for_status()
 
             pob_code = response.text.strip()

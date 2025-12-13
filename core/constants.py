@@ -8,11 +8,23 @@ Centralizes magic numbers and configuration values to improve maintainability.
 # Network Timeouts (seconds)
 # =============================================================================
 
-# Default timeout for API requests
+# Default timeout for API requests (general use)
 API_TIMEOUT_DEFAULT = 10
 
-# Extended timeout for large data fetches (e.g., RePoE data)
+# Standard timeout for most external API calls
+API_TIMEOUT_STANDARD = 15
+
+# Extended timeout for stash/OAuth operations
+API_TIMEOUT_STASH = 30
+
+# Extended timeout for large data fetches (e.g., RePoE data, skill trees)
 API_TIMEOUT_EXTENDED = 60
+
+# Local AI inference timeout (Ollama)
+API_TIMEOUT_LOCAL_AI = 120
+
+# Quick health check timeout
+API_TIMEOUT_HEALTH_CHECK = 5
 
 # Timeout for thread/worker joins
 THREAD_JOIN_TIMEOUT = 2.0

@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Mapping, Optional
 
 import requests
 
+from core.constants import API_TIMEOUT_STANDARD
 from data_sources.base_api import BaseAPIClient
 from data_sources.pricing.trade_stat_ids import build_stat_filters
 from core.price_multi import RESULT_COLUMNS
@@ -466,7 +467,7 @@ class TradeApiSource:
             query_snippet = str(query)[:800]
         self.logger.debug("Trade API search payload (truncated): %s", query_snippet)
 
-        resp = self.session.post(url, json=query, timeout=15)
+        resp = self.session.post(url, json=query, timeout=API_TIMEOUT_STANDARD)
         self.logger.debug("Trade API search status=%s", resp.status_code)
 
         # Log error details before raising
@@ -548,7 +549,7 @@ class TradeApiSource:
                 search_id,
             )
 
-            resp = self.session.get(url, params=params, timeout=15)
+            resp = self.session.get(url, params=params, timeout=API_TIMEOUT_STANDARD)
             self.logger.debug("Trade API fetch status=%s", resp.status_code)
             resp.raise_for_status()
 
