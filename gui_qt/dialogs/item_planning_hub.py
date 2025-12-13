@@ -224,9 +224,10 @@ class ItemPlanningHub(QDialog):
             if dialog.exec() == QDialog.DialogCode.Accepted:
                 new_priorities = dialog.get_priorities()
 
-                # Save to profile
-                profile.priorities = new_priorities
-                self.character_manager.save_profile(profile)
+                # Save to profile (update_profile sets attribute and saves)
+                self.character_manager.update_profile(
+                    self._current_profile, priorities=new_priorities
+                )
 
                 # Broadcast to tabs
                 self.bis_guide_tab.set_priorities(new_priorities)

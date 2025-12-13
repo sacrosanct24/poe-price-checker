@@ -433,12 +433,12 @@ class BiSGuideTab(QWidget):
         <p><b>Required Stats:</b></p>
         <ul style="margin: 4px 0;">
         """
-        for stat, value in requirements.required.items():
-            html += f'<li style="color: {COLORS["high_value"]};">{stat}: {value}</li>'
+        for stat_req in requirements.required_stats:
+            html += f'<li style="color: {COLORS["high_value"]};">{stat_req.stat_type}: {stat_req.min_value}</li>'
 
-        html += "</ul><p><b>Nice to Have:</b></p><ul style='margin: 4px 0;'>"
-        for stat, value in requirements.nice_to_have.items():
-            html += f'<li style="color: {COLORS["text_secondary"]};">{stat}: {value}</li>'
+        html += "</ul><p><b>Desired Stats:</b></p><ul style='margin: 4px 0;'>"
+        for stat_req in requirements.desired_stats:
+            html += f'<li style="color: {COLORS["text_secondary"]};">{stat_req.stat_type}: {stat_req.min_value}</li>'
 
         html += "</ul>"
         self.requirements_browser.setHtml(html)
@@ -531,19 +531,42 @@ class BiSGuideTab(QWidget):
 
         try:
             from core.affix_tier_calculator import AffixTierCalculator
+
             tier_calc = AffixTierCalculator()
-            ideal_affixes = tier_calc.get_ideal_affixes_for_slot(
-                slot, ilvl, self._calculator.stats
-            )
 
-            html = f"<h3>Ideal Rare {slot} (iLvl {ilvl})</h3>"
-            html += "<p><b>Target Affixes:</b></p><ul>"
+            # Get priorities from current profile
+            priorities = None
+            if self._current_profile and self.character_manager:
+                profile = self.character_manager.get_profile(self._current_profile)
+                if profile and hasattr(profile, 'priorities'):
+                    priorities = profile.priorities
 
-            for affix in ideal_affixes[:8]:
-                tier_str = f"T{affix.tier}" if hasattr(affix, 'tier') else ""
-                html += f'<li style="color: {COLORS["magic"]};">{affix.name} {tier_str}</li>'
+            if priorities:
+                # Use calculate_ideal_rare with priorities
+                ideal_spec = tier_calc.calculate_ideal_rare(
+                    slot=slot,
+                    priorities=priorities,
+                    target_ilvl=ilvl,
+                )
+                html = f"<h3>Ideal Rare {slot} (iLvl {ilvl})</h3>"
+                html += "<p><b>Target Affixes:</b></p><ul>"
 
-            html += "</ul>"
+                for affix in ideal_spec.affixes[:8]:
+                    tier_name = getattr(affix, 'tier_name', '')
+                    stat_name = getattr(affix, 'stat_name', str(affix))
+                    html += f'<li style="color: {COLORS["magic"]};">{stat_name} {tier_name}</li>'
+
+                html += "</ul>"
+            else:
+                # No priorities - show available stats for slot
+                available_stats = tier_calc.get_available_stats_for_slot(slot)
+                html = f"<h3>Available Stats for {slot}</h3>"
+                html += "<p>Set up build priorities to see ideal affixes.</p>"
+                html += "<p><b>Available:</b></p><ul>"
+                for stat in available_stats[:10]:
+                    html += f'<li style="color: {COLORS["text_secondary"]};">{stat}</li>'
+                html += "</ul>"
+
             self.ideal_rare_browser.setHtml(html)
 
         except Exception as e:
