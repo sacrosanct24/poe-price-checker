@@ -249,6 +249,46 @@ class RareEvaluationPanelWidget(QGroupBox):
 
         layout.addWidget(self.builds_frame)
 
+        # Row 7: Crafting Potential section
+        self.crafting_frame = QFrame()
+        self.crafting_frame.setVisible(False)  # Hidden until evaluation
+        self.crafting_frame.setStyleSheet(f"""
+            QFrame {{
+                background-color: {COLORS['surface']};
+                border: 1px solid {COLORS['border']};
+                border-radius: 4px;
+                padding: 4px;
+                margin: 4px 0;
+            }}
+        """)
+
+        crafting_layout = QVBoxLayout(self.crafting_frame)
+        crafting_layout.setContentsMargins(8, 6, 8, 6)
+        crafting_layout.setSpacing(4)
+
+        crafting_header = QLabel("CRAFTING POTENTIAL:")
+        crafting_header.setStyleSheet(f"""
+            QLabel {{
+                font-weight: bold;
+                color: #FFA726;
+                font-size: 10px;
+                letter-spacing: 1px;
+            }}
+        """)
+        crafting_layout.addWidget(crafting_header)
+
+        self.crafting_content_label = QLabel("")
+        self.crafting_content_label.setWordWrap(True)
+        self.crafting_content_label.setStyleSheet(f"""
+            QLabel {{
+                color: {COLORS['text']};
+                font-size: 11px;
+            }}
+        """)
+        crafting_layout.addWidget(self.crafting_content_label)
+
+        layout.addWidget(self.crafting_frame)
+
     def _on_update_meta_clicked(self) -> None:
         """Handle update meta weights button click."""
         self.update_meta_requested.emit()
@@ -418,6 +458,9 @@ class RareEvaluationPanelWidget(QGroupBox):
         # Update builds that want this section
         self._update_builds_section(evaluation)
 
+        # Update crafting potential section
+        self._update_crafting_section(evaluation)
+
     def _update_meta_info(self) -> None:
         """Update the meta info section based on evaluator state."""
         if self._evaluator is None:
@@ -524,6 +567,66 @@ class RareEvaluationPanelWidget(QGroupBox):
         else:
             self.builds_frame.setVisible(False)
 
+    def _update_crafting_section(self, evaluation: Any) -> None:
+        """Update the crafting potential section."""
+        # Get the item from evaluation
+        item = getattr(evaluation, 'item', None)
+        if not item:
+            self.crafting_frame.setVisible(False)
+            return
+
+        try:
+            from core.crafting_potential import analyze_crafting_potential
+
+            analysis = analyze_crafting_potential(item)
+
+            lines = []
+
+            # Open slots info
+            if analysis.open_prefixes > 0 or analysis.open_suffixes > 0:
+                lines.append(
+                    f"Open Slots: {analysis.open_prefixes}P / {analysis.open_suffixes}S"
+                )
+
+            # Divine potential
+            if analysis.divine_recommended:
+                lines.append("")
+                lines.append("Divine Potential:")
+                for mod in analysis.mod_analyses:
+                    if mod.divine_potential > 0 and mod.tier and mod.tier <= 2:
+                        stat = (mod.stat_type or "mod").replace("_", " ").title()
+                        quality = mod.roll_quality
+                        bar = "=" * int(quality / 10)
+                        lines.append(
+                            f"  {mod.tier_label} {stat}: {mod.current_value} "
+                            f"[{bar:<10}] {quality:.0f}%"
+                        )
+                        lines.append(
+                            f"     Roll range: {mod.min_roll}-{mod.max_roll} "
+                            f"(+{mod.divine_potential} potential)"
+                        )
+
+            # Best craft option
+            if analysis.craft_options:
+                lines.append("")
+                best = analysis.craft_options[0]
+                lines.append(f"Suggested: {best.name} ({best.cost_estimate})")
+
+            # Overall assessment
+            if analysis.crafting_value in ("high", "very high"):
+                lines.append("")
+                lines.append(f"Crafting Value: {analysis.crafting_value.upper()}")
+
+            if lines:
+                self.crafting_content_label.setText("\n".join(lines))
+                self.crafting_frame.setVisible(True)
+            else:
+                self.crafting_frame.setVisible(False)
+
+        except Exception as e:
+            # Don't show crafting section if analysis fails
+            self.crafting_frame.setVisible(False)
+
     def clear(self) -> None:
         """Clear the evaluation display."""
         self._evaluation = None
@@ -539,3 +642,5 @@ class RareEvaluationPanelWidget(QGroupBox):
         self.meta_label.setText("Meta: Waiting...")
         self.builds_content_label.setText("")
         self.builds_frame.setVisible(False)
+        self.crafting_content_label.setText("")
+        self.crafting_frame.setVisible(False)
