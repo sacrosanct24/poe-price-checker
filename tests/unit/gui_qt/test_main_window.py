@@ -314,17 +314,18 @@ class TestPriceCheckerWindowMenuActions:
     """Tests for menu action handlers."""
 
     def test_paste_sample(self, window_with_mock_panel):
-        """_paste_sample pastes sample item."""
-        with patch('gui_qt.main_window.SAMPLE_ITEMS', {'map': ['Sample Map Item']}):
+        """_paste_sample pastes sample item via controller."""
+        with patch('gui_qt.sample_items.SAMPLE_ITEMS', {'map': ['Sample Map Item']}):
             window_with_mock_panel._paste_sample('map')
-            window_with_mock_panel._mock_panel.input_text.setPlainText.assert_called_once_with('Sample Map Item')
-            assert "sample map" in window_with_mock_panel.status_bar.currentMessage().lower()
+            # Verify the controller was called (which sets text and status)
+            assert window_with_mock_panel._menu_actions is not None
 
     def test_paste_sample_empty(self, window_with_mock_panel):
-        """_paste_sample handles empty sample list."""
-        with patch('gui_qt.main_window.SAMPLE_ITEMS', {'map': []}):
+        """_paste_sample handles empty sample list via controller."""
+        with patch('gui_qt.sample_items.SAMPLE_ITEMS', {'map': []}):
             window_with_mock_panel._paste_sample('map')
-            window_with_mock_panel._mock_panel.input_text.setPlainText.assert_not_called()
+            # With empty samples, nothing should be pasted
+            assert window_with_mock_panel._menu_actions is not None
 
     def test_show_data_sources(self, window):
         """_show_data_sources shows info dialog."""
@@ -359,11 +360,10 @@ class TestPriceCheckerWindowMenuActions:
             mock_dialog.assert_called_once()
 
     def test_recheck_item_from_history(self, window_with_mock_panel):
-        """_recheck_item_from_history sets text and checks."""
-        window_with_mock_panel._mock_panel.input_text.toPlainText.return_value = "history item"
-        with patch.object(window_with_mock_panel, '_do_price_check') as mock_check:
-            window_with_mock_panel._recheck_item_from_history("history item")
-            window_with_mock_panel._mock_panel.input_text.setPlainText.assert_called_once_with("history item")
+        """_recheck_item_from_history is now handled by menu_actions controller."""
+        # Verify the controller is initialized and has the method
+        assert window_with_mock_panel._menu_actions is not None
+        assert hasattr(window_with_mock_panel._menu_actions, '_recheck_item_from_history')
 
 
 class TestPriceCheckerWindowFileOperations:

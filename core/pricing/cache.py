@@ -156,7 +156,8 @@ class ItemPriceCache:
     def _hash_item(self, item_text: str) -> str:
         """Generate hash key for item text."""
         normalized = self._normalize_item_text(item_text)
-        return hashlib.md5(normalized.encode('utf-8')).hexdigest()
+        # MD5 used only for cache key generation, not security
+        return hashlib.md5(normalized.encode('utf-8'), usedforsecurity=False).hexdigest()
 
     def _extract_item_name(self, item_text: str) -> str:
         """Extract item name from text for logging/debugging."""

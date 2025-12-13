@@ -10,8 +10,10 @@ Controllers coordinate between services and UI widgets:
 - PoBController: Manages Path of Building integration
 - ViewMenuController: Manages View menu creation
 - UpgradeAnalysisController: Manages AI-powered upgrade analysis orchestration
+- MenuActionsController: Manages menu bar action callbacks
 """
 
+from gui_qt.controllers.menu_actions_controller import MenuActionsController
 from gui_qt.controllers.price_check_controller import PriceCheckController
 from gui_qt.controllers.theme_controller import ThemeController
 from gui_qt.controllers.navigation_controller import (
@@ -39,6 +41,7 @@ from gui_qt.controllers.upgrade_analysis_controller import (
 )
 
 __all__ = [
+    "MenuActionsController",
     "PriceCheckController",
     "ThemeController",
     "NavigationController",

@@ -16,19 +16,15 @@ PyQt6 GUI for the PoE Price Checker.
 from __future__ import annotations
 
 import logging
-import os
-import random
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional, TYPE_CHECKING, cast
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QAction, QIcon
+from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import (
     QApplication,
     QMainWindow,
-    QMenu,
-    QMenuBar,
     QWidget,
     QVBoxLayout,
     QHBoxLayout,
@@ -39,19 +35,10 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QStatusBar,
     QMessageBox,
-    QFileDialog,
     QDialog,
 )
 
 from gui_qt.styles import Theme
-from gui_qt.menus.menu_builder import (
-    MenuBuilder, MenuConfig, MenuItem, MenuSection, create_resources_menu
-)
-from gui_qt.shortcuts import get_shortcut_manager
-from gui_qt.sample_items import SAMPLE_ITEMS
-from gui_qt.dialogs.help_dialogs import (
-    show_shortcuts_dialog, show_tips_dialog, show_about_dialog
-)
 from gui_qt.widgets.toast_notification import ToastManager
 from gui_qt.widgets.pinned_items_widget import PinnedItemsWidget
 from gui_qt.widgets.price_rankings_panel import PriceRankingsPanel
@@ -60,10 +47,10 @@ from gui_qt.workers import RankingsPopulationWorker
 from gui_qt.services import (
     get_window_manager,
     get_history_manager,
-    get_price_refresh_service,
     shutdown_price_refresh_service,
 )
 from gui_qt.controllers import (
+    MenuActionsController,
     PriceCheckController,
     ThemeController,
     NavigationController,
@@ -77,6 +64,7 @@ from gui_qt.controllers.ai_analysis_controller import AIAnalysisController
 from gui_qt.controllers.loot_tracking_controller import LootTrackingController
 from gui_qt.widgets.main_navigation_bar import MainNavigationBar
 from gui_qt.screens import ScreenController, ScreenType, AIAdvisorScreen, DaytraderScreen
+from gui_qt.mixins import ShortcutsMixin, MenuBarMixin, BackgroundServicesMixin
 from core.build_stat_calculator import BuildStats
 
 if TYPE_CHECKING:
@@ -86,7 +74,7 @@ if TYPE_CHECKING:
     from gui_qt.screens import AIAdvisorScreen as AIAdvisorScreenType
 
 
-class PriceCheckerWindow(QMainWindow):
+class PriceCheckerWindow(BackgroundServicesMixin, MenuBarMixin, ShortcutsMixin, QMainWindow):
     """Main window for the PoE Price Checker application."""
 
     def __init__(self, ctx: "AppContext", parent: Optional[QWidget] = None):
@@ -171,6 +159,9 @@ class PriceCheckerWindow(QMainWindow):
         # Upgrade analysis controller (initialized after AI controller)
         self._upgrade_controller: Optional[UpgradeAnalysisController] = None
 
+        # Menu actions controller (initialized after UI is created)
+        self._menu_actions: Optional[MenuActionsController] = None
+
         # Setup UI
         self.setWindowTitle("PoE Price Checker")
         self.setMinimumSize(1200, 800)
@@ -180,6 +171,9 @@ class PriceCheckerWindow(QMainWindow):
         self._create_central_widget()
         self._create_status_bar()
         self._setup_shortcuts()
+
+        # Initialize menu actions controller (after UI is ready)
+        self._init_menu_actions_controller()
 
         # Initialize theme controller and apply theme
         self._init_theme_controller()
@@ -197,67 +191,6 @@ class PriceCheckerWindow(QMainWindow):
 
         # Initialize build stats for item inspector from active PoB profile
         self._pob_controller.update_inspector_stats(self.item_inspector)
-
-    def _start_rankings_population(self) -> None:
-        """Start background task to populate price rankings if needed."""
-        try:
-            self._rankings_worker = RankingsPopulationWorker(self)
-            self._rankings_worker.status.connect(self._on_rankings_progress)
-            self._rankings_worker.result.connect(self._on_rankings_finished)
-            self._rankings_worker.error.connect(self._on_rankings_error)
-            self._rankings_worker.start()
-        except Exception as e:
-            self.logger.warning(f"Failed to start rankings population: {e}")
-
-    def _on_rankings_progress(self, message: str) -> None:
-        """Handle rankings population progress."""
-        self.logger.info(f"Rankings: {message}")
-
-    def _on_rankings_finished(self, count: int) -> None:
-        """Handle rankings population completion."""
-        if count > 0:
-            self.logger.info(f"Rankings: Populated {count} categories")
-        self._rankings_worker = None
-
-    def _on_rankings_error(self, error: str, traceback: str) -> None:
-        """Handle rankings population error."""
-        self.logger.warning(f"Rankings population failed: {error}")
-        self.logger.debug(f"Traceback:\n{traceback}")
-        self._rankings_worker = None
-
-    def _start_price_refresh_service(self) -> None:
-        """Start the background price refresh service."""
-        try:
-            service = get_price_refresh_service(self.ctx)
-            if service:
-                # Connect status updates to the summary label
-                service.status_update.connect(self._on_price_refresh_status)
-                service.price_changed.connect(self._on_price_changed)
-                service.start()
-                self.logger.info("Background price refresh service started")
-        except Exception as e:
-            self.logger.warning(f"Failed to start price refresh service: {e}")
-
-    def _on_price_refresh_status(self, message: str) -> None:
-        """Handle price refresh status update."""
-        self.logger.debug(f"Price refresh: {message}")
-        # Update summary label with last refresh time
-        if "refreshed at" in message.lower():
-            self.summary_label.setToolTip(message)
-
-    def _on_price_changed(self, item_name: str, old_price: float, new_price: float) -> None:
-        """Handle significant price change notification."""
-        direction = "up" if new_price > old_price else "down"
-        change_pct = abs(new_price - old_price) / old_price * 100 if old_price > 0 else 0
-        self.logger.info(
-            f"Price alert: {item_name} went {direction} "
-            f"({old_price:.1f}c -> {new_price:.1f}c, {change_pct:.1f}%)"
-        )
-        # Show toast notification for significant changes
-        if hasattr(self, '_toast_manager') and self._toast_manager:
-            self._toast_manager.info(
-                f"{item_name}: {old_price:.0f}c -> {new_price:.0f}c ({direction} {change_pct:.0f}%)"
-            )
 
     def _init_rare_evaluator(self) -> None:
         """Initialize the rare item evaluator."""
@@ -356,145 +289,6 @@ class PriceCheckerWindow(QMainWindow):
             self.logger.debug(f"Saved verdict stats: {stats_dict}")
         except Exception as e:
             self.logger.warning(f"Failed to save verdict statistics: {e}")
-
-    # -------------------------------------------------------------------------
-    # Menu Bar
-    # -------------------------------------------------------------------------
-
-    def _create_menu_bar(self) -> None:
-        """Create the application menu bar using declarative MenuBuilder."""
-        menubar = self.menuBar()
-        if not menubar:
-            return
-        builder = MenuBuilder(self)
-
-        # Define static menus declaratively
-        static_menus = [
-            MenuConfig("&File", [
-                MenuItem("Open &Log File", handler=self._open_log_file),
-                MenuItem("Open &Config Folder", handler=self._open_config_folder),
-                MenuSection([
-                    MenuItem("&Export Results (TSV)...", handler=self._export_results,
-                             shortcut="Ctrl+E"),
-                    MenuItem("Copy &All as TSV", handler=self._copy_all_as_tsv,
-                             shortcut="Ctrl+Shift+C"),
-                    MenuItem("Export &Data...", handler=self._show_export_dialog,
-                             shortcut="Ctrl+Shift+E"),
-                ]),
-                MenuSection([
-                    MenuItem("&Settings...", handler=self._show_settings,
-                             shortcut="Ctrl+,"),
-                ]),
-                MenuSection([
-                    MenuItem("E&xit", handler=self.close, shortcut="Alt+F4"),
-                ]),
-            ]),
-            MenuConfig("&Navigate", [
-                MenuItem("&Item Evaluator", handler=self._switch_to_evaluator,
-                         shortcut="Ctrl+1"),
-                MenuItem("&AI Advisor", handler=self._switch_to_advisor,
-                         shortcut="Ctrl+2"),
-                MenuItem("&Daytrader", handler=self._switch_to_daytrader,
-                         shortcut="Ctrl+3"),
-            ]),
-            MenuConfig("&Build", [
-                MenuSection([
-                    MenuItem("Go to &AI Advisor Screen", handler=self._switch_to_advisor),
-                ]),
-                MenuItem("&PoB Characters", handler=self._show_pob_characters,
-                         shortcut="Ctrl+B"),
-                MenuItem("&Compare Build Trees...", handler=self._show_build_comparison),
-                MenuItem("Build &Library...", handler=self._show_build_library,
-                         shortcut="Ctrl+Alt+B"),
-                MenuSection([
-                    MenuItem("Find &BiS Item...", handler=self._show_bis_search,
-                             shortcut="Ctrl+I"),
-                    MenuItem("&Upgrade Finder...", handler=self._show_upgrade_finder,
-                             shortcut="Ctrl+U"),
-                    MenuItem("Compare &Items...", handler=self._show_item_comparison,
-                             shortcut="Ctrl+Shift+I"),
-                ]),
-                MenuSection([
-                    MenuItem("Rare Item &Settings...", handler=self._show_rare_eval_config),
-                ]),
-            ]),
-            MenuConfig("&Economy", [
-                MenuSection([
-                    MenuItem("Go to &Daytrader Screen", handler=self._switch_to_daytrader),
-                ]),
-                MenuSection([
-                    MenuItem("&Top 20 Rankings", handler=self._show_price_rankings),
-                    MenuItem("Data &Sources Info", handler=self._show_data_sources),
-                ], label="Pricing"),
-                MenuSection([
-                    MenuItem("&Recent Sales", handler=self._show_recent_sales),
-                    MenuItem("Sales &Dashboard", handler=self._show_sales_dashboard),
-                    MenuItem("&Loot Tracking...", handler=self._show_loot_dashboard),
-                ], label="Sales & Loot"),
-                MenuSection([
-                    MenuItem("Price &History...", handler=self._show_price_history),
-                    MenuItem("Collect Economy &Snapshot", handler=self._collect_economy_snapshot),
-                ], label="Historical Data"),
-            ]),
-        ]
-        builder.build(menubar, static_menus)
-
-        # View menu - dynamic content (themes, accents, columns)
-        self._create_view_menu(menubar)
-
-        # Resources menu - use declarative config
-        resources_menu = menubar.addMenu("&Resources")
-        if resources_menu:
-            builder._populate_menu(resources_menu, create_resources_menu())
-
-        # Dev menu - dynamic content (sample items)
-        self._create_dev_menu(menubar)
-
-        # Help menu - static
-        help_config = [
-            MenuConfig("&Help", [
-                MenuItem("&Keyboard Shortcuts", handler=self._show_shortcuts),
-                MenuItem("Usage &Tips", handler=self._show_tips),
-                MenuSection([
-                    MenuItem("&About", handler=self._show_about),
-                ]),
-            ])
-        ]
-        builder.build(menubar, help_config)
-
-    def _create_view_menu(self, menubar: QMenuBar) -> None:
-        """Create View menu with dynamic theme/accent/column submenus."""
-        self._view_menu_controller = ViewMenuController(
-            on_history=self._show_history,
-            on_stash_viewer=self._show_stash_viewer,
-            on_set_theme=self._set_theme,
-            on_toggle_theme=self._toggle_theme,
-            on_set_accent=self._set_accent_color,
-            on_toggle_column=self._toggle_column,
-            parent=self,
-            logger=self.logger,
-        )
-        self._theme_actions, self._accent_actions, self._column_actions = \
-            self._view_menu_controller.create_view_menu(menubar)
-
-    def _create_dev_menu(self, menubar: QMenuBar) -> None:
-        """Create Dev menu with dynamic sample items."""
-        dev_menu = menubar.addMenu("&Dev")
-        if not dev_menu:
-            return
-
-        paste_menu = dev_menu.addMenu("Paste &Sample")
-        if paste_menu:
-            for item_type in SAMPLE_ITEMS.keys():
-                action = QAction(item_type.title(), self)
-                action.triggered.connect(lambda checked, t=item_type: self._paste_sample(t))
-                paste_menu.addAction(action)
-
-        dev_menu.addSeparator()
-
-        clear_db_action = QAction("&Wipe Database...", self)
-        clear_db_action.triggered.connect(self._wipe_database)
-        dev_menu.addAction(clear_db_action)
 
     # -------------------------------------------------------------------------
     # Central Widget
@@ -900,109 +694,6 @@ class PriceCheckerWindow(QMainWindow):
             self._upgrade_controller.handle_upgrade_analysis_from_fullscreen(slot, include_stash)
 
     # -------------------------------------------------------------------------
-    # Shortcuts
-    # -------------------------------------------------------------------------
-
-    def _setup_shortcuts(self) -> None:
-        """Setup keyboard shortcuts using the ShortcutManager."""
-        manager = get_shortcut_manager()
-        manager.set_window(self)
-
-        # Register all action callbacks
-        # General
-        manager.register("show_shortcuts", self._show_shortcuts)
-        manager.register("show_command_palette", self._show_command_palette)
-        manager.register("show_tips", self._show_tips)
-        manager.register("exit", lambda: (self.close(), None)[-1])
-
-        # Price Checking
-        manager.register("check_price", self._on_check_price)
-        manager.register("paste_and_check", self._paste_and_check)
-        manager.register("clear_input", self._clear_input)
-        manager.register("focus_input", self._focus_input)
-        manager.register("focus_filter", self._focus_filter)
-
-        # Build & PoB
-        manager.register("show_pob_characters", self._show_pob_characters)
-        manager.register("show_bis_search", self._show_bis_search)
-        manager.register("show_upgrade_finder", self._show_upgrade_finder)
-        manager.register("show_upgrade_advisor", self._show_upgrade_advisor)
-        manager.register("show_build_library", self._show_build_library)
-        manager.register("show_build_comparison", self._show_build_comparison)
-        manager.register("show_item_comparison", self._show_item_comparison)
-        manager.register("show_rare_eval_config", self._show_rare_eval_config)
-
-        # Navigation - Screen switching
-        manager.register("switch_to_evaluator", self._switch_to_evaluator)
-        manager.register("switch_to_advisor", self._switch_to_advisor)
-        manager.register("switch_to_daytrader", self._switch_to_daytrader)
-        manager.register("show_history", self._show_history)
-        manager.register("show_stash_viewer", self._show_stash_viewer)
-        manager.register("show_recent_sales", self._show_recent_sales)
-        manager.register("show_sales_dashboard", self._show_sales_dashboard)
-        manager.register("show_price_rankings", self._show_price_rankings)
-
-        # View & Theme
-        manager.register("toggle_theme", self._toggle_theme)
-        manager.register("cycle_theme", self._cycle_theme)
-        manager.register("toggle_rare_panel", self._toggle_rare_panel)
-
-        # Data & Export
-        manager.register("export_results", self._export_results)
-        manager.register("copy_all_tsv", self._copy_all_as_tsv)
-        manager.register("open_log_file", self._open_log_file)
-        manager.register("open_config_folder", self._open_config_folder)
-        manager.register("show_data_sources", self._show_data_sources)
-
-        # Register all shortcuts with Qt
-        manager.register_all()
-
-    def _focus_input(self) -> None:
-        """Focus the item input text area."""
-        self.input_text.setFocus()
-
-    def _focus_filter(self) -> None:
-        """Focus the results filter input."""
-        self.filter_input.setFocus()
-        self.filter_input.selectAll()
-
-    def _toggle_rare_panel(self) -> None:
-        """Toggle the rare evaluation panel visibility."""
-        self.rare_eval_panel.setVisible(not self.rare_eval_panel.isVisible())
-
-    def _cycle_theme(self) -> None:
-        """Cycle through all available themes."""
-        if self._theme_controller:
-            self._theme_controller.cycle_theme(self)
-
-    def _show_command_palette(self) -> None:
-        """Show the command palette for quick access to all actions."""
-        from gui_qt.dialogs.command_palette import CommandPaletteDialog
-
-        manager = get_shortcut_manager()
-        actions = manager.get_action_for_palette()
-
-        dialog = CommandPaletteDialog(
-            actions=actions,
-            on_action=self._execute_palette_action,
-            parent=self,
-        )
-
-        # Center dialog over main window
-        dialog.move(
-            self.x() + (self.width() - dialog.width()) // 2,
-            self.y() + 100,
-        )
-
-        dialog.exec()
-
-    def _execute_palette_action(self, action_id: str) -> None:
-        """Execute an action from the command palette."""
-        manager = get_shortcut_manager()
-        if not manager.trigger(action_id):
-            self._set_status(f"Action not available: {action_id}")
-
-    # -------------------------------------------------------------------------
     # Price Checking
     # -------------------------------------------------------------------------
 
@@ -1187,6 +878,26 @@ class PriceCheckerWindow(QMainWindow):
         self.results_table.set_column_visible(column, visible)
 
     # -------------------------------------------------------------------------
+    # Menu Actions Controller
+    # -------------------------------------------------------------------------
+
+    def _init_menu_actions_controller(self) -> None:
+        """Initialize the menu actions controller after UI is ready."""
+        self._menu_actions = MenuActionsController(
+            ctx=self.ctx,
+            parent=self,
+            window_manager=self._window_manager,
+            nav_controller=self._nav_controller,
+            history_manager=self._history_manager,
+            on_status=self._set_status,
+            get_input_text=lambda: self.input_text.toPlainText(),
+            set_input_text=lambda t: self.input_text.setPlainText(t),
+            on_check_price=self._on_check_price,
+            get_results_table=lambda: self.results_table,
+            get_session_panel=lambda: self.session_tabs.get_current_panel(),
+        )
+
+    # -------------------------------------------------------------------------
     # Theme Management
     # -------------------------------------------------------------------------
 
@@ -1326,142 +1037,68 @@ class PriceCheckerWindow(QMainWindow):
 
     def _open_log_file(self) -> None:
         """Open the log file in the default viewer."""
-        log_path = Path(__file__).parent.parent / "logs" / "price_checker.log"
-        if log_path.exists():
-            os.startfile(str(log_path))
-        else:
-            QMessageBox.information(self, "Log File", "No log file found.")
+        if self._menu_actions:
+            self._menu_actions.open_log_file()
 
     def _open_config_folder(self) -> None:
         """Open the config folder."""
-        config_path = Path(__file__).parent.parent / "data"
-        if config_path.exists():
-            os.startfile(str(config_path))
-        else:
-            QMessageBox.information(self, "Config Folder", "Config folder not found.")
+        if self._menu_actions:
+            self._menu_actions.open_config_folder()
 
     def _export_results(self) -> None:
         """Export results to TSV file."""
-        panel = self.session_tabs.get_current_panel()
-        if not panel or not panel._all_results:
-            QMessageBox.information(self, "Export", "No results to export.")
-            return
-
-        path, _ = QFileDialog.getSaveFileName(
-            self, "Export Results", "", "TSV Files (*.tsv);;All Files (*)"
-        )
-
-        if path:
-            try:
-                panel.results_table.export_tsv(path)
-                self._set_status(f"Exported to {path}")
-            except Exception as e:
-                QMessageBox.critical(self, "Export Error", f"Failed to export: {e}")
+        if self._menu_actions:
+            self._menu_actions.export_results()
 
     def _copy_all_as_tsv(self) -> None:
         """Copy all results as TSV."""
-        tsv = self.results_table.to_tsv(include_header=True)
-        clipboard = QApplication.clipboard()
-        if clipboard:
-            clipboard.setText(tsv)
-        self._set_status("All results copied as TSV")
+        if self._menu_actions:
+            self._menu_actions.copy_all_as_tsv()
 
     def _show_history(self) -> None:
         """Show session history dialog with re-check capability."""
-        if self._history_manager.is_empty():
-            QMessageBox.information(self, "Recent Items", "No items checked this session.")
-            return
-
-        from gui_qt.dialogs.recent_items_dialog import RecentItemsDialog
-        from gui_qt.services.history_manager import HistoryEntry
-        from typing import cast, Union
-
-        # Cast to satisfy type checker - list[HistoryEntry] is compatible with List[Union[...]]
-        history_entries = cast(
-            "List[Union[HistoryEntry, Dict[str, Any]]]",
-            self._history_manager.get_entries()
-        )
-        dialog = RecentItemsDialog(history_entries, self)
-        dialog.item_selected.connect(self._recheck_item_from_history)
-        dialog.exec()
-
-    def _recheck_item_from_history(self, item_text: str) -> None:
-        """Re-check an item from history."""
-        if item_text:
-            self.input_text.setPlainText(item_text)
-            self._on_check_price()
+        if self._menu_actions:
+            self._menu_actions.show_history()
 
     def _show_data_sources(self) -> None:
         """Show data sources dialog."""
-        text = "Data Sources:\n\n"
-        text += "- poe.ninja: Real-time economy data\n"
-        text += "- poe.watch: Alternative price source\n"
-        text += "- Trade API: Official trade site data\n"
-
-        QMessageBox.information(self, "Data Sources", text)
+        if self._menu_actions:
+            self._menu_actions.show_data_sources()
 
     def _show_recent_sales(self) -> None:
         """Show recent sales window."""
-        self._nav_controller.show_recent_sales()
+        if self._menu_actions:
+            self._menu_actions.show_recent_sales()
 
     def _show_sales_dashboard(self) -> None:
         """Show sales dashboard window."""
-        self._nav_controller.show_sales_dashboard()
+        if self._menu_actions:
+            self._menu_actions.show_sales_dashboard()
 
     def _show_loot_dashboard(self) -> None:
         """Show loot tracking dashboard window."""
-        # Lazily initialize loot tracking controller
-        if not self._loot_controller:
-            self._loot_controller = LootTrackingController(self.ctx, parent=self)
-            # Auto-start monitoring if configured
-            if self.ctx.config.loot_tracking_enabled:
-                self._loot_controller.start_monitoring()
-
-        from gui_qt.windows.loot_dashboard_window import LootDashboardWindow
-
-        self._window_manager.show_window(
-            "loot_dashboard",
-            LootDashboardWindow,
-            ctx=self.ctx,
-            controller=self._loot_controller,
-        )
+        if self._menu_actions:
+            self._menu_actions.show_loot_dashboard()
 
     def _show_stash_viewer(self) -> None:
         """Show stash viewer window."""
-        self._nav_controller.show_stash_viewer()
+        if self._menu_actions:
+            self._menu_actions.show_stash_viewer()
 
     def _collect_economy_snapshot(self) -> None:
         """Collect economy snapshot from poe.ninja for current league."""
-        from core.economy import LeagueEconomyService
-
-        league = self.ctx.config.league or "Keepers"
-        self._set_status(f"Collecting economy snapshot for {league}...")
-
-        try:
-            service = LeagueEconomyService(self.ctx.db)
-            snapshot = service.fetch_and_store_snapshot(league)
-
-            if snapshot:
-                self._set_status(
-                    f"Economy snapshot saved: {league} - "
-                    f"Divine={snapshot.divine_to_chaos:.0f}c"
-                )
-            else:
-                self._set_status(f"No economy data available for {league}")
-        except Exception as e:
-            self.logger.error(f"Failed to collect economy snapshot: {e}")
-            self._set_status(f"Error collecting snapshot: {e}")
+        if self._menu_actions:
+            self._menu_actions.collect_economy_snapshot()
 
     def _show_price_history(self) -> None:
         """Show price history analytics window."""
-        from gui_qt.windows.price_history_window import PriceHistoryWindow
-
-        window = PriceHistoryWindow(ctx=self.ctx, parent=self)
-        window.exec()
+        if self._menu_actions:
+            self._menu_actions.show_price_history()
 
     def _show_pob_characters(self) -> None:
         """Show PoB character manager window."""
-        self._nav_controller.show_pob_characters()
+        if self._menu_actions:
+            self._menu_actions.show_pob_characters()
 
     def _on_pob_profile_selected(self, profile_name: str) -> None:
         """Handle PoB profile selection."""
@@ -1482,7 +1119,8 @@ class PriceCheckerWindow(QMainWindow):
 
     def _show_rare_eval_config(self) -> None:
         """Show rare evaluation config window."""
-        self._nav_controller.show_rare_eval_config()
+        if self._menu_actions:
+            self._menu_actions.show_rare_eval_config()
 
     def _reload_rare_evaluator(self) -> None:
         """Reload the rare item evaluator."""
@@ -1507,7 +1145,8 @@ class PriceCheckerWindow(QMainWindow):
 
     def _show_price_rankings(self) -> None:
         """Show price rankings window."""
-        self._nav_controller.show_price_rankings()
+        if self._menu_actions:
+            self._menu_actions.show_price_rankings()
 
     def _on_ranking_price_check(self, item_name: str) -> None:
         """Handle price check request from rankings window."""
@@ -1517,7 +1156,8 @@ class PriceCheckerWindow(QMainWindow):
 
     def _show_build_comparison(self) -> None:
         """Show build comparison dialog."""
-        self._nav_controller.show_build_comparison()
+        if self._menu_actions:
+            self._menu_actions.show_build_comparison()
 
     def _on_loadout_selected(self, config: dict) -> None:
         """Handle loadout selection from the selector dialog."""
@@ -1539,23 +1179,23 @@ class PriceCheckerWindow(QMainWindow):
 
     def _show_bis_search(self) -> None:
         """Show BiS item search dialog."""
-        self._nav_controller.show_bis_search()
+        if self._menu_actions:
+            self._menu_actions.show_bis_search()
 
     def _show_upgrade_finder(self) -> None:
         """Show upgrade finder dialog."""
-        self._nav_controller.show_upgrade_finder()
+        if self._menu_actions:
+            self._menu_actions.show_upgrade_finder()
 
     def _show_build_library(self) -> None:
         """Show build library dialog."""
-        self._nav_controller.show_build_library()
+        if self._menu_actions:
+            self._menu_actions.show_build_library()
 
     def _show_local_builds_import(self) -> None:
         """Show dialog to import local PoB builds."""
-        from gui_qt.dialogs.local_builds_dialog import LocalBuildsDialog
-
-        dialog = LocalBuildsDialog(self)
-        dialog.build_imported.connect(self._on_local_build_imported)
-        dialog.exec()
+        if self._menu_actions:
+            self._menu_actions.show_local_builds_import(self._on_local_build_imported)
 
     def _on_local_build_imported(self, name: str, build_data: dict) -> None:
         """Handle local build import completion."""
@@ -1570,44 +1210,33 @@ class PriceCheckerWindow(QMainWindow):
 
     def _show_item_comparison(self) -> None:
         """Show item comparison dialog."""
-        self._nav_controller.show_item_comparison()
+        if self._menu_actions:
+            self._menu_actions.show_item_comparison()
 
     def _paste_sample(self, item_type: str) -> None:
         """Paste a sample item of the given type."""
-        samples = SAMPLE_ITEMS.get(item_type, [])
-        if samples:
-            sample = random.choice(samples)
-            self.input_text.setPlainText(sample)
-            self._set_status(f"Pasted sample {item_type}")
+        if self._menu_actions:
+            self._menu_actions.paste_sample(item_type)
 
     def _wipe_database(self) -> None:
         """Wipe the database after confirmation."""
-        result = QMessageBox.warning(
-            self,
-            "Wipe Database",
-            "Are you sure you want to delete all recorded sales?\n\nThis cannot be undone.",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
-        )
-
-        if result == QMessageBox.StandardButton.Yes:
-            try:
-                self.ctx.db.wipe_all_data()
-                self._set_status("Database wiped")
-            except Exception as e:
-                QMessageBox.critical(self, "Error", f"Failed to wipe database: {e}")
+        if self._menu_actions:
+            self._menu_actions.wipe_database()
 
     def _show_shortcuts(self) -> None:
         """Show keyboard shortcuts dialog."""
-        show_shortcuts_dialog(self)
+        if self._menu_actions:
+            self._menu_actions.show_shortcuts()
 
     def _show_tips(self) -> None:
         """Show usage tips dialog."""
-        show_tips_dialog(self)
+        if self._menu_actions:
+            self._menu_actions.show_tips()
 
     def _show_about(self) -> None:
         """Show about dialog."""
-        show_about_dialog(self)
+        if self._menu_actions:
+            self._menu_actions.show_about()
 
     def closeEvent(self, event) -> None:
         """Handle window close - clean up application resources."""

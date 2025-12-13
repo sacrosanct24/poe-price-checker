@@ -126,6 +126,10 @@ class VerdictResult:
     confidence: str = "medium"  # low, medium, high
     meta_affixes_found: Optional[List[str]] = None  # Meta-popular affixes on item
     meta_bonus_applied: float = 0.0  # Total meta bonus added
+    # WHY explanation fields
+    verdict_logic: str = ""  # Human-readable calculation summary
+    threshold_used: float = 0.0  # The threshold that determined the verdict
+    effective_value: float = 0.0  # Calculated effective value (price + bonuses)
 
     def __post_init__(self):
         """Initialize mutable defaults."""
@@ -517,9 +521,45 @@ class QuickVerdictCalculator:
         # Calculate effective value
         effective_value = (price_chaos or 0) + modifiers
 
+        # Build calculation breakdown for WHY explanation
+        calc_parts = []
+        if price_chaos:
+            calc_parts.append(f"Base {price_chaos:.0f}c")
+        if modifiers > 0:
+            # Break down the modifiers into components
+            modifier_details = []
+            if links >= 6:
+                modifier_details.append(f"6-link +{self.thresholds.six_link_bonus:.0f}c")
+            elif sockets >= 6:
+                modifier_details.append(f"6-socket +{self.thresholds.six_socket_bonus:.0f}c")
+            if influences:
+                modifier_details.append(f"influenced +{self.thresholds.influenced_bonus:.0f}c")
+            if is_fractured:
+                modifier_details.append(f"fractured +{self.thresholds.fractured_bonus:.0f}c")
+            if is_synthesised:
+                modifier_details.append(f"synthesised +{self.thresholds.fractured_bonus:.0f}c")
+            if meta_bonus > 0:
+                modifier_details.append(f"meta bonus +{meta_bonus:.0f}c")
+            # Affix value (remaining modifiers)
+            affix_modifier = modifiers - sum([
+                self.thresholds.six_link_bonus if links >= 6 else 0,
+                self.thresholds.six_socket_bonus if sockets >= 6 and links < 6 else 0,
+                self.thresholds.influenced_bonus if influences else 0,
+                self.thresholds.fractured_bonus if is_fractured else 0,
+                self.thresholds.fractured_bonus if is_synthesised else 0,
+                meta_bonus
+            ])
+            if affix_modifier > 0:
+                modifier_details.append(f"affixes +{affix_modifier:.0f}c")
+            if modifier_details:
+                calc_parts.append(" + ".join(modifier_details))
+
+        calc_summary = " + ".join(calc_parts) if calc_parts else "No price data"
+
         # Determine verdict
         if effective_value >= self.thresholds.keep_threshold:
             verdict = Verdict.KEEP
+            threshold_used = self.thresholds.keep_threshold
             if price_chaos and price_chaos >= self.thresholds.keep_threshold:
                 explanation = f"Worth ~{int(price_chaos)}c - definitely keep"
             elif reasons:
@@ -527,19 +567,27 @@ class QuickVerdictCalculator:
             else:
                 explanation = "Looks valuable - worth keeping"
             confidence = "high" if price_chaos else "medium"
+            verdict_logic = f"{calc_summary} = {effective_value:.0f}c >= {threshold_used:.0f}c threshold"
 
         elif effective_value <= self.thresholds.vendor_threshold:
             verdict = Verdict.VENDOR
+            threshold_used = self.thresholds.vendor_threshold
             explanation = self._get_vendor_reason(item, reasons)
             confidence = "high" if price_chaos and price_chaos < 1 else "medium"
+            verdict_logic = f"{calc_summary} = {effective_value:.0f}c <= {threshold_used:.0f}c threshold"
 
         else:
             verdict = Verdict.MAYBE
+            threshold_used = self.thresholds.keep_threshold  # The higher threshold
             if price_chaos:
                 explanation = f"Worth ~{int(price_chaos)}c - your call"
             else:
                 explanation = "Could be worth something - check market"
             confidence = "low"
+            verdict_logic = (
+                f"{calc_summary} = {effective_value:.0f}c "
+                f"(between {self.thresholds.vendor_threshold:.0f}c and {self.thresholds.keep_threshold:.0f}c)"
+            )
 
         return VerdictResult(
             verdict=verdict,
@@ -549,6 +597,9 @@ class QuickVerdictCalculator:
             confidence=confidence,
             meta_affixes_found=meta_affixes_found,
             meta_bonus_applied=meta_bonus,
+            verdict_logic=verdict_logic,
+            threshold_used=threshold_used,
+            effective_value=effective_value,
         )
 
     def _analyze_rare_affixes_with_meta(self, item: Any) -> Tuple[List[str], List[str]]:

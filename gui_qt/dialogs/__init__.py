@@ -15,6 +15,7 @@ from gui_qt.dialogs.upgrade_finder_dialog import UpgradeFinderDialog
 from gui_qt.dialogs.stash_grid_dialog import StashGridDialog
 from gui_qt.dialogs.build_library_dialog import BuildLibraryDialog
 from gui_qt.dialogs.settings_dialog import SettingsDialog
+from gui_qt.dialogs.item_planning_hub import ItemPlanningHub
 
 __all__ = [
     "RecordSaleDialog",
@@ -30,4 +31,5 @@ __all__ = [
     "StashGridDialog",
     "BuildLibraryDialog",
     "SettingsDialog",
+    "ItemPlanningHub",
 ]

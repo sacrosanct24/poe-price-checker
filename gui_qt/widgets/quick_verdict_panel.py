@@ -135,6 +135,47 @@ class QuickVerdictPanel(QWidget):
         """)
         verdict_layout.addWidget(self._explanation_label)
 
+        # WHY section - visible by default (shows calculation breakdown)
+        self._why_frame = QFrame()
+        self._why_frame.setVisible(False)  # Hidden until verdict calculated
+        self._why_frame.setStyleSheet(f"""
+            QFrame {{
+                background-color: {COLORS['background']};
+                border: 1px solid {COLORS['border']};
+                border-radius: 4px;
+                padding: 6px;
+                margin-top: 4px;
+            }}
+        """)
+
+        why_layout = QVBoxLayout(self._why_frame)
+        why_layout.setContentsMargins(8, 6, 8, 6)
+        why_layout.setSpacing(4)
+
+        why_header = QLabel("WHY:")
+        why_header.setStyleSheet(f"""
+            QLabel {{
+                font-weight: bold;
+                color: {COLORS['text_secondary']};
+                font-size: 10px;
+                letter-spacing: 1px;
+            }}
+        """)
+        why_layout.addWidget(why_header)
+
+        self._why_logic_label = QLabel("")
+        self._why_logic_label.setWordWrap(True)
+        self._why_logic_label.setStyleSheet(f"""
+            QLabel {{
+                color: {COLORS['text']};
+                font-size: 11px;
+                font-family: monospace;
+            }}
+        """)
+        why_layout.addWidget(self._why_logic_label)
+
+        verdict_layout.addWidget(self._why_frame)
+
         # Details section (initially hidden)
         self._details_frame = QFrame()
         self._details_frame.setVisible(False)
@@ -263,6 +304,13 @@ class QuickVerdictPanel(QWidget):
         # Explanation
         self._explanation_label.setText(result.explanation)
 
+        # WHY section - show calculation breakdown
+        if result.verdict_logic:
+            self._why_logic_label.setText(result.verdict_logic)
+            self._why_frame.setVisible(True)
+        else:
+            self._why_frame.setVisible(False)
+
         # Details
         if result.detailed_reasons:
             details_text = "\n".join(f"• {r}" for r in result.detailed_reasons)
@@ -319,6 +367,8 @@ class QuickVerdictPanel(QWidget):
         """)
         self._confidence_label.setText("")
         self._explanation_label.setText("Paste an item to get a verdict")
+        self._why_frame.setVisible(False)
+        self._why_logic_label.setText("")
         self._details_frame.setVisible(False)
         self._details_visible = False
         self._toggle_btn.setText("Show details")

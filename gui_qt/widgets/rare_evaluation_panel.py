@@ -84,6 +84,46 @@ class RareEvaluationPanelWidget(QGroupBox):
         tier_row.addStretch()
         layout.addLayout(tier_row)
 
+        # Row 1.5: WHY section - shows contributing factors
+        self.why_frame = QFrame()
+        self.why_frame.setVisible(False)  # Hidden until evaluation
+        self.why_frame.setStyleSheet(f"""
+            QFrame {{
+                background-color: {COLORS['background']};
+                border: 1px solid {COLORS['border']};
+                border-radius: 4px;
+                padding: 4px;
+                margin: 4px 0;
+            }}
+        """)
+
+        why_layout = QVBoxLayout(self.why_frame)
+        why_layout.setContentsMargins(8, 6, 8, 6)
+        why_layout.setSpacing(2)
+
+        why_header = QLabel("WHY THIS TIER:")
+        why_header.setStyleSheet(f"""
+            QLabel {{
+                font-weight: bold;
+                color: {COLORS['text_secondary']};
+                font-size: 10px;
+                letter-spacing: 1px;
+            }}
+        """)
+        why_layout.addWidget(why_header)
+
+        self.why_content_label = QLabel("")
+        self.why_content_label.setWordWrap(True)
+        self.why_content_label.setStyleSheet(f"""
+            QLabel {{
+                color: {COLORS['text']};
+                font-size: 11px;
+            }}
+        """)
+        why_layout.addWidget(self.why_content_label)
+
+        layout.addWidget(self.why_frame)
+
         # Row 2: Scores
         score_row = QHBoxLayout()
         score_row.setSpacing(16)
@@ -173,6 +213,104 @@ class RareEvaluationPanelWidget(QGroupBox):
         """Handle update meta weights button click."""
         self.update_meta_requested.emit()
 
+    def _build_why_explanation(self, evaluation: Any) -> str:
+        """
+        Build a human-readable WHY explanation from evaluation factors.
+
+        Shows the top contributing factors that led to the tier.
+        """
+        factors = []
+
+        # Helper to safely get numeric values
+        def safe_int(val: Any, default: int = 0) -> int:
+            try:
+                return int(val) if val is not None else default
+            except (TypeError, ValueError):
+                return default
+
+        # Synergies (e.g., "Life + resist combo")
+        synergies = getattr(evaluation, 'synergies_found', []) or []
+        synergy_bonus = safe_int(getattr(evaluation, 'synergy_bonus', 0))
+        if synergies and synergy_bonus > 0:
+            for syn in synergies[:2]:  # Max 2 synergies
+                factors.append(f"+ {syn} (+{synergy_bonus // len(synergies)} synergy)")
+
+        # Slot-specific bonuses (e.g., "Premium base: Stygian Vise")
+        slot_reasons = getattr(evaluation, 'slot_bonus_reasons', []) or []
+        slot_bonus = safe_int(getattr(evaluation, 'slot_bonus', 0))
+        if slot_reasons and slot_bonus > 0:
+            for reason in slot_reasons[:1]:  # Just top one
+                factors.append(f"+ {reason} (+{slot_bonus})")
+
+        # Matched archetypes / meta fit
+        archetypes = getattr(evaluation, 'matched_archetypes', []) or []
+        arch_bonus = safe_int(getattr(evaluation, 'archetype_bonus', 0))
+        meta_bonus = safe_int(getattr(evaluation, 'meta_bonus', 0))
+        if archetypes and arch_bonus > 0:
+            archs = ", ".join(archetypes[:2])
+            factors.append(f"+ Meta fit: {archs} (+{arch_bonus})")
+        elif meta_bonus > 0:
+            factors.append(f"+ Meta popularity bonus (+{meta_bonus})")
+
+        # Crafting potential
+        crafting_bonus = safe_int(getattr(evaluation, 'crafting_bonus', 0))
+        if crafting_bonus > 0:
+            open_slots = []
+            open_prefixes = safe_int(getattr(evaluation, 'open_prefixes', 0))
+            open_suffixes = safe_int(getattr(evaluation, 'open_suffixes', 0))
+            if open_prefixes > 0:
+                open_slots.append(f"{open_prefixes}P")
+            if open_suffixes > 0:
+                open_slots.append(f"{open_suffixes}S")
+            slot_str = "/".join(open_slots) if open_slots else "open"
+            factors.append(f"+ Crafting potential ({slot_str}) (+{crafting_bonus})")
+
+        # Fractured bonus
+        fractured_bonus = safe_int(getattr(evaluation, 'fractured_bonus', 0))
+        if fractured_bonus > 0:
+            mod = getattr(evaluation, 'fractured_mod', None) or "mod"
+            factors.append(f"+ Fractured {str(mod)[:20]}... (+{fractured_bonus})")
+
+        # High tier affixes (count T1s)
+        matched_affixes = getattr(evaluation, 'matched_affixes', []) or []
+        try:
+            t1_count = sum(1 for m in matched_affixes if getattr(m, 'tier', '') == "tier1")
+            if t1_count >= 2:
+                factors.append(f"+ {t1_count}x T1 affixes (high value)")
+            elif t1_count == 1:
+                t1_affix = next((m for m in matched_affixes if getattr(m, 'tier', '') == "tier1"), None)
+                if t1_affix:
+                    factors.append(f"+ T1 {getattr(t1_affix, 'affix_type', 'affix')}")
+        except (TypeError, AttributeError):
+            pass  # Skip if matched_affixes is not iterable
+
+        # Red flags (penalties)
+        red_flags = getattr(evaluation, 'red_flags_found', []) or []
+        red_penalty = safe_int(getattr(evaluation, 'red_flag_penalty', 0))
+        if red_flags and red_penalty > 0:
+            for flag in red_flags[:1]:
+                factors.append(f"- {flag} (-{red_penalty})")
+
+        # Base type quality
+        is_valuable = getattr(evaluation, 'is_valuable_base', False)
+        if is_valuable:
+            factors.append("+ High-tier base type")
+        else:
+            factors.append("- Not a premium base")
+
+        # If no factors found, provide basic info
+        if len(factors) <= 1:  # Only base type info
+            total_score = safe_int(getattr(evaluation, 'total_score', 0))
+            if total_score >= 70:
+                factors.insert(0, "+ High affix quality")
+            elif total_score >= 50:
+                factors.insert(0, "+ Decent affix rolls")
+            else:
+                factors.insert(0, "- No standout mods")
+
+        # Limit to top 4 factors
+        return "\n".join(factors[:4])
+
     def set_evaluation(self, evaluation: Any) -> None:
         """Display evaluation results."""
         self._evaluation = evaluation
@@ -185,6 +323,11 @@ class RareEvaluationPanelWidget(QGroupBox):
 
         # Update value
         self.value_label.setText(f"Est. Value: {evaluation.estimated_value}")
+
+        # Update WHY section
+        why_text = self._build_why_explanation(evaluation)
+        self.why_content_label.setText(why_text)
+        self.why_frame.setVisible(True)
 
         # Update scores
         self.total_score_label.setText(f"{evaluation.total_score}/100")
@@ -279,6 +422,8 @@ class RareEvaluationPanelWidget(QGroupBox):
 
         self.tier_label.setText("")
         self.value_label.setText("")
+        self.why_content_label.setText("")
+        self.why_frame.setVisible(False)
         self.total_score_label.setText("")
         self.base_score_label.setText("")
         self.affix_score_label.setText("")

@@ -212,6 +212,30 @@ class NavigationController:
 
         self._wm.show_window("upgrade_finder")
 
+    def show_item_planning_hub(self, initial_tab: str = "upgrade_finder") -> None:
+        """Show the unified Item Planning Hub dialog.
+
+        Args:
+            initial_tab: Which tab to show initially ("upgrade_finder" or "bis_guide")
+        """
+        from gui_qt.dialogs.item_planning_hub import ItemPlanningHub
+
+        if "item_planning_hub" not in self._wm._factories:
+            def create_hub():
+                hub = ItemPlanningHub(
+                    self._main_window,
+                    character_manager=self._character_manager,
+                )
+                hub.set_initial_tab(initial_tab)
+                return hub
+
+            self._wm.register_factory("item_planning_hub", create_hub)
+
+        # Update the initial tab before showing
+        window = self._wm.show_window("item_planning_hub")
+        if window and hasattr(window, 'set_initial_tab'):
+            window.set_initial_tab(initial_tab)
+
     def show_build_library(self) -> None:
         """Show build library dialog."""
         from gui_qt.dialogs.build_library_dialog import BuildLibraryDialog
