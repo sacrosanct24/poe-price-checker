@@ -8,7 +8,9 @@ editing the main service code.
 
 from __future__ import annotations
 
+import threading
 from dataclasses import dataclass
+from typing import Dict, Any
 
 
 @dataclass(frozen=True)
@@ -27,45 +29,79 @@ class DisplayPolicy:
     step_ge_10: float = 1.0    # >= 10c  → round to nearest 1c
 
 
-# Default policy used across the app. Consider sourcing from Config later.
+# Default policy used across the app.
 DEFAULT_POLICY = DisplayPolicy()
 
-# Active policy can be customized at runtime (e.g., from Config)
-_ACTIVE_POLICY: DisplayPolicy = DEFAULT_POLICY
+
+class PolicyManager:
+    """
+    Thread-safe manager for DisplayPolicy state.
+
+    Encapsulates the active policy in a class to avoid module-level
+    global state with `global` statements. Provides the same interface
+    as the previous module-level functions.
+    """
+
+    def __init__(self, default: DisplayPolicy = DEFAULT_POLICY) -> None:
+        self._policy: DisplayPolicy = default
+        self._default: DisplayPolicy = default
+        self._lock = threading.Lock()
+
+    def get_policy(self) -> DisplayPolicy:
+        """Return the current active DisplayPolicy."""
+        with self._lock:
+            return self._policy
+
+    def set_policy(self, policy: DisplayPolicy) -> None:
+        """Set the active DisplayPolicy."""
+        with self._lock:
+            self._policy = policy
+
+    def set_policy_from_dict(self, data: Dict[str, Any]) -> None:
+        """Set active policy from a mapping, using defaults for missing keys."""
+        if not isinstance(data, dict):
+            return
+        # Use defaults as base so calling with {} resets to defaults
+        base = self._default
+        try:
+            policy = DisplayPolicy(
+                high_count=int(data.get("high_count", base.high_count)),
+                medium_count=int(data.get("medium_count", base.medium_count)),
+                high_spread=float(data.get("high_spread", base.high_spread)),
+                medium_spread=float(data.get("medium_spread", base.medium_spread)),
+                low_conf_spread=float(data.get("low_conf_spread", base.low_conf_spread)),
+                step_ge_100=float(data.get("step_ge_100", base.step_ge_100)),
+                step_ge_10=float(data.get("step_ge_10", base.step_ge_10)),
+            )
+        except (ValueError, TypeError):
+            # If any cast fails, keep current policy
+            return
+        self.set_policy(policy)
+
+    def reset(self) -> None:
+        """Reset to default policy."""
+        with self._lock:
+            self._policy = self._default
 
 
+# Module-level singleton instance for backward compatibility
+_policy_manager = PolicyManager()
+
+
+# Backward-compatible module-level functions that delegate to the singleton
 def get_active_policy() -> DisplayPolicy:
     """Return the current active DisplayPolicy (may be customized at runtime)."""
-    return _ACTIVE_POLICY
+    return _policy_manager.get_policy()
 
 
 def set_active_policy(policy: DisplayPolicy) -> None:
     """Set the active DisplayPolicy."""
-    global _ACTIVE_POLICY
-    _ACTIVE_POLICY = policy
+    _policy_manager.set_policy(policy)
 
 
 def set_active_policy_from_dict(data: dict) -> None:
     """Set active policy from a mapping, using defaults for missing keys."""
-    if not isinstance(data, dict):
-        return
-    # Use DEFAULTS as base so calling with {} resets to defaults and
-    # to avoid leaking overrides across tests/runs.
-    base = DEFAULT_POLICY
-    try:
-        policy = DisplayPolicy(
-            high_count=int(data.get("high_count", base.high_count)),
-            medium_count=int(data.get("medium_count", base.medium_count)),
-            high_spread=float(data.get("high_spread", base.high_spread)),
-            medium_spread=float(data.get("medium_spread", base.medium_spread)),
-            low_conf_spread=float(data.get("low_conf_spread", base.low_conf_spread)),
-            step_ge_100=float(data.get("step_ge_100", base.step_ge_100)),
-            step_ge_10=float(data.get("step_ge_10", base.step_ge_10)),
-        )
-    except Exception:
-        # If any cast fails, keep current policy
-        return
-    set_active_policy(policy)
+    _policy_manager.set_policy_from_dict(data)
 
 
 def round_to_step(value: float, step: float) -> float:

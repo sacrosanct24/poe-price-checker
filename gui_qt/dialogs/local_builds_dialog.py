@@ -41,12 +41,12 @@ class ScanWorker(QThread):
     finished = pyqtSignal(list)  # List[LocalBuildInfo]
     progress = pyqtSignal(str)
 
-    def __init__(self, scanner: "PoBLocalScanner", load_metadata: bool = True):
+    def __init__(self, scanner: "PoBLocalScanner", load_metadata: bool = True) -> None:
         super().__init__()
         self._scanner = scanner
         self._load_metadata = load_metadata
 
-    def run(self):
+    def run(self) -> None:
         """Scan for builds in background."""
         self.progress.emit("Scanning for builds...")
 
@@ -72,7 +72,7 @@ class LocalBuildsDialog(QDialog):
 
     build_imported = pyqtSignal(str, dict)  # name, build_data
 
-    def __init__(self, parent=None):
+    def __init__(self, parent: Optional["QDialog"] = None) -> None:
         super().__init__(parent)
         self.setWindowTitle("Import Local PoB Build")
         self.setMinimumSize(800, 500)
@@ -88,7 +88,7 @@ class LocalBuildsDialog(QDialog):
         # Auto-scan on open
         self._init_scanner()
 
-    def _setup_ui(self):
+    def _setup_ui(self) -> None:
         """Create the dialog UI."""
         layout = QVBoxLayout(self)
 
@@ -169,7 +169,7 @@ class LocalBuildsDialog(QDialog):
 
         layout.addLayout(button_layout)
 
-    def _connect_signals(self):
+    def _connect_signals(self) -> None:
         """Connect signal handlers."""
         self._browse_btn.clicked.connect(self._browse_folder)
         self._refresh_btn.clicked.connect(self._refresh_builds)
@@ -179,7 +179,7 @@ class LocalBuildsDialog(QDialog):
         self._import_btn.clicked.connect(self._import_selected)
         self._cancel_btn.clicked.connect(self.reject)
 
-    def _init_scanner(self):
+    def _init_scanner(self) -> None:
         """Initialize the scanner and start scanning."""
         from core.pob_local_scanner import get_pob_scanner
 
@@ -191,7 +191,7 @@ class LocalBuildsDialog(QDialog):
         else:
             self._path_label.setText("PoB folder not found - click Browse to locate")
 
-    def _browse_folder(self):
+    def _browse_folder(self) -> None:
         """Let user browse for PoB builds folder."""
         folder = QFileDialog.getExistingDirectory(
             self,
@@ -213,12 +213,12 @@ class LocalBuildsDialog(QDialog):
                     "The selected folder does not appear to contain PoB builds.",
                 )
 
-    def _refresh_builds(self):
+    def _refresh_builds(self) -> None:
         """Refresh the builds list."""
         if self._scanner:
             self._start_scan()
 
-    def _start_scan(self):
+    def _start_scan(self) -> None:
         """Start background scan for builds."""
         if not self._scanner:
             return
@@ -235,11 +235,11 @@ class LocalBuildsDialog(QDialog):
         self._worker.finished.connect(self._on_scan_finished)
         self._worker.start()
 
-    def _on_scan_progress(self, message: str):
+    def _on_scan_progress(self, message: str) -> None:
         """Handle scan progress update."""
         self._progress.setFormat(message)
 
-    def _on_scan_finished(self, builds: List["LocalBuildInfo"]):
+    def _on_scan_finished(self, builds: List["LocalBuildInfo"]) -> None:
         """Handle scan completion."""
         self._builds = builds
         self._populate_table(builds)
@@ -250,7 +250,7 @@ class LocalBuildsDialog(QDialog):
 
         self._worker = None
 
-    def _populate_table(self, builds: List["LocalBuildInfo"]):
+    def _populate_table(self, builds: List["LocalBuildInfo"]) -> None:
         """Populate the table with builds."""
         self._table.setSortingEnabled(False)
         self._table.setRowCount(len(builds))
@@ -281,7 +281,7 @@ class LocalBuildsDialog(QDialog):
 
         self._table.setSortingEnabled(True)
 
-    def _filter_builds(self, query: str):
+    def _filter_builds(self, query: str) -> None:
         """Filter the builds table by search query."""
         if not query:
             # Show all rows
@@ -302,16 +302,16 @@ class LocalBuildsDialog(QDialog):
 
             self._table.setRowHidden(row, not match)
 
-    def _on_selection_changed(self):
+    def _on_selection_changed(self) -> None:
         """Handle table selection change."""
         selected = self._table.selectedItems()
         self._import_btn.setEnabled(len(selected) > 0)
 
-    def _on_double_click(self, item: QTableWidgetItem):
+    def _on_double_click(self, item: QTableWidgetItem) -> None:
         """Handle double-click to import."""
         self._import_selected()
 
-    def _import_selected(self):
+    def _import_selected(self) -> None:
         """Import the selected build."""
         selected_rows = self._table.selectionModel().selectedRows()
         if not selected_rows:
@@ -400,7 +400,7 @@ class LocalBuildsDialog(QDialog):
                     f"Could not parse the build file:\n{build_info.file_path}",
                 )
 
-    def closeEvent(self, event):
+    def closeEvent(self, event) -> None:
         """Clean up on close."""
         if self._worker and self._worker.isRunning():
             self._worker.quit()

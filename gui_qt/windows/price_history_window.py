@@ -81,7 +81,7 @@ class CurrencySummaryModel(QAbstractTableModel):
         ("data_points", "Days", 60),
     ]
 
-    def __init__(self, parent: Optional[QWidget] = None):
+    def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self._data: List[Dict[str, Any]] = []
 
@@ -155,7 +155,7 @@ class TopItemsModel(QAbstractTableModel):
         ("data_points", "Days", 60),
     ]
 
-    def __init__(self, parent: Optional[QWidget] = None):
+    def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self._data: List[Dict[str, Any]] = []
 
@@ -219,10 +219,10 @@ class TopItemsModel(QAbstractTableModel):
 class PriceHistoryWindow(QDialog):
     """Window for historical economy data analysis."""
 
-    def __init__(self, ctx: "AppContext", parent: Optional[QWidget] = None):
+    def __init__(self, ctx: "AppContext", parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self.ctx = ctx
-        self._economy_service = None
+        self._economy_service: Any = None
         self._chart_service: Optional["ChartDataService"] = None
         self._setup_ui()
         self._load_leagues()
@@ -234,7 +234,7 @@ class PriceHistoryWindow(QDialog):
             self._chart_service = ChartDataService(self.ctx.db)
         return self._chart_service
 
-    def _get_economy_service(self):
+    def _get_economy_service(self) -> Any:
         """Get or create the economy service."""
         if self._economy_service is None:
             from core.economy import LeagueEconomyService

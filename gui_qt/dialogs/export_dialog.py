@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
@@ -55,10 +55,10 @@ class ExportDialog(QDialog):
         (90, "Last 90 Days"),
     ]
 
-    def __init__(self, ctx: "AppContext", parent: Optional[object] = None):
+    def __init__(self, ctx: "AppContext", parent: Optional[object] = None) -> None:
         super().__init__(parent)
         self.ctx = ctx
-        self._export_service = None
+        self._export_service: Any = None
 
         self.setWindowTitle("Export Data")
         self.setMinimumWidth(400)
@@ -66,7 +66,7 @@ class ExportDialog(QDialog):
 
         self._setup_ui()
 
-    def _get_export_service(self):
+    def _get_export_service(self) -> Any:
         """Get or create the export service."""
         if self._export_service is None:
             from core.services.export_service import ExportService
