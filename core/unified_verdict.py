@@ -408,12 +408,9 @@ class UnifiedVerdictEngine:
         verdict: UnifiedVerdict,
         item: "ParsedItem",
     ) -> None:
-        """Evaluate cross-build appeal."""
-        # Already done in rare evaluation if applicable
-        # This handles non-rare items
-
+        """Evaluate cross-build appeal using archetype matcher."""
+        # If rare evaluation already provided matches, use those
         if verdict.top_build_matches:
-            # Already have matches from rare evaluation
             if len(verdict.to_stash.good_for_builds) >= 2:
                 verdict.to_stash.should_stash = True
                 verdict.to_stash.stash_reason = (
@@ -421,11 +418,38 @@ class UnifiedVerdictEngine:
                 )
             return
 
-        # For uniques, could add unique-specific build matching here
-        rarity = getattr(item, 'rarity', '')
-        if rarity == 'Unique':
-            # Uniques have specific build uses - would need unique database
-            pass
+        # For all items (including non-rares), use archetype matcher
+        try:
+            from core.build_archetypes import analyze_item_for_builds
+
+            # Use lower threshold to capture weaker matches for informational purposes
+            cross_analysis = analyze_item_for_builds(item, min_score=15.0)
+            top_matches = cross_analysis.get_top_matches(5)
+
+            for match in top_matches:
+                archetype = match.archetype
+                verdict.top_build_matches.append(
+                    f"{archetype.name} ({match.score:.0f}%)"
+                )
+                if match.score >= 50:  # Moderate+ match
+                    verdict.to_stash.good_for_builds.append(archetype.name)
+                    verdict.to_stash.build_match_scores[archetype.name] = match.score
+
+            # Set stash recommendation if good matches
+            if len(verdict.to_stash.good_for_builds) >= 2:
+                verdict.to_stash.should_stash = True
+                verdict.to_stash.stash_reason = (
+                    f"Good for {len(verdict.to_stash.good_for_builds)} builds"
+                )
+            elif cross_analysis.strong_matches:
+                verdict.to_stash.should_stash = True
+                best = cross_analysis.best_match
+                verdict.to_stash.stash_reason = (
+                    f"Strong match for {best.archetype.name}"
+                )
+
+        except Exception as e:
+            logger.debug(f"Cross-build analysis failed: {e}")
 
     def _evaluate_market_context(
         self,

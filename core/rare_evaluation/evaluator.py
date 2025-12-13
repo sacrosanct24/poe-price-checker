@@ -335,10 +335,12 @@ class RareItemEvaluator:
         cross_build_appeal = 0
         cross_build_summary = ""
         try:
-            cross_analysis = analyze_item_for_builds(item, min_score=40.0)
+            # Use lower threshold to capture weak matches, then filter for display
+            cross_analysis = analyze_item_for_builds(item, min_score=15.0)
             cross_build_matches = cross_analysis.get_top_matches(5)
-            cross_build_appeal = cross_analysis.good_for_builds
-            cross_build_summary = cross_analysis.get_summary()
+            # Count builds with moderate+ match (50%+)
+            cross_build_appeal = len(cross_analysis.strong_matches) + len(cross_analysis.moderate_matches)
+            cross_build_summary = cross_analysis.summary
         except Exception as e:
             logger.debug(f"Cross-build analysis failed: {e}")
 

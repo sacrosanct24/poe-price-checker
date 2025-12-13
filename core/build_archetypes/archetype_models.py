@@ -1,11 +1,8 @@
 """
-Build Archetype Models.
+Build Archetype Models
 
-Defines data structures for representing build archetypes used
-in cross-build item analysis. Each archetype represents a popular
-build type with its stat priorities and requirements.
+Dataclasses defining build archetypes and match results.
 """
-
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -14,160 +11,142 @@ from typing import Dict, List, Optional, Set
 
 
 class BuildCategory(Enum):
-    """Categories for organizing build archetypes."""
-    ATTACK = "Attack"
-    SPELL = "Spell"
-    MINION = "Minion"
-    DOT = "Damage Over Time"
-    TOTEM_TRAP_MINE = "Totem/Trap/Mine"
-    AURA_SUPPORT = "Aura/Support"
+    """Categories of build archetypes."""
+    ATTACK = "attack"
+    SPELL = "spell"
+    MINION = "minion"
+    DOT = "dot"  # Damage over time
+    TOTEM_TRAP_MINE = "totem_trap_mine"
+    AURA_SUPPORT = "aura_support"
 
 
-class DefenseType(Enum):
-    """Primary defense mechanisms."""
-    LIFE = "Life"
-    ENERGY_SHIELD = "Energy Shield"
-    HYBRID = "Hybrid"
-    LOW_LIFE = "Low Life"
-    WARD = "Ward"
-    EVASION = "Evasion"
-    ARMOUR = "Armour"
-    BLOCK = "Block"
-    DODGE = "Dodge"
+# Alias for backward compatibility
+ArchetypeCategory = BuildCategory
 
 
 class DamageType(Enum):
     """Primary damage types."""
-    PHYSICAL = "Physical"
-    FIRE = "Fire"
-    COLD = "Cold"
-    LIGHTNING = "Lightning"
-    CHAOS = "Chaos"
-    ELEMENTAL = "Elemental"  # Multi-element
+    PHYSICAL = "physical"
+    FIRE = "fire"
+    COLD = "cold"
+    LIGHTNING = "lightning"
+    CHAOS = "chaos"
+    ELEMENTAL = "elemental"  # Mixed elemental
+
+
+class DefenseType(Enum):
+    """Primary defense mechanisms."""
+    LIFE = "life"
+    ENERGY_SHIELD = "energy_shield"
+    HYBRID = "hybrid"  # Life + ES
+    EVASION = "evasion"
+    ARMOUR = "armour"
+    BLOCK = "block"
+    DODGE = "dodge"
+    MOM = "mind_over_matter"
+    LOW_LIFE = "low_life"
 
 
 @dataclass
 class StatWeight:
-    """
-    Weight for a specific stat in build evaluation.
-
-    Attributes:
-        stat_name: Normalized stat identifier (e.g., "maximum_life", "fire_resistance")
-        weight: Importance multiplier (1.0 = normal, 2.0 = very important)
-        min_threshold: Minimum value to be considered useful (optional)
-        ideal_value: Target value for "perfect" item (optional)
-    """
+    """A weighted stat for a build archetype."""
     stat_name: str
     weight: float = 1.0
-    min_threshold: Optional[float] = None
-    ideal_value: Optional[float] = None
+    min_threshold: Optional[float] = None  # Minimum value to be useful
+    ideal_value: Optional[float] = None  # Ideal value for max scoring
+
+
+@dataclass
+class StatRequirement:
+    """A stat requirement for a build archetype."""
+    stat_type: str  # e.g., "life", "fire_resistance", "spell_damage"
+    weight: float = 1.0  # How important (0.5 = nice to have, 2.0 = critical)
+    min_value: Optional[int] = None  # Minimum value to be useful
+    ideal_value: Optional[int] = None  # Ideal value for scoring
 
 
 @dataclass
 class BuildArchetype:
     """
-    Represents a popular build archetype for cross-build analysis.
+    Defines a build archetype for cross-build item matching.
 
-    Used to determine if an item is valuable for builds the user
-    doesn't currently have loaded.
-
-    Attributes:
-        id: Unique identifier (e.g., "rf_juggernaut")
-        name: Display name (e.g., "RF Juggernaut")
-        description: Brief description of the build
-        category: Build category (attack, spell, etc.)
-        ascendancy: Primary ascendancy class
-        damage_types: Primary damage types used
-        defense_types: Primary defense mechanisms
-        key_stats: List of essential stats with weights
-        required_stats: Stats that MUST be present for the item to be useful
-        stat_weights: Full dictionary of stat -> weight mappings
-        popularity: Estimated percentage of players (0.0-1.0)
-        tags: Search/filter tags
-        league_starter: Whether this is a good league starter
-        ssf_viable: Whether this build works in SSF
-        budget_tier: Estimated budget tier (1=budget, 2=mid, 3=high)
-        guide_url: Optional link to a build guide
-        poe_ninja_id: Optional poe.ninja build identifier
+    Archetypes represent common/meta builds and their stat priorities,
+    allowing items to be scored against builds the user may not have.
     """
-    id: str
-    name: str
-    description: str = ""
-    category: BuildCategory = BuildCategory.ATTACK
-    ascendancy: str = ""
+    # Identity
+    id: str  # e.g., "rf_juggernaut"
+    name: str  # e.g., "RF Juggernaut"
+    description: str  # Brief description
+
+    # Classification
+    category: BuildCategory
+    ascendancy: str  # e.g., "Juggernaut", "Necromancer"
     damage_types: List[DamageType] = field(default_factory=list)
     defense_types: List[DefenseType] = field(default_factory=list)
-    key_stats: List[StatWeight] = field(default_factory=list)
-    required_stats: Set[str] = field(default_factory=set)
-    stat_weights: Dict[str, float] = field(default_factory=dict)
-    popularity: float = 0.0
-    tags: List[str] = field(default_factory=list)
-    league_starter: bool = False
-    ssf_viable: bool = False
-    budget_tier: int = 2
-    guide_url: str = ""
-    poe_ninja_id: str = ""
 
-    def get_stat_weight(self, stat_name: str) -> float:
-        """Get the weight for a specific stat, defaulting to 0 if not relevant."""
-        # Check key_stats first
+    # Stat priorities
+    key_stats: List[StatWeight] = field(default_factory=list)  # Primary stats with weights
+    stat_weights: Dict[str, float] = field(default_factory=dict)  # Additional stat weights
+    required_stats: Set[str] = field(default_factory=set)  # Must-have stats
+
+    # Metadata
+    popularity: float = 0.05  # Fraction of players (0.05 = 5%)
+    tags: List[str] = field(default_factory=list)  # ["tanky", "league_starter", "boss_killer"]
+    league_starter: bool = False  # Good for league start
+    ssf_viable: bool = False  # Viable in SSF
+    budget_tier: int = 2  # 1=budget, 2=mid, 3=expensive
+    poe_version: str = "poe1"  # "poe1" or "poe2"
+
+    def get_stat_weight(self, stat: str) -> float:
+        """Get the weight for a stat, defaulting to 0 if not relevant."""
+        # First check key_stats
         for key_stat in self.key_stats:
-            if key_stat.stat_name == stat_name:
+            if key_stat.stat_name == stat:
                 return key_stat.weight
+        # Then check stat_weights dict
+        return self.stat_weights.get(stat, 0.0)
 
-        # Fall back to stat_weights dict
-        return self.stat_weights.get(stat_name, 0.0)
-
-    def is_stat_required(self, stat_name: str) -> bool:
-        """Check if a stat is required for this build."""
-        return stat_name in self.required_stats
-
-    def matches_tags(self, tags: List[str]) -> bool:
-        """Check if this archetype matches any of the given tags."""
-        return bool(set(self.tags) & set(tags))
+    def is_key_stat(self, stat: str) -> bool:
+        """Check if a stat is a key stat for this archetype."""
+        return any(ks.stat_name == stat for ks in self.key_stats)
 
 
 @dataclass
 class ArchetypeMatch:
-    """
-    Result of matching an item against a build archetype.
-
-    Attributes:
-        archetype: The matched build archetype
-        score: Match score (0-100)
-        matching_stats: Stats that contributed positively
-        missing_required: Required stats that are missing
-        reasons: Human-readable reasons for the match
-    """
+    """Result of matching an item against an archetype."""
     archetype: BuildArchetype
-    score: float
-    matching_stats: List[str] = field(default_factory=list)
-    missing_required: List[str] = field(default_factory=list)
-    reasons: List[str] = field(default_factory=list)
+    score: float  # 0-100 match score
+    matching_stats: List[str] = field(default_factory=list)  # Stats found on item
+    missing_required: List[str] = field(default_factory=list)  # Required stats missing
+    reasons: List[str] = field(default_factory=list)  # Why this is a good match
 
     @property
-    def is_good_match(self) -> bool:
-        """Check if this is a good match (score >= 60)."""
-        return self.score >= 60.0 and not self.missing_required
+    def is_strong_match(self) -> bool:
+        """Check if this is a strong match (>= 70%)."""
+        return self.score >= 70
 
     @property
-    def is_excellent_match(self) -> bool:
-        """Check if this is an excellent match (score >= 80)."""
-        return self.score >= 80.0 and not self.missing_required
+    def is_moderate_match(self) -> bool:
+        """Check if this is a moderate match (50-69%)."""
+        return 50 <= self.score < 70
+
+    @property
+    def match_summary(self) -> str:
+        """Get a brief summary of the match."""
+        if self.score >= 90:
+            return "Excellent"
+        elif self.score >= 70:
+            return "Strong"
+        elif self.score >= 50:
+            return "Moderate"
+        elif self.score >= 30:
+            return "Weak"
+        return "Poor"
 
 
 @dataclass
 class CrossBuildAnalysis:
-    """
-    Complete analysis of an item across all build archetypes.
-
-    Attributes:
-        item_name: Name of the analyzed item
-        matches: List of archetype matches, sorted by score
-        best_match: The highest-scoring match
-        good_for_builds: Number of builds this item is good for
-        universal_appeal: Whether this item is good for many builds
-    """
+    """Analysis of an item against all build archetypes."""
     item_name: str
     matches: List[ArchetypeMatch] = field(default_factory=list)
 
@@ -179,48 +158,28 @@ class CrossBuildAnalysis:
         return max(self.matches, key=lambda m: m.score)
 
     @property
-    def good_matches(self) -> List[ArchetypeMatch]:
-        """Get all good matches (score >= 60)."""
-        return [m for m in self.matches if m.is_good_match]
+    def strong_matches(self) -> List[ArchetypeMatch]:
+        """Get all strong matches (>= 70% score)."""
+        return [m for m in self.matches if m.score >= 70]
 
     @property
-    def excellent_matches(self) -> List[ArchetypeMatch]:
-        """Get all excellent matches (score >= 80)."""
-        return [m for m in self.matches if m.is_excellent_match]
+    def moderate_matches(self) -> List[ArchetypeMatch]:
+        """Get all moderate matches (50-69% score)."""
+        return [m for m in self.matches if 50 <= m.score < 70]
 
-    @property
-    def good_for_builds(self) -> int:
-        """Count of builds this item is good for."""
-        return len(self.good_matches)
-
-    @property
-    def universal_appeal(self) -> bool:
-        """Check if item is good for 5+ different builds."""
-        return self.good_for_builds >= 5
-
-    def get_top_matches(self, limit: int = 3) -> List[ArchetypeMatch]:
-        """Get the top N matches by score."""
+    def get_top_matches(self, n: int = 3) -> List[ArchetypeMatch]:
+        """Get top N matches by score."""
         sorted_matches = sorted(self.matches, key=lambda m: m.score, reverse=True)
-        return sorted_matches[:limit]
+        return sorted_matches[:n]
 
-    def get_summary(self) -> str:
-        """Generate a human-readable summary."""
-        if not self.matches:
-            return "No build matches found"
-
-        best = self.best_match
-        if best is None:
-            return "No build matches found"
-
-        if best.score < 40:
-            return "Niche item - limited build appeal"
-
-        good_count = self.good_for_builds
-        if good_count == 0:
-            return f"Best match: {best.archetype.name} ({best.score:.0f}%)"
-
-        if self.universal_appeal:
-            return f"Universal item - good for {good_count}+ builds"
-
-        top_names = [m.archetype.name for m in self.get_top_matches(3)]
-        return f"Good for: {', '.join(top_names)}"
+    @property
+    def summary(self) -> str:
+        """Get a summary of the analysis."""
+        strong = len(self.strong_matches)
+        moderate = len(self.moderate_matches)
+        if strong > 0:
+            best = self.best_match
+            return f"Strong fit for {strong} builds (best: {best.archetype.name} {best.score:.0f}%)"
+        elif moderate > 0:
+            return f"Moderate fit for {moderate} builds"
+        return "No strong build matches"

@@ -289,15 +289,32 @@ def extract_item_stats(item: "ParsedItem") -> Dict[str, float]:
     stats: Dict[str, float] = {}
 
     # Get all mods from the item
+    # Handle both ParsedItem attribute names (explicits vs explicit_mods)
     all_mods: List[str] = []
+
+    # Explicit mods (check both attribute names)
     if hasattr(item, 'explicit_mods') and item.explicit_mods:
         all_mods.extend(item.explicit_mods)
+    elif hasattr(item, 'explicits') and item.explicits:
+        all_mods.extend(item.explicits)
+
+    # Implicit mods (check both attribute names)
     if hasattr(item, 'implicit_mods') and item.implicit_mods:
         all_mods.extend(item.implicit_mods)
+    elif hasattr(item, 'implicits') and item.implicits:
+        all_mods.extend(item.implicits)
+
+    # Crafted mods
     if hasattr(item, 'crafted_mods') and item.crafted_mods:
         all_mods.extend(item.crafted_mods)
+    elif hasattr(item, 'crafted') and item.crafted:
+        all_mods.extend(item.crafted)
+
+    # Fractured mods
     if hasattr(item, 'fractured_mods') and item.fractured_mods:
         all_mods.extend(item.fractured_mods)
+    elif hasattr(item, 'fractured') and item.fractured:
+        all_mods.extend(item.fractured)
 
     # Process each mod against patterns
     for mod in all_mods:
