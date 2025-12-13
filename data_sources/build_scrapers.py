@@ -47,7 +47,7 @@ def is_allowed_pob_url(url: str) -> bool:
         parsed = urlparse(url)
         # Check the actual hostname, not a substring match
         return parsed.netloc.lower() in ALLOWED_POB_HOSTS
-    except Exception:
+    except (ValueError, AttributeError):
         return False
 
 
@@ -57,7 +57,7 @@ def _is_pobarchives_url(url: str) -> bool:
         parsed = urlparse(url)
         host = parsed.netloc.lower()
         return host == 'pobarchives.com' or host == 'www.pobarchives.com'
-    except Exception:
+    except (ValueError, AttributeError):
         return False
 
 logger = logging.getLogger(__name__)
@@ -215,8 +215,8 @@ class PoeNinjaBuildScraper:
         except requests.RequestException as e:
             logger.error(f"Failed to scrape poe.ninja: {e}")
             return []
-        except Exception as e:
-            logger.error(f"Unexpected error scraping poe.ninja: {e}")
+        except (ValueError, KeyError, AttributeError) as e:
+            logger.error(f"Failed to parse poe.ninja response: {e}")
             return []
 
     def get_pob_from_profile(self, profile_url: str) -> Optional[str]:
@@ -264,8 +264,11 @@ class PoeNinjaBuildScraper:
             logger.warning("No PoB code found in profile")
             return None
 
-        except Exception as e:
-            logger.error(f"Failed to get PoB from profile: {e}")
+        except requests.RequestException as e:
+            logger.error(f"Network error fetching profile: {e}")
+            return None
+        except (ValueError, AttributeError) as e:
+            logger.error(f"Failed to parse profile page: {e}")
             return None
 
 
@@ -477,8 +480,8 @@ class PoBArchivesScraper:
         except requests.RequestException as e:
             logger.error(f"Failed to scrape pobarchives.com: {e}")
             return []
-        except Exception as e:
-            logger.error(f"Unexpected error scraping pobarchives.com: {e}")
+        except (ValueError, KeyError, AttributeError) as e:
+            logger.error(f"Failed to parse pobarchives.com response: {e}")
             return []
 
     def _parse_build_listings(
@@ -607,8 +610,11 @@ class PoBArchivesScraper:
 
             return None
 
-        except Exception as e:
-            logger.error(f"Failed to fetch pobb.in URL from {internal_url}: {e}")
+        except requests.RequestException as e:
+            logger.error(f"Network error fetching pobb.in URL from {internal_url}: {e}")
+            return None
+        except (ValueError, AttributeError) as e:
+            logger.error(f"Failed to parse pobb.in URL from {internal_url}: {e}")
             return None
 
     def scrape_all_categories(
@@ -698,8 +704,8 @@ class PastebinScraper:
                 logger.warning("Retrieved text too short to be PoB code")
                 return None
 
-        except Exception as e:
-            logger.error(f"Failed to fetch from pastebin: {e}")
+        except requests.RequestException as e:
+            logger.error(f"Network error fetching from pastebin: {e}")
             return None
 
 

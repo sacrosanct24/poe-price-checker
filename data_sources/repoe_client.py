@@ -149,8 +149,11 @@ class RePoEClient:
             logger.info(f"Cached {data_type} to {cache_path}")
             return data
 
-        except Exception as e:
-            logger.error(f"Failed to download {data_type}: {e}")
+        except requests.RequestException as e:
+            logger.error(f"Network error downloading {data_type}: {e}")
+            return None
+        except (IOError, json.JSONDecodeError) as e:
+            logger.error(f"Failed to cache {data_type}: {e}")
             return None
 
     def _load_data(self, data_type: str) -> Optional[dict]:
@@ -176,7 +179,7 @@ class RePoEClient:
                     data: Dict[str, Any] = json.load(f)
                 self._data_cache[data_type] = data
                 return data
-            except Exception as e:
+            except (IOError, json.JSONDecodeError) as e:
                 logger.warning(f"Failed to load cached {data_type}: {e}")
 
         # Download if auto_download enabled

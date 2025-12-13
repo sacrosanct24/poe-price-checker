@@ -6,8 +6,10 @@ import logging
 from functools import lru_cache
 from typing import Any, Dict, List, Optional
 
+import requests
+
 from core.constants import API_TIMEOUT_DEFAULT
-from data_sources.base_api import BaseAPIClient
+from data_sources.base_api import BaseAPIClient, RateLimitExceeded
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +87,7 @@ class PoeNinjaAPI(BaseAPIClient):
         """
         try:
             data = self.get_currency_overview()
-        except Exception as exc:
+        except (requests.RequestException, RateLimitExceeded) as exc:
             logger.warning("Failed to fetch currency overview for divine rate: %s", exc)
             self.divine_chaos_rate = 0.0
             return 0.0
@@ -214,7 +216,7 @@ class PoeNinjaAPI(BaseAPIClient):
                 )
                 return leagues
 
-        except Exception as e:
+        except requests.RequestException as e:
             logger.warning(f"Failed to fetch leagues from trade API: {e}")
 
         # Fallback: at least keep the permanent leagues usable
@@ -304,7 +306,7 @@ class PoeNinjaAPI(BaseAPIClient):
         if not self._currency_index:
             try:
                 self.get_currency_overview()
-            except Exception as exc:
+            except (requests.RequestException, RateLimitExceeded) as exc:
                 logger.warning("Failed to fetch currency overview: %s", exc)
                 return 0.0, "fetch error"
 
@@ -333,7 +335,7 @@ class PoeNinjaAPI(BaseAPIClient):
                 },
             )
             return data if isinstance(data, dict) else None
-        except Exception as e:
+        except (requests.RequestException, RateLimitExceeded) as e:
             logger.warning(f"Failed to fetch itemoverview for {item_type}: {e}")
             return None
 
@@ -403,8 +405,8 @@ class PoeNinjaAPI(BaseAPIClient):
 
                         cache[cache_key][key] = item
 
-                except Exception as e:
-                    logger.error(f"Failed to load {item_type}: {e}")
+                except (KeyError, TypeError, AttributeError) as e:
+                    logger.error(f"Failed to parse {item_type} data: {e}")
 
         logger.info(f"Loaded all prices for {self.league}")
         return cache
@@ -560,7 +562,7 @@ class PoeNinjaAPI(BaseAPIClient):
                         if search_key == item_key or item_name.lower() in item_key:
                             return dict(item)
 
-                except Exception as e:
+                except (KeyError, TypeError, AttributeError) as e:
                     logger.debug(f"Search in {item_type} failed: {e}")
 
         # Rares and other categories we don't explicitly know how to map

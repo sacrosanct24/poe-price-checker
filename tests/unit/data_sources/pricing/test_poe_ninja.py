@@ -2,6 +2,7 @@
 
 import time
 import pytest
+import requests
 from unittest.mock import Mock, patch, MagicMock
 
 from data_sources.pricing.poe_ninja import PoeNinjaAPI
@@ -161,8 +162,8 @@ class TestDivineRate:
         assert api.divine_chaos_rate == 0.0
 
     def test_refresh_divine_rate_handles_exception(self, api):
-        """Should return 0 on exception."""
-        api.get_currency_overview = Mock(side_effect=Exception("API error"))
+        """Should return 0 on network exception."""
+        api.get_currency_overview = Mock(side_effect=requests.RequestException("API error"))
 
         rate = api.refresh_divine_rate_from_currency()
 
@@ -284,8 +285,8 @@ class TestLeagueDetection:
 
     @patch('requests.get')
     def test_get_current_leagues_fallback_on_error(self, mock_get, api):
-        """Should fallback to static leagues on error."""
-        mock_get.side_effect = Exception("Network error")
+        """Should fallback to static leagues on network error."""
+        mock_get.side_effect = requests.RequestException("Network error")
 
         leagues = api.get_current_leagues()
 
@@ -438,9 +439,9 @@ class TestCurrencyPrice:
         api.get_currency_overview.assert_called_once()
 
     def test_get_currency_price_handles_fetch_error(self, api):
-        """Should return error on fetch failure."""
+        """Should return error on network fetch failure."""
         api._currency_index = {}
-        api.get_currency_overview = Mock(side_effect=Exception("API error"))
+        api.get_currency_overview = Mock(side_effect=requests.RequestException("API error"))
 
         price, source = api.get_currency_price("Divine Orb")
 
@@ -481,8 +482,8 @@ class TestItemOverview:
         assert result["lines"][0]["name"] == "Headhunter"
 
     def test_get_item_overview_handles_error(self, api):
-        """Should return None on error."""
-        api.get = Mock(side_effect=Exception("API error"))
+        """Should return None on network error."""
+        api.get = Mock(side_effect=requests.RequestException("API error"))
 
         result = api._get_item_overview("UniqueArmour")
 
@@ -533,11 +534,12 @@ class TestLoadAllPrices:
         assert "oils" in cache
 
     def test_load_all_prices_handles_errors(self, api):
-        """Should handle errors for individual categories."""
+        """Should handle parsing errors for individual categories."""
         api.get_currency_overview = Mock(return_value={"lines": []})
-        api._get_item_overview = Mock(side_effect=Exception("API error"))
+        # Return data with missing 'name' key to trigger KeyError
+        api._get_item_overview = Mock(return_value={"lines": [{"baseType": "Belt"}]})
 
-        # Should not raise
+        # Should not raise - KeyError is caught
         cache = api.load_all_prices()
 
         assert cache is not None
