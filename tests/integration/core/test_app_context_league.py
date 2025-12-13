@@ -37,6 +37,16 @@ class DummyConfig:
         self.set_game_config_calls: list[GameConfig] = []
 
     @property
+    def display_policy(self) -> dict:
+        """Return default display policy for testing."""
+        return {
+            "high_count": 20,
+            "medium_count": 8,
+            "low_count": 3,
+            "price_precision": 1,
+        }
+
+    @property
     def league(self) -> str:
         if self.current_game == GameVersion.POE1:
             return self._poe1_cfg.league

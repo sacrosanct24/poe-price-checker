@@ -38,6 +38,8 @@ from gui_qt.widgets.item_inspector import ItemInspectorWidget
 from gui_qt.widgets.rare_evaluation_panel import RareEvaluationPanelWidget
 from gui_qt.widgets.ai_analysis_panel import AIAnalysisPanelWidget
 from gui_qt.widgets.quick_verdict_panel import QuickVerdictPanel, VerdictStatisticsWidget
+from gui_qt.widgets.unified_verdict_panel import UnifiedVerdictPanel
+from gui_qt.widgets.item_comparison_widget import ItemComparisonWidget
 
 if TYPE_CHECKING:
     pass
@@ -201,6 +203,16 @@ class SessionPanel(QWidget):
         self.ai_panel.setVisible(False)
         layout.addWidget(self.ai_panel)
 
+        # Bottom: Unified verdict panel (comprehensive FOR YOU/TO SELL/TO STASH view)
+        self.unified_verdict_panel = UnifiedVerdictPanel()
+        self.unified_verdict_panel.setVisible(False)
+        layout.addWidget(self.unified_verdict_panel)
+
+        # Bottom: Item comparison widget (compare vs ideal/market)
+        self.item_comparison_widget = ItemComparisonWidget()
+        self.item_comparison_widget.setVisible(False)
+        layout.addWidget(self.item_comparison_widget)
+
     def _on_check_price(self) -> None:
         """Handle check price button click."""
         text = self.input_text.toPlainText().strip()
@@ -219,6 +231,10 @@ class SessionPanel(QWidget):
         self.verdict_stats_widget.reset()
         self.ai_panel.clear()
         self.ai_panel.setVisible(False)
+        self.unified_verdict_panel.clear()
+        self.unified_verdict_panel.setVisible(False)
+        self.item_comparison_widget.clear()
+        self.item_comparison_widget.setVisible(False)
 
     def _on_update_meta_requested(self) -> None:
         """Forward update meta request to parent."""
@@ -259,6 +275,33 @@ class SessionPanel(QWidget):
             stats: VerdictStatistics instance to set
         """
         self.verdict_stats_widget.update_stats(stats)
+
+    def set_unified_verdict(self, verdict: Any) -> None:
+        """Display a unified verdict for the current item.
+
+        Args:
+            verdict: UnifiedVerdict instance with comprehensive evaluation
+        """
+        if verdict:
+            self.unified_verdict_panel.set_verdict(verdict)
+            self.unified_verdict_panel.setVisible(True)
+        else:
+            self.unified_verdict_panel.clear()
+            self.unified_verdict_panel.setVisible(False)
+
+    def set_item_comparison(self, item: Any, analysis: Any) -> None:
+        """Display item comparison view.
+
+        Args:
+            item: ParsedItem being compared
+            analysis: CraftingAnalysis with mod analysis data
+        """
+        if item and analysis and analysis.mod_analyses:
+            self.item_comparison_widget.set_item(item, analysis)
+            self.item_comparison_widget.setVisible(True)
+        else:
+            self.item_comparison_widget.clear()
+            self.item_comparison_widget.setVisible(False)
 
     def _on_row_selected(self, row_data: Dict[str, Any]) -> None:
         """Handle row selection in results table."""
@@ -620,3 +663,36 @@ class SessionTabWidget(QTabWidget):
             panel = self.widget(session_index)
             if isinstance(panel, SessionPanel):
                 panel.record_verdict(result)
+
+    def set_unified_verdict(
+        self, verdict: Any, session_index: Optional[int] = None
+    ) -> None:
+        """Set unified verdict for a session panel.
+
+        Args:
+            verdict: UnifiedVerdict instance with comprehensive evaluation
+            session_index: Which session to update (default: current)
+        """
+        if session_index is None:
+            session_index = self.currentIndex()
+        if 0 <= session_index < self.count():
+            panel = self.widget(session_index)
+            if isinstance(panel, SessionPanel):
+                panel.set_unified_verdict(verdict)
+
+    def set_item_comparison(
+        self, item: Any, analysis: Any, session_index: Optional[int] = None
+    ) -> None:
+        """Set item comparison for a session panel.
+
+        Args:
+            item: ParsedItem being compared
+            analysis: CraftingAnalysis with mod analysis data
+            session_index: Which session to update (default: current)
+        """
+        if session_index is None:
+            session_index = self.currentIndex()
+        if 0 <= session_index < self.count():
+            panel = self.widget(session_index)
+            if isinstance(panel, SessionPanel):
+                panel.set_item_comparison(item, analysis)

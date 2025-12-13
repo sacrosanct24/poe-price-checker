@@ -747,8 +747,19 @@ class PriceCheckerWindow(BackgroundServicesMixin, MenuBarMixin, ShortcutsMixin, 
             if data.is_rare and data.evaluation:
                 panel.rare_eval_panel.set_evaluation(data.evaluation)
                 panel.rare_eval_panel.setVisible(True)
+
+                # Also update item comparison widget with crafting analysis
+                try:
+                    from core.crafting_potential import CraftingPotentialAnalyzer
+                    crafting_analyzer = CraftingPotentialAnalyzer()
+                    crafting_analysis = crafting_analyzer.analyze(data.parsed_item)
+                    panel.set_item_comparison(data.parsed_item, crafting_analysis)
+                except Exception as e:
+                    self.logger.debug(f"Crafting analysis failed: {e}")
+                    panel.item_comparison_widget.setVisible(False)
             else:
                 panel.rare_eval_panel.setVisible(False)
+                panel.item_comparison_widget.setVisible(False)
 
             # Update quick verdict panel (casual player summary)
             # Get best price from results for verdict calculation
@@ -772,6 +783,22 @@ class PriceCheckerWindow(BackgroundServicesMixin, MenuBarMixin, ShortcutsMixin, 
 
             # Record verdict in session statistics
             panel.record_verdict(verdict_result)
+
+            # Update unified verdict panel (comprehensive FOR YOU/TO SELL/TO STASH)
+            try:
+                from core.unified_verdict import UnifiedVerdictEngine
+                unified_engine = UnifiedVerdictEngine()
+                unified_verdict = unified_engine.evaluate(
+                    item=data.parsed_item,
+                    price_chaos=best_price,
+                    rare_evaluation=data.evaluation,
+                    current_equipment=None,  # TODO: Get from PoB if available
+                    user_builds=None,  # TODO: Get from character manager
+                )
+                panel.set_unified_verdict(unified_verdict)
+            except Exception as e:
+                self.logger.debug(f"Unified verdict failed: {e}")
+                panel.unified_verdict_panel.setVisible(False)
 
             # Add to history
             self._history_manager.add_entry(item_text, data.parsed_item, data.results)

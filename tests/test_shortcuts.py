@@ -94,9 +94,9 @@ class TestDefaultShortcuts:
         assert "paste_and_check" in action_ids
         assert "clear_input" in action_ids
 
-        # Build & PoB
-        assert "show_pob_characters" in action_ids
-        assert "show_bis_search" in action_ids
+        # Build & PoB (Phase 1: merged features)
+        assert "show_build_manager" in action_ids
+        assert "show_item_planning_hub" in action_ids
         assert "show_item_comparison" in action_ids
 
         # Navigation
@@ -315,4 +315,4 @@ class TestGetShortcutsHelpText:
 
         assert "F1" in help_text  # show_shortcuts
         assert "Ctrl+Return" in help_text  # check_price
-        assert "Ctrl+B" in help_text  # show_pob_characters
+        assert "Ctrl+B" in help_text  # show_build_manager

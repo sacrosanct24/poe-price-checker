@@ -55,7 +55,7 @@ class ModComparisonRow(QWidget):
         layout.setContentsMargins(4, 2, 4, 2)
         layout.setSpacing(8)
 
-        # Tier badge
+        # Tier badge with tooltip
         tier_label = QLabel(self._mod.tier_label or "???")
         tier_label.setFixedWidth(30)
         tier_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -70,6 +70,8 @@ class ModComparisonRow(QWidget):
                 padding: 2px;
             }}
         """)
+        # Add tier tooltip with detailed information
+        tier_label.setToolTip(self._build_tier_tooltip())
         layout.addWidget(tier_label)
 
         # Stat name
@@ -175,6 +177,58 @@ class ModComparisonRow(QWidget):
         elif tier is not None and tier >= 4:
             return str(COLORS["low_value"])
         return str(COLORS["border"])
+
+    def _build_tier_tooltip(self) -> str:
+        """Build detailed tooltip for tier badge."""
+        from core.affix_tier_calculator import AFFIX_TIER_DATA
+
+        lines = []
+        stat_type = self._mod.stat_type or "unknown"
+        stat_display = stat_type.replace("_", " ").title()
+        tier = self._mod.tier
+        current_value = self._mod.current_value or 0
+
+        # Header
+        if tier:
+            lines.append(f"<b>{stat_display} - Tier {tier}</b>")
+        else:
+            lines.append(f"<b>{stat_display}</b>")
+
+        # Get tier data for this stat
+        tier_data = AFFIX_TIER_DATA.get(stat_type, [])
+
+        if tier_data and tier:
+            # Find current tier info
+            for t, ilvl, min_val, max_val in tier_data:
+                if t == tier:
+                    lines.append(f"<br>Item Level Required: {ilvl}+")
+                    lines.append(f"Roll Range: {min_val}-{max_val}")
+
+                    # Calculate roll quality within tier
+                    if max_val > min_val:
+                        quality = ((current_value - min_val) / (max_val - min_val)) * 100
+                        quality = max(0, min(100, quality))
+                        lines.append(f"Your Roll: {current_value} ({quality:.0f}% of tier)")
+                    else:
+                        lines.append(f"Your Roll: {current_value}")
+                    break
+
+            # Show all tiers for reference
+            lines.append("<br><b>All Tiers:</b>")
+            for t, ilvl, min_val, max_val in tier_data[:5]:  # Show top 5 tiers
+                marker = " ◄" if t == tier else ""
+                lines.append(f"T{t}: {min_val}-{max_val} (ilvl {ilvl}+){marker}")
+        else:
+            # No tier data available
+            lines.append(f"<br>Value: {current_value}")
+            if hasattr(self._mod, 'roll_quality') and self._mod.roll_quality is not None:
+                lines.append(f"Roll Quality: {self._mod.roll_quality:.0f}%")
+
+        # Divine potential if available
+        if hasattr(self._mod, 'divine_potential') and self._mod.divine_potential:
+            lines.append(f"<br><i>Divine Potential: +{self._mod.divine_potential}</i>")
+
+        return "<br>".join(lines)
 
 
 class ItemComparisonWidget(QWidget):
