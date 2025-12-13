@@ -20,14 +20,20 @@ from core.database.repositories.base_repository import BaseRepository
 from core.database.repositories.checked_items_repository import CheckedItemsRepository
 from core.database.repositories.currency_repository import CurrencyRepository
 from core.database.repositories.plugin_repository import PluginRepository
+from core.database.repositories.price_repository import PriceRepository
 from core.database.repositories.sales_repository import SalesRepository
 from core.database.repositories.stats_repository import StatsRepository
+from core.database.repositories.upgrade_advice_repository import UpgradeAdviceRepository
+from core.database.repositories.verdict_repository import VerdictRepository
 
 __all__ = [
     "BaseRepository",
     "CheckedItemsRepository",
     "CurrencyRepository",
     "PluginRepository",
+    "PriceRepository",
     "SalesRepository",
     "StatsRepository",
+    "UpgradeAdviceRepository",
+    "VerdictRepository",
 ]
