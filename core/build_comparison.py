@@ -18,6 +18,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 import defusedxml.ElementTree as ET
 import requests
 
+from core.constants import API_TIMEOUT_STASH
 from core.pob import PoBBuild, PoBDecoder, PoBItem
 
 logger = logging.getLogger(__name__)
@@ -163,7 +164,7 @@ class MaxrollBuildFetcher:
     """Fetch and cache builds from Maxroll.gg."""
 
     BASE_URL = "https://maxroll.gg/poe/api/pob"
-    DEFAULT_TIMEOUT = 30
+    DEFAULT_TIMEOUT = API_TIMEOUT_STASH  # Use standard timeout constant (30s)
     USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
 
     def __init__(self):

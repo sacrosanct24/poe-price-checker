@@ -161,7 +161,7 @@ class ClipboardMonitor:
                             notify_payload = current
 
                 # Perform logging and callbacks outside the lock to avoid deadlocks
-                if should_notify:
+                if should_notify and notify_payload is not None:
                     logger.info(f"PoE item detected in clipboard ({len(current)} chars)")
                     if self.on_item_detected:
                         try:

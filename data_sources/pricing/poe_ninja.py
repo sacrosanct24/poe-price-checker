@@ -173,8 +173,6 @@ class PoeNinjaAPI(BaseAPIClient):
           - Restrict to PC realm.
           - Deduplicate by league id.
         """
-        import requests
-
         url = "https://www.pathofexile.com/api/trade/data/leagues"
         headers = {
             "User-Agent": "PoE-Price-Checker/2.5 (GitHub: sacrosanct24/poe-price-checker)",
