@@ -7,6 +7,7 @@ PoB codes are base64-encoded, zlib-compressed XML.
 from __future__ import annotations
 
 import base64
+import binascii
 import logging
 import re
 import zlib
@@ -35,7 +36,7 @@ def _is_pastebin_url(url: str) -> bool:
     try:
         parsed = urlparse(url)
         return parsed.netloc.lower() in _PASTEBIN_HOSTS
-    except Exception:
+    except (ValueError, AttributeError):
         return False
 
 
@@ -44,7 +45,7 @@ def _is_pobbin_url(url: str) -> bool:
     try:
         parsed = urlparse(url)
         return parsed.netloc.lower() in _POBBIN_HOSTS
-    except Exception:
+    except (ValueError, AttributeError):
         return False
 
 
@@ -54,7 +55,7 @@ def _url_host_matches(url: str, host: str) -> bool:
         parsed = urlparse(url)
         netloc = parsed.netloc.lower()
         return netloc == host or netloc == f'www.{host}'
-    except Exception:
+    except (ValueError, AttributeError):
         return False
 
 
@@ -152,7 +153,7 @@ class PoBDecoder:
         except zlib.error as e:
             logger.error(f"Failed to decompress PoB code: {e}")
             raise ValueError(f"Invalid PoB code (decompression failed): {e}")
-        except Exception as e:
+        except (binascii.Error, UnicodeDecodeError) as e:
             logger.error(f"Failed to decode PoB code: {e}")
             raise ValueError(f"Invalid PoB code: {e}")
 
@@ -173,7 +174,7 @@ class PoBDecoder:
             response = requests.get(url, timeout=API_TIMEOUT_DEFAULT)
             response.raise_for_status()
             return response.text.strip()
-        except Exception as e:
+        except requests.RequestException as e:
             logger.error(f"Failed to fetch pastebin: {e}")
             raise ValueError(f"Could not fetch pastebin: {e}")
 
@@ -195,7 +196,7 @@ class PoBDecoder:
             response = requests.get(raw_url, timeout=API_TIMEOUT_DEFAULT)
             response.raise_for_status()
             return response.text.strip()
-        except Exception as e:
+        except requests.RequestException as e:
             # Fallback: try the API endpoint
             logger.debug(f"pobb.in raw endpoint failed, trying API: {e}")
             api_url = f"https://pobb.in/api/v1/paste/{paste_id}"
@@ -205,7 +206,7 @@ class PoBDecoder:
                 data = response.json()
                 # The API returns the code in a 'code' or 'content' field
                 return str(data.get("code") or data.get("content") or "")
-            except Exception as e:
+            except requests.RequestException as e:
                 logger.error(f"Failed to fetch pobb.in: {e}")
                 raise ValueError(f"Could not fetch pobb.in: {e}")
 

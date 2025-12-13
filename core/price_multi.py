@@ -105,7 +105,7 @@ class MultiSourcePriceService:
         if self._on_change_enabled_state is not None:
             try:
                 self._on_change_enabled_state(self.get_enabled_state())
-            except Exception:  # defensive: do not let persistence errors bubble
+            except (OSError, TypeError, ValueError):  # defensive: do not let persistence errors bubble
                 logger.exception("Failed to persist enabled sources state")
 
     # ---------------------------------------------------------------------
@@ -172,7 +172,7 @@ class MultiSourcePriceService:
             try:
                 priority = [s.name for s in active_sources]
                 chosen = arbitrate_rows(results, source_priority=priority)
-            except Exception:
+            except (TypeError, ValueError, KeyError):
                 chosen = None
             if chosen:
                 display = dict(chosen)

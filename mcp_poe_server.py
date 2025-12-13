@@ -1243,8 +1243,8 @@ def run_security_scan(path: str = "core/", full_scan: bool = False) -> dict:
                                     "pattern": pattern,
                                     "risk": risk
                                 })
-            except Exception:
-                pass
+            except (OSError, UnicodeDecodeError):
+                pass  # Skip unreadable files
 
     results["scans"]["dangerous_patterns"] = {
         "findings": pattern_findings[:20],  # Limit

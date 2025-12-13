@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+import requests
 from unittest.mock import Mock, patch, MagicMock
 
 from core.app_context import create_app_context, AppContext
@@ -187,7 +188,7 @@ class TestAppContextPolicyConfig:
         mock_config.current_game = GameVersion.POE2
         mock_config.display_policy = {"invalid": "policy"}
         mock_config_class.return_value = mock_config
-        mock_set_policy.side_effect = Exception("Invalid policy")
+        mock_set_policy.side_effect = ValueError("Invalid policy")
 
         with patch("core.app_context.ItemParser"), \
              patch("core.app_context.Database"), \
@@ -229,7 +230,7 @@ class TestAppContextPolicyConfig:
         mock_config.api_retry_logging_verbosity = "invalid"
         mock_config.display_policy = {}
         mock_config_class.return_value = mock_config
-        mock_set_verbosity.side_effect = Exception("Invalid verbosity")
+        mock_set_verbosity.side_effect = ValueError("Invalid verbosity")
 
         with patch("core.app_context.ItemParser"), \
              patch("core.app_context.Database"), \
@@ -253,7 +254,7 @@ class TestAppContextPOE1Setup:
         mock_config.current_game = GameVersion.POE1
         mock_config.display_policy = {}
         mock_config.auto_detect_league = False
-        mock_config.get_api_timeouts.side_effect = Exception("Timeout config error")
+        mock_config.get_api_timeouts.side_effect = ValueError("Timeout config error")
         mock_game_cfg = Mock()
         mock_game_cfg.league = "Test"
         mock_config.get_game_config.return_value = mock_game_cfg
@@ -342,7 +343,7 @@ class TestAppContextPOE1Setup:
              patch("core.app_context.set_active_policy_from_dict"), \
              patch("core.app_context.set_retry_logging_verbosity"):
             mock_ninja_instance = Mock()
-            mock_ninja_instance.detect_current_league.side_effect = Exception("API error")
+            mock_ninja_instance.detect_current_league.side_effect = requests.RequestException("API error")
             mock_ninja.return_value = mock_ninja_instance
 
             ctx = create_app_context()
@@ -411,7 +412,7 @@ class TestAppContextPOE1Setup:
              patch("core.app_context.UndercutPriceSource"), \
              patch("core.app_context.set_active_policy_from_dict"), \
              patch("core.app_context.set_retry_logging_verbosity"):
-            mock_watch.side_effect = Exception("Watch init error")
+            mock_watch.side_effect = requests.RequestException("Watch init error")
 
             ctx = create_app_context()
             assert ctx.poe_watch is None
@@ -443,7 +444,7 @@ class TestAppContextPOE1Setup:
              patch("core.app_context.UndercutPriceSource"), \
              patch("core.app_context.set_active_policy_from_dict"), \
              patch("core.app_context.set_retry_logging_verbosity"):
-            mock_eval.side_effect = Exception("Evaluator init error")
+            mock_eval.side_effect = OSError("Evaluator init error")
 
             ctx = create_app_context()
             # Should still create context, but with no rare_evaluator
@@ -633,7 +634,7 @@ class TestAppContextEnabledSources:
         mock_config_class.return_value = mock_config
 
         mock_multi_service = Mock()
-        mock_multi_service.set_enabled_state.side_effect = Exception("Set state error")
+        mock_multi_service.set_enabled_state.side_effect = ValueError("Set state error")
 
         with patch("core.app_context.ItemParser"), \
              patch("core.app_context.Database"), \
@@ -713,7 +714,7 @@ class TestAppContextPersistCallback:
         mock_config.current_game = GameVersion.POE2
         mock_config.display_policy = {}
         mock_config.enabled_sources = {}
-        mock_config.set_enabled_sources.side_effect = Exception("Save error")
+        mock_config.set_enabled_sources.side_effect = OSError("Save error")
         mock_config_class.return_value = mock_config
 
         captured_callback = [None]

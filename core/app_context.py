@@ -4,6 +4,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 import logging
 
+import requests
+
 from core.config import Config
 from core.item_parser import ItemParser
 from core.database import Database
@@ -88,12 +90,12 @@ def create_app_context() -> AppContext:
     # Apply pricing display policy from config at startup (runtime-tunable)
     try:
         set_active_policy_from_dict(config.display_policy)
-    except Exception:
+    except (ValueError, KeyError, TypeError):
         pass  # Defensive: invalid display_policy config, use defaults
     # Apply API retry logging verbosity
     try:
         set_retry_logging_verbosity(config.api_retry_logging_verbosity)
-    except Exception:
+    except (ValueError, TypeError, AttributeError):
         pass  # Defensive: invalid retry logging config, use defaults
     parser = ItemParser()
     db = Database()  # Uses default ~/.poe_price_checker/data.db
@@ -113,14 +115,14 @@ def create_app_context() -> AppContext:
             connect_to, read_to = config.get_api_timeouts()
             poe_ninja.timeout = (connect_to, read_to)
             poe_ninja.endpoint_ttls = config.get_pricing_ttls()
-        except Exception:
+        except (ValueError, TypeError, AttributeError):
             pass  # Defensive: invalid timeout/TTL config, use API defaults
 
         # Optionally auto-detect the active temp league via poe.ninja
         if config.auto_detect_league:
             try:
                 detected = poe_ninja.detect_current_league()
-            except Exception as exc:
+            except (requests.RequestException, ValueError, OSError) as exc:
                 logger.warning(
                     "Failed to auto-detect league from poe.ninja; "
                     "using configured league %s. Error: %s",
@@ -150,10 +152,10 @@ def create_app_context() -> AppContext:
                 connect_to, read_to = config.get_api_timeouts()
                 poe_watch.timeout = (connect_to, read_to)
                 poe_watch.endpoint_ttls = config.get_pricing_ttls()
-            except Exception:
+            except (ValueError, TypeError, AttributeError):
                 pass  # Defensive: invalid timeout/TTL config, use API defaults
             logger.info("[OK] poe.watch API initialized successfully")
-        except Exception as exc:
+        except (requests.RequestException, ValueError, OSError) as exc:
             logger.warning(
                 "Failed to initialize poe.watch API; "
                 "continuing with poe.ninja only. Error: %s",
@@ -187,7 +189,7 @@ def create_app_context() -> AppContext:
             logger.info("Initializing rare item evaluator")
             rare_evaluator = RareItemEvaluator()
             logger.info("[OK] Rare item evaluator initialized successfully")
-        except Exception as exc:
+        except (OSError, ValueError, KeyError) as exc:
             logger.warning(
                 "Failed to initialize rare item evaluator; "
                 "rare pricing will be unavailable. Error: %s",
@@ -241,13 +243,13 @@ def create_app_context() -> AppContext:
     def _persist_enabled_state(state: dict[str, bool]) -> None:
         try:
             config.set_enabled_sources(state)
-        except Exception:
+        except (OSError, TypeError, ValueError):
             logging.getLogger(__name__).exception("Failed to persist enabled source state")
 
     use_arbitration_flag = False
     try:
         use_arbitration_flag = bool(getattr(config, "use_cross_source_arbitration", False))
-    except Exception:
+    except (AttributeError, TypeError, ValueError):
         use_arbitration_flag = False
 
     # Construct multi-source service with backward-compatible fallback for
@@ -273,7 +275,7 @@ def create_app_context() -> AppContext:
             # Some older test doubles may not implement set_enabled_state
             if hasattr(multi_price_service, "set_enabled_state"):
                 multi_price_service.set_enabled_state(enabled_map)
-    except Exception:
+    except (AttributeError, TypeError, ValueError):
         pass  # Defensive: ignore invalid enabled_sources config
 
     return AppContext(
