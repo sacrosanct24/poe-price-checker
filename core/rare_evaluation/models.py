@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 if TYPE_CHECKING:
     from core.item_parser import ParsedItem
     from core.build_archetype import BuildArchetype
+    from core.build_archetypes.archetype_models import ArchetypeMatch
 
 
 @dataclass
@@ -76,3 +77,8 @@ class RareItemEvaluation:
     build_archetype: Optional["BuildArchetype"] = None
     archetype_weighted_score: int = 0  # Score adjusted by archetype weights
     archetype_affix_details: List[Dict[str, Any]] = field(default_factory=list)
+
+    # Cross-build analysis (Phase 2 - What builds want this?)
+    cross_build_matches: List["ArchetypeMatch"] = field(default_factory=list)
+    cross_build_appeal: int = 0  # Number of builds this is good for
+    cross_build_summary: str = ""  # Human-readable summary

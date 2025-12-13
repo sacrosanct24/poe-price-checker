@@ -22,6 +22,7 @@ from core.constants import (
     MAX_AFFIX_WEIGHT,
 )
 from core.rare_evaluation.models import AffixMatch, RareItemEvaluation
+from core.build_archetypes import analyze_item_for_builds
 
 logger = logging.getLogger(__name__)
 
@@ -329,6 +330,18 @@ class RareItemEvaluator:
             total_score, matched_affixes, synergies_found,
             is_fractured, crafting_bonus, matched_archetypes)
 
+        # Cross-build analysis: What builds want this item?
+        cross_build_matches = []
+        cross_build_appeal = 0
+        cross_build_summary = ""
+        try:
+            cross_analysis = analyze_item_for_builds(item, min_score=40.0)
+            cross_build_matches = cross_analysis.get_top_matches(5)
+            cross_build_appeal = cross_analysis.good_for_builds
+            cross_build_summary = cross_analysis.get_summary()
+        except Exception as e:
+            logger.debug(f"Cross-build analysis failed: {e}")
+
         return RareItemEvaluation(
             item=item,
             base_score=base_score,
@@ -353,7 +366,10 @@ class RareItemEvaluator:
             archetype_bonus=archetype_bonus,
             meta_bonus=meta_bonus,
             tier=tier,
-            estimated_value=estimated_value
+            estimated_value=estimated_value,
+            cross_build_matches=cross_build_matches,
+            cross_build_appeal=cross_build_appeal,
+            cross_build_summary=cross_build_summary,
         )
 
     def evaluate_with_archetype(

@@ -209,6 +209,46 @@ class RareEvaluationPanelWidget(QGroupBox):
 
         layout.addLayout(meta_row)
 
+        # Row 6: Builds That Want This section
+        self.builds_frame = QFrame()
+        self.builds_frame.setVisible(False)  # Hidden until evaluation
+        self.builds_frame.setStyleSheet(f"""
+            QFrame {{
+                background-color: {COLORS['surface']};
+                border: 1px solid {COLORS['accent_blue']};
+                border-radius: 4px;
+                padding: 4px;
+                margin: 4px 0;
+            }}
+        """)
+
+        builds_layout = QVBoxLayout(self.builds_frame)
+        builds_layout.setContentsMargins(8, 6, 8, 6)
+        builds_layout.setSpacing(4)
+
+        builds_header = QLabel("BUILDS THAT WANT THIS:")
+        builds_header.setStyleSheet(f"""
+            QLabel {{
+                font-weight: bold;
+                color: {COLORS['accent_blue']};
+                font-size: 10px;
+                letter-spacing: 1px;
+            }}
+        """)
+        builds_layout.addWidget(builds_header)
+
+        self.builds_content_label = QLabel("")
+        self.builds_content_label.setWordWrap(True)
+        self.builds_content_label.setStyleSheet(f"""
+            QLabel {{
+                color: {COLORS['text']};
+                font-size: 11px;
+            }}
+        """)
+        builds_layout.addWidget(self.builds_content_label)
+
+        layout.addWidget(self.builds_frame)
+
     def _on_update_meta_clicked(self) -> None:
         """Handle update meta weights button click."""
         self.update_meta_requested.emit()
@@ -375,6 +415,9 @@ class RareEvaluationPanelWidget(QGroupBox):
         # Update meta info section
         self._update_meta_info()
 
+        # Update builds that want this section
+        self._update_builds_section(evaluation)
+
     def _update_meta_info(self) -> None:
         """Update the meta info section based on evaluator state."""
         if self._evaluator is None:
@@ -416,6 +459,71 @@ class RareEvaluationPanelWidget(QGroupBox):
 
         self.meta_label.setText(f"Meta: {league} ({builds} builds){top_str}")
 
+    def _update_builds_section(self, evaluation: Any) -> None:
+        """Update the builds that want this section."""
+        # Safely get attributes with defensive checks
+        cross_build_matches = getattr(evaluation, 'cross_build_matches', None)
+        cross_build_summary = getattr(evaluation, 'cross_build_summary', None)
+        cross_build_appeal = getattr(evaluation, 'cross_build_appeal', None)
+
+        # Convert to safe types
+        if not isinstance(cross_build_matches, list):
+            cross_build_matches = []
+        if not isinstance(cross_build_summary, str):
+            cross_build_summary = ''
+        try:
+            cross_build_appeal = int(cross_build_appeal) if cross_build_appeal is not None else 0
+        except (TypeError, ValueError):
+            cross_build_appeal = 0
+
+        if not cross_build_matches:
+            self.builds_frame.setVisible(False)
+            return
+
+        # Build the display text
+        lines = []
+
+        # Show summary if available
+        if cross_build_summary and cross_build_summary != "No build matches found":
+            lines.append(cross_build_summary)
+            lines.append("")
+
+        # Show top matches with scores
+        try:
+            for match in cross_build_matches[:3]:  # Top 3
+                archetype = getattr(match, 'archetype', None)
+                score = getattr(match, 'score', 0)
+                # Safe numeric conversion
+                try:
+                    score = float(score)
+                except (TypeError, ValueError):
+                    score = 0.0
+                if archetype:
+                    name = getattr(archetype, 'name', 'Unknown')
+                    if not isinstance(name, str):
+                        name = 'Unknown'
+                    # Use symbols to indicate match quality
+                    if score >= 80:
+                        symbol = "★"  # Excellent
+                    elif score >= 60:
+                        symbol = "●"  # Good
+                    else:
+                        symbol = "○"  # Moderate
+                    lines.append(f"{symbol} {name} ({score:.0f}% match)")
+        except (TypeError, AttributeError):
+            pass  # Skip if iteration fails
+
+        # Show appeal count if significant
+        if cross_build_appeal >= 3:
+            lines.append("")
+            lines.append(f"→ Good for {cross_build_appeal}+ builds")
+
+        if lines:
+            self.builds_content_label.setText("\n".join(lines))
+            self.builds_frame.setVisible(True)
+        else:
+            self.builds_frame.setVisible(False)
+
     def clear(self) -> None:
         """Clear the evaluation display."""
         self._evaluation = None
@@ -429,3 +537,5 @@ class RareEvaluationPanelWidget(QGroupBox):
         self.affix_score_label.setText("")
         self.affixes_text.setPlainText("Paste a rare item to see evaluation...")
         self.meta_label.setText("Meta: Waiting...")
+        self.builds_content_label.setText("")
+        self.builds_frame.setVisible(False)
