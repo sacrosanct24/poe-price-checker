@@ -113,7 +113,7 @@ class PriceIntegrator:
         self._prices_loaded = False
 
     @property
-    def ninja_client(self):
+    def ninja_client(self) -> Any:
         """Lazy-load poe.ninja client."""
         if self._ninja_client is None:
             try:
@@ -129,7 +129,7 @@ class PriceIntegrator:
         return self._ninja_client
 
     @property
-    def poeprices_client(self):
+    def poeprices_client(self) -> Optional[Any]:
         """Lazy-load poeprices.info client."""
         if self._poeprices_client is None and self.use_poeprices:
             try:
@@ -142,7 +142,7 @@ class PriceIntegrator:
         return self._poeprices_client
 
     @property
-    def character_manager(self):
+    def character_manager(self) -> Optional[Any]:
         """Lazy-load character manager for PoB profiles."""
         if self._character_manager is None and self.enable_upgrade_check:
             try:
@@ -159,7 +159,7 @@ class PriceIntegrator:
         return self._character_manager
 
     @property
-    def upgrade_checker(self):
+    def upgrade_checker(self) -> Optional[Any]:
         """Lazy-load upgrade checker."""
         if self._upgrade_checker is None and self.character_manager:
             try:
@@ -646,7 +646,7 @@ class PriceIntegrator:
     def get_high_value_uniques(
         self,
         min_chaos: float = 50,
-    ) -> List[dict]:
+    ) -> List[Dict[str, Any]]:
         """
         Get list of high-value unique items from loaded prices.
 
@@ -748,19 +748,19 @@ class PriceIntegrator:
 class DummyPriceClient:
     """Fallback when poe.ninja is unavailable."""
 
-    def get_price(self, name: str):
+    def get_price(self, name: str) -> None:
         return None
 
-    def fetch_all_uniques(self):
+    def fetch_all_uniques(self) -> List[Any]:
         return []
 
-    def get_meta_uniques(self, **kwargs):
+    def get_meta_uniques(self, **kwargs: Any) -> List[Any]:
         return []
 
-    def get_high_value_items(self, **kwargs):
+    def get_high_value_items(self, **kwargs: Any) -> List[Any]:
         return []
 
-    def get_divine_value(self):
+    def get_divine_value(self) -> float:
         return 180.0
 
 

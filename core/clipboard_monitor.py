@@ -15,7 +15,7 @@ import logging
 import threading
 import time
 from dataclasses import dataclass
-from typing import Callable, Optional, List
+from typing import Any, Callable, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -139,7 +139,7 @@ class ClipboardMonitor:
         # Need at least 2 indicators for confidence
         return matches >= 2
 
-    def _clipboard_poll_loop(self):
+    def _clipboard_poll_loop(self) -> None:
         """Background thread loop that polls clipboard for changes."""
         logger.info("Clipboard monitor started")
 
@@ -197,7 +197,7 @@ class ClipboardMonitor:
         self._monitor_thread.start()
         return True
 
-    def stop_monitoring(self):
+    def stop_monitoring(self) -> None:
         """Stop background clipboard monitoring."""
         self._running = False
         if self._monitor_thread:
@@ -256,7 +256,7 @@ class ClipboardMonitor:
             logger.error(f"Failed to unregister hotkey '{hotkey}': {e}")
             return False
 
-    def unregister_all_hotkeys(self):
+    def unregister_all_hotkeys(self) -> None:
         """Unregister all registered hotkeys."""
         if not KEYBOARD_AVAILABLE:
             return
@@ -281,7 +281,7 @@ class ClipboardMonitor:
             return text
         return None
 
-    def get_stats(self) -> dict:
+    def get_stats(self) -> Dict[str, Any]:
         """Get monitoring statistics."""
         return {
             "running": self._running,
@@ -296,7 +296,7 @@ class ClipboardMonitor:
         """Check if monitor is running."""
         return self._running
 
-    def cleanup(self):
+    def cleanup(self) -> None:
         """Clean up resources."""
         self.stop_monitoring()
         self.unregister_all_hotkeys()
@@ -351,7 +351,7 @@ class PriceCheckHotkeyManager:
 
         return results
 
-    def _on_price_check_hotkey(self):
+    def _on_price_check_hotkey(self) -> None:
         """Handle price check hotkey press."""
         item_text = self.monitor.check_clipboard_now()
         if item_text:
@@ -379,11 +379,11 @@ class PriceCheckHotkeyManager:
         self.monitor.on_item_detected = on_item_detected
         return self.monitor.start_monitoring()
 
-    def disable_auto_detection(self):
+    def disable_auto_detection(self) -> None:
         """Disable automatic clipboard monitoring."""
         self.monitor.stop_monitoring()
 
-    def cleanup(self):
+    def cleanup(self) -> None:
         """Clean up all resources."""
         self.monitor.cleanup()
 
@@ -412,7 +412,7 @@ def get_hotkey_manager(
     return _manager
 
 
-def cleanup_hotkey_manager():
+def cleanup_hotkey_manager() -> None:
     """Clean up the global hotkey manager."""
     global _manager
     if _manager:
