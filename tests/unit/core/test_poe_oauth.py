@@ -733,3 +733,381 @@ class TestOAuthCallbackHandler:
 
         # Should not have 'code' parameter
         assert 'code' not in params
+
+
+# -------------------------
+# OAuthCallbackHandler Direct Tests
+# -------------------------
+
+class TestOAuthCallbackHandlerDirect:
+    """Direct tests for OAuthCallbackHandler do_GET method."""
+
+    def test_do_get_success_sets_authorization_code(self):
+        """do_GET should set authorization_code class variable on success."""
+        from io import BytesIO
+
+        # Reset class variables
+        OAuthCallbackHandler.authorization_code = None
+        OAuthCallbackHandler.received_state = None
+
+        # Create mock handler
+        handler = object.__new__(OAuthCallbackHandler)
+        handler.path = '/oauth/callback?code=test_code_123&state=test_state'
+        handler.wfile = BytesIO()
+        handler.requestline = 'GET /oauth/callback HTTP/1.1'
+        handler.request_version = 'HTTP/1.1'
+
+        # Mock required methods
+        handler.send_response = Mock()
+        handler.send_header = Mock()
+        handler.end_headers = Mock()
+
+        handler.do_GET()
+
+        assert OAuthCallbackHandler.authorization_code == 'test_code_123'
+        assert OAuthCallbackHandler.received_state == 'test_state'
+        handler.send_response.assert_called_with(200)
+
+    def test_do_get_error_returns_400(self):
+        """do_GET should return 400 on error parameter."""
+        from io import BytesIO
+
+        # Reset class variables
+        OAuthCallbackHandler.authorization_code = None
+
+        handler = object.__new__(OAuthCallbackHandler)
+        handler.path = '/oauth/callback?error=access_denied'
+        handler.wfile = BytesIO()
+        handler.requestline = 'GET /oauth/callback HTTP/1.1'
+        handler.request_version = 'HTTP/1.1'
+
+        handler.send_response = Mock()
+        handler.send_header = Mock()
+        handler.end_headers = Mock()
+
+        handler.do_GET()
+
+        assert OAuthCallbackHandler.authorization_code is None
+        handler.send_response.assert_called_with(400)
+
+    def test_log_message_suppresses_output(self):
+        """log_message should suppress default logging."""
+        handler = object.__new__(OAuthCallbackHandler)
+        # Should not raise any errors
+        handler.log_message("Test %s", "message")
+
+
+# -------------------------
+# Token Loading Edge Cases
+# -------------------------
+
+class TestTokenLoadingEdgeCases:
+    """Test edge cases in token loading."""
+
+    def test_loads_encrypted_token(self, tmp_path):
+        """Should load and decrypt encrypted tokens."""
+        from core.secure_storage import get_secure_storage
+
+        token_file = tmp_path / "token.json"
+
+        # Create encrypted token file
+        storage = get_secure_storage()
+        token_data = {
+            'access_token': storage.encrypt('encrypted_access_token'),
+            'refresh_token': storage.encrypt('encrypted_refresh_token'),
+            'expires_at': '2030-12-31T23:59:59'
+        }
+        with open(token_file, 'w') as f:
+            json.dump(token_data, f)
+
+        client = PoeOAuthClient(
+            client_id="test_client",
+            token_file=token_file
+        )
+
+        assert client.access_token == 'encrypted_access_token'
+        assert client.refresh_token == 'encrypted_refresh_token'
+
+    def test_loads_expired_token_logs_info(self, tmp_path):
+        """Should log info when loading expired token."""
+        token_file = tmp_path / "token.json"
+
+        # Create expired token file
+        token_data = {
+            'access_token': 'expired_token',
+            'refresh_token': 'refresh',
+            'expires_at': '2020-01-01T00:00:00'  # Past date
+        }
+        with open(token_file, 'w') as f:
+            json.dump(token_data, f)
+
+        client = PoeOAuthClient(
+            client_id="test_client",
+            token_file=token_file
+        )
+
+        # Token should be loaded but marked expired
+        assert client.access_token == 'expired_token'
+        assert client.is_token_expired() is True
+
+    def test_handles_missing_expires_at(self, tmp_path):
+        """Should handle token file missing expires_at."""
+        token_file = tmp_path / "token.json"
+
+        token_data = {
+            'access_token': 'token',
+            'refresh_token': 'refresh'
+            # No expires_at
+        }
+        with open(token_file, 'w') as f:
+            json.dump(token_data, f)
+
+        client = PoeOAuthClient(
+            client_id="test_client",
+            token_file=token_file
+        )
+
+        assert client.access_token == 'token'
+        assert client.expires_at is None
+
+    def test_handles_empty_tokens_in_file(self, tmp_path):
+        """Should handle empty token strings in file."""
+        token_file = tmp_path / "token.json"
+
+        token_data = {
+            'access_token': '',
+            'refresh_token': '',
+            'expires_at': '2030-12-31T23:59:59'
+        }
+        with open(token_file, 'w') as f:
+            json.dump(token_data, f)
+
+        client = PoeOAuthClient(
+            client_id="test_client",
+            token_file=token_file
+        )
+
+        # Empty strings should result in None
+        assert client.access_token is None
+        assert client.refresh_token is None
+
+
+# -------------------------
+# Save Token Edge Cases
+# -------------------------
+
+class TestSaveTokenEdgeCases:
+    """Test edge cases in token saving."""
+
+    def test_save_token_does_nothing_without_access_token(self, tmp_path):
+        """_save_token should do nothing if no access_token."""
+        token_file = tmp_path / "token.json"
+
+        client = PoeOAuthClient(
+            client_id="test_client",
+            token_file=token_file
+        )
+        client.access_token = None
+
+        client._save_token()
+
+        # File should not be created
+        assert not token_file.exists()
+
+    def test_save_token_handles_none_refresh_token(self, tmp_path):
+        """_save_token should handle None refresh_token."""
+        token_file = tmp_path / "token.json"
+
+        client = PoeOAuthClient(
+            client_id="test_client",
+            token_file=token_file
+        )
+        client.access_token = "test_token"
+        client.refresh_token = None
+        client.expires_at = None
+
+        client._save_token()
+
+        assert token_file.exists()
+        with open(token_file) as f:
+            data = json.load(f)
+        assert data['refresh_token'] is None
+        assert data['expires_at'] is None
+
+
+# -------------------------
+# Authentication Flow Tests
+# -------------------------
+
+class TestAuthenticationFlow:
+    """Test the full authentication flow."""
+
+    @patch('core.poe_oauth.webbrowser.open')
+    @patch('core.poe_oauth.HTTPServer')
+    @patch('core.poe_oauth.requests.post')
+    def test_authenticate_success(self, mock_post, mock_server, mock_browser, tmp_path):
+        """Should successfully complete authentication flow."""
+        # Setup mock server
+        mock_server_instance = Mock()
+        mock_server.return_value = mock_server_instance
+
+        def handle_request_side_effect():
+            OAuthCallbackHandler.authorization_code = 'auth_code_123'
+            OAuthCallbackHandler.received_state = 'expected_state'
+
+        mock_server_instance.handle_request.side_effect = handle_request_side_effect
+
+        # Setup mock token response
+        mock_response = Mock()
+        mock_response.json.return_value = {
+            'access_token': 'new_token',
+            'refresh_token': 'new_refresh',
+            'expires_in': 3600
+        }
+        mock_response.raise_for_status = Mock()
+        mock_post.return_value = mock_response
+
+        client = PoeOAuthClient(
+            client_id="test_client",
+            token_file=tmp_path / "token.json"
+        )
+
+        # Mock the state to match
+        with patch('core.poe_oauth.secrets.token_urlsafe', return_value='expected_state'):
+            result = client.authenticate()
+
+        assert result is True
+        assert client.access_token == 'new_token'
+        mock_browser.assert_called_once()
+
+    @patch('core.poe_oauth.webbrowser.open')
+    @patch('core.poe_oauth.HTTPServer')
+    def test_authenticate_no_code_returns_false(self, mock_server, mock_browser, tmp_path):
+        """Should return False if no authorization code received."""
+        mock_server_instance = Mock()
+        mock_server.return_value = mock_server_instance
+
+        def handle_request_side_effect():
+            OAuthCallbackHandler.authorization_code = None
+            OAuthCallbackHandler.received_state = None
+
+        mock_server_instance.handle_request.side_effect = handle_request_side_effect
+
+        client = PoeOAuthClient(
+            client_id="test_client",
+            token_file=tmp_path / "token.json"
+        )
+
+        result = client.authenticate()
+
+        assert result is False
+
+    @patch('core.poe_oauth.webbrowser.open')
+    @patch('core.poe_oauth.HTTPServer')
+    def test_authenticate_state_mismatch_returns_false(self, mock_server, mock_browser, tmp_path):
+        """Should return False on state mismatch (CSRF protection)."""
+        mock_server_instance = Mock()
+        mock_server.return_value = mock_server_instance
+
+        def handle_request_side_effect():
+            OAuthCallbackHandler.authorization_code = 'auth_code'
+            OAuthCallbackHandler.received_state = 'wrong_state'
+
+        mock_server_instance.handle_request.side_effect = handle_request_side_effect
+
+        client = PoeOAuthClient(
+            client_id="test_client",
+            token_file=tmp_path / "token.json"
+        )
+
+        with patch('core.poe_oauth.secrets.token_urlsafe', return_value='expected_state'):
+            result = client.authenticate()
+
+        assert result is False
+
+    @patch('core.poe_oauth.webbrowser.open')
+    @patch('core.poe_oauth.HTTPServer')
+    @patch('core.poe_oauth.requests.post')
+    def test_authenticate_token_exchange_failure(self, mock_post, mock_server, mock_browser, tmp_path):
+        """Should return False if token exchange fails."""
+        import requests as req
+
+        mock_server_instance = Mock()
+        mock_server.return_value = mock_server_instance
+
+        def handle_request_side_effect():
+            OAuthCallbackHandler.authorization_code = 'auth_code'
+            OAuthCallbackHandler.received_state = 'expected_state'
+
+        mock_server_instance.handle_request.side_effect = handle_request_side_effect
+
+        # Token exchange fails
+        mock_response = Mock()
+        mock_response.raise_for_status.side_effect = req.RequestException("Token exchange failed")
+        mock_post.return_value = mock_response
+
+        client = PoeOAuthClient(
+            client_id="test_client",
+            token_file=tmp_path / "token.json"
+        )
+
+        with patch('core.poe_oauth.secrets.token_urlsafe', return_value='expected_state'):
+            result = client.authenticate()
+
+        assert result is False
+
+
+# -------------------------
+# Confidential Client Tests
+# -------------------------
+
+class TestConfidentialClient:
+    """Test confidential client (with client_secret) behavior."""
+
+    @patch('core.poe_oauth.requests.post')
+    def test_refresh_includes_secret_for_confidential_client(self, mock_post, tmp_path):
+        """Confidential client should include client_secret in refresh request."""
+        mock_response = Mock()
+        mock_response.json.return_value = {
+            'access_token': 'new_token',
+            'expires_in': 3600
+        }
+        mock_response.raise_for_status = Mock()
+        mock_post.return_value = mock_response
+
+        client = PoeOAuthClient(
+            client_id="test_client",
+            client_secret="test_secret",
+            token_file=tmp_path / "token.json",
+            is_public_client=False
+        )
+        client.refresh_token = "old_refresh"
+
+        client.refresh_access_token()
+
+        call_args = mock_post.call_args
+        assert call_args[1]['data']['client_secret'] == 'test_secret'
+
+    @patch('core.poe_oauth.requests.post')
+    def test_public_client_does_not_include_secret(self, mock_post, tmp_path):
+        """Public client should not include client_secret."""
+        mock_response = Mock()
+        mock_response.json.return_value = {
+            'access_token': 'new_token',
+            'expires_in': 3600
+        }
+        mock_response.raise_for_status = Mock()
+        mock_post.return_value = mock_response
+
+        client = PoeOAuthClient(
+            client_id="test_client",
+            client_secret="test_secret",  # Has secret but is public client
+            token_file=tmp_path / "token.json",
+            is_public_client=True
+        )
+        client.refresh_token = "old_refresh"
+
+        client.refresh_access_token()
+
+        call_args = mock_post.call_args
+        assert 'client_secret' not in call_args[1]['data']
