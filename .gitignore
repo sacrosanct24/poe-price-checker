@@ -89,3 +89,6 @@ assets/temp/
 
 # Archived docs (code reviews, old plans, etc.)
 docs_archived/
+
+# Local documentation (internal reference only)
+.docs_local/

@@ -54,40 +54,45 @@
 - Character profile management with equipped item viewing
 - Upgrade checking against your current gear
 
-### Maxroll Integration
-- Import builds directly from Maxroll.gg guides
-- Compare against meta builds
-
-### Upgrade Finder *(New in v1.4.0)*
-- **Smart gear recommendations** within your budget
-- Queries Trade API for items matching your build priorities
-- Ranks results by defensive impact, DPS improvement, resistance gaps
-
-### Build Library *(New in v1.4.0)*
-- Save and organize multiple PoB builds
+### Build Manager (Ctrl+B)
+- Unified build profile management
+- Save and organize multiple PoB builds with filtering
 - Categorize builds (League Starter, Mapper, Bosser, etc.)
-- Quick-switch between builds with one click
+- Equipment tab with item tree and price check integration
 
-### Stash Visualization *(New in v1.4.0)*
-- **Visual grid view** of stash tab contents
-- Heatmap overlay showing item values
-- Click to inspect, double-click to price check
+### Item Planning Hub (Ctrl+U)
+- Unified upgrade finder and BiS search
+- Smart gear recommendations within your budget
+- Queries Trade API for items matching your build priorities
+- BiS Guide tab showing ideal affixes per slot
 
-### AI Item Analysis *(New in v1.5.0)*
+### Cross-Build Intelligence
+- **"What builds want this item?"** analysis
+- 20+ meta build archetypes (RF Jugg, Lightning Arrow, Boneshatter, etc.)
+- Match percentage showing how well item fits each archetype
+- Helps identify items valuable for trade or alt characters
+
+### Unified Verdict Engine
+- **Single-click comprehensive evaluation**
+- FOR YOU: Is this an upgrade for your build?
+- TO SELL: Market value and demand analysis
+- TO STASH: Good for your alt characters?
+- WHY explanations showing calculation breakdown
+
+### AI Item Analysis
 - **Ask AI about any item** via right-click context menu
 - Supports **Google Gemini** (free tier available), **Claude**, and **OpenAI**
 - **Build-aware analysis** - AI knows your PoB build context when evaluating items
 - Get detailed explanations of item value, mod synergies, and upgrade recommendations
-- API keys encrypted and stored securely on your machine
 
-### Local PoB Build Import *(New)*
-- **Import builds directly** from your local Path of Building installation
-- Auto-detects PoB Builds folder, or browse to custom location
-- Generate build summaries for AI context (stats, resistances, DPS, upgrade priorities)
+### Stash Visualization
+- Visual grid view of stash tab contents
+- Heatmap overlay showing item values
+- Click to inspect, double-click to price check
 
-### Loot Tracking *(New)*
-- **Zone detection** from Client.txt (map entry/exit)
-- **Stash diffing** to detect new items between map runs
+### Loot Tracking
+- Zone detection from Client.txt (map entry/exit)
+- Stash diffing to detect new items between map runs
 - Session management with duration, drop counts, and chaos/hour stats
 - Loot Dashboard with live analytics
 
@@ -99,7 +104,7 @@
 - Right-click menus for quick actions
 - Session tabs for multiple price-checking workflows
 
-### 3-Screen Architecture *(New in v1.6.0)*
+### 3-Screen Architecture
 The application is organized into three focused screens:
 
 | Screen | Shortcut | Purpose |
@@ -149,10 +154,11 @@ python build.py
 3. **View prices** from multiple sources instantly
 
 ### Pro Tips
-- Use the **PoB Panel** to import your build and check upgrades
+- Use the **Build Manager** (Ctrl+B) to import your build and check upgrades
+- Use the **Item Planning Hub** (Ctrl+U) to find upgrades within your budget
 - Enable **Price Rankings** to see top items by category
 - Right-click results for additional options (copy, record sale, ask AI)
-- Configure AI in Settings → AI tab (Gemini offers a free tier)
+- Configure AI in Settings > AI tab (Gemini offers a free tier)
 
 ---
 
@@ -160,10 +166,17 @@ python build.py
 
 | Guide | Description |
 |-------|-------------|
+| [Keyboard Shortcuts](docs/features/KEYBOARD_SHORTCUTS.md) | All available shortcuts |
+| [BiS Search Guide](docs/features/BIS_SEARCH_GUIDE.md) | Find optimal gear upgrades |
+| [Item Comparison](docs/features/ITEM_COMPARISON_GUIDE.md) | Compare items side-by-side |
+| [Troubleshooting](docs/troubleshooting/) | Common issues and fixes |
+
+For developers:
+| Guide | Description |
+|-------|-------------|
 | [Development Guide](docs/development/DEVELOPMENT_GUIDE.md) | Architecture & code style |
 | [Plugin Spec](docs/development/PLUGIN_SPEC.md) | Create custom plugins |
-| [Test Suite Guide](docs/testing/TEST_SUITE_GUIDE.md) | Running & writing tests |
-| [Maxroll Integration](docs/integration/MAXROLL_INTEGRATION.md) | Import builds from Maxroll |
+| [Testing Guide](docs/testing/TESTING_GUIDE.md) | Running & writing tests |
 
 ---
 
@@ -172,10 +185,10 @@ python build.py
 ```
 poe-price-checker/
 ├── core/           # Parsing, pricing, database services
-├── gui_qt/         # PyQt6 interface (default)
-├── data_sources/   # PoE Ninja, poe.watch, and more
+├── gui_qt/         # PyQt6 interface
+├── data_sources/   # PoE Ninja, poe.watch, AI providers
 ├── plugins/        # Custom pricing sources
-├── tests/          # 3300+ unit & integration tests
+├── tests/          # Unit & integration tests
 └── docs/           # Documentation
 ```
 
@@ -183,10 +196,7 @@ poe-price-checker/
 
 ## Contributing
 
-Contributions are welcome! Please:
-- Follow the existing code style
-- Add tests for new features
-- Keep PRs focused and small
+Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ---
 
