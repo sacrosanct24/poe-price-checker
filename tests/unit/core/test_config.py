@@ -439,3 +439,762 @@ class TestConfigIntegration:
         assert cfg2.window_size == (1920, 1080)
         assert cfg2.is_plugin_enabled("price_alert")
         assert cfg2.is_plugin_enabled("export")
+
+
+# -------------------------
+# Theme Settings Tests
+# -------------------------
+
+class TestThemeSettings:
+    def test_theme_default(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        assert cfg.theme == "dark"
+
+    def test_theme_setter_valid(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.theme = "light"
+        assert cfg.theme == "light"
+
+        cfg.theme = "system"
+        assert cfg.theme == "system"
+
+    def test_theme_setter_invalid_falls_back(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.theme = "invalid_theme"
+        assert cfg.theme == "dark"
+
+    def test_theme_persists(self, tmp_path):
+        path = get_unique_config_path(tmp_path)
+        cfg = Config(path)
+        cfg.theme = "light"
+
+        cfg2 = Config(path)
+        assert cfg2.theme == "light"
+
+    def test_accent_color_default(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        assert cfg.accent_color is None
+
+    def test_accent_color_setter(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.accent_color = "divine"
+        assert cfg.accent_color == "divine"
+
+    def test_accent_color_none(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.accent_color = "chaos"
+        cfg.accent_color = None
+        assert cfg.accent_color is None
+
+
+# -------------------------
+# System Tray Settings Tests
+# -------------------------
+
+class TestSystemTraySettings:
+    def test_minimize_to_tray_default(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        assert cfg.minimize_to_tray is True
+
+    def test_minimize_to_tray_setter(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.minimize_to_tray = False
+        assert cfg.minimize_to_tray is False
+
+    def test_start_minimized_default(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        assert cfg.start_minimized is False
+
+    def test_start_minimized_setter(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.start_minimized = True
+        assert cfg.start_minimized is True
+
+    def test_show_tray_notifications_default(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        assert cfg.show_tray_notifications is True
+
+    def test_show_tray_notifications_setter(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.show_tray_notifications = False
+        assert cfg.show_tray_notifications is False
+
+    def test_tray_alert_threshold_default(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        assert cfg.tray_alert_threshold == 50.0
+
+    def test_tray_alert_threshold_setter(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.tray_alert_threshold = 100.0
+        assert cfg.tray_alert_threshold == 100.0
+
+    def test_tray_alert_threshold_clamps_negative(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.tray_alert_threshold = -10.0
+        assert cfg.tray_alert_threshold == 0.0
+
+
+# -------------------------
+# Verdict Settings Tests
+# -------------------------
+
+class TestVerdictSettings:
+    def test_verdict_vendor_threshold_default(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        assert cfg.verdict_vendor_threshold == 2.0
+
+    def test_verdict_vendor_threshold_setter(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.verdict_vendor_threshold = 5.0
+        assert cfg.verdict_vendor_threshold == 5.0
+
+    def test_verdict_vendor_threshold_guardrails(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.verdict_vendor_threshold = 0.01  # Below min
+        assert cfg.verdict_vendor_threshold == 0.1
+
+        cfg.verdict_vendor_threshold = 100.0  # Above max
+        assert cfg.verdict_vendor_threshold == 50.0
+
+    def test_verdict_keep_threshold_default(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        assert cfg.verdict_keep_threshold == 15.0
+
+    def test_verdict_keep_threshold_setter(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.verdict_keep_threshold = 25.0
+        assert cfg.verdict_keep_threshold == 25.0
+
+    def test_verdict_keep_threshold_guardrails(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.verdict_keep_threshold = 0.5  # Below min
+        assert cfg.verdict_keep_threshold == 1.0
+
+        cfg.verdict_keep_threshold = 1000.0  # Above max
+        assert cfg.verdict_keep_threshold == 500.0
+
+    def test_verdict_preset_default(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        assert cfg.verdict_preset == "default"
+
+    def test_verdict_preset_setter_valid(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.verdict_preset = "league_start"
+        assert cfg.verdict_preset == "league_start"
+
+        cfg.verdict_preset = "ssf"
+        assert cfg.verdict_preset == "ssf"
+
+    def test_verdict_preset_setter_invalid_ignored(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.verdict_preset = "league_start"
+        cfg.verdict_preset = "invalid_preset"
+        # Should remain unchanged
+        assert cfg.verdict_preset == "league_start"
+
+
+# -------------------------
+# Accessibility Settings Tests
+# -------------------------
+
+class TestAccessibilitySettings:
+    def test_font_scale_default(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        assert cfg.font_scale == 1.0
+
+    def test_font_scale_setter(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.font_scale = 1.2
+        assert cfg.font_scale == 1.2
+
+    def test_font_scale_guardrails(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.font_scale = 0.5  # Below min
+        assert cfg.font_scale == 0.8
+
+        cfg.font_scale = 2.0  # Above max
+        assert cfg.font_scale == 1.5
+
+    def test_tooltip_delay_ms_default(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        assert cfg.tooltip_delay_ms == 500
+
+    def test_tooltip_delay_ms_setter(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.tooltip_delay_ms = 1000
+        assert cfg.tooltip_delay_ms == 1000
+
+    def test_tooltip_delay_ms_guardrails(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.tooltip_delay_ms = 50  # Below min
+        assert cfg.tooltip_delay_ms == 100
+
+        cfg.tooltip_delay_ms = 5000  # Above max
+        assert cfg.tooltip_delay_ms == 2000
+
+    def test_reduce_animations_default(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        assert cfg.reduce_animations is False
+
+    def test_reduce_animations_setter(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.reduce_animations = True
+        assert cfg.reduce_animations is True
+
+
+# -------------------------
+# Performance Settings Tests
+# -------------------------
+
+class TestPerformanceSettings:
+    def test_rankings_cache_hours_default(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        assert cfg.rankings_cache_hours == 24
+
+    def test_rankings_cache_hours_setter(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.rankings_cache_hours = 48
+        assert cfg.rankings_cache_hours == 48
+
+    def test_rankings_cache_hours_guardrails(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.rankings_cache_hours = 0  # Below min
+        assert cfg.rankings_cache_hours == 1
+
+        cfg.rankings_cache_hours = 500  # Above max
+        assert cfg.rankings_cache_hours == 168
+
+    def test_price_cache_ttl_seconds_default(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        assert cfg.price_cache_ttl_seconds == 3600
+
+    def test_price_cache_ttl_seconds_setter(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.price_cache_ttl_seconds = 1800
+        assert cfg.price_cache_ttl_seconds == 1800
+
+    def test_price_cache_ttl_seconds_guardrails(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.price_cache_ttl_seconds = 100  # Below min
+        assert cfg.price_cache_ttl_seconds == 300
+
+        cfg.price_cache_ttl_seconds = 10000  # Above max
+        assert cfg.price_cache_ttl_seconds == 7200
+
+    def test_toast_duration_ms_default(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        assert cfg.toast_duration_ms == 3000
+
+    def test_toast_duration_ms_setter(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.toast_duration_ms = 5000
+        assert cfg.toast_duration_ms == 5000
+
+    def test_toast_duration_ms_guardrails(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.toast_duration_ms = 500  # Below min
+        assert cfg.toast_duration_ms == 1000
+
+        cfg.toast_duration_ms = 20000  # Above max
+        assert cfg.toast_duration_ms == 10000
+
+    def test_history_max_entries_default(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        assert cfg.history_max_entries == 100
+
+    def test_history_max_entries_setter(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.history_max_entries = 200
+        assert cfg.history_max_entries == 200
+
+    def test_history_max_entries_guardrails(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.history_max_entries = 5  # Below min
+        assert cfg.history_max_entries == 10
+
+        cfg.history_max_entries = 1000  # Above max
+        assert cfg.history_max_entries == 500
+
+
+# -------------------------
+# API Rate Limit Settings Tests
+# -------------------------
+
+class TestAPIRateLimitSettings:
+    def test_api_rate_limit_default(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        assert cfg.api_rate_limit == 0.33
+
+    def test_api_rate_limit_setter(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.api_rate_limit = 0.5
+        assert cfg.api_rate_limit == 0.5
+
+    def test_api_rate_limit_guardrails(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.api_rate_limit = 0.1  # Below min
+        assert cfg.api_rate_limit == 0.2
+
+        cfg.api_rate_limit = 2.0  # Above max
+        assert cfg.api_rate_limit == 1.0
+
+    def test_api_retry_logging_verbosity_default(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        assert cfg.api_retry_logging_verbosity == "minimal"
+
+    def test_api_retry_logging_verbosity_detailed(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.data["api"]["retry_logging_verbosity"] = "detailed"
+        assert cfg.api_retry_logging_verbosity == "detailed"
+
+
+# -------------------------
+# API Pricing TTLs and Timeouts Tests
+# -------------------------
+
+class TestAPIPricingSettings:
+    def test_get_pricing_ttls_default(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        ttls = cfg.get_pricing_ttls()
+        assert isinstance(ttls, dict)
+
+    def test_set_pricing_ttl(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.set_pricing_ttl("poe_ninja:currencyoverview", 1800)
+        ttls = cfg.get_pricing_ttls()
+        assert ttls["poe_ninja:currencyoverview"] == 1800
+
+    def test_set_pricing_ttl_guardrails(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.set_pricing_ttl("test_endpoint", 30)  # Below min
+        assert cfg.get_pricing_ttls()["test_endpoint"] == 60
+
+        cfg.set_pricing_ttl("test_endpoint", 100000)  # Above max
+        assert cfg.get_pricing_ttls()["test_endpoint"] == 86400
+
+    def test_price_cache_ttl_for_with_endpoint(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.set_pricing_ttl("custom_endpoint", 1200)
+        assert cfg.price_cache_ttl_for("custom_endpoint") == 1200
+
+    def test_price_cache_ttl_for_unknown_endpoint(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        # Should fall back to performance.price_cache_ttl_seconds
+        ttl = cfg.price_cache_ttl_for("unknown_endpoint")
+        assert ttl == 3600
+
+    def test_price_cache_ttl_for_with_default(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        ttl = cfg.price_cache_ttl_for(None, default=600)
+        assert ttl == 3600  # Still uses performance setting
+
+    def test_get_api_timeouts_default(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        connect, read = cfg.get_api_timeouts()
+        assert connect == 10
+        assert read == 10
+
+    def test_set_api_timeouts(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.set_api_timeouts(15, 30)
+        connect, read = cfg.get_api_timeouts()
+        assert connect == 15
+        assert read == 30
+
+    def test_set_api_timeouts_guardrails(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.set_api_timeouts(0, 500)  # Out of bounds
+        connect, read = cfg.get_api_timeouts()
+        assert connect == 1  # Min clamped
+        assert read == 300  # Max clamped
+
+
+# -------------------------
+# Display Policy Tests
+# -------------------------
+
+class TestDisplayPolicy:
+    def test_display_policy_returns_dict(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        dp = cfg.display_policy
+        assert isinstance(dp, dict)
+
+    def test_set_display_policy(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.set_display_policy({"show_confidence": False})
+        dp = cfg.display_policy
+        assert dp.get("show_confidence") is False
+
+    def test_set_display_policy_invalid_type_ignored(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.set_display_policy("not a dict")  # type: ignore
+        # Should not crash, policy should still work
+        assert isinstance(cfg.display_policy, dict)
+
+
+# -------------------------
+# Cross-Source Arbitration Tests
+# -------------------------
+
+class TestCrossSourceArbitration:
+    def test_use_cross_source_arbitration_default(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        assert cfg.use_cross_source_arbitration is False
+
+    def test_use_cross_source_arbitration_setter(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.use_cross_source_arbitration = True
+        assert cfg.use_cross_source_arbitration is True
+
+    def test_enabled_sources_default(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        sources = cfg.enabled_sources
+        assert isinstance(sources, dict)
+
+    def test_set_enabled_sources(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.set_enabled_sources({"poe_ninja": True, "poe_watch": False})
+        sources = cfg.enabled_sources
+        assert sources["poe_ninja"] is True
+        assert sources["poe_watch"] is False
+
+    def test_set_enabled_sources_invalid_type_ignored(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.set_enabled_sources("not a dict")  # type: ignore
+        # Should not crash
+        assert isinstance(cfg.enabled_sources, dict)
+
+
+# -------------------------
+# Stash Settings Tests
+# -------------------------
+
+class TestStashSettings:
+    def test_account_name_default(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        assert cfg.account_name == ""
+
+    def test_account_name_setter(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.account_name = "TestAccount"
+        assert cfg.account_name == "TestAccount"
+
+    def test_stash_last_fetch_default(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        assert cfg.stash_last_fetch is None
+
+    def test_stash_last_fetch_setter(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.stash_last_fetch = "2024-01-01T12:00:00"
+        assert cfg.stash_last_fetch == "2024-01-01T12:00:00"
+
+    def test_has_stash_credentials_false(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        assert cfg.has_stash_credentials() is False
+
+    def test_has_stash_credentials_partial(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.account_name = "TestAccount"
+        # No poesessid
+        assert cfg.has_stash_credentials() is False
+
+
+# -------------------------
+# AI Settings Tests
+# -------------------------
+
+class TestAISettings:
+    def test_ai_provider_default(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        assert cfg.ai_provider == ""
+
+    def test_ai_provider_setter_valid(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.ai_provider = "gemini"
+        assert cfg.ai_provider == "gemini"
+
+        cfg.ai_provider = "claude"
+        assert cfg.ai_provider == "claude"
+
+        cfg.ai_provider = "ollama"
+        assert cfg.ai_provider == "ollama"
+
+    def test_ai_provider_setter_invalid(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.ai_provider = "invalid_provider"
+        assert cfg.ai_provider == ""
+
+    def test_ai_max_tokens_default(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        assert cfg.ai_max_tokens == 500
+
+    def test_ai_max_tokens_setter(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.ai_max_tokens = 1000
+        assert cfg.ai_max_tokens == 1000
+
+    def test_ai_max_tokens_guardrails(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.ai_max_tokens = 50  # Below min
+        assert cfg.ai_max_tokens == 100
+
+        cfg.ai_max_tokens = 5000  # Above max
+        assert cfg.ai_max_tokens == 2000
+
+    def test_ai_timeout_default(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        # Default is 30 for non-ollama
+        assert cfg.ai_timeout == 30
+
+    def test_ai_timeout_ollama_default(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.ai_provider = "ollama"
+        # Clear any stored timeout to test dynamic default
+        if "timeout_seconds" in cfg.data.get("ai", {}):
+            del cfg.data["ai"]["timeout_seconds"]
+        # Ollama gets higher default when no stored value
+        assert cfg.ai_timeout == 180
+
+    def test_ai_timeout_setter(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.ai_timeout = 60
+        assert cfg.ai_timeout == 60
+
+    def test_ai_timeout_guardrails(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.ai_timeout = 5  # Below min
+        assert cfg.ai_timeout == 10
+
+        cfg.ai_timeout = 500  # Above max
+        assert cfg.ai_timeout == 300
+
+    def test_has_ai_configured_false(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        assert cfg.has_ai_configured() is False
+
+    def test_has_ai_configured_ollama(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.ai_provider = "ollama"
+        # Ollama doesn't need API key
+        assert cfg.has_ai_configured() is True
+
+    def test_ollama_host_default(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        assert cfg.ollama_host == "http://localhost:11434"
+
+    def test_ollama_host_setter(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.ollama_host = "http://192.168.1.100:11434"
+        assert cfg.ollama_host == "http://192.168.1.100:11434"
+
+    def test_ollama_host_empty_resets(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.ollama_host = ""
+        assert cfg.ollama_host == "http://localhost:11434"
+
+    def test_ollama_model_default(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        assert cfg.ollama_model == "deepseek-r1:14b"
+
+    def test_ollama_model_setter(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.ollama_model = "llama2:7b"
+        assert cfg.ollama_model == "llama2:7b"
+
+    def test_ai_custom_prompt_default(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        assert cfg.ai_custom_prompt == ""
+
+    def test_ai_custom_prompt_setter(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.ai_custom_prompt = "Custom prompt {item_text}"
+        assert cfg.ai_custom_prompt == "Custom prompt {item_text}"
+
+    def test_ai_build_name_default(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        assert cfg.ai_build_name == ""
+
+    def test_ai_build_name_setter(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.ai_build_name = "Lightning Arrow Deadeye"
+        assert cfg.ai_build_name == "Lightning Arrow Deadeye"
+
+
+# -------------------------
+# Loot Tracking Tests
+# -------------------------
+
+class TestLootTrackingSettings:
+    def test_loot_tracking_enabled_default(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        assert cfg.loot_tracking_enabled is False
+
+    def test_loot_tracking_enabled_setter(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.loot_tracking_enabled = True
+        assert cfg.loot_tracking_enabled is True
+
+    def test_loot_client_txt_path_default(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        assert cfg.loot_client_txt_path == ""
+
+    def test_loot_client_txt_path_setter(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.loot_client_txt_path = "C:/Games/PoE/logs/Client.txt"
+        assert cfg.loot_client_txt_path == "C:/Games/PoE/logs/Client.txt"
+
+    def test_loot_tracked_tabs_default(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        assert cfg.loot_tracked_tabs == []
+
+    def test_loot_tracked_tabs_setter(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.loot_tracked_tabs = ["Dump", "Currency"]
+        assert cfg.loot_tracked_tabs == ["Dump", "Currency"]
+
+    def test_loot_min_value_default(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        assert cfg.loot_min_value == 1.0
+
+    def test_loot_min_value_setter(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.loot_min_value = 5.0
+        assert cfg.loot_min_value == 5.0
+
+    def test_loot_min_value_clamps_negative(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.loot_min_value = -10.0
+        assert cfg.loot_min_value == 0.0
+
+    def test_loot_notify_high_value_default(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        assert cfg.loot_notify_high_value is True
+
+    def test_loot_notify_high_value_setter(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.loot_notify_high_value = False
+        assert cfg.loot_notify_high_value is False
+
+    def test_loot_high_value_threshold_default(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        assert cfg.loot_high_value_threshold == 50.0
+
+    def test_loot_high_value_threshold_setter(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.loot_high_value_threshold = 100.0
+        assert cfg.loot_high_value_threshold == 100.0
+
+    def test_loot_poll_interval_default(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        assert cfg.loot_poll_interval == 1.0
+
+    def test_loot_poll_interval_setter(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.loot_poll_interval = 2.0
+        assert cfg.loot_poll_interval == 2.0
+
+    def test_loot_poll_interval_guardrails(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.loot_poll_interval = 0.1  # Below min
+        assert cfg.loot_poll_interval == 0.5
+
+        cfg.loot_poll_interval = 10.0  # Above max
+        assert cfg.loot_poll_interval == 5.0
+
+
+# -------------------------
+# Background Refresh Tests
+# -------------------------
+
+class TestBackgroundRefreshSettings:
+    def test_background_refresh_enabled_default(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        assert cfg.background_refresh_enabled is True
+
+    def test_background_refresh_enabled_setter(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.background_refresh_enabled = False
+        assert cfg.background_refresh_enabled is False
+
+    def test_price_refresh_interval_minutes_default(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        assert cfg.price_refresh_interval_minutes == 30
+
+    def test_price_refresh_interval_minutes_setter(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.price_refresh_interval_minutes = 60
+        assert cfg.price_refresh_interval_minutes == 60
+
+    def test_price_refresh_interval_minutes_guardrails(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.price_refresh_interval_minutes = 2  # Below min
+        assert cfg.price_refresh_interval_minutes == 5
+
+        cfg.price_refresh_interval_minutes = 500  # Above max
+        assert cfg.price_refresh_interval_minutes == 240
+
+    def test_price_change_threshold_default(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        assert cfg.price_change_threshold == 0.10
+
+    def test_price_change_threshold_setter(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.price_change_threshold = 0.25
+        assert cfg.price_change_threshold == 0.25
+
+    def test_price_change_threshold_guardrails(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.price_change_threshold = 0.01  # Below min
+        assert cfg.price_change_threshold == 0.05
+
+        cfg.price_change_threshold = 1.0  # Above max
+        assert cfg.price_change_threshold == 0.50
+
+
+# -------------------------
+# Item Cache Tests
+# -------------------------
+
+class TestItemCacheSettings:
+    def test_item_cache_enabled_default(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        assert cfg.item_cache_enabled is True
+
+    def test_item_cache_enabled_setter(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.item_cache_enabled = False
+        assert cfg.item_cache_enabled is False
+
+    def test_item_cache_ttl_seconds_default(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        assert cfg.item_cache_ttl_seconds == 300
+
+    def test_item_cache_ttl_seconds_setter(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.item_cache_ttl_seconds = 120
+        assert cfg.item_cache_ttl_seconds == 120
+
+    def test_item_cache_ttl_seconds_guardrails(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.item_cache_ttl_seconds = 30  # Below min
+        assert cfg.item_cache_ttl_seconds == 60
+
+        cfg.item_cache_ttl_seconds = 1000  # Above max
+        assert cfg.item_cache_ttl_seconds == 600
+
+    def test_item_cache_max_size_default(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        assert cfg.item_cache_max_size == 500
+
+    def test_item_cache_max_size_setter(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.item_cache_max_size = 1000
+        assert cfg.item_cache_max_size == 1000
+
+    def test_item_cache_max_size_guardrails(self, tmp_path):
+        cfg = Config(get_unique_config_path(tmp_path))
+        cfg.item_cache_max_size = 50  # Below min
+        assert cfg.item_cache_max_size == 100
+
+        cfg.item_cache_max_size = 5000  # Above max
+        assert cfg.item_cache_max_size == 2000

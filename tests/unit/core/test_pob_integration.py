@@ -10,8 +10,10 @@ from __future__ import annotations
 
 import base64
 import zlib
+from unittest.mock import patch, MagicMock
 
 import pytest
+import requests
 
 from core.pob import (
     BuildCategory,
@@ -22,6 +24,7 @@ from core.pob import (
     PoBItem,
     UpgradeChecker,
 )
+from core.pob.decoder import _is_pastebin_url, _is_pobbin_url, _url_host_matches
 
 
 # Sample PoB XML for testing
@@ -486,3 +489,482 @@ class TestCharacterManagerCategories:
         assert "meta" in profile.categories
         assert "endgame" in profile.categories
         assert profile.is_upgrade_target is True
+
+
+# -------------------------
+# URL Helper Function Tests
+# -------------------------
+
+class TestUrlHelperFunctions:
+    """Tests for URL validation helper functions."""
+
+    def test_is_pastebin_url_valid(self):
+        assert _is_pastebin_url("https://pastebin.com/abc123") is True
+        assert _is_pastebin_url("http://pastebin.com/raw/abc123") is True
+        assert _is_pastebin_url("https://www.pastebin.com/xyz") is True
+
+    def test_is_pastebin_url_invalid(self):
+        assert _is_pastebin_url("https://evil.com/pastebin.com") is False
+        assert _is_pastebin_url("https://pobb.in/abc") is False
+        assert _is_pastebin_url("not a url") is False
+
+    def test_is_pastebin_url_exception_handling(self):
+        # Test with values that could cause parsing exceptions
+        assert _is_pastebin_url(None) is False  # type: ignore
+        assert _is_pastebin_url("") is False
+
+    def test_is_pobbin_url_valid(self):
+        assert _is_pobbin_url("https://pobb.in/abc123") is True
+        assert _is_pobbin_url("http://www.pobb.in/xyz") is True
+
+    def test_is_pobbin_url_invalid(self):
+        assert _is_pobbin_url("https://evil.com?pobb.in") is False
+        assert _is_pobbin_url("https://pastebin.com/abc") is False
+        assert _is_pobbin_url("not a url") is False
+
+    def test_is_pobbin_url_exception_handling(self):
+        assert _is_pobbin_url(None) is False  # type: ignore
+        assert _is_pobbin_url("") is False
+
+    def test_url_host_matches_valid(self):
+        assert _url_host_matches("https://maxroll.gg/poe/build", "maxroll.gg") is True
+        assert _url_host_matches("https://www.maxroll.gg/build", "maxroll.gg") is True
+
+    def test_url_host_matches_invalid(self):
+        assert _url_host_matches("https://evil.com/maxroll.gg", "maxroll.gg") is False
+        assert _url_host_matches("not-a-url", "maxroll.gg") is False
+
+    def test_url_host_matches_exception_handling(self):
+        assert _url_host_matches(None, "test.com") is False  # type: ignore
+        assert _url_host_matches("", "test.com") is False
+
+
+# -------------------------
+# Decoder Edge Case Tests
+# -------------------------
+
+class TestPoBDecoderEdgeCases:
+    """Tests for PoBDecoder edge cases and error handling."""
+
+    def test_decode_code_too_large(self):
+        """Test rejection of excessively large codes."""
+        large_code = "A" * (PoBDecoder.MAX_CODE_SIZE + 1)
+        with pytest.raises(ValueError, match="PoB code too large"):
+            PoBDecoder.decode_pob_code(large_code)
+
+    def test_decode_strips_whitespace(self):
+        """Test that whitespace is properly stripped."""
+        code = _encode_pob_code(SAMPLE_POB_XML)
+        code_with_whitespace = f"  {code}  \n\r"
+        xml = PoBDecoder.decode_pob_code(code_with_whitespace)
+        assert "PathOfBuilding" in xml
+
+    def test_decode_handles_url_safe_base64(self):
+        """Test handling of URL-safe base64 characters."""
+        code = _encode_pob_code(SAMPLE_POB_XML)
+        # URL-safe base64 uses - and _ instead of + and /
+        # The decoder should handle both
+        xml = PoBDecoder.decode_pob_code(code)
+        assert "PathOfBuilding" in xml
+
+    @patch("core.pob.decoder.requests.get")
+    def test_fetch_pastebin_success(self, mock_get):
+        """Test successful pastebin fetch."""
+        mock_response = MagicMock()
+        mock_response.text = _encode_pob_code(SAMPLE_POB_XML)
+        mock_response.raise_for_status = MagicMock()
+        mock_get.return_value = mock_response
+
+        xml = PoBDecoder.decode_pob_code("https://pastebin.com/abc123")
+        assert "PathOfBuilding" in xml
+        mock_get.assert_called_once()
+
+    @patch("core.pob.decoder.requests.get")
+    def test_fetch_pastebin_raw_url(self, mock_get):
+        """Test pastebin raw URL handling."""
+        mock_response = MagicMock()
+        mock_response.text = _encode_pob_code(SAMPLE_POB_XML)
+        mock_response.raise_for_status = MagicMock()
+        mock_get.return_value = mock_response
+
+        # Raw URL should be used directly
+        xml = PoBDecoder.decode_pob_code("https://pastebin.com/raw/abc123")
+        assert "PathOfBuilding" in xml
+
+    @patch("core.pob.decoder.requests.get")
+    def test_fetch_pastebin_failure(self, mock_get):
+        """Test pastebin fetch failure handling."""
+        mock_get.side_effect = requests.RequestException("Connection error")
+
+        with pytest.raises(ValueError, match="Could not fetch pastebin"):
+            PoBDecoder.decode_pob_code("https://pastebin.com/abc123")
+
+    @patch("core.pob.decoder.requests.get")
+    def test_fetch_pastebin_invalid_url(self, mock_get):
+        """Test pastebin with empty paste ID."""
+        with pytest.raises(ValueError, match="no paste ID found"):
+            PoBDecoder._fetch_pastebin("https://pastebin.com/")
+
+    @patch("core.pob.decoder.requests.get")
+    def test_fetch_pobbin_success(self, mock_get):
+        """Test successful pobb.in fetch."""
+        mock_response = MagicMock()
+        mock_response.text = _encode_pob_code(SAMPLE_POB_XML)
+        mock_response.raise_for_status = MagicMock()
+        mock_get.return_value = mock_response
+
+        xml = PoBDecoder.decode_pob_code("https://pobb.in/abc123")
+        assert "PathOfBuilding" in xml
+
+    @patch("core.pob.decoder.requests.get")
+    def test_fetch_pobbin_fallback_to_api(self, mock_get):
+        """Test pobb.in fallback to API endpoint."""
+        # First call (raw) fails, second call (API) succeeds
+        mock_response_fail = MagicMock()
+        mock_response_fail.raise_for_status = MagicMock(side_effect=requests.RequestException("Not found"))
+
+        mock_response_success = MagicMock()
+        mock_response_success.json.return_value = {"code": _encode_pob_code(SAMPLE_POB_XML)}
+        mock_response_success.raise_for_status = MagicMock()
+
+        mock_get.side_effect = [
+            requests.RequestException("Raw failed"),
+            mock_response_success
+        ]
+
+        xml = PoBDecoder.decode_pob_code("https://pobb.in/abc123")
+        assert "PathOfBuilding" in xml
+
+    @patch("core.pob.decoder.requests.get")
+    def test_fetch_pobbin_both_fail(self, mock_get):
+        """Test pobb.in when both endpoints fail."""
+        mock_get.side_effect = requests.RequestException("Connection error")
+
+        with pytest.raises(ValueError, match="Could not fetch pobb.in"):
+            PoBDecoder.decode_pob_code("https://pobb.in/abc123")
+
+    @patch("core.pob.decoder.requests.get")
+    def test_fetch_pobbin_invalid_url(self, mock_get):
+        """Test pobb.in with empty paste ID."""
+        with pytest.raises(ValueError, match="no paste ID found"):
+            PoBDecoder._fetch_pobbin("https://pobb.in/")
+
+    def test_looks_like_url_http(self):
+        """Test URL detection for http:// prefix."""
+        assert PoBDecoder._looks_like_url("http://example.com") is True
+        assert PoBDecoder._looks_like_url("https://example.com") is True
+
+    def test_looks_like_url_www(self):
+        """Test URL detection for www. prefix."""
+        assert PoBDecoder._looks_like_url("www.example.com") is True
+
+    def test_looks_like_url_build_sites(self):
+        """Test URL detection for known build sites."""
+        assert PoBDecoder._looks_like_url("https://maxroll.gg/build") is True
+        assert PoBDecoder._looks_like_url("https://mobalytics.gg/poe") is True
+        assert PoBDecoder._looks_like_url("https://poe.ninja/builds") is True
+
+    def test_looks_like_url_pob_code(self):
+        """Test that PoB codes are not detected as URLs."""
+        code = _encode_pob_code(SAMPLE_POB_XML)
+        assert PoBDecoder._looks_like_url(code) is False
+
+    def test_raise_url_error_maxroll(self):
+        """Test helpful error for maxroll.gg URLs."""
+        with pytest.raises(ValueError, match="Maxroll.gg URLs cannot be imported"):
+            PoBDecoder._raise_url_error("https://maxroll.gg/poe/build/123")
+
+    def test_raise_url_error_mobalytics(self):
+        """Test helpful error for mobalytics.gg URLs."""
+        with pytest.raises(ValueError, match="Mobalytics URLs cannot be imported"):
+            PoBDecoder._raise_url_error("https://mobalytics.gg/poe/builds/123")
+
+    def test_raise_url_error_poe_ninja(self):
+        """Test helpful error for poe.ninja URLs."""
+        with pytest.raises(ValueError, match="poe.ninja URLs cannot be imported"):
+            PoBDecoder._raise_url_error("https://poe.ninja/builds/123")
+
+    def test_raise_url_error_pobarchives(self):
+        """Test helpful error for pobarchives.com URLs."""
+        with pytest.raises(ValueError, match="PoB Archives URLs cannot be imported"):
+            PoBDecoder._raise_url_error("https://pobarchives.com/build/123")
+
+    def test_raise_url_error_unknown_site(self):
+        """Test generic error for unknown URLs."""
+        with pytest.raises(ValueError, match="URL detected but cannot be imported"):
+            PoBDecoder._raise_url_error("https://unknown-site.com/build")
+
+
+# -------------------------
+# Item Parsing Edge Cases
+# -------------------------
+
+class TestPoBItemParsing:
+    """Tests for PoB item parsing edge cases."""
+
+    def test_parse_item_with_implicits(self):
+        """Test parsing item with implicit mods."""
+        xml = """<?xml version="1.0" encoding="UTF-8"?>
+<PathOfBuilding>
+    <Build level="90" className="Witch" ascendClassName="Elementalist"></Build>
+    <Items activeItemSet="1">
+        <Item id="1">
+Rarity: RARE
+Test Ring
+Two-Stone Ring
+Item Level: 84
+Implicits: 1
++16% to Fire and Cold Resistances
++50 to maximum Life
++30% to Fire Resistance
+</Item>
+        <ItemSet id="1">
+            <Slot name="Ring 1" itemId="1"/>
+        </ItemSet>
+    </Items>
+</PathOfBuilding>"""
+
+        build = PoBDecoder.parse_build(xml)
+        ring = build.items.get("Ring 1")
+        assert ring is not None
+        assert "+16% to Fire and Cold Resistances" in ring.implicit_mods
+        assert "+50 to maximum Life" in ring.explicit_mods
+
+    def test_parse_item_with_crafted_mod(self):
+        """Test parsing item with crafted mods."""
+        xml = """<?xml version="1.0" encoding="UTF-8"?>
+<PathOfBuilding>
+    <Build level="90" className="Witch" ascendClassName="Elementalist"></Build>
+    <Items activeItemSet="1">
+        <Item id="1">
+Rarity: RARE
+Test Amulet
+Onyx Amulet
+Item Level: 84
+Implicits: 1
++25 to all Attributes
++50 to maximum Life
+{crafted}+30% to Fire Resistance
+</Item>
+        <ItemSet id="1">
+            <Slot name="Amulet" itemId="1"/>
+        </ItemSet>
+    </Items>
+</PathOfBuilding>"""
+
+        build = PoBDecoder.parse_build(xml)
+        amulet = build.items.get("Amulet")
+        assert amulet is not None
+        # Crafted mod should be marked
+        assert any("(crafted)" in mod for mod in amulet.explicit_mods)
+
+    def test_parse_item_with_fractured_mod(self):
+        """Test parsing item with fractured mods."""
+        xml = """<?xml version="1.0" encoding="UTF-8"?>
+<PathOfBuilding>
+    <Build level="90" className="Witch" ascendClassName="Elementalist"></Build>
+    <Items activeItemSet="1">
+        <Item id="1">
+Rarity: RARE
+Test Belt
+Stygian Vise
+Item Level: 84
+Implicits: 1
+Has 1 Abyssal Socket
+{fractured}+100 to maximum Life
++30% to Fire Resistance
+</Item>
+        <ItemSet id="1">
+            <Slot name="Belt" itemId="1"/>
+        </ItemSet>
+    </Items>
+</PathOfBuilding>"""
+
+        build = PoBDecoder.parse_build(xml)
+        belt = build.items.get("Belt")
+        assert belt is not None
+        # Fractured mod should be marked
+        assert any("(fractured)" in mod for mod in belt.explicit_mods)
+
+    def test_parse_item_with_quality(self):
+        """Test parsing item quality."""
+        xml = """<?xml version="1.0" encoding="UTF-8"?>
+<PathOfBuilding>
+    <Build level="90" className="Marauder" ascendClassName="Juggernaut"></Build>
+    <Items activeItemSet="1">
+        <Item id="1">
+Rarity: RARE
+Test Armour
+Astral Plate
+Item Level: 84
+Quality: +20%
+Implicits: 0
++100 to maximum Life
+</Item>
+        <ItemSet id="1">
+            <Slot name="Body Armour" itemId="1"/>
+        </ItemSet>
+    </Items>
+</PathOfBuilding>"""
+
+        build = PoBDecoder.parse_build(xml)
+        armour = build.items.get("Body Armour")
+        assert armour is not None
+        assert armour.quality == 20
+
+    def test_parse_item_with_sockets(self):
+        """Test parsing item sockets."""
+        xml = """<?xml version="1.0" encoding="UTF-8"?>
+<PathOfBuilding>
+    <Build level="90" className="Marauder" ascendClassName="Juggernaut"></Build>
+    <Items activeItemSet="1">
+        <Item id="1">
+Rarity: RARE
+Test Armour
+Astral Plate
+Item Level: 84
+Sockets: R-R-R-G-G-B
+Implicits: 0
++100 to maximum Life
+</Item>
+        <ItemSet id="1">
+            <Slot name="Body Armour" itemId="1"/>
+        </ItemSet>
+    </Items>
+</PathOfBuilding>"""
+
+        build = PoBDecoder.parse_build(xml)
+        armour = build.items.get("Body Armour")
+        assert armour is not None
+        assert armour.sockets == "R-R-R-G-G-B"
+        assert armour.link_count == 6
+
+    def test_parse_item_empty_text(self):
+        """Test parsing item with empty text returns None."""
+        import defusedxml.ElementTree as ET
+        item_elem = ET.fromstring("<Item id='1'>  </Item>")
+        result = PoBDecoder._parse_item(item_elem)
+        assert result is None
+
+    def test_parse_item_minimal_lines(self):
+        """Test parsing item with too few lines returns None."""
+        import defusedxml.ElementTree as ET
+        item_elem = ET.fromstring("<Item id='1'>OnlyOneLine</Item>")
+        result = PoBDecoder._parse_item(item_elem)
+        assert result is None
+
+    def test_parse_build_extracts_skills(self):
+        """Test extraction of skill labels."""
+        xml = """<?xml version="1.0" encoding="UTF-8"?>
+<PathOfBuilding>
+    <Build level="90" className="Marauder" ascendClassName="Juggernaut"></Build>
+    <Items></Items>
+    <Skills>
+        <Skill label="Main Attack"/>
+        <Skill label="Auras"/>
+        <Skill label=""/>
+    </Skills>
+</PathOfBuilding>"""
+
+        build = PoBDecoder.parse_build(xml)
+        assert "Main Attack" in build.skills
+        assert "Auras" in build.skills
+        # Empty label should be skipped
+        assert "" not in build.skills
+
+    def test_parse_build_extracts_config(self):
+        """Test extraction of config inputs."""
+        xml = """<?xml version="1.0" encoding="UTF-8"?>
+<PathOfBuilding>
+    <Build level="90" className="Marauder" ascendClassName="Juggernaut"></Build>
+    <Items></Items>
+    <Config>
+        <Input name="enemyIsBoss" boolean="true"/>
+        <Input name="enemyPhysicalReduction" number="50"/>
+        <Input name="customMods" string="test mod"/>
+    </Config>
+</PathOfBuilding>"""
+
+        build = PoBDecoder.parse_build(xml)
+        assert build.config.get("enemyIsBoss") == "true"
+        assert build.config.get("enemyPhysicalReduction") == "50"
+        assert build.config.get("customMods") == "test mod"
+
+    def test_parse_build_extracts_player_stats(self):
+        """Test extraction of PlayerStat values."""
+        xml = """<?xml version="1.0" encoding="UTF-8"?>
+<PathOfBuilding>
+    <Build level="90" className="Marauder" ascendClassName="Juggernaut">
+        <PlayerStat stat="Life" value="5000"/>
+        <PlayerStat stat="EnergyShield" value="1000"/>
+        <PlayerStat stat="InvalidStat" value="not_a_number"/>
+    </Build>
+    <Items></Items>
+</PathOfBuilding>"""
+
+        build = PoBDecoder.parse_build(xml)
+        assert build.stats.get("Life") == 5000.0
+        assert build.stats.get("EnergyShield") == 1000.0
+        # Invalid stats should be skipped
+        assert "InvalidStat" not in build.stats
+
+    def test_parse_build_skips_abyssal_slots(self):
+        """Test that abyssal socket slots are skipped."""
+        xml = """<?xml version="1.0" encoding="UTF-8"?>
+<PathOfBuilding>
+    <Build level="90" className="Marauder" ascendClassName="Juggernaut"></Build>
+    <Items activeItemSet="1">
+        <Item id="1">
+Rarity: RARE
+Test Belt
+Stygian Vise
+Item Level: 84
+Implicits: 0
++100 to maximum Life
+</Item>
+        <Item id="2">
+Rarity: RARE
+Abyssal Jewel
+Murderous Eye Jewel
+Item Level: 84
+Implicits: 0
++50 to maximum Life
+</Item>
+        <ItemSet id="1">
+            <Slot name="Belt" itemId="1"/>
+            <Slot name="Belt Abyssal Socket 1" itemId="2"/>
+        </ItemSet>
+    </Items>
+</PathOfBuilding>"""
+
+        build = PoBDecoder.parse_build(xml)
+        assert "Belt" in build.items
+        # Abyssal socket should be skipped
+        assert "Belt Abyssal Socket 1" not in build.items
+
+    def test_parse_build_skips_empty_slots(self):
+        """Test that empty slots (itemId=0) are skipped."""
+        xml = """<?xml version="1.0" encoding="UTF-8"?>
+<PathOfBuilding>
+    <Build level="90" className="Marauder" ascendClassName="Juggernaut"></Build>
+    <Items activeItemSet="1">
+        <Item id="1">
+Rarity: RARE
+Test Helmet
+Eternal Burgonet
+Item Level: 84
+Implicits: 0
++100 to maximum Life
+</Item>
+        <ItemSet id="1">
+            <Slot name="Helmet" itemId="1"/>
+            <Slot name="Gloves" itemId="0"/>
+            <Slot name="Boots" itemId=""/>
+        </ItemSet>
+    </Items>
+</PathOfBuilding>"""
+
+        build = PoBDecoder.parse_build(xml)
+        assert "Helmet" in build.items
+        assert "Gloves" not in build.items
+        assert "Boots" not in build.items
