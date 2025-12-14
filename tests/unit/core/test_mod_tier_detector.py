@@ -505,3 +505,37 @@ class TestEdgeCases:
         assert detect_mod_tier("+50 to Dex (Crafted)").is_crafted is True
         assert detect_mod_tier("+50 to Dex (CRAFTED)").is_crafted is True
         assert detect_mod_tier("+50 to Dex (crafted)").is_crafted is True
+
+    @patch('core.mod_tier_detector.AFFIX_TIER_DATA', {
+        "life": [
+            (1, 82, 90, 99),  # T1: 90-99
+            (2, 64, 70, 79),  # T2: 70-79 (gap at 80-89)
+        ]
+    })
+    def test_value_in_gap_returns_none(self):
+        """Returns None for value in gap between tiers."""
+        # Value 85 is between T1 min (90) and T2 max (79) - in the gap
+        result = _get_tier_for_value("life", 85)
+        assert result is None
+
+    def test_parse_error_during_mod_detection(self):
+        """Parse errors during mod detection are handled gracefully."""
+        # Create a pattern that might cause a parsing issue
+        # This tests the exception handler at lines 127-129
+        result = detect_mod_tier("+to Maximum Life")
+        # Should not raise, should return result with None values
+        assert result.value is None
+        assert result.stat_type is None
+
+    @patch('core.mod_tier_detector.MOD_PATTERNS', [
+        (r'\+(\d+) to [Mm]aximum [Ll]ife', "life", int),
+        # Add a pattern that will match but cause ValueError during conversion
+        (r'Adds (\S+) to (\S+) Physical Damage', "phys_damage", int),
+    ])
+    def test_value_conversion_error_continues(self):
+        """ValueError during value conversion is caught and continues."""
+        # "NaN" will match the second pattern but fail int() conversion
+        result = detect_mod_tier("Adds NaN to stuff Physical Damage")
+        # Should not raise, should return result with None (no patterns matched successfully)
+        assert result.stat_type is None
+        assert result.value is None

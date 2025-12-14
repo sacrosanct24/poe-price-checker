@@ -647,6 +647,22 @@ class TestDetectArchetypeEdgeCases:
         arch = detect_archetype(stats)
         assert arch.defense_type == DefenseType.LOW_LIFE
 
+    def test_defense_type_else_default_case(self):
+        """Low life and low ES ratio should default to LIFE with low confidence.
+
+        This tests the else branch when:
+        - Neither ratio is > 0.8 (not pure life/ES)
+        - Not both > 0.3 (not hybrid)
+        - No reserved life
+        """
+        # life=80, es=20 -> life_ratio=0.8, es_ratio=0.2
+        # 0.8 is NOT > 0.8, so life check fails
+        # 0.2 is NOT > 0.3, so hybrid check fails
+        # Falls through to else branch
+        stats = {"Life": 80, "EnergyShield": 20}
+        arch = detect_archetype(stats)
+        assert arch.defense_type == DefenseType.LIFE
+
 
 # =============================================================================
 # Weight Loading Error Cases

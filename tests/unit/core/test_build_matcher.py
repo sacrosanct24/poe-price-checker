@@ -609,6 +609,21 @@ class TestBuildSummary:
 
         assert "Lightning Strike" in summary
 
+    def test_summary_includes_required_es(self, tmp_path):
+        """Summary should include required ES when set."""
+        matcher = BuildMatcher(builds_file=tmp_path / "builds.json")
+        matcher.add_manual_build(
+            "CI Build",
+            required_es=8000,
+            required_life=0
+        )
+
+        summary = matcher.get_build_summary("CI Build")
+
+        assert summary is not None
+        assert "8000" in summary
+        assert "ES" in summary
+
 
 # -------------------------
 # Build Listing Tests

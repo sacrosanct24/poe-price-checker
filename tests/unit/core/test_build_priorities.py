@@ -274,6 +274,24 @@ class TestBuildPriorities:
         assert len(priorities.important) == 1
         assert priorities.uses_attack is True
 
+    def test_from_dict_with_nice_to_have(self):
+        """Should deserialize nice_to_have priorities."""
+        data = {
+            "critical": [{"stat_type": "life", "tier": "critical"}],
+            "important": [],
+            "nice_to_have": [
+                {"stat_type": "movement_speed", "tier": "nice_to_have"},
+                {"stat_type": "mana", "tier": "nice_to_have"},
+            ],
+            "is_life_build": True,
+        }
+
+        priorities = BuildPriorities.from_dict(data)
+
+        assert len(priorities.nice_to_have) == 2
+        assert priorities.nice_to_have[0].stat_type == "movement_speed"
+        assert priorities.nice_to_have[1].stat_type == "mana"
+
     def test_serialization_roundtrip(self):
         """Serialize then deserialize should preserve data."""
         original = BuildPriorities()

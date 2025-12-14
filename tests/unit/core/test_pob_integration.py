@@ -282,6 +282,47 @@ class TestCharacterProfile:
         assert profile.get_item_for_slot("Helmet") == item
         assert profile.get_item_for_slot("Gloves") is None
 
+    def test_get_archetype_returns_archetype(self):
+        """Test get_archetype method lazy-loads and caches archetype."""
+        build = PoBBuild()
+        profile = CharacterProfile(name="Test", build=build)
+
+        # Access archetype - should trigger detection
+        archetype = profile.get_archetype()
+        assert archetype is not None
+
+        # Access again - should return cached value
+        archetype2 = profile.get_archetype()
+        assert archetype2 is archetype
+
+    def test_get_archetype_with_build_stats(self):
+        """Test archetype detection with build stats."""
+        build = PoBBuild(
+            stats={"TotalDPS": 1000000, "Life": 5000},
+            main_skill="Cyclone"
+        )
+        profile = CharacterProfile(name="Test", build=build)
+
+        archetype = profile.get_archetype()
+        assert archetype is not None
+
+    def test_clear_archetype_cache(self):
+        """Test clearing archetype cache."""
+        build = PoBBuild()
+        profile = CharacterProfile(name="Test", build=build)
+
+        # Load archetype
+        archetype1 = profile.get_archetype()
+        assert archetype1 is not None
+
+        # Clear cache
+        profile.clear_archetype_cache()
+        assert profile._archetype is None
+
+        # Should re-detect
+        archetype2 = profile.get_archetype()
+        assert archetype2 is not None
+
 
 class TestUpgradeChecker:
     """Tests for UpgradeChecker class."""
@@ -347,6 +388,86 @@ class TestUpgradeChecker:
         assert isinstance(is_upgrade, bool)
         if is_upgrade:
             assert any("life" in r.lower() for r in reasons)
+
+    def test_check_upgrade_with_profile_name(self, manager_with_build):
+        """Test check_upgrade with explicit profile_name parameter."""
+        checker = UpgradeChecker(manager_with_build)
+        is_upgrade, reasons, slot = checker.check_upgrade(
+            item_class="Helmets",
+            item_mods=["+100 to maximum Life"],
+            profile_name="Test Build"
+        )
+        # Should work with explicit profile name
+        assert isinstance(is_upgrade, bool)
+        assert isinstance(reasons, list)
+
+    def test_check_upgrade_unknown_item_class(self, checker):
+        """Unknown item class should return appropriate message."""
+        is_upgrade, reasons, slot = checker.check_upgrade(
+            item_class="Totally Unknown Item Type",
+            item_mods=["+50 to maximum Life"]
+        )
+        assert is_upgrade is False
+        assert any("Unknown item class" in r for r in reasons)
+        assert slot is None
+
+    def test_check_upgrade_no_improvement(self, checker):
+        """When new item is worse, should return no improvement."""
+        # Check with worse stats than current gear
+        is_upgrade, reasons, slot = checker.check_upgrade(
+            item_class="Helmets",
+            item_mods=["+5% to Fire Resistance"]  # Worse than current
+        )
+        # If not an upgrade, should say no improvement
+        if not is_upgrade:
+            assert any("No improvement" in r for r in reasons)
+
+    def test_compare_mods_better_life(self, checker):
+        """Test _compare_mods with better life."""
+        new_mods = ["+99 to maximum Life"]
+        current_mods = ["+50 to maximum Life"]
+        reasons = checker._compare_mods(new_mods, current_mods)
+        assert any("More life" in r for r in reasons)
+        assert any("99" in r and "50" in r for r in reasons)
+
+    def test_compare_mods_better_resistance(self, checker):
+        """Test _compare_mods with better resistance."""
+        new_mods = ["+45% to Fire Resistance"]
+        current_mods = ["+30% to Fire Resistance"]
+        reasons = checker._compare_mods(new_mods, current_mods)
+        assert any("More Fire res" in r for r in reasons)
+
+    def test_compare_mods_adds_resistance(self, checker):
+        """Test _compare_mods when adding new resistance."""
+        new_mods = ["+40% to Cold Resistance"]
+        current_mods = ["+50 to maximum Life"]
+        reasons = checker._compare_mods(new_mods, current_mods)
+        assert any("Adds" in r and "Cold res" in r for r in reasons)
+
+    def test_compare_mods_better_energy_shield(self, checker):
+        """Test _compare_mods with better energy shield."""
+        new_mods = ["+100 to maximum Energy Shield"]
+        current_mods = ["+50 to maximum Energy Shield"]
+        reasons = checker._compare_mods(new_mods, current_mods)
+        assert any("More ES" in r for r in reasons)
+
+    def test_extract_stat_no_match(self, checker):
+        """Test _extract_stat returns None when no match."""
+        mods = ["+50 to Dexterity"]
+        result = checker._extract_stat(mods, r"\+(\d+) to maximum Life")
+        assert result is None
+
+    def test_check_upgrade_empty_slot(self, checker):
+        """Test upgrade detection for empty equipment slot."""
+        # The test build only has Helmet and Gloves, Belt slot is empty
+        is_upgrade, reasons, slot = checker.check_upgrade(
+            item_class="Belts",
+            item_mods=["+50 to maximum Life", "+30% to Fire Resistance"]
+        )
+        # Empty slot should always be an upgrade
+        assert is_upgrade is True
+        assert any("Empty slot" in r for r in reasons)
+        assert slot == "Belt"
 
 
 class TestPoBDecoderSlotMapping:

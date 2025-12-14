@@ -232,3 +232,50 @@ class TestChartDataService:
         call_args = mock_db.conn.execute.call_args
         query = call_args[0][0]
         assert "recorded_at >=" not in query
+
+    def test_get_currency_rate_series_empty_returns_none(self, service, mock_db):
+        """Test get_currency_rate_series returns None for empty data."""
+        mock_db.conn.execute.return_value.fetchall.return_value = []
+
+        series = service.get_currency_rate_series("Divine Orb", "Settlers", days=30)
+
+        assert series is None
+
+    def test_get_currency_rate_series_with_string_date(self, service, mock_db):
+        """Test handling string dates from database."""
+        mock_db.conn.execute.return_value.fetchall.return_value = [
+            ("2024-01-15T12:00:00", 200.0),
+        ]
+
+        series = service.get_currency_rate_series("Divine Orb", "Settlers", days=30)
+
+        assert series is not None
+        assert len(series.data_points) == 1
+
+    def test_get_currency_rate_series_error(self, service, mock_db):
+        """Test error handling in get_currency_rate_series."""
+        mock_db.conn.execute.side_effect = Exception("Database error")
+
+        series = service.get_currency_rate_series("Divine Orb", "Settlers")
+
+        assert series is None
+
+    def test_get_item_from_economy_items_error(self, service, mock_db):
+        """Test error handling in get_item_from_economy_items."""
+        mock_db.conn.execute.side_effect = Exception("Database error")
+
+        series = service.get_item_from_economy_items("Test Item", "Settlers")
+
+        assert series is None
+
+    def test_get_item_from_economy_items_empty_returns_none(self, service, mock_db):
+        """Test get_item_from_economy_items returns None for empty data."""
+        # Both queries return empty
+        mock_db.conn.execute.return_value.fetchall.side_effect = [
+            [],  # economy_items empty
+            [],  # price_history also empty
+        ]
+
+        series = service.get_item_from_economy_items("Unknown Item", "Settlers")
+
+        assert series is None

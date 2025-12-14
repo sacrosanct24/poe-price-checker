@@ -10,9 +10,35 @@ import uuid
 from pathlib import Path
 
 from core.config import Config
+from core.config.defaults import get_config_dir
 from core.game_version import GameVersion, GameConfig
 
 pytestmark = pytest.mark.unit
+
+
+# -------------------------
+# Defaults Tests
+# -------------------------
+
+class TestConfigDefaults:
+    """Tests for config.defaults module."""
+
+    def test_get_config_dir_returns_path(self):
+        """get_config_dir should return a Path object."""
+        result = get_config_dir()
+        assert isinstance(result, Path)
+
+    def test_get_config_dir_creates_directory(self):
+        """get_config_dir should ensure the directory exists."""
+        result = get_config_dir()
+        assert result.exists()
+        assert result.is_dir()
+
+    def test_get_config_dir_is_in_home(self):
+        """get_config_dir should be in user's home directory."""
+        result = get_config_dir()
+        assert result.parent == Path.home()
+        assert result.name == ".poe_price_checker"
 
 
 # -------------------------
