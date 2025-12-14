@@ -111,3 +111,161 @@ def test_trade_api_source_normalizes_fake_listings() -> None:
     # fields like variant/links/divine_value/listing_count should be present (possibly "")
     for col in ("variant", "links", "divine_value", "listing_count"):
         assert col in second
+
+
+class TestPoeTradeClientCacheKey:
+    """Tests for PoeTradeClient._get_cache_key method."""
+
+    def test_cache_key_basic(self):
+        """Basic cache key generation."""
+        client = PoeTradeClient(league="Standard")
+        key = client._get_cache_key("GET", "/test/path")
+        assert key == "GET:/test/path"
+
+    def test_cache_key_with_params(self):
+        """Cache key with query params should be sorted."""
+        client = PoeTradeClient(league="Standard")
+        key = client._get_cache_key("GET", "/test", params={"b": "2", "a": "1"})
+        assert "a=1" in key
+        assert "b=2" in key
+        # Params should be sorted
+        assert key.index("a=1") < key.index("b=2")
+
+    def test_cache_key_method_uppercase(self):
+        """Method should be uppercased."""
+        client = PoeTradeClient(league="Standard")
+        key = client._get_cache_key("get", "/test")
+        assert key.startswith("GET:")
+
+    def test_cache_key_none_method_defaults_to_get(self):
+        """None method should default to GET."""
+        client = PoeTradeClient(league="Standard")
+        key = client._get_cache_key(None, "/test")
+        assert key.startswith("GET:")
+
+
+class TestTradeApiSourceInfluenceFilters:
+    """Tests for influence filter handling in _build_query."""
+
+    def test_build_query_with_shaper_influence(self):
+        """Should add shaper_item filter for Shaper influence."""
+        source, _ = _make_source_with_fake_client([])
+
+        class ShaperItem:
+            name = "Shaper Helmet"
+            base_type = "Hubris Circlet"
+            rarity = "RARE"
+            influences = ["Shaper"]
+
+        query = source._build_query(ShaperItem())
+
+        # Shaper influence should be in type_filters
+        filters = query.get("query", {}).get("filters", {})
+        type_filters = filters.get("type_filters", {}).get("filters", {})
+        assert "shaper_item" in type_filters
+        assert type_filters["shaper_item"]["option"] == "true"
+
+    def test_build_query_with_exarch_influence(self):
+        """Should add searing_item filter for Exarch influence."""
+        source, _ = _make_source_with_fake_client([])
+
+        class ExarchItem:
+            name = "Exarch Helmet"
+            base_type = "Hubris Circlet"
+            rarity = "RARE"
+            influences = ["Exarch"]
+
+        query = source._build_query(ExarchItem())
+
+        # Exarch influence should be in misc_filters
+        filters = query.get("query", {}).get("filters", {})
+        misc_filters = filters.get("misc_filters", {}).get("filters", {})
+        assert "searing_item" in misc_filters
+
+    def test_build_query_with_multiple_influences(self):
+        """Should handle multiple influences."""
+        source, _ = _make_source_with_fake_client([])
+
+        class DualInfluenceItem:
+            name = "Dual Influence"
+            base_type = "Astral Plate"
+            rarity = "RARE"
+            influences = ["Hunter", "Warlord"]
+
+        query = source._build_query(DualInfluenceItem())
+
+        filters = query.get("query", {}).get("filters", {})
+        type_filters = filters.get("type_filters", {}).get("filters", {})
+        assert "hunter_item" in type_filters
+        assert "warlord_item" in type_filters
+
+
+class TestTradeApiSourceNormalizeListing:
+    """Tests for _normalize_listing edge cases."""
+
+    def test_normalize_listing_no_price(self):
+        """Should return None for listing without price."""
+        source, _ = _make_source_with_fake_client([])
+
+        listing = {
+            "id": "123",
+            "listing": {},
+            "item": {}
+        }
+        result = source._normalize_listing(listing)
+        assert result is None
+
+    def test_normalize_listing_invalid_amount(self):
+        """Should return None for invalid amount."""
+        source, _ = _make_source_with_fake_client([])
+
+        listing = {
+            "id": "123",
+            "listing": {
+                "price": {
+                    "amount": "not_a_number",
+                    "currency": "chaos"
+                }
+            },
+            "item": {}
+        }
+        result = source._normalize_listing(listing)
+        assert result is None
+
+    def test_normalize_listing_no_currency(self):
+        """Should return None for missing currency."""
+        source, _ = _make_source_with_fake_client([])
+
+        listing = {
+            "id": "123",
+            "listing": {
+                "price": {
+                    "amount": 10,
+                    "currency": None
+                }
+            },
+            "item": {}
+        }
+        result = source._normalize_listing(listing)
+        assert result is None
+
+    def test_normalize_listing_exception_handling(self):
+        """Should return None and log on unexpected exception."""
+        source, _ = _make_source_with_fake_client([])
+
+        # Create a nested dict that will raise an exception inside the try block
+        class BadPriceDict(dict):
+            def get(self, key, default=None):
+                if key == "amount":
+                    raise RuntimeError("Unexpected error")
+                return super().get(key, default)
+
+        listing = {
+            "id": "123",
+            "listing": {
+                "price": BadPriceDict({"amount": 10, "currency": "chaos"})
+            },
+            "item": {}
+        }
+        result = source._normalize_listing(listing)
+        assert result is None
