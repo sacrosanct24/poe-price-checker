@@ -60,6 +60,7 @@ jobs:
       id: pytest
       run: |
         pytest tests/ --ignore=tests/integration --ignore=tests/unit/gui_qt --ignore=tests/test_shortcuts.py \
+          -p no:pytest-qt \
           --cov=core --cov=gui_qt --cov-report=term-missing \
           --cov-report=xml \
           --junitxml=test-results-ubuntu-${{ matrix.python-version }}.xml \
