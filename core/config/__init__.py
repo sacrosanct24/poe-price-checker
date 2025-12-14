@@ -1112,6 +1112,75 @@ class Config:
         self.save()
 
     # ------------------------------------------------------------------
+    # Price Alerts Settings
+    # ------------------------------------------------------------------
+
+    def _get_alerts_bool(self, key: str, default: bool) -> bool:
+        """Get a boolean from the alerts settings."""
+        return bool(self.data.get("alerts", {}).get(key, default))
+
+    def _get_alerts_int(self, key: str, default: int) -> int:
+        """Get an int from the alerts settings."""
+        return int(self.data.get("alerts", {}).get(key, default))
+
+    @property
+    def alerts_enabled(self) -> bool:
+        """Whether price alerts are enabled."""
+        return self._get_alerts_bool("enabled", True)
+
+    @alerts_enabled.setter
+    def alerts_enabled(self, value: bool) -> None:
+        """Enable/disable price alerts."""
+        self.data.setdefault("alerts", {})["enabled"] = bool(value)
+        self.save()
+
+    @property
+    def alert_polling_interval_minutes(self) -> int:
+        """Interval between price alert checks (5-60 minutes)."""
+        return self._get_alerts_int("polling_interval_minutes", 15)
+
+    @alert_polling_interval_minutes.setter
+    def alert_polling_interval_minutes(self, value: int) -> None:
+        """Set the alert polling interval (min 5, max 60 minutes)."""
+        clamped = max(5, min(60, int(value)))
+        self.data.setdefault("alerts", {})["polling_interval_minutes"] = clamped
+        self.save()
+
+    @property
+    def alert_default_cooldown_minutes(self) -> int:
+        """Default cooldown between alert triggers (10-1440 minutes)."""
+        return self._get_alerts_int("default_cooldown_minutes", 30)
+
+    @alert_default_cooldown_minutes.setter
+    def alert_default_cooldown_minutes(self, value: int) -> None:
+        """Set the default alert cooldown (min 10, max 1440 minutes)."""
+        clamped = max(10, min(1440, int(value)))
+        self.data.setdefault("alerts", {})["default_cooldown_minutes"] = clamped
+        self.save()
+
+    @property
+    def alert_show_tray_notifications(self) -> bool:
+        """Whether to show system tray notifications for price alerts."""
+        return self._get_alerts_bool("show_tray_notifications", True)
+
+    @alert_show_tray_notifications.setter
+    def alert_show_tray_notifications(self, value: bool) -> None:
+        """Enable/disable tray notifications for alerts."""
+        self.data.setdefault("alerts", {})["show_tray_notifications"] = bool(value)
+        self.save()
+
+    @property
+    def alert_show_toast_notifications(self) -> bool:
+        """Whether to show in-app toast notifications for price alerts."""
+        return self._get_alerts_bool("show_toast_notifications", True)
+
+    @alert_show_toast_notifications.setter
+    def alert_show_toast_notifications(self, value: bool) -> None:
+        """Enable/disable toast notifications for alerts."""
+        self.data.setdefault("alerts", {})["show_toast_notifications"] = bool(value)
+        self.save()
+
+    # ------------------------------------------------------------------
     # Utility
     # ------------------------------------------------------------------
 

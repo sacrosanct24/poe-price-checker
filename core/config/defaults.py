@@ -160,4 +160,16 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         # Polling interval for Client.txt in seconds
         "poll_interval": 1.0,
     },
+    "alerts": {
+        # Whether price alerts are enabled
+        "enabled": True,
+        # Polling interval for price checks (5-60 minutes)
+        "polling_interval_minutes": 15,
+        # Default cooldown between alert triggers (minutes)
+        "default_cooldown_minutes": 30,
+        # Show system tray notifications when alerts trigger
+        "show_tray_notifications": True,
+        # Show in-app toast notifications when alerts trigger
+        "show_toast_notifications": True,
+    },
 }

@@ -48,6 +48,8 @@ from gui_qt.services import (
     get_window_manager,
     get_history_manager,
     shutdown_price_refresh_service,
+    get_price_alert_service,
+    shutdown_price_alert_service,
 )
 from gui_qt.controllers import (
     MenuActionsController,
@@ -128,6 +130,9 @@ class PriceCheckerWindow(BackgroundServicesMixin, MenuBarMixin, ShortcutsMixin, 
         # Tray controller for system tray functionality
         self._tray_controller: Optional[TrayController] = None
 
+        # Price alert service for background alert monitoring
+        self._alert_service = None
+
         # Navigation controller for window/dialog management
         # Note: AI callbacks added after UI is created via _register_ai_callbacks
         self._nav_controller = NavigationController(
@@ -180,6 +185,9 @@ class PriceCheckerWindow(BackgroundServicesMixin, MenuBarMixin, ShortcutsMixin, 
 
         # Initialize system tray
         self._init_system_tray()
+
+        # Initialize price alert service
+        self._init_price_alert_service()
 
         self._set_status("Ready")
 
@@ -968,6 +976,53 @@ class PriceCheckerWindow(BackgroundServicesMixin, MenuBarMixin, ShortcutsMixin, 
         )
         self._tray_controller.initialize()
 
+    def _init_price_alert_service(self) -> None:
+        """Initialize the price alert monitoring service."""
+        self._alert_service = get_price_alert_service(self.ctx)
+        if self._alert_service:
+            # Connect alert triggered signal
+            self._alert_service.alert_triggered.connect(self._on_alert_triggered)
+
+            # Start if enabled in config
+            if self.ctx.config.alerts_enabled:
+                self._alert_service.start()
+                self.logger.info("Price alert service started")
+
+    def _on_alert_triggered(
+        self,
+        alert_id: int,
+        item_name: str,
+        alert_type: str,
+        threshold: float,
+        current_price: float,
+    ) -> None:
+        """Handle a triggered price alert."""
+        direction = "dropped below" if alert_type == "below" else "rose above"
+        message = f"{item_name} {direction} {threshold:.0f}c (now {current_price:.0f}c)"
+
+        self.logger.info(f"Price alert triggered: {message}")
+
+        # Show tray notification if enabled
+        if self.ctx.config.alert_show_tray_notifications:
+            if self._tray_controller:
+                self._tray_controller.show_notification(
+                    item_name,
+                    current_price,
+                    None,  # No divine price
+                )
+
+        # Show toast notification if enabled
+        if self.ctx.config.alert_show_toast_notifications:
+            if self.toast_manager:
+                self.toast_manager.warning(f"Price Alert: {message}")
+
+    def _show_price_alerts_dialog(self) -> None:
+        """Show the price alerts management dialog."""
+        if self._alert_service:
+            from gui_qt.dialogs.price_alerts_dialog import PriceAlertsDialog
+            dialog = PriceAlertsDialog(self._alert_service, self)
+            dialog.exec()
+
     def changeEvent(self, event) -> None:
         """Handle window state changes (minimize to tray)."""
         from PyQt6.QtCore import QEvent
@@ -1042,6 +1097,9 @@ class PriceCheckerWindow(BackgroundServicesMixin, MenuBarMixin, ShortcutsMixin, 
 
         # Stop price refresh service
         shutdown_price_refresh_service()
+
+        # Stop price alert service
+        shutdown_price_alert_service()
 
         # Stop loot tracking
         if self._loot_controller:

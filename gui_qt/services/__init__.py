@@ -6,6 +6,7 @@ This package contains extracted services that manage application-wide concerns:
 - SystemTrayManager: System tray icon and notifications
 - HistoryManager: Price check session history with bounded storage
 - PriceRefreshService: Background price data refresh
+- PriceAlertService: Price alert monitoring and notifications
 """
 
 from gui_qt.services.window_manager import WindowManager, get_window_manager
@@ -15,6 +16,11 @@ from gui_qt.services.price_refresh_service import (
     PriceRefreshService,
     get_price_refresh_service,
     shutdown_price_refresh_service,
+)
+from gui_qt.services.price_alert_service import (
+    PriceAlertService,
+    get_price_alert_service,
+    shutdown_price_alert_service,
 )
 
 __all__ = [
@@ -26,4 +32,7 @@ __all__ = [
     "PriceRefreshService",
     "get_price_refresh_service",
     "shutdown_price_refresh_service",
+    "PriceAlertService",
+    "get_price_alert_service",
+    "shutdown_price_alert_service",
 ]

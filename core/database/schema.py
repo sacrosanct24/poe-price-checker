@@ -6,7 +6,7 @@ Separated from the main Database class for better maintainability.
 """
 
 # Current schema version. Increment if schema structure changes.
-SCHEMA_VERSION = 11
+SCHEMA_VERSION = 12
 
 # Full schema creation SQL for fresh databases
 CREATE_SCHEMA_SQL = """
@@ -320,6 +320,30 @@ CREATE TABLE IF NOT EXISTS verdict_statistics (
 
 CREATE INDEX IF NOT EXISTS idx_verdict_statistics_lookup
 ON verdict_statistics (league, game_version, session_date);
+
+-- v12: Price alerts for monitoring item prices
+CREATE TABLE IF NOT EXISTS price_alerts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    item_name TEXT NOT NULL,
+    item_base_type TEXT,
+    league TEXT NOT NULL,
+    game_version TEXT NOT NULL DEFAULT 'poe1',
+    alert_type TEXT NOT NULL,  -- 'above' or 'below'
+    threshold_chaos REAL NOT NULL,
+    enabled INTEGER NOT NULL DEFAULT 1,
+    last_price_chaos REAL,
+    last_triggered_at TIMESTAMP,
+    trigger_count INTEGER DEFAULT 0,
+    cooldown_minutes INTEGER DEFAULT 30,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_price_alerts_lookup
+ON price_alerts (league, game_version, enabled);
+
+CREATE INDEX IF NOT EXISTS idx_price_alerts_item
+ON price_alerts (item_name, league);
 """
 
 # Migration SQL for each version upgrade
@@ -591,6 +615,31 @@ CREATE TABLE IF NOT EXISTS verdict_statistics (
 
 CREATE INDEX IF NOT EXISTS idx_verdict_statistics_lookup
 ON verdict_statistics (league, game_version, session_date);
+"""
+
+MIGRATION_V12_SQL = """
+CREATE TABLE IF NOT EXISTS price_alerts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    item_name TEXT NOT NULL,
+    item_base_type TEXT,
+    league TEXT NOT NULL,
+    game_version TEXT NOT NULL DEFAULT 'poe1',
+    alert_type TEXT NOT NULL,  -- 'above' or 'below'
+    threshold_chaos REAL NOT NULL,
+    enabled INTEGER NOT NULL DEFAULT 1,
+    last_price_chaos REAL,
+    last_triggered_at TIMESTAMP,
+    trigger_count INTEGER DEFAULT 0,
+    cooldown_minutes INTEGER DEFAULT 30,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_price_alerts_lookup
+ON price_alerts (league, game_version, enabled);
+
+CREATE INDEX IF NOT EXISTS idx_price_alerts_item
+ON price_alerts (item_name, league);
 """
 
 # Whitelist of allowed column names and types for v4 migration security

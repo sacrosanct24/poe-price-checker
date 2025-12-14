@@ -23,6 +23,7 @@ from core.database.schema import (
     MIGRATION_V9_SQL,
     MIGRATION_V10_SQL,
     MIGRATION_V11_SQL,
+    MIGRATION_V12_SQL,
     ALLOWED_MIGRATION_COLUMNS,
 )
 
@@ -142,6 +143,9 @@ class MigrationRunner:
         v10 -> v11:
             - Add `verdict_statistics` for persistent verdict tracking.
             - Stores daily verdict counts and values per league.
+        v11 -> v12:
+            - Add `price_alerts` for price monitoring and notifications.
+            - Tracks item alerts with above/below thresholds and cooldowns.
 
         Args:
             old: Current schema version
@@ -179,6 +183,9 @@ class MigrationRunner:
 
             if old < 11 <= new:
                 self._migrate_v11(conn)
+
+            if old < 12 <= new:
+                self._migrate_v12(conn)
 
         self._set_schema_version(new)
         logger.info(f"Schema migration complete. Now at v{new}.")
@@ -274,3 +281,8 @@ class MigrationRunner:
         """v10 -> v11: Create verdict_statistics table."""
         logger.info("Applying v11 migration: creating verdict_statistics table.")
         conn.executescript(MIGRATION_V11_SQL)
+
+    def _migrate_v12(self, conn: sqlite3.Connection) -> None:
+        """v11 -> v12: Create price_alerts table."""
+        logger.info("Applying v12 migration: creating price_alerts table.")
+        conn.executescript(MIGRATION_V12_SQL)

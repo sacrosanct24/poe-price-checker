@@ -66,6 +66,7 @@ class ViewMenuController:
         on_toggle_column: Callable[[str, bool], None],
         parent: Any = None,
         logger: Optional[logging.Logger] = None,
+        on_price_alerts: Optional[Callable[[], None]] = None,
     ):
         """
         Initialize the ViewMenuController.
@@ -79,6 +80,7 @@ class ViewMenuController:
             on_toggle_column: Callback to toggle column visibility.
             parent: Parent widget for actions.
             logger: Logger instance.
+            on_price_alerts: Callback to show price alerts dialog.
         """
         self._on_history = on_history
         self._on_stash_viewer = on_stash_viewer
@@ -86,6 +88,7 @@ class ViewMenuController:
         self._on_toggle_theme = on_toggle_theme
         self._on_set_accent = on_set_accent
         self._on_toggle_column = on_toggle_column
+        self._on_price_alerts = on_price_alerts
         self._parent = parent
         self._logger = logger or logging.getLogger(__name__)
 
@@ -134,6 +137,13 @@ class ViewMenuController:
         stash_action = QAction("&Stash Viewer", self._parent)
         stash_action.triggered.connect(self._on_stash_viewer)
         view_menu.addAction(stash_action)
+
+        # Price Alerts
+        if self._on_price_alerts:
+            alerts_action = QAction("&Price Alerts...", self._parent)
+            alerts_action.setShortcut(QKeySequence("Ctrl+Shift+A"))
+            alerts_action.triggered.connect(self._on_price_alerts)
+            view_menu.addAction(alerts_action)
 
         view_menu.addSeparator()
 

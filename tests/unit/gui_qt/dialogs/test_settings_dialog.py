@@ -19,8 +19,8 @@ class TestSettingsDialogInit:
         assert dialog.windowTitle() == "Settings"
         assert dialog._config is mock_config
 
-    def test_has_five_tabs(self, qtbot):
-        """Dialog has five tabs: Accessibility, Performance, System Tray, AI, Verdict."""
+    def test_has_six_tabs(self, qtbot):
+        """Dialog has six tabs: Accessibility, Performance, System Tray, AI, Verdict, Alerts."""
         from gui_qt.dialogs.settings_dialog import SettingsDialog
 
         mock_config = self._create_mock_config()
@@ -28,12 +28,13 @@ class TestSettingsDialogInit:
         dialog = SettingsDialog(mock_config)
         qtbot.addWidget(dialog)
 
-        assert dialog._tabs.count() == 5
+        assert dialog._tabs.count() == 6
         assert dialog._tabs.tabText(0) == "Accessibility"
         assert dialog._tabs.tabText(1) == "Performance"
         assert dialog._tabs.tabText(2) == "System Tray"
         assert dialog._tabs.tabText(3) == "AI"
         assert dialog._tabs.tabText(4) == "Verdict"
+        assert dialog._tabs.tabText(5) == "Alerts"
 
     def _create_mock_config(self):
         """Create a mock config with all required properties."""
@@ -66,6 +67,12 @@ class TestSettingsDialogInit:
         mock_config.verdict_vendor_threshold = 2.0
         mock_config.verdict_keep_threshold = 15.0
         mock_config.verdict_preset = "default"
+        # Alerts
+        mock_config.alerts_enabled = True
+        mock_config.alert_polling_interval_minutes = 15
+        mock_config.alert_default_cooldown_minutes = 30
+        mock_config.alert_show_tray_notifications = True
+        mock_config.alert_show_toast_notifications = True
         return mock_config
 
 
@@ -100,6 +107,12 @@ class TestAccessibilityTab:
         mock_config.verdict_vendor_threshold = 2.0
         mock_config.verdict_keep_threshold = 15.0
         mock_config.verdict_preset = "default"
+        # Alerts
+        mock_config.alerts_enabled = True
+        mock_config.alert_polling_interval_minutes = 15
+        mock_config.alert_default_cooldown_minutes = 30
+        mock_config.alert_show_tray_notifications = True
+        mock_config.alert_show_toast_notifications = True
         return mock_config
 
     def test_font_scale_slider_range(self, qtbot):

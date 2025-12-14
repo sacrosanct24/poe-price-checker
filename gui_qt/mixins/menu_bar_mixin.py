@@ -140,6 +140,7 @@ class MenuBarMixin:
             on_toggle_column=self._toggle_column,
             parent=self,
             logger=self.logger,
+            on_price_alerts=self._show_price_alerts_dialog,
         )
         self._theme_actions, self._accent_actions, self._column_actions = \
             self._view_menu_controller.create_view_menu(menubar)

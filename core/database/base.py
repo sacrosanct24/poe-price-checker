@@ -30,6 +30,7 @@ from core.database.migrations import MigrationRunner
 from core.database.repositories.checked_items_repository import CheckedItemsRepository
 from core.database.repositories.currency_repository import CurrencyRepository
 from core.database.repositories.plugin_repository import PluginRepository
+from core.database.repositories.price_alert_repository import PriceAlertRepository
 from core.database.repositories.price_repository import PriceRepository
 from core.database.repositories.sales_repository import SalesRepository
 from core.database.repositories.stats_repository import StatsRepository
@@ -88,6 +89,7 @@ class Database:
         self._checked_items_repo = CheckedItemsRepository(self.conn, self._lock)
         self._currency_repo = CurrencyRepository(self.conn, self._lock)
         self._plugin_repo = PluginRepository(self.conn, self._lock)
+        self._price_alert_repo = PriceAlertRepository(self.conn, self._lock)
         self._price_repo = PriceRepository(self.conn, self._lock)
         self._sales_repo = SalesRepository(self.conn, self._lock)
         self._stats_repo = StatsRepository(self.conn, self._lock)
@@ -574,6 +576,105 @@ class Database:
     ) -> int:
         """Clear verdict statistics."""
         return self._verdict_repo.clear_verdict_statistics(league, game_version)
+
+    # ----------------------------------------------------------------------
+    # Price Alerts (delegated to PriceAlertRepository)
+    # ----------------------------------------------------------------------
+
+    def create_price_alert(
+        self,
+        item_name: str,
+        league: str,
+        game_version: str,
+        alert_type: str,
+        threshold_chaos: float,
+        item_base_type: Optional[str] = None,
+        cooldown_minutes: int = 30,
+    ) -> int:
+        """Create a new price alert."""
+        return self._price_alert_repo.create_alert(
+            item_name, league, game_version, alert_type,
+            threshold_chaos, item_base_type, cooldown_minutes
+        )
+
+    def get_price_alert(self, alert_id: int) -> Optional[Dict[str, Any]]:
+        """Get a single alert by ID."""
+        return self._price_alert_repo.get_alert(alert_id)
+
+    def get_active_price_alerts(
+        self,
+        league: str,
+        game_version: str = "poe1",
+    ) -> List[Dict[str, Any]]:
+        """Get all enabled alerts for a league."""
+        return self._price_alert_repo.get_active_alerts(league, game_version)
+
+    def get_all_price_alerts(
+        self,
+        league: Optional[str] = None,
+        game_version: Optional[str] = None,
+        enabled_only: bool = False,
+    ) -> List[Dict[str, Any]]:
+        """Get all alerts with optional filtering."""
+        return self._price_alert_repo.get_all_alerts(league, game_version, enabled_only)
+
+    def update_price_alert(
+        self,
+        alert_id: int,
+        threshold_chaos: Optional[float] = None,
+        alert_type: Optional[str] = None,
+        enabled: Optional[bool] = None,
+        cooldown_minutes: Optional[int] = None,
+    ) -> bool:
+        """Update an existing alert."""
+        return self._price_alert_repo.update_alert(
+            alert_id, threshold_chaos, alert_type, enabled, cooldown_minutes
+        )
+
+    def delete_price_alert(self, alert_id: int) -> bool:
+        """Delete an alert."""
+        return self._price_alert_repo.delete_alert(alert_id)
+
+    def record_alert_trigger(
+        self,
+        alert_id: int,
+        current_price: float,
+    ) -> None:
+        """Record that an alert was triggered."""
+        return self._price_alert_repo.record_trigger(alert_id, current_price)
+
+    def should_alert_trigger(
+        self,
+        alert_id: int,
+        current_price: float,
+    ) -> bool:
+        """Check if an alert should trigger based on threshold and cooldown."""
+        return self._price_alert_repo.should_trigger(alert_id, current_price)
+
+    def get_price_alerts_for_item(
+        self,
+        item_name: str,
+        league: str,
+        game_version: str = "poe1",
+    ) -> List[Dict[str, Any]]:
+        """Get all alerts for a specific item."""
+        return self._price_alert_repo.get_alerts_for_item(item_name, league, game_version)
+
+    def clear_price_alerts(
+        self,
+        league: Optional[str] = None,
+        game_version: Optional[str] = None,
+    ) -> int:
+        """Clear all alerts, optionally filtered by league/game."""
+        return self._price_alert_repo.clear_alerts(league, game_version)
+
+    def get_price_alert_statistics(
+        self,
+        league: Optional[str] = None,
+        game_version: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Get aggregate statistics for alerts."""
+        return self._price_alert_repo.get_alert_statistics(league, game_version)
 
     def close(self) -> None:
         """Close the underlying SQLite connection."""

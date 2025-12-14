@@ -86,6 +86,10 @@ class SettingsDialog(QDialog):
         verdict_tab = self._create_verdict_tab()
         self._tabs.addTab(verdict_tab, "Verdict")
 
+        # Alerts tab
+        alerts_tab = self._create_alerts_tab()
+        self._tabs.addTab(alerts_tab, "Alerts")
+
         # Buttons
         button_row = QHBoxLayout()
         button_row.addStretch()
@@ -816,6 +820,134 @@ class SettingsDialog(QDialog):
 
         return tab
 
+    def _create_alerts_tab(self) -> QWidget:
+        """Create the Price Alerts settings tab."""
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+        layout.setSpacing(16)
+
+        # Enable/Disable group
+        enable_group = QGroupBox("Price Alert Monitoring")
+        enable_layout = QVBoxLayout(enable_group)
+        enable_layout.setSpacing(8)
+
+        self._alerts_enabled_cb = QCheckBox("Enable price alerts")
+        self._alerts_enabled_cb.setToolTip(
+            "When enabled, the app will periodically check prices\n"
+            "for items in your alert list and notify you when\n"
+            "prices cross your configured thresholds."
+        )
+        self._alerts_enabled_cb.stateChanged.connect(self._on_alerts_enabled_changed)
+        enable_layout.addWidget(self._alerts_enabled_cb)
+
+        info_label = QLabel(
+            "Create alerts via View > Price Alerts or right-click\n"
+            "an item in the results table."
+        )
+        info_label.setStyleSheet("color: gray; font-size: 11px;")
+        enable_layout.addWidget(info_label)
+
+        layout.addWidget(enable_group)
+
+        # Polling Settings group
+        polling_group = QGroupBox("Polling Settings")
+        self._polling_group = polling_group
+        polling_layout = QVBoxLayout(polling_group)
+        polling_layout.setSpacing(12)
+
+        # Polling interval
+        interval_row = QHBoxLayout()
+        interval_label = QLabel("Check interval:")
+        interval_label.setMinimumWidth(120)
+        interval_row.addWidget(interval_label)
+
+        self._alert_interval_spin = QSpinBox()
+        self._alert_interval_spin.setRange(5, 60)
+        self._alert_interval_spin.setSuffix(" minutes")
+        self._alert_interval_spin.setToolTip(
+            "How often to check prices for active alerts.\n"
+            "Min: 5 minutes, Max: 60 minutes\n"
+            "Lower = more up-to-date but more API calls"
+        )
+        interval_row.addWidget(self._alert_interval_spin)
+        interval_row.addStretch()
+        polling_layout.addLayout(interval_row)
+
+        # Default cooldown
+        cooldown_row = QHBoxLayout()
+        cooldown_label = QLabel("Default cooldown:")
+        cooldown_label.setMinimumWidth(120)
+        cooldown_row.addWidget(cooldown_label)
+
+        self._alert_cooldown_spin = QSpinBox()
+        self._alert_cooldown_spin.setRange(10, 1440)
+        self._alert_cooldown_spin.setSuffix(" minutes")
+        self._alert_cooldown_spin.setToolTip(
+            "Default time to wait after an alert triggers\n"
+            "before it can trigger again.\n"
+            "Prevents notification spam for volatile prices."
+        )
+        cooldown_row.addWidget(self._alert_cooldown_spin)
+        cooldown_row.addStretch()
+        polling_layout.addLayout(cooldown_row)
+
+        layout.addWidget(polling_group)
+
+        # Notification Settings group
+        notif_group = QGroupBox("Notification Settings")
+        self._alert_notif_group = notif_group
+        notif_layout = QVBoxLayout(notif_group)
+        notif_layout.setSpacing(8)
+
+        self._alert_tray_cb = QCheckBox("Show system tray notifications")
+        self._alert_tray_cb.setToolTip(
+            "When enabled, triggered alerts will show\n"
+            "a notification in your system tray."
+        )
+        notif_layout.addWidget(self._alert_tray_cb)
+
+        self._alert_toast_cb = QCheckBox("Show in-app toast notifications")
+        self._alert_toast_cb.setToolTip(
+            "When enabled, triggered alerts will show\n"
+            "a toast notification inside the app."
+        )
+        notif_layout.addWidget(self._alert_toast_cb)
+
+        layout.addWidget(notif_group)
+
+        # Manage Alerts button
+        manage_row = QHBoxLayout()
+        manage_row.addStretch()
+
+        self._manage_alerts_btn = QPushButton("Manage Alerts...")
+        self._manage_alerts_btn.setToolTip("Open the Price Alerts management dialog")
+        self._manage_alerts_btn.clicked.connect(self._open_alerts_dialog)
+        manage_row.addWidget(self._manage_alerts_btn)
+
+        layout.addLayout(manage_row)
+
+        # Push content to top
+        layout.addStretch()
+
+        return tab
+
+    def _on_alerts_enabled_changed(self) -> None:
+        """Handle alerts enabled checkbox change."""
+        enabled = self._alerts_enabled_cb.isChecked()
+        self._polling_group.setEnabled(enabled)
+        self._alert_notif_group.setEnabled(enabled)
+
+    def _open_alerts_dialog(self) -> None:
+        """Open the price alerts management dialog."""
+        from gui_qt.services import get_price_alert_service
+
+        # Get the alert service (may not be initialized yet)
+        service = get_price_alert_service()
+        if service:
+            from gui_qt.dialogs.price_alerts_dialog import PriceAlertsDialog
+            dialog = PriceAlertsDialog(service, self)
+            dialog.exec()
+
     def _apply_verdict_preset(self, preset: str) -> None:
         """Apply a verdict threshold preset."""
         from core.quick_verdict import VerdictThresholds
@@ -945,10 +1077,18 @@ class SettingsDialog(QDialog):
         else:
             self._preset_label.setText("Current preset: Custom")
 
+        # Alerts
+        self._alerts_enabled_cb.setChecked(self._config.alerts_enabled)
+        self._alert_interval_spin.setValue(self._config.alert_polling_interval_minutes)
+        self._alert_cooldown_spin.setValue(self._config.alert_default_cooldown_minutes)
+        self._alert_tray_cb.setChecked(self._config.alert_show_tray_notifications)
+        self._alert_toast_cb.setChecked(self._config.alert_show_toast_notifications)
+
         # Update dependent states
         self._on_font_scale_changed(self._font_scale_slider.value())
         self._on_rate_limit_changed(self._rate_limit_slider.value())
         self._on_notifications_toggled()
+        self._on_alerts_enabled_changed()
 
     def _reset_to_defaults(self) -> None:
         """Reset settings to their default values based on current tab."""
@@ -980,6 +1120,13 @@ class SettingsDialog(QDialog):
             self._vendor_threshold_spin.setValue(2.0)
             self._keep_threshold_spin.setValue(15.0)
             self._preset_label.setText("Current preset: Default")
+        elif current_tab == 5:  # Alerts
+            self._alerts_enabled_cb.setChecked(True)
+            self._alert_interval_spin.setValue(15)
+            self._alert_cooldown_spin.setValue(30)
+            self._alert_tray_cb.setChecked(True)
+            self._alert_toast_cb.setChecked(True)
+            self._on_alerts_enabled_changed()
 
     def _save_and_accept(self) -> None:
         """Save settings and close the dialog."""
@@ -1049,6 +1196,13 @@ class SettingsDialog(QDialog):
             self._config.verdict_preset = "ssf"
         else:
             self._config.verdict_preset = "custom"
+
+        # Alerts
+        self._config.alerts_enabled = self._alerts_enabled_cb.isChecked()
+        self._config.alert_polling_interval_minutes = self._alert_interval_spin.value()
+        self._config.alert_default_cooldown_minutes = self._alert_cooldown_spin.value()
+        self._config.alert_show_tray_notifications = self._alert_tray_cb.isChecked()
+        self._config.alert_show_toast_notifications = self._alert_toast_cb.isChecked()
 
         self.accept()
 
