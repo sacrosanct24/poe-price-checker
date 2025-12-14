@@ -35,7 +35,11 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         },
         "poe2": {
             "league": "Standard",
-            "divine_chaos_rate": 0.0,
+            # PoE2 uses Exalted Orbs as base currency (not Chaos)
+            # divine_exalted_rate: How many Exalts per Divine (~70-100)
+            "divine_exalted_rate": 80.0,
+            # chaos_exalted_rate: How many Exalts per Chaos (~7)
+            "chaos_exalted_rate": 7.0,
             "last_price_update": None,
         },
     },

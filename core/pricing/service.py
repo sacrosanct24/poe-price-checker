@@ -16,6 +16,7 @@ from core.database import Database
 from core.game_version import GameVersion
 from core.rare_evaluation import RareItemEvaluator
 from data_sources.pricing.poe_ninja import PoeNinjaAPI
+from data_sources.pricing.poe2_ninja import Poe2NinjaAPI
 from data_sources.pricing.poe_watch import PoeWatchAPI
 from data_sources.pricing.trade_api import TradeApiSource
 from core.price_estimation import get_active_policy, round_to_step
@@ -51,19 +52,23 @@ class PriceService:
         parser: ItemParser,
         db: Database,
         poe_ninja: PoeNinjaAPI | None,
+        poe2_ninja: Poe2NinjaAPI | None = None,
         poe_watch: PoeWatchAPI | None = None,
         trade_source: TradeApiSource | None = None,
         rare_evaluator: RareItemEvaluator | None = None,
         logger: logging.Logger | None = None,
         cache: ItemPriceCache | None = None,
+        game_version: GameVersion = GameVersion.POE1,
     ) -> None:
         self.config = config
         self.parser = parser
         self.db = db
         self.poe_ninja = poe_ninja
+        self.poe2_ninja = poe2_ninja
         self.poe_watch = poe_watch
         self.trade_source = trade_source
         self.rare_evaluator = rare_evaluator
+        self.game_version = game_version
         self.logger = logger or logging.getLogger(__name__)
 
         # Item price cache - use provided or get global instance
@@ -896,24 +901,31 @@ class PriceService:
         self, parsed: Any
     ) -> tuple[float, int, str, str]:
         """
-        Look up price using multiple sources (poe.ninja + poe.watch).
+        Look up price using multiple sources.
 
-        Strategy:
+        PoE1 Strategy:
         1. Get price from poe.ninja (primary, faster updates)
         2. Get price from poe.watch (secondary, validation)
-        3. Compare and validate:
-           - If both agree (within 20%), use ninja price with high confidence
-           - If diverge significantly, average them with medium confidence
-           - If one is low confidence, prefer the other
-           - If only one source available, use it with appropriate confidence
+        3. Compare and validate
+
+        PoE2 Strategy:
+        1. Get price from poe2.ninja (primary for PoE2)
+        2. No poe.watch support for PoE2 yet
 
         Returns:
-            (chaos_value, listing_count, source_label, confidence)
+            (value, listing_count, source_label, confidence)
+            - PoE1: value in chaos
+            - PoE2: value in exalted
         """
         item_name = self._get_item_display_name(parsed)
         base_type = self._get_base_type(parsed)
         rarity = (self._get_rarity(parsed) or "").upper()
 
+        # PoE2: Use poe2.ninja
+        if self.game_version == GameVersion.POE2:
+            return self._lookup_price_poe2(parsed, item_name, base_type, rarity)
+
+        # PoE1: Use poe.ninja + poe.watch
         # DEBUG LOGGING
         self.logger.info(f"[MULTI-SOURCE] Looking up price for '{item_name}' (rarity: {rarity}, base: {base_type})")
         self.logger.info(f"[MULTI-SOURCE] Available sources: poe.ninja={self.poe_ninja is not None}, poe.watch={self.poe_watch is not None}")
@@ -1141,6 +1153,92 @@ class PriceService:
             listing_count = 0
 
         return chaos_value, listing_count, "poe.ninja"
+
+    # ------------------------------------------------------------------ #
+    # PoE2 pricing helpers (poe2.ninja)
+    # ------------------------------------------------------------------ #
+
+    def _lookup_price_poe2(
+        self,
+        parsed: Any,
+        item_name: str,
+        base_type: str,
+        rarity: str,
+    ) -> tuple[float, int, str, str]:
+        """
+        Look up PoE2 item price using poe2.ninja.
+
+        Returns:
+            (exalted_value, listing_count, source_label, confidence)
+        """
+        self.logger.info(f"[POE2] Looking up price for '{item_name}' (rarity: {rarity}, base: {base_type})")
+
+        if self.poe2_ninja is None:
+            self.logger.warning("[POE2] poe2.ninja not initialized")
+            return 0.0, 0, "no poe2.ninja", "none"
+
+        # Currency lookup
+        if rarity == "CURRENCY":
+            exalted_value = self.poe2_ninja.get_currency_price(item_name)
+            if exalted_value is not None and exalted_value > 0:
+                self.logger.info(f"[POE2] Currency '{item_name}' = {exalted_value:.2f} exalted")
+                return exalted_value, 1, "poe2.ninja", "high"
+            return 0.0, 0, "poe2.ninja", "none"
+
+        # Item lookup
+        try:
+            price_data = self.poe2_ninja.find_item_price(
+                item_name=item_name,
+                base_type=base_type,
+                rarity=rarity,
+                gem_level=self._get_gem_level(parsed),
+                gem_quality=self._get_gem_quality(parsed),
+                corrupted=self._get_corrupted_flag(parsed),
+            )
+        except Exception as exc:
+            self.logger.warning("poe2.ninja find_item_price failed: %s", exc)
+            return 0.0, 0, "poe2.ninja error", "none"
+
+        if not price_data:
+            self.logger.info(f"[POE2] No price found for '{item_name}'")
+            return 0.0, 0, "not found", "none"
+
+        # PoE2 uses exaltedValue as base currency
+        exalted_raw = (
+            price_data.get("exaltedValue")
+            or price_data.get("exalted_value")
+            or price_data.get("chaosValue")  # fallback if API returns chaos
+            or 0.0
+        )
+        count_raw = (
+            price_data.get("count")
+            or price_data.get("listingCount")
+            or price_data.get("listing_count")
+            or 0
+        )
+
+        try:
+            exalted_value = float(exalted_raw)
+        except (TypeError, ValueError):
+            exalted_value = 0.0
+
+        try:
+            listing_count = int(count_raw)
+        except (TypeError, ValueError):
+            listing_count = 0
+
+        # Determine confidence based on listing count
+        if listing_count >= 20:
+            confidence = "high"
+        elif listing_count >= 5:
+            confidence = "medium"
+        elif listing_count > 0:
+            confidence = "low"
+        else:
+            confidence = "none"
+
+        self.logger.info(f"[POE2] Result: {exalted_value:.1f} exalted (count: {listing_count}, confidence: {confidence})")
+        return exalted_value, listing_count, "poe2.ninja", confidence
 
     def _convert_chaos_to_divines(self, chaos_value: float) -> float:
         """

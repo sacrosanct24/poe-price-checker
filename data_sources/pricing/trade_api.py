@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Mapping, Optional
 import requests
 
 from core.constants import API_TIMEOUT_STANDARD
+from core.game_version import GameVersion
 from data_sources.base_api import BaseAPIClient
 from data_sources.pricing.trade_stat_ids import build_stat_filters
 from core.price_multi import RESULT_COLUMNS
@@ -36,19 +37,26 @@ class PoeTradeClient(BaseAPIClient):
 
     Thin wrapper around BaseAPIClient so other components (e.g. TradeApiSource)
     can share rate limiting, caching, and base_url.
+
+    Supports both PoE1 (/api/trade) and PoE2 (/api/trade2) endpoints.
     """
 
     def __init__(
         self,
         league: str = "Standard",
         *,
+        game_version: GameVersion = GameVersion.POE1,
         logger: Optional[logging.Logger] = None,
         rate_limit: float = 0.33,  # ~1 request per 3 seconds
         cache_ttl: int = 60,       # short TTL for trade listings
         user_agent: Optional[str] = None,
     ) -> None:
+        # Select API endpoint based on game version
+        api_path = "trade2" if game_version == GameVersion.POE2 else "trade"
+        base_url = f"https://www.pathofexile.com/api/{api_path}"
+
         super().__init__(
-            base_url="https://www.pathofexile.com/api/trade",
+            base_url=base_url,
             rate_limit=rate_limit,
             cache_ttl=cache_ttl,
             user_agent=(
@@ -58,11 +66,13 @@ class PoeTradeClient(BaseAPIClient):
         )
 
         self.league = league
+        self.game_version = game_version
         self.logger = logger or logging.getLogger(__name__)
 
         self.logger.info(
-            "Initialized PoeTradeClient for league=%s (rate=%.2f req/s, cache_ttl=%ds)",
+            "Initialized PoeTradeClient for league=%s, game=%s (rate=%.2f req/s, cache_ttl=%ds)",
             league,
+            game_version.value,
             rate_limit,
             cache_ttl,
         )
@@ -112,15 +122,16 @@ class TradeApiSource:
        - check_item(parsed_item: ParsedItem, max_results=20) ->
          list of quote dicts with original_currency/amount/etc.,
          using the official PoE trade HTTP API (search + fetch).
-    """
 
-    BASE_URL = "https://www.pathofexile.com/api/trade"
+    Supports both PoE1 (/api/trade) and PoE2 (/api/trade2) endpoints.
+    """
 
     def __init__(
         self,
         client: Optional[PoeTradeClient] = None,
         *,
         league: Optional[str] = None,
+        game_version: GameVersion = GameVersion.POE1,
         name: Optional[str] = None,
         logger: Optional[logging.Logger] = None,
         session: Optional[requests.Session] = None,
@@ -131,18 +142,28 @@ class TradeApiSource:
 
         Parameters:
             client: PoeTradeClient instance for this league. If omitted,
-                    a new one will be created using `league`.
+                    a new one will be created using `league` and `game_version`.
             league: Optional league name override (e.g. "Keepers").
+            game_version: Game version (POE1 or POE2) for API endpoint selection.
             name: Optional logical name for this source (e.g. "trade_api").
             logger: Logger to use; defaults to module logger.
             session: Optional requests.Session (used in tests to inject fakes).
         """
         self.logger = logger or logging.getLogger(__name__)
 
+        # Set game version and derive BASE_URL
+        self.game_version = game_version
+        api_path = "trade2" if game_version == GameVersion.POE2 else "trade"
+        self.BASE_URL = f"https://www.pathofexile.com/api/{api_path}"
+
         # Decide which league to use and ensure we have a client
         if client is None:
             effective_league = league or "Standard"
-            client = PoeTradeClient(league=effective_league, logger=self.logger)
+            client = PoeTradeClient(
+                league=effective_league,
+                game_version=game_version,
+                logger=self.logger,
+            )
         else:
             effective_league = league or client.league
 
@@ -159,9 +180,10 @@ class TradeApiSource:
             self.session = requests.Session()
 
         self.logger.info(
-            "Initialized TradeApiSource(name=%s, league=%s)",
+            "Initialized TradeApiSource(name=%s, league=%s, game=%s)",
             self.name,
             self.league,
+            self.game_version.value,
         )
 
     # ------------------------------------------------------------------ #
@@ -431,13 +453,20 @@ class TradeApiSource:
                 if rare_evaluation is not None:
                     matched_affixes = getattr(rare_evaluation, "matched_affixes", None)
                     if matched_affixes:
-                        stat_filters = build_stat_filters(matched_affixes, max_filters=4)
+                        # Use game-version-appropriate stat ID builder
+                        if self.game_version == GameVersion.POE2:
+                            from .trade_stat_ids_poe2 import build_poe2_stat_filters
+                            stat_filters = build_poe2_stat_filters(matched_affixes, max_filters=4)
+                        else:
+                            stat_filters = build_stat_filters(matched_affixes, max_filters=4)
+
                         if stat_filters:
                             query["query"]["stats"][0]["filters"] = stat_filters
                             self.logger.info(
-                                "Built rare item query with %d affix filters for base '%s'",
+                                "Built rare item query with %d affix filters for base '%s' (game=%s)",
                                 len(stat_filters),
-                                base_str
+                                base_str,
+                                self.game_version.value,
                             )
 
         # UNIQUE/OTHER items: use name + type

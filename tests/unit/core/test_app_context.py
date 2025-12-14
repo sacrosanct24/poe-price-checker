@@ -71,6 +71,7 @@ class TestAppContextClose:
         """close() should close database and API clients."""
         mock_db = Mock()
         mock_poe_ninja = Mock()
+        mock_poe2_ninja = Mock()
         mock_poe_watch = Mock()
         mock_price_service = Mock()
 
@@ -79,6 +80,7 @@ class TestAppContextClose:
             parser=Mock(),
             db=mock_db,
             poe_ninja=mock_poe_ninja,
+            poe2_ninja=mock_poe2_ninja,
             poe_watch=mock_poe_watch,
             price_service=mock_price_service,
         )
@@ -87,6 +89,7 @@ class TestAppContextClose:
 
         mock_db.close.assert_called_once()
         mock_poe_ninja.close.assert_called_once()
+        mock_poe2_ninja.close.assert_called_once()
         mock_poe_watch.close.assert_called_once()
 
     def test_close_handles_database_error(self):
@@ -99,6 +102,7 @@ class TestAppContextClose:
             parser=Mock(),
             db=mock_db,
             poe_ninja=None,
+            poe2_ninja=None,
             poe_watch=None,
             price_service=Mock(),
         )
@@ -117,6 +121,7 @@ class TestAppContextClose:
             parser=Mock(),
             db=Mock(),
             poe_ninja=mock_poe_ninja,
+            poe2_ninja=None,
             poe_watch=None,
             price_service=Mock(),
         )
@@ -135,6 +140,7 @@ class TestAppContextClose:
             parser=Mock(),
             db=Mock(),
             poe_ninja=None,
+            poe2_ninja=None,
             poe_watch=mock_poe_watch,
             price_service=Mock(),
         )
@@ -144,12 +150,13 @@ class TestAppContextClose:
         mock_poe_watch.close.assert_called_once()
 
     def test_close_handles_none_components(self):
-        """close() should handle None poe_ninja and poe_watch."""
+        """close() should handle None poe_ninja, poe2_ninja, and poe_watch."""
         ctx = AppContext(
             config=Mock(),
             parser=Mock(),
             db=Mock(),
             poe_ninja=None,
+            poe2_ninja=None,
             poe_watch=None,
             price_service=Mock(),
         )

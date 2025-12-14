@@ -12,6 +12,7 @@ from core.database import Database
 from core.game_version import GameVersion, GameConfig
 from core.rare_evaluation import RareItemEvaluator
 from data_sources.pricing.poe_ninja import PoeNinjaAPI
+from data_sources.pricing.poe2_ninja import Poe2NinjaAPI
 from data_sources.pricing.poe_watch import PoeWatchAPI
 from core.pricing import PriceService
 from core.price_multi import (
@@ -35,6 +36,7 @@ class AppContext:
     - parser: item text → ParsedItem
     - db: SQLite persistence (checked items, sales, price history, plugins)
     - poe_ninja: PoE1 pricing API client
+    - poe2_ninja: PoE2 pricing API client (poe2.ninja)
     - price_service: high-level *multi-source* item pricing façade for GUI/CLI
       (currently wraps the existing single PriceService, but can host multiple
        PriceSource implementations going forward).
@@ -44,7 +46,8 @@ class AppContext:
     config: Config
     parser: ItemParser
     db: Database
-    poe_ninja: PoeNinjaAPI | None  # None when current game is PoE2 (until PoE2 support exists)
+    poe_ninja: PoeNinjaAPI | None  # None when current game is PoE2
+    poe2_ninja: Poe2NinjaAPI | None  # None when current game is PoE1
     poe_watch: PoeWatchAPI | None  # None when disabled or PoE2
     price_service: MultiSourcePriceService
 
@@ -75,6 +78,13 @@ class AppContext:
             except Exception as e:
                 logger.error(f"Error closing poe.ninja API: {e}")
 
+        if self.poe2_ninja:
+            try:
+                self.poe2_ninja.close()
+                logger.debug("poe2.ninja API closed")
+            except Exception as e:
+                logger.error(f"Error closing poe2.ninja API: {e}")
+
         if self.poe_watch:
             try:
                 self.poe_watch.close()
@@ -104,6 +114,7 @@ def create_app_context() -> AppContext:
     game_cfg: GameConfig = config.get_game_config(game)
 
     poe_ninja: PoeNinjaAPI | None = None
+    poe2_ninja: Poe2NinjaAPI | None = None
     poe_watch: PoeWatchAPI | None = None
     logger = logging.getLogger(__name__)
 
@@ -163,20 +174,61 @@ def create_app_context() -> AppContext:
             )
             poe_watch = None
 
+    elif game == GameVersion.POE2:
+        # ------------------------------------------------------------------
+        # PoE2 pricing sources
+        # ------------------------------------------------------------------
+        logger.info("Initializing PoE2 pricing sources for league: %s", game_cfg.league)
+
+        # poe2.ninja API (primary pricing source for PoE2)
+        try:
+            poe2_ninja = Poe2NinjaAPI(league=game_cfg.league)
+            # Apply timeouts and endpoint TTLs from config
+            try:
+                connect_to, read_to = config.get_api_timeouts()
+                poe2_ninja.timeout = (connect_to, read_to)
+                poe2_ninja.endpoint_ttls = config.get_pricing_ttls()
+            except (ValueError, TypeError, AttributeError):
+                pass  # Defensive: invalid timeout/TTL config, use API defaults
+            logger.info("[OK] poe2.ninja API initialized successfully")
+        except (requests.RequestException, ValueError, OSError) as exc:
+            logger.warning(
+                "Failed to initialize poe2.ninja API; "
+                "PoE2 pricing may be unavailable. Error: %s",
+                exc,
+            )
+            poe2_ninja = None
+
     # ------------------------------------------------------------------
-    # Trade API source (PoE1 only) – wired into PriceService
+    # Trade API source – wired into PriceService
     # ------------------------------------------------------------------
     trade_source: TradeApiSource | None = None
     if game == GameVersion.POE1:
         trade_logger = logging.getLogger("poe_price_checker.trade_api")
         trade_client = PoeTradeClient(
             league=game_cfg.league,
+            game_version=GameVersion.POE1,
             logger=trade_logger,
         )
         trade_source = TradeApiSource(
             name="trade_api",
             client=trade_client,
             league=game_cfg.league,
+            game_version=GameVersion.POE1,
+            logger=trade_logger,
+        )
+    elif game == GameVersion.POE2:
+        trade_logger = logging.getLogger("poe_price_checker.trade_api")
+        trade_client = PoeTradeClient(
+            league=game_cfg.league,
+            game_version=GameVersion.POE2,
+            logger=trade_logger,
+        )
+        trade_source = TradeApiSource(
+            name="trade_api_poe2",
+            client=trade_client,
+            league=game_cfg.league,
+            game_version=GameVersion.POE2,
             logger=trade_logger,
         )
 
@@ -199,7 +251,8 @@ def create_app_context() -> AppContext:
 
     # ------------------------------------------------------------------
     # Base price service with multi-source support
-    # Now integrates poe.ninja + poe.watch + trade API + rare evaluator
+    # PoE1: poe.ninja + poe.watch + trade API + rare evaluator
+    # PoE2: poe2.ninja + trade API
     # ------------------------------------------------------------------
     price_logger = logging.getLogger("poe_price_checker.price_service")
     base_price_service = PriceService(
@@ -207,19 +260,22 @@ def create_app_context() -> AppContext:
         parser=parser,
         db=db,
         poe_ninja=poe_ninja,
-        poe_watch=poe_watch,  # secondary pricing source
+        poe2_ninja=poe2_ninja,  # PoE2 pricing source
+        poe_watch=poe_watch,  # secondary pricing source (PoE1 only)
         trade_source=trade_source,
-        rare_evaluator=rare_evaluator,  # NEW: rare item pricing
+        rare_evaluator=rare_evaluator,  # rare item pricing (PoE1 only)
         logger=price_logger,
+        game_version=game,  # which game version we're pricing for
     )
 
     # ------------------------------------------------------------------
     # Multi-source aggregation layer
     # ------------------------------------------------------------------
     # Wrap the existing PriceService as a PriceSource. This "main" source
-    # already uses poe.ninja + trade quotes + DB stats internally.
+    # uses poe.ninja (PoE1) or poe2.ninja (PoE2) + trade quotes + DB stats.
+    base_source_name = "poe2.ninja" if game == GameVersion.POE2 else "poe.ninja"
     base_source: PriceSource = ExistingServiceAdapter(
-        name="poe_ninja",  # logical source label for the main row
+        name=base_source_name,  # logical source label for the main row
         service=base_price_service,
     )
 
@@ -283,6 +339,7 @@ def create_app_context() -> AppContext:
         parser=parser,
         db=db,
         poe_ninja=poe_ninja,
+        poe2_ninja=poe2_ninja,
         poe_watch=poe_watch,
         price_service=multi_price_service,
     )

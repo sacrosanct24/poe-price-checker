@@ -59,27 +59,41 @@ class GameVersion(Enum):
 class GameConfig:
     """
     Configuration for a specific game version.
-    Stores league, last update time, etc.
+    Stores league, currency rates, etc.
+
+    PoE1 uses Chaos as base currency, Divine as high-value.
+    PoE2 uses Exalted as base currency, Divine as high-value.
     """
 
     def __init__(
             self,
             game_version: GameVersion,
             league: str = "Standard",
-            divine_chaos_rate: float = 1.0
+            divine_chaos_rate: float = 1.0,
+            # PoE2-specific: Exalted is the base currency
+            divine_exalted_rate: float = 80.0,
+            chaos_exalted_rate: float = 7.0,
     ):
         """
         Args:
             game_version: Which game (POE1 or POE2)
             league: Current league name
-            divine_chaos_rate: Divine orb to chaos conversion rate
+            divine_chaos_rate: PoE1: Divine orb to chaos conversion rate
+            divine_exalted_rate: PoE2: Divine orb to exalted conversion rate
+            chaos_exalted_rate: PoE2: Chaos orb to exalted conversion rate
         """
         self.game_version = game_version
         self.league = league
+        # PoE1 currency rates
         self.divine_chaos_rate = divine_chaos_rate
+        # PoE2 currency rates
+        self.divine_exalted_rate = divine_exalted_rate
+        self.chaos_exalted_rate = chaos_exalted_rate
 
     def __repr__(self) -> str:
-        return f"GameConfig(game={self.game_version}, league={self.league}, divine_rate={self.divine_chaos_rate:.1f})"
+        if self.is_poe2():
+            return f"GameConfig(game={self.game_version}, league={self.league}, divine_exalt_rate={self.divine_exalted_rate:.1f})"
+        return f"GameConfig(game={self.game_version}, league={self.league}, divine_chaos_rate={self.divine_chaos_rate:.1f})"
 
     def get_api_league_name(self) -> str:
         """
@@ -95,6 +109,26 @@ class GameConfig:
     def is_poe2(self) -> bool:
         """Check if this is PoE2"""
         return self.game_version == GameVersion.POE2
+
+    def get_base_currency_name(self) -> str:
+        """
+        Get the name of the base currency for this game.
+
+        PoE1: Chaos Orb
+        PoE2: Exalted Orb
+        """
+        return "exalted" if self.is_poe2() else "chaos"
+
+    def get_divine_rate(self) -> float:
+        """
+        Get divine orb conversion rate to base currency.
+
+        PoE1: Divine per Chaos
+        PoE2: Divine per Exalted
+        """
+        if self.is_poe2():
+            return self.divine_exalted_rate
+        return self.divine_chaos_rate
 
 
 # Testing
