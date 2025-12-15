@@ -1,0 +1,474 @@
+{
+  "_comment": "Cluster jewel notables database for evaluation",
+  "_version": "1.0",
+  "notables": {
+    "Sadist": {
+      "weight": 10,
+      "tier": "meta",
+      "skill_type": "elemental_damage",
+      "description": "10% increased Damage for each type of Ailment on enemy"
+    },
+    "Widespread Destruction": {
+      "weight": 9,
+      "tier": "high",
+      "skill_type": "elemental_damage",
+      "description": "20% increased Elemental Damage, 10% increased AoE"
+    },
+    "Prismatic Heart": {
+      "weight": 8,
+      "tier": "high",
+      "skill_type": "elemental_damage",
+      "description": "+10% to all Elemental Resistances, 30% inc Elemental Damage"
+    },
+    "Doryani's Lesson": {
+      "weight": 9,
+      "tier": "high",
+      "skill_type": "elemental_damage",
+      "description": "0.2% of Elemental Damage Leeched as Life"
+    },
+    "Blowback": {
+      "weight": 8,
+      "tier": "high",
+      "skill_type": "fire_damage",
+      "description": "Ignites spread to nearby enemies"
+    },
+    "Fan the Flames": {
+      "weight": 8,
+      "tier": "high",
+      "skill_type": "fire_damage",
+      "description": "Ignites spread to enemies within small radius"
+    },
+    "Burning Bright": {
+      "weight": 7,
+      "tier": "medium",
+      "skill_type": "fire_damage",
+      "description": "25% increased Fire Damage, 8% increased Area of Effect"
+    },
+    "Cooked Alive": {
+      "weight": 7,
+      "tier": "medium",
+      "skill_type": "fire_damage",
+      "description": "Ignited enemies have -5% Fire Resistance"
+    },
+    "Smoking Remains": {
+      "weight": 6,
+      "tier": "medium",
+      "skill_type": "fire_damage",
+      "description": "25% chance to create Smoke Cloud on Kill"
+    },
+    "Snowstorm": {
+      "weight": 8,
+      "tier": "high",
+      "skill_type": "cold_damage",
+      "description": "Lightning Damage can Chill, Cold Damage can Shock"
+    },
+    "Deep Chill": {
+      "weight": 7,
+      "tier": "medium",
+      "skill_type": "cold_damage",
+      "description": "Enemies Chilled by you have -10% Cold Resistance"
+    },
+    "Blanketed Snow": {
+      "weight": 7,
+      "tier": "medium",
+      "skill_type": "cold_damage",
+      "description": "25% increased Cold Damage, Enemies on Chilled Ground have -10% Cold Res"
+    },
+    "Storm Drinker": {
+      "weight": 8,
+      "tier": "high",
+      "skill_type": "lightning_damage",
+      "description": "0.5% of Lightning Damage Leeched as Energy Shield"
+    },
+    "Supercharge": {
+      "weight": 8,
+      "tier": "high",
+      "skill_type": "lightning_damage",
+      "description": "Lightning Damage with Non-Crit Strikes is Lucky"
+    },
+    "Stormrider": {
+      "weight": 7,
+      "tier": "medium",
+      "skill_type": "lightning_damage",
+      "description": "Gain Power Charge when you Shock a Rare or Unique Enemy"
+    },
+    "Unspeakable Gifts": {
+      "weight": 9,
+      "tier": "high",
+      "skill_type": "chaos_damage",
+      "description": "10% chance for enemies to Explode on Kill dealing Chaos Damage"
+    },
+    "Unholy Grace": {
+      "weight": 8,
+      "tier": "high",
+      "skill_type": "chaos_damage",
+      "description": "30% increased Chaos Damage, 10% increased Attack and Cast Speed"
+    },
+    "Wicked Pall": {
+      "weight": 7,
+      "tier": "medium",
+      "skill_type": "chaos_damage",
+      "description": "35% increased Chaos Damage, 10% increased Skill Effect Duration"
+    },
+    "Touch of Cruelty": {
+      "weight": 8,
+      "tier": "high",
+      "skill_type": "chaos_damage",
+      "description": "Chaos Damage can Hinder, Hindered Enemies deal 10% reduced Damage"
+    },
+    "Feed the Fury": {
+      "weight": 9,
+      "tier": "high",
+      "skill_type": "attack_damage",
+      "description": "0.4% Attack Damage Leeched as Life, 3% Attack Speed per Leech"
+    },
+    "Fuel the Fight": {
+      "weight": 8,
+      "tier": "high",
+      "skill_type": "attack_damage",
+      "description": "0.4% Attack Damage Leeched as Mana, 3% Attack Speed per Leech"
+    },
+    "Martial Prowess": {
+      "weight": 8,
+      "tier": "high",
+      "skill_type": "attack_damage",
+      "description": "20% increased Attack Damage, 6% Attack Speed, 15% Accuracy"
+    },
+    "Drive the Destruction": {
+      "weight": 7,
+      "tier": "medium",
+      "skill_type": "attack_damage",
+      "description": "Exerted Attacks deal 25% increased Damage"
+    },
+    "Deadly Repartee": {
+      "weight": 7,
+      "tier": "medium",
+      "skill_type": "attack_damage",
+      "description": "+15% to Critical Strike Multiplier for Counterattacks"
+    },
+    "Run Through": {
+      "weight": 8,
+      "tier": "high",
+      "skill_type": "physical_damage",
+      "description": "Overwhelm 10% Physical Damage Reduction"
+    },
+    "Force Multiplier": {
+      "weight": 7,
+      "tier": "medium",
+      "skill_type": "physical_damage",
+      "description": "20% increased Physical Damage, 5% increased Attack Speed"
+    },
+    "Battle-Hardened": {
+      "weight": 7,
+      "tier": "medium",
+      "skill_type": "physical_damage",
+      "description": "30% increased Armour, 25% increased Physical Damage"
+    },
+    "Master of Fear": {
+      "weight": 9,
+      "tier": "high",
+      "skill_type": "curse",
+      "description": "Enemies Cursed by you are Intimidated, Unnerved"
+    },
+    "Wish for Death": {
+      "weight": 9,
+      "tier": "high",
+      "skill_type": "curse",
+      "description": "Culling Strike against Cursed Enemies"
+    },
+    "Evil Eye": {
+      "weight": 7,
+      "tier": "medium",
+      "skill_type": "curse",
+      "description": "Curse Skills have 20% increased Skill Effect Duration"
+    },
+    "Dark Discourse": {
+      "weight": 7,
+      "tier": "medium",
+      "skill_type": "curse",
+      "description": "+1 to maximum number of Curses on Enemies"
+    },
+    "Renewal": {
+      "weight": 9,
+      "tier": "high",
+      "skill_type": "minion_damage",
+      "description": "Minions Regenerate 1% Life per second, +10% to Minion Attack and Cast Speed"
+    },
+    "Rotten Claws": {
+      "weight": 8,
+      "tier": "high",
+      "skill_type": "minion_damage",
+      "description": "Minions have 20% chance to Impale on Hit"
+    },
+    "Call to the Slaughter": {
+      "weight": 8,
+      "tier": "high",
+      "skill_type": "minion_damage",
+      "description": "Minions deal 25% increased Damage, +10% Movement Speed"
+    },
+    "Feasting Fiends": {
+      "weight": 9,
+      "tier": "high",
+      "skill_type": "minion_damage",
+      "description": "Minions have 10% chance to deal Double Damage"
+    },
+    "Vicious Bite": {
+      "weight": 8,
+      "tier": "high",
+      "skill_type": "minion_damage",
+      "description": "+30% to Minion Critical Strike Multiplier"
+    },
+    "Blessed Rebirth": {
+      "weight": 9,
+      "tier": "high",
+      "skill_type": "minion_life",
+      "description": "Minions are Immune to Damage for 4 seconds after Summoned"
+    },
+    "Life from Death": {
+      "weight": 8,
+      "tier": "high",
+      "skill_type": "minion_life",
+      "description": "Regenerate 2% Life on Minion Death"
+    },
+    "Precise Commander": {
+      "weight": 8,
+      "tier": "high",
+      "skill_type": "aura",
+      "description": "+25% Crit Chance and Multiplier while affected by Precision"
+    },
+    "Purposeful Harbinger": {
+      "weight": 9,
+      "tier": "high",
+      "skill_type": "aura",
+      "description": "Auras from Skills grant +2% increased Damage per Aura"
+    },
+    "First Among Equals": {
+      "weight": 7,
+      "tier": "medium",
+      "skill_type": "aura",
+      "description": "+2% to effect of Non-Curse Auras"
+    },
+    "Pure Agony": {
+      "weight": 8,
+      "tier": "high",
+      "skill_type": "aura",
+      "description": "+5 to Maximum Virulence, +3% Minion Poison Chance per Virulence"
+    },
+    "Fettle": {
+      "weight": 9,
+      "tier": "high",
+      "skill_type": "life",
+      "description": "+20 to maximum Life, 10% increased maximum Life"
+    },
+    "Feast of Flesh": {
+      "weight": 7,
+      "tier": "medium",
+      "skill_type": "life",
+      "description": "Recover 1% of Life on Kill"
+    },
+    "Surging Vitality": {
+      "weight": 8,
+      "tier": "high",
+      "skill_type": "life",
+      "description": "Regenerate 1.5% of Life per second during Effect"
+    },
+    "Peak Vigour": {
+      "weight": 7,
+      "tier": "medium",
+      "skill_type": "life",
+      "description": "+25 to Maximum Life, 6% increased Maximum Life"
+    },
+    "Energy From Naught": {
+      "weight": 8,
+      "tier": "high",
+      "skill_type": "energy_shield",
+      "description": "+100 to Maximum Energy Shield"
+    },
+    "Will Shaper": {
+      "weight": 7,
+      "tier": "medium",
+      "skill_type": "energy_shield",
+      "description": "+50 to Maximum Energy Shield, 10% faster start of ES Recharge"
+    },
+    "Spring Back": {
+      "weight": 7,
+      "tier": "medium",
+      "skill_type": "energy_shield",
+      "description": "100% increased Energy Shield Recharge Rate"
+    },
+    "Pressure Points": {
+      "weight": 9,
+      "tier": "high",
+      "skill_type": "crit",
+      "description": "+25% to Critical Strike Multiplier"
+    },
+    "Quick Getaway": {
+      "weight": 8,
+      "tier": "high",
+      "skill_type": "crit",
+      "description": "10% increased Attack/Cast Speed on Crit, +5% Movement Speed"
+    },
+    "Basics of Pain": {
+      "weight": 7,
+      "tier": "medium",
+      "skill_type": "crit",
+      "description": "+20% to Critical Strike Multiplier"
+    },
+    "Assert Dominance": {
+      "weight": 7,
+      "tier": "medium",
+      "skill_type": "crit",
+      "description": "Gain Adrenaline for 3 seconds on Crit"
+    },
+    "Eye of the Storm": {
+      "weight": 8,
+      "tier": "high",
+      "skill_type": "spell_damage",
+      "description": "30% increased Spell Damage, +10% Crit Chance for Spells"
+    },
+    "Thaumophage": {
+      "weight": 8,
+      "tier": "high",
+      "skill_type": "spell_damage",
+      "description": "0.5% of Spell Damage Leeched as Energy Shield"
+    },
+    "Conjured Wall": {
+      "weight": 7,
+      "tier": "medium",
+      "skill_type": "spell_damage",
+      "description": "+5% Chance to Block Spell Damage"
+    },
+    "Burden Projection": {
+      "weight": 7,
+      "tier": "medium",
+      "skill_type": "spell_damage",
+      "description": "Enemies take 5% increased Damage for each Impale on them"
+    },
+    "Scintillating Idea": {
+      "weight": 8,
+      "tier": "high",
+      "skill_type": "mana",
+      "description": "10% of Maximum Mana as Extra Maximum Energy Shield"
+    },
+    "Openness": {
+      "weight": 6,
+      "tier": "low",
+      "skill_type": "mana",
+      "description": "+20 to Maximum Mana, 10% increased Mana"
+    }
+  },
+  "enchantment_values": {
+    "fire_damage": { "base_weight": 7, "meta_multiplier": 1.2, "display_name": "Fire Damage" },
+    "cold_damage": { "base_weight": 7, "meta_multiplier": 1.0, "display_name": "Cold Damage" },
+    "lightning_damage": { "base_weight": 7, "meta_multiplier": 1.1, "display_name": "Lightning Damage" },
+    "chaos_damage": { "base_weight": 6, "meta_multiplier": 1.3, "display_name": "Chaos Damage" },
+    "physical_damage": { "base_weight": 7, "meta_multiplier": 1.0, "display_name": "Physical Damage" },
+    "elemental_damage": { "base_weight": 8, "meta_multiplier": 1.2, "display_name": "Elemental Damage" },
+    "attack_damage": { "base_weight": 8, "meta_multiplier": 1.2, "display_name": "Attack Damage" },
+    "spell_damage": { "base_weight": 7, "meta_multiplier": 1.1, "display_name": "Spell Damage" },
+    "minion_damage": { "base_weight": 8, "meta_multiplier": 1.4, "display_name": "Minion Damage" },
+    "minion_life": { "base_weight": 7, "meta_multiplier": 1.3, "display_name": "Minion Life" },
+    "life": { "base_weight": 9, "meta_multiplier": 1.3, "display_name": "Life" },
+    "mana": { "base_weight": 5, "meta_multiplier": 0.9, "display_name": "Mana" },
+    "energy_shield": { "base_weight": 6, "meta_multiplier": 1.0, "display_name": "Energy Shield" },
+    "armour": { "base_weight": 6, "meta_multiplier": 1.1, "display_name": "Armour" },
+    "evasion": { "base_weight": 6, "meta_multiplier": 1.0, "display_name": "Evasion" },
+    "crit": { "base_weight": 8, "meta_multiplier": 1.2, "display_name": "Critical Strike" },
+    "curse": { "base_weight": 7, "meta_multiplier": 1.1, "display_name": "Curse Effect" },
+    "aura": { "base_weight": 8, "meta_multiplier": 1.2, "display_name": "Aura Effect" },
+    "effect_duration": { "base_weight": 6, "meta_multiplier": 1.0, "display_name": "Skill Effect Duration" },
+    "totem": { "base_weight": 6, "meta_multiplier": 1.0, "display_name": "Totem Damage" },
+    "trap": { "base_weight": 6, "meta_multiplier": 1.0, "display_name": "Trap Damage" },
+    "mine": { "base_weight": 6, "meta_multiplier": 1.0, "display_name": "Mine Damage" },
+    "brand": { "base_weight": 6, "meta_multiplier": 1.0, "display_name": "Brand Damage" },
+    "channelling": { "base_weight": 6, "meta_multiplier": 1.0, "display_name": "Channelling Skill Damage" }
+  },
+  "synergy_combos": {
+    "fire_dot_spread": {
+      "required_notables": ["Blowback", "Fan the Flames"],
+      "bonus": 20,
+      "description": "Fire DoT spread combo"
+    },
+    "attack_leech": {
+      "required_notables": ["Feed the Fury", "Fuel the Fight"],
+      "bonus": 15,
+      "description": "Attack sustain combo"
+    },
+    "minion_offense": {
+      "required_notables": ["Rotten Claws", "Vicious Bite"],
+      "bonus": 15,
+      "description": "Minion crit/impale combo"
+    },
+    "minion_sustain": {
+      "required_notables": ["Renewal", "Blessed Rebirth"],
+      "bonus": 18,
+      "description": "Minion survivability combo"
+    },
+    "curse_amplify": {
+      "required_notables": ["Master of Fear", "Wish for Death"],
+      "bonus": 20,
+      "description": "Curse damage amplification"
+    },
+    "elemental_ailment": {
+      "required_notables": ["Sadist", "Snowstorm"],
+      "bonus": 15,
+      "description": "Multi-ailment synergy"
+    },
+    "chaos_dot": {
+      "required_notables": ["Wicked Pall", "Unholy Grace"],
+      "bonus": 12,
+      "description": "Chaos DoT combo"
+    },
+    "life_sustain": {
+      "required_notables": ["Fettle", "Surging Vitality"],
+      "bonus": 12,
+      "description": "Life recovery combo"
+    }
+  },
+  "size_values": {
+    "Small": {
+      "base_value": 1.0,
+      "max_passives": 3,
+      "max_notables": 1,
+      "socket_bonus": 0
+    },
+    "Medium": {
+      "base_value": 1.5,
+      "max_passives": 5,
+      "max_notables": 2,
+      "socket_bonus": 0
+    },
+    "Large": {
+      "base_value": 2.0,
+      "max_passives": 12,
+      "max_notables": 3,
+      "socket_bonus": 10
+    }
+  },
+  "enchantment_patterns": {
+    "fire_damage": ["fire damage", "burning damage", "ignite"],
+    "cold_damage": ["cold damage", "freeze", "chill"],
+    "lightning_damage": ["lightning damage", "shock"],
+    "chaos_damage": ["chaos damage", "poison"],
+    "physical_damage": ["physical damage", "impale"],
+    "elemental_damage": ["elemental damage"],
+    "attack_damage": ["attack damage", "attack speed", "accuracy"],
+    "spell_damage": ["spell damage", "cast speed"],
+    "minion_damage": ["minion damage", "minions deal"],
+    "minion_life": ["minion life", "minion maximum life"],
+    "life": ["maximum life", "life regeneration"],
+    "mana": ["maximum mana", "mana regeneration"],
+    "energy_shield": ["energy shield", "maximum energy shield"],
+    "armour": ["armour", "physical damage reduction"],
+    "evasion": ["evasion", "evasion rating"],
+    "crit": ["critical strike", "critical"],
+    "curse": ["curse effect", "cursed enemies"],
+    "aura": ["aura effect", "non-curse auras"],
+    "effect_duration": ["skill effect duration"],
+    "totem": ["totem damage", "totem life"],
+    "trap": ["trap damage", "trap throwing speed"],
+    "mine": ["mine damage", "mine throwing speed"],
+    "brand": ["brand damage", "brand attachment"],
+    "channelling": ["channelling skill"]
+  }
+}

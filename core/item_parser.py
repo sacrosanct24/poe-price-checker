@@ -84,8 +84,17 @@ class ParsedItem:
     # PoE2 mod types
     rune_mods: List[str] = field(default_factory=list)  # Mods from socketed runes
 
+    # Cluster jewel specific fields
+    cluster_jewel_size: Optional[str] = None  # "Small", "Medium", "Large"
+    cluster_jewel_passives: Optional[int] = None  # Number of passives (2-12)
+    cluster_jewel_enchantment: Optional[str] = None  # e.g., "fire_damage"
+    cluster_jewel_enchantment_text: Optional[str] = None  # Full enchant text
+    cluster_jewel_notables: List[str] = field(default_factory=list)  # Notable names
+    cluster_jewel_sockets: int = 0  # Jewel sockets on large clusters
+
     # Attached during price checking (set by price_service)
     _rare_evaluation: Optional[Any] = None
+    _unique_evaluation: Optional[Any] = None  # UniqueItemEvaluation for uniques
 
     def get_display_name(self) -> str:
         """
@@ -131,6 +140,13 @@ class ParsedItem:
             "is_unmodifiable": self.is_unmodifiable,
             "is_sanctified": self.is_sanctified,
             "rune_mods": self.rune_mods,
+            # Cluster jewel specific
+            "cluster_jewel_size": self.cluster_jewel_size,
+            "cluster_jewel_passives": self.cluster_jewel_passives,
+            "cluster_jewel_enchantment": self.cluster_jewel_enchantment,
+            "cluster_jewel_enchantment_text": self.cluster_jewel_enchantment_text,
+            "cluster_jewel_notables": self.cluster_jewel_notables,
+            "cluster_jewel_sockets": self.cluster_jewel_sockets,
         }
 
     @classmethod
@@ -558,6 +574,10 @@ class ItemParser:
                 # Otherwise it's a normal explicit mod
                 item.explicits.append(line)
 
+        # Post-processing: Cluster jewel detection
+        if item.base_type and "Cluster Jewel" in item.base_type:
+            self._parse_cluster_jewel(item)
+
     # ----------------------------------------------------------------------
     # Helpers
     # ----------------------------------------------------------------------
@@ -591,6 +611,111 @@ class ItemParser:
                 except ValueError:
                     pass  # Invalid requirement value, skip silently
                 return
+
+    # ----------------------------------------------------------------------
+    # Cluster Jewel Parsing
+    # ----------------------------------------------------------------------
+
+    # Regex for cluster jewel parsing
+    CLUSTER_PASSIVE_COUNT_RE = re.compile(r"Adds (\d+) Passive Skill", re.IGNORECASE)
+    CLUSTER_NOTABLE_RE = re.compile(r"1 Added Passive Skill is (.+)", re.IGNORECASE)
+    CLUSTER_SOCKET_RE = re.compile(r"Adds? (\d+) Jewel Sockets?", re.IGNORECASE)
+
+    # Mapping of keywords to enchantment types
+    CLUSTER_ENCHANT_PATTERNS = {
+        "fire damage": "fire_damage",
+        "burning damage": "fire_damage",
+        "ignite": "fire_damage",
+        "cold damage": "cold_damage",
+        "freeze": "cold_damage",
+        "chill": "cold_damage",
+        "lightning damage": "lightning_damage",
+        "shock": "lightning_damage",
+        "chaos damage": "chaos_damage",
+        "poison": "chaos_damage",
+        "physical damage": "physical_damage",
+        "impale": "physical_damage",
+        "elemental damage": "elemental_damage",
+        "attack damage": "attack_damage",
+        "attack speed": "attack_damage",
+        "accuracy": "attack_damage",
+        "spell damage": "spell_damage",
+        "cast speed": "spell_damage",
+        "minion damage": "minion_damage",
+        "minions deal": "minion_damage",
+        "minion life": "minion_life",
+        "minion maximum life": "minion_life",
+        "maximum life": "life",
+        "life regeneration": "life",
+        "maximum mana": "mana",
+        "mana regeneration": "mana",
+        "energy shield": "energy_shield",
+        "maximum energy shield": "energy_shield",
+        "armour": "armour",
+        "physical damage reduction": "armour",
+        "evasion": "evasion",
+        "evasion rating": "evasion",
+        "critical strike": "crit",
+        "critical": "crit",
+        "curse effect": "curse",
+        "cursed enemies": "curse",
+        "aura effect": "aura",
+        "non-curse auras": "aura",
+        "skill effect duration": "effect_duration",
+        "totem damage": "totem",
+        "totem life": "totem",
+        "trap damage": "trap",
+        "trap throwing speed": "trap",
+        "mine damage": "mine",
+        "mine throwing speed": "mine",
+        "brand damage": "brand",
+        "brand attachment": "brand",
+        "channelling skill": "channelling",
+    }
+
+    def _parse_cluster_jewel(self, item: ParsedItem) -> None:
+        """Parse cluster jewel specific properties from enchants and explicits."""
+        # Determine size from base type
+        base = item.base_type or ""
+        if "Large" in base:
+            item.cluster_jewel_size = "Large"
+        elif "Medium" in base:
+            item.cluster_jewel_size = "Medium"
+        elif "Small" in base:
+            item.cluster_jewel_size = "Small"
+
+        # Parse enchantments for passive count and skill type
+        for enchant in item.enchants:
+            # Extract passive count: "Adds 8 Passive Skills"
+            if m := self.CLUSTER_PASSIVE_COUNT_RE.search(enchant):
+                item.cluster_jewel_passives = int(m.group(1))
+
+            # Check for skill type enchantment: "Added Small Passive Skills grant: ..."
+            if "Added Small Passive Skills grant" in enchant or "grant:" in enchant.lower():
+                item.cluster_jewel_enchantment_text = enchant
+                item.cluster_jewel_enchantment = self._identify_cluster_enchantment(enchant)
+
+        # Parse explicits for notables and jewel sockets
+        for mod in item.explicits:
+            # Extract notable: "1 Added Passive Skill is Blowback"
+            if m := self.CLUSTER_NOTABLE_RE.match(mod):
+                notable_name = m.group(1).strip()
+                item.cluster_jewel_notables.append(notable_name)
+                continue
+
+            # Count jewel sockets: "Adds 1 Jewel Socket"
+            if m := self.CLUSTER_SOCKET_RE.search(mod):
+                item.cluster_jewel_sockets += int(m.group(1))
+
+    def _identify_cluster_enchantment(self, enchant_text: str) -> str:
+        """Identify the enchantment type from full enchantment text."""
+        enchant_lower = enchant_text.lower()
+
+        for pattern, enchant_type in self.CLUSTER_ENCHANT_PATTERNS.items():
+            if pattern in enchant_lower:
+                return enchant_type
+
+        return "unknown"
 
 
 if __name__ == "__main__":  # pragma: no cover

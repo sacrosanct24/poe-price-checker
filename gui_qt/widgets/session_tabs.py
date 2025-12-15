@@ -180,18 +180,20 @@ class SessionPanel(QWidget):
 
         layout.addWidget(results_group, stretch=1)
 
-        # Bottom: Rare evaluation panel (hidden by default)
+        # Rare evaluation panel (kept for evaluator/meta weights, not displayed)
+        # Merged into UnifiedVerdictPanel
         self.rare_eval_panel = RareEvaluationPanelWidget()
         self.rare_eval_panel.setVisible(False)
-        layout.addWidget(self.rare_eval_panel)
+        # Note: Not added to layout - functionality merged into UnifiedVerdictPanel
 
         # Forward the update_meta_requested signal
         self.rare_eval_panel.update_meta_requested.connect(self._on_update_meta_requested)
 
-        # Bottom: Quick verdict panel (casual player summary)
+        # Quick verdict panel (kept for meta weights/thresholds, not displayed)
+        # Merged into UnifiedVerdictPanel
         self.quick_verdict_panel = QuickVerdictPanel()
         self.quick_verdict_panel.setVisible(False)
-        layout.addWidget(self.quick_verdict_panel)
+        # Note: Not added to layout - functionality merged into UnifiedVerdictPanel
 
         # Bottom: Verdict statistics (session tracking)
         self.verdict_stats_widget = VerdictStatisticsWidget()
@@ -276,14 +278,17 @@ class SessionPanel(QWidget):
         """
         self.verdict_stats_widget.update_stats(stats)
 
-    def set_unified_verdict(self, verdict: Any) -> None:
+    def set_unified_verdict(
+        self, verdict: Any, rare_evaluation: Any = None
+    ) -> None:
         """Display a unified verdict for the current item.
 
         Args:
             verdict: UnifiedVerdict instance with comprehensive evaluation
+            rare_evaluation: Optional RareItemEvaluation for detailed sections
         """
         if verdict:
-            self.unified_verdict_panel.set_verdict(verdict)
+            self.unified_verdict_panel.set_verdict(verdict, rare_evaluation)
             self.unified_verdict_panel.setVisible(True)
         else:
             self.unified_verdict_panel.clear()
@@ -665,12 +670,16 @@ class SessionTabWidget(QTabWidget):
                 panel.record_verdict(result)
 
     def set_unified_verdict(
-        self, verdict: Any, session_index: Optional[int] = None
+        self,
+        verdict: Any,
+        rare_evaluation: Any = None,
+        session_index: Optional[int] = None,
     ) -> None:
         """Set unified verdict for a session panel.
 
         Args:
             verdict: UnifiedVerdict instance with comprehensive evaluation
+            rare_evaluation: Optional RareItemEvaluation for detailed sections
             session_index: Which session to update (default: current)
         """
         if session_index is None:
@@ -678,7 +687,7 @@ class SessionTabWidget(QTabWidget):
         if 0 <= session_index < self.count():
             panel = self.widget(session_index)
             if isinstance(panel, SessionPanel):
-                panel.set_unified_verdict(verdict)
+                panel.set_unified_verdict(verdict, rare_evaluation)
 
     def set_item_comparison(
         self, item: Any, analysis: Any, session_index: Optional[int] = None

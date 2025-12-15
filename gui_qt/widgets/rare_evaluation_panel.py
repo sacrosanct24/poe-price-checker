@@ -50,6 +50,24 @@ class RareEvaluationPanelWidget(QGroupBox):
     # Color for meta bonus tag
     META_BONUS_COLOR = "#00cc88"  # Teal/green
 
+    # Notable tier colors for cluster jewels
+    NOTABLE_TIER_COLORS = {
+        "meta": "#22dd22",     # Green - meta tier
+        "high": "#4488ff",     # Blue - high tier
+        "medium": "#ff8800",   # Orange - medium tier
+        "low": "#888888",      # Gray - low tier
+    }
+
+    # Unique item tier colors
+    UNIQUE_TIER_COLORS = {
+        "chase": "#ff00ff",     # Magenta - chase uniques
+        "excellent": "#22dd22", # Green
+        "good": "#4488ff",      # Blue
+        "average": "#ff8800",   # Orange
+        "vendor": "#dd2222",    # Red
+        "unknown": "#888888",   # Gray
+    }
+
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__("Rare Item Evaluation", parent)
 
@@ -289,6 +307,86 @@ class RareEvaluationPanelWidget(QGroupBox):
 
         layout.addWidget(self.crafting_frame)
 
+        # Row 8: Cluster Jewel section
+        self.cluster_frame = QFrame()
+        self.cluster_frame.setVisible(False)  # Hidden until cluster jewel evaluation
+        self.cluster_frame.setStyleSheet(f"""
+            QFrame {{
+                background-color: {COLORS['surface']};
+                border: 1px solid #9c27b0;
+                border-radius: 4px;
+                padding: 4px;
+                margin: 4px 0;
+            }}
+        """)
+
+        cluster_layout = QVBoxLayout(self.cluster_frame)
+        cluster_layout.setContentsMargins(8, 6, 8, 6)
+        cluster_layout.setSpacing(4)
+
+        cluster_header = QLabel("CLUSTER JEWEL INFO:")
+        cluster_header.setStyleSheet(f"""
+            QLabel {{
+                font-weight: bold;
+                color: #9c27b0;
+                font-size: 10px;
+                letter-spacing: 1px;
+            }}
+        """)
+        cluster_layout.addWidget(cluster_header)
+
+        self.cluster_content_label = QLabel("")
+        self.cluster_content_label.setWordWrap(True)
+        self.cluster_content_label.setStyleSheet(f"""
+            QLabel {{
+                color: {COLORS['text']};
+                font-size: 11px;
+            }}
+        """)
+        cluster_layout.addWidget(self.cluster_content_label)
+
+        layout.addWidget(self.cluster_frame)
+
+        # Row 9: Unique Item section
+        self.unique_frame = QFrame()
+        self.unique_frame.setVisible(False)  # Hidden until unique item evaluation
+        self.unique_frame.setStyleSheet(f"""
+            QFrame {{
+                background-color: {COLORS['surface']};
+                border: 1px solid #af6025;
+                border-radius: 4px;
+                padding: 4px;
+                margin: 4px 0;
+            }}
+        """)
+
+        unique_layout = QVBoxLayout(self.unique_frame)
+        unique_layout.setContentsMargins(8, 6, 8, 6)
+        unique_layout.setSpacing(4)
+
+        unique_header = QLabel("UNIQUE ITEM INFO:")
+        unique_header.setStyleSheet(f"""
+            QLabel {{
+                font-weight: bold;
+                color: #af6025;
+                font-size: 10px;
+                letter-spacing: 1px;
+            }}
+        """)
+        unique_layout.addWidget(unique_header)
+
+        self.unique_content_label = QLabel("")
+        self.unique_content_label.setWordWrap(True)
+        self.unique_content_label.setStyleSheet(f"""
+            QLabel {{
+                color: {COLORS['text']};
+                font-size: 11px;
+            }}
+        """)
+        unique_layout.addWidget(self.unique_content_label)
+
+        layout.addWidget(self.unique_frame)
+
     def _on_update_meta_clicked(self) -> None:
         """Handle update meta weights button click."""
         self.update_meta_requested.emit()
@@ -461,6 +559,12 @@ class RareEvaluationPanelWidget(QGroupBox):
         # Update crafting potential section
         self._update_crafting_section(evaluation)
 
+        # Update cluster jewel section
+        self._update_cluster_section(evaluation)
+
+        # Update unique item section
+        self._update_unique_section(evaluation)
+
     def _update_meta_info(self) -> None:
         """Update the meta info section based on evaluator state."""
         if self._evaluator is None:
@@ -627,6 +731,223 @@ class RareEvaluationPanelWidget(QGroupBox):
             # Don't show crafting section if analysis fails
             self.crafting_frame.setVisible(False)
 
+    def _update_cluster_section(self, evaluation: Any) -> None:
+        """Update the cluster jewel section if applicable."""
+        # Get cluster evaluation from the _cluster_evaluation field
+        cluster_eval = getattr(evaluation, '_cluster_evaluation', None)
+        if not cluster_eval:
+            self.cluster_frame.setVisible(False)
+            return
+
+        lines = []
+
+        # Size and passives
+        size = getattr(cluster_eval, 'size', 'Unknown')
+        passives = getattr(cluster_eval, 'passive_count', 0)
+        sockets = getattr(cluster_eval, 'jewel_sockets', 0)
+
+        # Ensure numeric values for comparison (handle MagicMock in tests)
+        try:
+            passives = int(passives) if passives else 0
+            sockets = int(sockets) if sockets else 0
+        except (TypeError, ValueError):
+            passives = 0
+            sockets = 0
+
+        size_info = f"{size} Cluster"
+        if passives:
+            size_info += f" ({passives} passives"
+            if sockets > 0:
+                size_info += f", {sockets} jewel socket{'s' if sockets > 1 else ''}"
+            size_info += ")"
+        lines.append(size_info)
+
+        # Enchantment info
+        enchant_display = getattr(cluster_eval, 'enchantment_display', '')
+        enchant_score = getattr(cluster_eval, 'enchantment_score', 0)
+        if enchant_display:
+            lines.append(f"Enchant: {enchant_display} (Score: {enchant_score})")
+
+        # Notables with color-coded tiers
+        matched_notables = getattr(cluster_eval, 'matched_notables', [])
+        if matched_notables:
+            lines.append("")
+            lines.append("Notables:")
+            for notable in matched_notables:
+                name = getattr(notable, 'name', 'Unknown')
+                tier = getattr(notable, 'tier', 'low')
+                weight = getattr(notable, 'weight', 0)
+                has_synergy = getattr(notable, 'has_synergy', False)
+
+                # Get tier color
+                tier_color = self.NOTABLE_TIER_COLORS.get(tier, "#888888")
+
+                # Build tier symbol
+                tier_symbols = {
+                    "meta": "★",
+                    "high": "●",
+                    "medium": "◐",
+                    "low": "○",
+                }
+                symbol = tier_symbols.get(tier, "○")
+
+                synergy_mark = " ⚡" if has_synergy else ""
+                lines.append(f"  {symbol} {name} [{tier.upper()}]{synergy_mark}")
+
+        # Synergies found
+        synergies = getattr(cluster_eval, 'synergies_found', [])
+        synergy_bonus = getattr(cluster_eval, 'synergy_bonus', 0)
+        if synergies:
+            lines.append("")
+            lines.append(f"Synergies Found (+{synergy_bonus}):")
+            for syn in synergies:
+                lines.append(f"  ⚡ {syn}")
+
+        # Scoring factors
+        factors = getattr(cluster_eval, 'factors', [])
+        if factors:
+            lines.append("")
+            lines.append("Value Factors:")
+            for factor in factors[:4]:
+                lines.append(f"  + {factor}")
+
+        # Total score
+        total_score = getattr(cluster_eval, 'total_score', 0)
+        tier = getattr(cluster_eval, 'tier', 'vendor')
+        lines.append("")
+        lines.append(f"Cluster Score: {total_score}/100 ({tier.upper()})")
+
+        self.cluster_content_label.setText("\n".join(lines))
+        self.cluster_frame.setVisible(True)
+
+    def _update_unique_section(self, evaluation: Any) -> None:
+        """Update the unique item section if applicable."""
+        # Get unique evaluation from the _unique_evaluation field
+        unique_eval = getattr(evaluation, '_unique_evaluation', None)
+        if not unique_eval:
+            self.unique_frame.setVisible(False)
+            return
+
+        lines = []
+
+        # Item name and tier
+        name = getattr(unique_eval, 'unique_name', 'Unknown')
+        tier = getattr(unique_eval, 'tier', 'unknown')
+        is_chase = getattr(unique_eval, 'is_chase_unique', False)
+
+        # Tier symbol
+        tier_symbols = {
+            "chase": "★★★",
+            "excellent": "★★",
+            "good": "★",
+            "average": "●",
+            "vendor": "○",
+        }
+        symbol = tier_symbols.get(tier, "○")
+
+        if is_chase:
+            lines.append(f"{symbol} CHASE UNIQUE: {name}")
+        else:
+            lines.append(f"{symbol} {name} [{tier.upper()}]")
+
+        # Price info
+        ninja_price = getattr(unique_eval, 'ninja_price_chaos', None)
+        has_ninja = getattr(unique_eval, 'has_poe_ninja_price', False)
+        estimated = getattr(unique_eval, 'estimated_value', 'Unknown')
+
+        # Ensure ninja_price is numeric (handle MagicMock in tests)
+        try:
+            if ninja_price is not None:
+                ninja_price = float(ninja_price)
+        except (TypeError, ValueError):
+            ninja_price = None
+
+        if has_ninja and ninja_price is not None:
+            if ninja_price >= 150:
+                divine = ninja_price / 150
+                lines.append(f"Price: {ninja_price:.0f}c ({divine:.1f}div)")
+            else:
+                lines.append(f"Price: {ninja_price:.0f}c")
+        else:
+            lines.append(f"Estimated: {estimated}")
+
+        # Corruption info
+        is_corrupted = getattr(unique_eval, 'is_corrupted', False)
+        corruption_tier = getattr(unique_eval, 'corruption_tier', 'none')
+        corruption_matches = getattr(unique_eval, 'corruption_matches', [])
+
+        if is_corrupted:
+            lines.append("")
+            if corruption_tier == "bricked":
+                lines.append("⚠ BRICKED CORRUPTION")
+            elif corruption_matches:
+                corruption_symbols = {
+                    "excellent": "★",
+                    "high": "●",
+                    "good": "◐",
+                }
+                for match in corruption_matches[:2]:
+                    tier_sym = corruption_symbols.get(match.tier, "○")
+                    lines.append(f"  {tier_sym} {match.mod_text}")
+
+        # Link info
+        link_eval = getattr(unique_eval, 'link_evaluation', None)
+        if link_eval:
+            # Get link values safely (handle MagicMock in tests)
+            try:
+                links = int(getattr(link_eval, 'links', 0))
+                link_mult = float(getattr(link_eval, 'link_multiplier', 1.0))
+                socket_bonus = int(getattr(link_eval, 'socket_bonus', 0))
+                white_sockets = int(getattr(link_eval, 'white_sockets', 0))
+            except (TypeError, ValueError):
+                links = 0
+                link_mult = 1.0
+                socket_bonus = 0
+                white_sockets = 0
+
+            if links >= 5:
+                lines.append("")
+                if links >= 6:
+                    lines.append(f"6-Link ({link_mult:.1f}x value)")
+                else:
+                    lines.append(f"5-Link (+{socket_bonus} score)")
+                if white_sockets > 0:
+                    lines.append(f"  + {white_sockets} white socket(s)")
+
+        # Meta relevance
+        meta = getattr(unique_eval, 'meta_relevance', None)
+        if meta and meta.builds_using:
+            lines.append("")
+            lines.append("Meta Builds:")
+            for build in meta.builds_using[:3]:
+                lines.append(f"  • {build}")
+            if meta.is_trending:
+                lines.append(f"  ↗ Trending ({meta.trend_direction})")
+
+        # Value factors
+        factors = getattr(unique_eval, 'factors', [])
+        if factors:
+            lines.append("")
+            lines.append("Value Factors:")
+            for factor in factors[:4]:
+                lines.append(f"  + {factor}")
+
+        # Warnings
+        warnings = getattr(unique_eval, 'warnings', [])
+        if warnings:
+            lines.append("")
+            for warning in warnings[:2]:
+                lines.append(f"⚠ {warning}")
+
+        # Total score
+        total_score = getattr(unique_eval, 'total_score', 0)
+        confidence = getattr(unique_eval, 'confidence', 'unknown')
+        lines.append("")
+        lines.append(f"Score: {total_score}/100 ({confidence})")
+
+        self.unique_content_label.setText("\n".join(lines))
+        self.unique_frame.setVisible(True)
+
     def clear(self) -> None:
         """Clear the evaluation display."""
         self._evaluation = None
@@ -644,3 +965,7 @@ class RareEvaluationPanelWidget(QGroupBox):
         self.builds_frame.setVisible(False)
         self.crafting_content_label.setText("")
         self.crafting_frame.setVisible(False)
+        self.cluster_content_label.setText("")
+        self.cluster_frame.setVisible(False)
+        self.unique_content_label.setText("")
+        self.unique_frame.setVisible(False)

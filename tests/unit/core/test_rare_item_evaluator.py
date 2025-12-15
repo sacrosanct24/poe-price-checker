@@ -768,15 +768,17 @@ class TestFullEvaluation:
         assert len(eval_result.matched_affixes) == 0
         assert eval_result.tier == "vendor"
 
-    def test_returns_not_rare_for_non_rare_items(self, evaluator):
-        """Should reject non-rare items."""
+    def test_returns_unique_evaluation_for_unique_items(self, evaluator):
+        """Unique items should get proper unique evaluation."""
         item = create_rare_item()
         item.rarity = "UNIQUE"
+        item.name = "Test Unique"
 
         eval_result = evaluator.evaluate(item)
 
-        assert eval_result.tier == "not_rare"
-        assert eval_result.total_score == 0
+        # Unique items now get proper evaluation, not "not_rare"
+        assert eval_result.tier in ["chase", "excellent", "good", "average", "vendor"]
+        assert eval_result._unique_evaluation is not None
 
     def test_evaluation_includes_synergy_bonus(self, evaluator):
         """Evaluation should include synergy bonuses."""
@@ -1732,17 +1734,19 @@ class TestEvaluateWithArchetype:
         assert result.archetype_affix_details is not None
         assert len(result.archetype_affix_details) == 2
 
-    def test_evaluate_with_archetype_non_rare(self, archetype_eval_setup):
-        """Non-rare items should return unchanged."""
+    def test_evaluate_with_archetype_unique_item(self, archetype_eval_setup):
+        """Unique items should get proper unique evaluation."""
         evaluator, archetype = archetype_eval_setup
 
         item = create_rare_item()
         item.rarity = "UNIQUE"
+        item.name = "Test Unique"
 
         result = evaluator.evaluate_with_archetype(item, archetype)
 
-        assert result.tier == "not_rare"
-        assert result.build_archetype is None
+        # Unique items now get proper evaluation
+        assert result.tier in ["chase", "excellent", "good", "average", "vendor"]
+        assert result._unique_evaluation is not None
 
     def test_evaluate_with_archetype_calculates_weighted_score(self, archetype_eval_setup):
         """Should calculate archetype-weighted total score."""

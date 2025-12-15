@@ -82,3 +82,9 @@ class RareItemEvaluation:
     cross_build_matches: List["ArchetypeMatch"] = field(default_factory=list)
     cross_build_appeal: int = 0  # Number of builds this is good for
     cross_build_summary: str = ""  # Human-readable summary
+
+    # Cluster jewel evaluation (stored for UI access)
+    _cluster_evaluation: Optional[Any] = None  # ClusterJewelEvaluation if cluster jewel
+
+    # Unique item evaluation (stored for UI access)
+    _unique_evaluation: Optional[Any] = None  # UniqueItemEvaluation if unique item

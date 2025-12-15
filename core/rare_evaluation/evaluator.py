@@ -270,6 +270,14 @@ class RareItemEvaluator:
         Returns:
             RareItemEvaluation with scores and matched affixes
         """
+        # Check for cluster jewel - use specialized evaluator
+        if item.base_type and "Cluster Jewel" in item.base_type:
+            return self._evaluate_cluster_jewel(item)
+
+        # Check for unique items - use specialized evaluator
+        if item.rarity and item.rarity.upper() == "UNIQUE":
+            return self._evaluate_unique_item(item)
+
         # Only evaluate rares
         if not item.rarity or item.rarity.upper() != "RARE":
             return RareItemEvaluation(
@@ -1259,6 +1267,193 @@ class RareItemEvaluator:
             lines.append(self.get_meta_info())
 
         return "\n".join(lines)
+
+    # ------------------------------------------------------------------
+    # Cluster Jewel Integration
+    # ------------------------------------------------------------------
+
+    def _evaluate_cluster_jewel(self, item: ParsedItem) -> RareItemEvaluation:
+        """
+        Evaluate a cluster jewel using the specialized evaluator.
+
+        Converts ClusterJewelEvaluation to RareItemEvaluation for UI compatibility.
+
+        Args:
+            item: Parsed cluster jewel item
+
+        Returns:
+            RareItemEvaluation populated with cluster jewel data
+        """
+        from core.cluster_evaluation import ClusterJewelEvaluator, ClusterJewelEvaluation
+
+        evaluator = ClusterJewelEvaluator(data_dir=self.data_dir)
+        cluster_eval = evaluator.evaluate(item)
+
+        if cluster_eval is None:
+            # Fallback to standard evaluation
+            return RareItemEvaluation(
+                item=item,
+                base_score=0,
+                affix_score=0,
+                synergy_bonus=0,
+                red_flag_penalty=0,
+                total_score=0,
+                is_valuable_base=False,
+                has_high_ilvl=False,
+                matched_affixes=[],
+                tier="vendor",
+                estimated_value="<10c"
+            )
+
+        # Convert ClusterJewelEvaluation to RareItemEvaluation
+        return self._convert_cluster_evaluation(cluster_eval)
+
+    def _convert_cluster_evaluation(
+        self, cluster_eval: "ClusterJewelEvaluation"
+    ) -> RareItemEvaluation:
+        """
+        Convert ClusterJewelEvaluation to RareItemEvaluation for UI compatibility.
+
+        Args:
+            cluster_eval: The cluster jewel evaluation result
+
+        Returns:
+            RareItemEvaluation with cluster jewel data
+        """
+        from core.cluster_evaluation import ClusterJewelEvaluation
+
+        # Create AffixMatch objects from NotableMatches
+        matched_affixes = []
+        for notable in cluster_eval.matched_notables:
+            matched_affixes.append(AffixMatch(
+                affix_type=f"notable",
+                pattern="1 Added Passive Skill is",
+                mod_text=f"{notable.name}",
+                value=None,
+                weight=notable.weight,
+                tier=notable.tier,
+                is_influence_mod=False,
+                has_meta_bonus=notable.has_synergy,
+            ))
+
+        # Build slot bonus reasons from factors
+        slot_bonus_reasons = cluster_eval.factors.copy()
+
+        return RareItemEvaluation(
+            item=cluster_eval.item,
+            base_score=cluster_eval.enchantment_score,
+            affix_score=cluster_eval.notable_score,
+            synergy_bonus=cluster_eval.synergy_bonus,
+            red_flag_penalty=0,
+            total_score=cluster_eval.total_score,
+            is_valuable_base=(cluster_eval.size in ["Large", "Medium"]),
+            has_high_ilvl=(cluster_eval.ilvl_score >= 10),
+            matched_affixes=matched_affixes,
+            tier=cluster_eval.tier,
+            estimated_value=cluster_eval.estimated_value,
+            synergies_found=cluster_eval.synergies_found,
+            slot_bonus_reasons=slot_bonus_reasons,
+            crafting_bonus=cluster_eval.crafting_potential,
+            open_suffixes=1 if cluster_eval.has_open_suffix else 0,
+            # Store cluster evaluation for UI access
+            _cluster_evaluation=cluster_eval,  # type: ignore[call-arg]
+        )
+
+    def _evaluate_unique_item(self, item: ParsedItem) -> RareItemEvaluation:
+        """
+        Evaluate a unique item using the specialized evaluator.
+
+        Converts UniqueItemEvaluation to RareItemEvaluation for UI compatibility.
+
+        Args:
+            item: Parsed unique item
+
+        Returns:
+            RareItemEvaluation populated with unique item data
+        """
+        from core.unique_evaluation import UniqueItemEvaluator
+
+        evaluator = UniqueItemEvaluator(data_dir=self.data_dir)
+        unique_eval = evaluator.evaluate(item)
+
+        if unique_eval is None:
+            # Fallback - should not happen for unique items
+            return RareItemEvaluation(
+                item=item,
+                base_score=0,
+                affix_score=0,
+                synergy_bonus=0,
+                red_flag_penalty=0,
+                total_score=0,
+                is_valuable_base=False,
+                has_high_ilvl=False,
+                matched_affixes=[],
+                tier="not_rare",
+                estimated_value="N/A"
+            )
+
+        # Convert UniqueItemEvaluation to RareItemEvaluation
+        return self._convert_unique_evaluation(unique_eval)
+
+    def _convert_unique_evaluation(
+        self, unique_eval: "UniqueItemEvaluation"
+    ) -> RareItemEvaluation:
+        """
+        Convert UniqueItemEvaluation to RareItemEvaluation for UI compatibility.
+
+        Args:
+            unique_eval: The unique item evaluation result
+
+        Returns:
+            RareItemEvaluation with unique item data
+        """
+        from core.unique_evaluation import UniqueItemEvaluation
+
+        # Create AffixMatch objects from corruption matches
+        matched_affixes = []
+        for corruption in unique_eval.corruption_matches:
+            matched_affixes.append(AffixMatch(
+                affix_type=f"corruption",
+                pattern=corruption.corruption_type,
+                mod_text=corruption.mod_text,
+                value=None,
+                weight=corruption.weight,
+                tier=corruption.tier,
+                is_influence_mod=False,
+                has_meta_bonus=False,
+            ))
+
+        # Build slot bonus reasons from factors
+        slot_bonus_reasons = unique_eval.factors.copy()
+
+        # Meta relevance info for builds section
+        cross_build_matches = []
+        if unique_eval.meta_relevance and unique_eval.meta_relevance.builds_using:
+            cross_build_summary = f"Used by: {', '.join(unique_eval.meta_relevance.builds_using[:3])}"
+            cross_build_appeal = len(unique_eval.meta_relevance.builds_using)
+        else:
+            cross_build_summary = ""
+            cross_build_appeal = 0
+
+        return RareItemEvaluation(
+            item=unique_eval.item,
+            base_score=unique_eval.base_score,
+            affix_score=unique_eval.corruption_score,
+            synergy_bonus=unique_eval.link_score,
+            red_flag_penalty=0,
+            total_score=unique_eval.total_score,
+            is_valuable_base=unique_eval.is_chase_unique,
+            has_high_ilvl=unique_eval.has_poe_ninja_price,
+            matched_affixes=matched_affixes,
+            tier=unique_eval.tier,
+            estimated_value=unique_eval.estimated_value,
+            synergies_found=[],
+            slot_bonus_reasons=slot_bonus_reasons,
+            cross_build_summary=cross_build_summary,
+            cross_build_appeal=cross_build_appeal,
+            # Store unique evaluation for UI access
+            _unique_evaluation=unique_eval,  # type: ignore[call-arg]
+        )
 
 
 if __name__ == "__main__":

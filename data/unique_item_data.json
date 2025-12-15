@@ -1,0 +1,360 @@
+{
+  "_comment": "Unique item evaluation data for PoE Price Checker",
+  "_version": "1.0",
+
+  "valuable_corruptions": {
+    "implicit_overrides": {
+      "+1 to Level of all Skill Gems": {
+        "tier": "excellent",
+        "weight": 20,
+        "applies_to": ["body_armour", "amulet"]
+      },
+      "+2 to Level of all Skill Gems": {
+        "tier": "excellent",
+        "weight": 25,
+        "applies_to": ["body_armour", "amulet"]
+      },
+      "+1 to Level of all Spell Skill Gems": {
+        "tier": "high",
+        "weight": 15,
+        "applies_to": ["body_armour", "amulet", "shield"]
+      },
+      "+2 to Level of all Spell Skill Gems": {
+        "tier": "excellent",
+        "weight": 22,
+        "applies_to": ["body_armour", "amulet", "shield"]
+      },
+      "+1 to Level of all Physical Skill Gems": {
+        "tier": "high",
+        "weight": 12,
+        "applies_to": ["body_armour", "amulet"]
+      },
+      "+1 to Level of all Fire Skill Gems": {
+        "tier": "high",
+        "weight": 12,
+        "applies_to": ["body_armour", "amulet"]
+      },
+      "+1 to Level of all Cold Skill Gems": {
+        "tier": "high",
+        "weight": 12,
+        "applies_to": ["body_armour", "amulet"]
+      },
+      "+1 to Level of all Lightning Skill Gems": {
+        "tier": "high",
+        "weight": 12,
+        "applies_to": ["body_armour", "amulet"]
+      },
+      "+1 to Level of all Chaos Skill Gems": {
+        "tier": "high",
+        "weight": 12,
+        "applies_to": ["body_armour", "amulet"]
+      },
+      "+1 to Level of all Minion Skill Gems": {
+        "tier": "high",
+        "weight": 14,
+        "applies_to": ["body_armour", "helmet"]
+      },
+      "+#% to Critical Strike Chance": {
+        "tier": "high",
+        "weight": 12,
+        "applies_to": ["all"]
+      },
+      "+#% to Global Critical Strike Multiplier": {
+        "tier": "high",
+        "weight": 10,
+        "applies_to": ["all"]
+      },
+      "+#% maximum Life": {
+        "tier": "high",
+        "weight": 10,
+        "applies_to": ["body_armour", "helmet", "gloves", "boots", "belt"]
+      },
+      "+#% maximum Energy Shield": {
+        "tier": "high",
+        "weight": 10,
+        "applies_to": ["body_armour", "helmet", "gloves", "boots", "shield"]
+      },
+      "Curse Enemies with Despair on Hit": {
+        "tier": "high",
+        "weight": 12,
+        "applies_to": ["ring", "gloves"]
+      },
+      "Curse Enemies with Elemental Weakness on Hit": {
+        "tier": "high",
+        "weight": 12,
+        "applies_to": ["ring", "gloves"]
+      },
+      "Curse Enemies with Vulnerability on Hit": {
+        "tier": "high",
+        "weight": 12,
+        "applies_to": ["ring", "gloves"]
+      },
+      "Curse Enemies with Assassin's Mark on Hit": {
+        "tier": "high",
+        "weight": 14,
+        "applies_to": ["ring", "gloves"]
+      },
+      "You take #% reduced Extra Damage from Critical Strikes": {
+        "tier": "good",
+        "weight": 8,
+        "applies_to": ["body_armour", "helmet", "shield"]
+      },
+      "#% increased Area of Effect": {
+        "tier": "good",
+        "weight": 6,
+        "applies_to": ["all"]
+      },
+      "#% chance to Avoid being Stunned": {
+        "tier": "good",
+        "weight": 5,
+        "applies_to": ["all"]
+      }
+    },
+    "keystone_grants": {
+      "Resolute Technique": {
+        "tier": "niche",
+        "weight": 5,
+        "relevant_builds": ["accuracy_stacking"]
+      },
+      "Acrobatics": {
+        "tier": "niche",
+        "weight": 5,
+        "relevant_builds": ["evasion"]
+      },
+      "Phase Acrobatics": {
+        "tier": "niche",
+        "weight": 5,
+        "relevant_builds": ["evasion"]
+      },
+      "Elemental Equilibrium": {
+        "tier": "good",
+        "weight": 8,
+        "relevant_builds": ["dot", "minion"]
+      },
+      "Point Blank": {
+        "tier": "good",
+        "weight": 7,
+        "relevant_builds": ["bow", "projectile"]
+      },
+      "Iron Reflexes": {
+        "tier": "niche",
+        "weight": 5,
+        "relevant_builds": ["armour"]
+      }
+    },
+    "socket_corruptions": {
+      "white_sockets": {
+        "weight_per_socket": 5,
+        "max_weight": 30
+      }
+    },
+    "brick_corruptions": {
+      "reduced_resistance_patterns": [
+        "-#% to Fire Resistance",
+        "-#% to Cold Resistance",
+        "-#% to Lightning Resistance",
+        "-#% to all Elemental Resistances"
+      ],
+      "reduced_attribute_patterns": [
+        "-# to Strength",
+        "-# to Dexterity",
+        "-# to Intelligence",
+        "-# to all Attributes"
+      ],
+      "brick_penalty": -15
+    }
+  },
+
+  "link_values": {
+    "6_link": {
+      "multiplier": 2.5,
+      "min_base_value": 50,
+      "description": "6-link items are significantly more valuable"
+    },
+    "5_link": {
+      "multiplier": 1.3,
+      "min_base_value": 10,
+      "description": "5-link provides moderate value increase"
+    },
+    "4_link": {
+      "multiplier": 1.0,
+      "min_base_value": 0,
+      "description": "4-link is baseline, no premium"
+    }
+  },
+
+  "chase_uniques": {
+    "Mageblood": {
+      "tier": "chase",
+      "always_valuable": true,
+      "min_value_divine": 50,
+      "description": "Best-in-slot belt, always extremely valuable"
+    },
+    "Headhunter": {
+      "tier": "chase",
+      "always_valuable": true,
+      "min_value_divine": 30,
+      "description": "Mapping chase unique"
+    },
+    "Ashes of the Stars": {
+      "tier": "high_demand",
+      "always_valuable": true,
+      "min_value_divine": 5,
+      "description": "Build-enabling amulet for many casters"
+    },
+    "Crystallised Omniscience": {
+      "tier": "high_demand",
+      "always_valuable": true,
+      "min_value_divine": 3,
+      "description": "Popular for omniscience builds"
+    },
+    "Aegis Aurora": {
+      "tier": "high_demand",
+      "always_valuable": true,
+      "min_value_divine": 2,
+      "description": "Best-in-slot for ES recovery tanks"
+    },
+    "Nimis": {
+      "tier": "high_demand",
+      "always_valuable": true,
+      "min_value_divine": 10,
+      "description": "Projectile build chase ring"
+    },
+    "Forbidden Flame": {
+      "tier": "high_demand",
+      "always_valuable": true,
+      "description": "Value depends on ascendancy notable"
+    },
+    "Forbidden Flesh": {
+      "tier": "high_demand",
+      "always_valuable": true,
+      "description": "Value depends on ascendancy notable"
+    },
+    "Sublime Vision": {
+      "tier": "high_demand",
+      "always_valuable": true,
+      "description": "Value depends on aura type"
+    },
+    "The Squire": {
+      "tier": "chase",
+      "always_valuable": true,
+      "min_value_divine": 20,
+      "description": "Build-enabling for many summoners"
+    },
+    "Original Sin": {
+      "tier": "chase",
+      "always_valuable": true,
+      "min_value_divine": 15,
+      "description": "Chaos conversion chase ring"
+    }
+  },
+
+  "slot_categories": {
+    "body_armour": {
+      "6L_premium": true,
+      "socket_weight": 10,
+      "max_sockets": 6,
+      "corruption_focus": "implicit"
+    },
+    "two_hand_weapon": {
+      "6L_premium": true,
+      "socket_weight": 10,
+      "max_sockets": 6,
+      "corruption_focus": "implicit"
+    },
+    "one_hand_weapon": {
+      "6L_premium": false,
+      "socket_weight": 3,
+      "max_sockets": 3,
+      "corruption_focus": "implicit"
+    },
+    "helmet": {
+      "6L_premium": false,
+      "socket_weight": 3,
+      "max_sockets": 4,
+      "enchant_valuable": true,
+      "corruption_focus": "implicit"
+    },
+    "gloves": {
+      "6L_premium": false,
+      "socket_weight": 3,
+      "max_sockets": 4,
+      "enchant_valuable": true,
+      "corruption_focus": "implicit"
+    },
+    "boots": {
+      "6L_premium": false,
+      "socket_weight": 3,
+      "max_sockets": 4,
+      "enchant_valuable": true,
+      "corruption_focus": "implicit"
+    },
+    "shield": {
+      "6L_premium": false,
+      "socket_weight": 3,
+      "max_sockets": 3,
+      "corruption_focus": "implicit"
+    },
+    "amulet": {
+      "6L_premium": false,
+      "socket_weight": 0,
+      "max_sockets": 0,
+      "corruption_focus": "implicit"
+    },
+    "ring": {
+      "6L_premium": false,
+      "socket_weight": 0,
+      "max_sockets": 0,
+      "corruption_focus": "implicit"
+    },
+    "belt": {
+      "6L_premium": false,
+      "socket_weight": 0,
+      "max_sockets": 0,
+      "corruption_focus": "implicit"
+    },
+    "jewel": {
+      "6L_premium": false,
+      "socket_weight": 0,
+      "max_sockets": 0,
+      "corruption_focus": "implicit"
+    },
+    "quiver": {
+      "6L_premium": false,
+      "socket_weight": 0,
+      "max_sockets": 0,
+      "corruption_focus": "implicit"
+    }
+  },
+
+  "base_value_tiers": {
+    "comment": "Price thresholds for base score calculation",
+    "divine_thresholds": {
+      "chase": 50,
+      "excellent": 5,
+      "good": 1,
+      "average": 0.1
+    },
+    "chaos_thresholds": {
+      "excellent": 500,
+      "good": 100,
+      "average": 20,
+      "vendor": 5
+    }
+  },
+
+  "slot_detection_patterns": {
+    "body_armour": ["Vest", "Plate", "Armour", "Regalia", "Robe", "Brigandine", "Coat", "Wrap", "Garb", "Tunic", "Wyrmscale"],
+    "helmet": ["Circlet", "Crown", "Helm", "Burgonet", "Mask", "Cap", "Hood", "Tricorne", "Pelt", "Cage"],
+    "gloves": ["Gloves", "Gauntlets", "Mitts", "Bracers"],
+    "boots": ["Boots", "Greaves", "Slippers", "Shoes", "Solleret"],
+    "belt": ["Belt", "Sash", "Stygian Vise", "Rustic", "Chain"],
+    "ring": ["Ring"],
+    "amulet": ["Amulet", "Talisman"],
+    "shield": ["Shield", "Buckler", "Tower Shield", "Kite Shield", "Spirit Shield"],
+    "quiver": ["Quiver"],
+    "one_hand_weapon": ["Dagger", "Wand", "Sceptre", "Mace", "Axe", "Sword", "Claw", "Rapier"],
+    "two_hand_weapon": ["Staff", "Bow", "Two Hand"],
+    "jewel": ["Jewel"]
+  }
+}

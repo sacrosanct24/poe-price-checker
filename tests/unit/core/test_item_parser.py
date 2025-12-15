@@ -528,3 +528,183 @@ Hubris Circlet
     names = {i.name or i.base_type for i in items}
     assert "Shavronne's Wrappings" in names or "Occultist's Vestment" in names
     assert "Doom Visor" in names or "Hubris Circlet" in names
+
+
+# --------------------------------------
+# Cluster Jewel parsing
+# --------------------------------------
+
+class TestClusterJewelParsing:
+    """Tests for cluster jewel parsing."""
+
+    def test_parse_large_cluster_jewel(self):
+        """Parse a large cluster jewel with full properties."""
+        parser = ItemParser()
+
+        text = """Rarity: RARE
+Blight Charm
+Large Cluster Jewel
+--------
+Item Level: 84
+--------
+Adds 8 Passive Skills (enchant)
+Added Small Passive Skills grant: 12% increased Fire Damage (enchant)
+--------
+1 Added Passive Skill is Blowback
+1 Added Passive Skill is Fan the Flames
+1 Added Passive Skill is Burning Bright
+Adds 1 Jewel Socket
+--------
+Corrupted
+"""
+
+        item = parser.parse(text)
+
+        assert item is not None
+        assert item.base_type == "Large Cluster Jewel"
+        assert item.cluster_jewel_size == "Large"
+        assert item.cluster_jewel_passives == 8
+        assert item.cluster_jewel_enchantment == "fire_damage"
+        assert len(item.cluster_jewel_notables) == 3
+        assert "Blowback" in item.cluster_jewel_notables
+        assert "Fan the Flames" in item.cluster_jewel_notables
+        assert "Burning Bright" in item.cluster_jewel_notables
+        assert item.cluster_jewel_sockets == 1
+        assert item.is_corrupted is True
+
+    def test_parse_medium_cluster_jewel(self):
+        """Parse a medium cluster jewel."""
+        parser = ItemParser()
+
+        text = """Rarity: RARE
+Entropy Thread
+Medium Cluster Jewel
+--------
+Item Level: 75
+--------
+Adds 5 Passive Skills (enchant)
+Added Small Passive Skills grant: 10% increased Effect of Non-Damaging Ailments (enchant)
+--------
+1 Added Passive Skill is Astonishing Affliction
+1 Added Passive Skill is Wicked Pall
+"""
+
+        item = parser.parse(text)
+
+        assert item is not None
+        assert item.base_type == "Medium Cluster Jewel"
+        assert item.cluster_jewel_size == "Medium"
+        assert item.cluster_jewel_passives == 5
+        assert len(item.cluster_jewel_notables) == 2
+        assert "Astonishing Affliction" in item.cluster_jewel_notables
+        assert "Wicked Pall" in item.cluster_jewel_notables
+        assert item.cluster_jewel_sockets == 0
+
+    def test_parse_small_cluster_jewel(self):
+        """Parse a small cluster jewel."""
+        parser = ItemParser()
+
+        text = """Rarity: RARE
+Horror Loop
+Small Cluster Jewel
+--------
+Item Level: 68
+--------
+Adds 3 Passive Skills (enchant)
+Added Small Passive Skills grant: +12 to Maximum Life (enchant)
+--------
+1 Added Passive Skill is Fettle
+"""
+
+        item = parser.parse(text)
+
+        assert item is not None
+        assert item.base_type == "Small Cluster Jewel"
+        assert item.cluster_jewel_size == "Small"
+        assert item.cluster_jewel_passives == 3
+        assert item.cluster_jewel_enchantment == "life"
+        assert len(item.cluster_jewel_notables) == 1
+        assert "Fettle" in item.cluster_jewel_notables
+
+    def test_parse_cluster_enchantment_attack_damage(self):
+        """Parse a cluster jewel with attack damage enchant."""
+        parser = ItemParser()
+
+        text = """Rarity: RARE
+Test Cluster
+Large Cluster Jewel
+--------
+Adds 12 Passive Skills (enchant)
+Added Small Passive Skills grant: 10% increased Attack Damage (enchant)
+--------
+1 Added Passive Skill is Feed the Fury
+Adds 2 Jewel Sockets
+"""
+
+        item = parser.parse(text)
+
+        assert item is not None
+        assert item.cluster_jewel_enchantment == "attack_damage"
+        assert item.cluster_jewel_sockets == 2
+        assert "Feed the Fury" in item.cluster_jewel_notables
+
+    def test_parse_cluster_enchantment_minion_damage(self):
+        """Parse a cluster jewel with minion damage enchant."""
+        parser = ItemParser()
+
+        text = """Rarity: RARE
+Ghoul Circle
+Large Cluster Jewel
+--------
+Adds 10 Passive Skills (enchant)
+Added Small Passive Skills grant: Minions deal 10% increased Damage (enchant)
+--------
+1 Added Passive Skill is Rotten Claws
+1 Added Passive Skill is Vicious Bite
+"""
+
+        item = parser.parse(text)
+
+        assert item is not None
+        assert item.cluster_jewel_enchantment == "minion_damage"
+        assert len(item.cluster_jewel_notables) == 2
+
+    def test_cluster_jewel_to_dict(self):
+        """Cluster jewel fields should be included in to_dict()."""
+        item = ParsedItem(
+            raw_text="Test cluster",
+            rarity="RARE",
+            base_type="Large Cluster Jewel",
+            cluster_jewel_size="Large",
+            cluster_jewel_passives=8,
+            cluster_jewel_enchantment="fire_damage",
+            cluster_jewel_notables=["Blowback", "Fan the Flames"],
+            cluster_jewel_sockets=1,
+        )
+
+        result = item.to_dict()
+
+        assert result["cluster_jewel_size"] == "Large"
+        assert result["cluster_jewel_passives"] == 8
+        assert result["cluster_jewel_enchantment"] == "fire_damage"
+        assert result["cluster_jewel_notables"] == ["Blowback", "Fan the Flames"]
+        assert result["cluster_jewel_sockets"] == 1
+
+    def test_non_cluster_jewel_has_none_fields(self):
+        """Non-cluster jewels should have None cluster fields."""
+        parser = ItemParser()
+
+        text = """Rarity: UNIQUE
+Watcher's Eye
+Prismatic Jewel
+--------
+Item Level: 86
+"""
+
+        item = parser.parse(text)
+
+        assert item is not None
+        assert item.cluster_jewel_size is None
+        assert item.cluster_jewel_passives is None
+        assert item.cluster_jewel_enchantment is None
+        assert item.cluster_jewel_notables == []

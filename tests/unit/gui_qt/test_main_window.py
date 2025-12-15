@@ -64,6 +64,11 @@ def window_with_mock_panel(window):
     mock_panel.filter_input = MagicMock()
     mock_panel.source_filter = MagicMock()
     mock_panel.rare_eval_panel = MagicMock()
+    mock_panel.quick_verdict_panel = MagicMock()
+    mock_panel.unified_verdict_panel = MagicMock()
+    mock_panel.item_comparison_widget = MagicMock()
+    mock_panel.set_unified_verdict = MagicMock()
+    mock_panel.record_verdict = MagicMock()
     mock_panel.check_btn = MagicMock()
     mock_panel._all_results = []
 
@@ -225,7 +230,7 @@ class TestPriceCheckerWindowPriceCheck:
                     assert window_with_mock_panel._check_in_progress is False
 
     def test_do_price_check_with_rare_evaluation(self, window_with_mock_panel):
-        """_do_price_check shows rare eval panel for rare items."""
+        """_do_price_check uses unified verdict for rare items."""
         mock_data = MagicMock()
         mock_data.parsed_item = MagicMock()
         mock_data.formatted_rows = []
@@ -233,12 +238,24 @@ class TestPriceCheckerWindowPriceCheck:
         mock_data.evaluation = MagicMock()
         mock_data.results = []
 
+        # Mock unified verdict engine
+        mock_verdict = MagicMock()
+        mock_verdict.quick_verdict_result = MagicMock()
+
         with patch.object(window_with_mock_panel._price_controller, 'check_price', return_value=Ok(mock_data)):
             with patch.object(window_with_mock_panel._price_controller, 'get_price_summary', return_value="Rare item"):
                 with patch.object(window_with_mock_panel._price_controller, 'should_show_toast', return_value=(False, None, None)):
-                    window_with_mock_panel._do_price_check("rare item", 0)
-                    window_with_mock_panel._mock_panel.rare_eval_panel.set_evaluation.assert_called_once_with(mock_data.evaluation)
-                    window_with_mock_panel._mock_panel.rare_eval_panel.setVisible.assert_called_with(True)
+                    with patch('core.unified_verdict.UnifiedVerdictEngine') as MockEngine:
+                        MockEngine.return_value.evaluate.return_value = mock_verdict
+                        window_with_mock_panel._do_price_check("rare item", 0)
+                        # Unified verdict is called with both verdict and rare evaluation
+                        window_with_mock_panel._mock_panel.set_unified_verdict.assert_called()
+                        # Check that it was called with verdict and rare_evaluation
+                        call_args = window_with_mock_panel._mock_panel.set_unified_verdict.call_args
+                        assert call_args is not None
+                        # First arg is verdict, second is rare_evaluation
+                        assert call_args.args[0] == mock_verdict
+                        assert call_args.args[1] == mock_data.evaluation
 
     def test_do_price_check_exception(self, window_with_mock_panel):
         """_do_price_check handles exceptions."""

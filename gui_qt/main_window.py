@@ -751,12 +751,19 @@ class PriceCheckerWindow(BackgroundServicesMixin, MenuBarMixin, ShortcutsMixin, 
             panel.set_results(data.formatted_rows)
             self._update_summary()
 
-            # Handle rare item evaluation panel
-            if data.is_rare and data.evaluation:
-                panel.rare_eval_panel.set_evaluation(data.evaluation)
-                panel.rare_eval_panel.setVisible(True)
+            # Get best price from results for verdict calculation
+            best_price = None
+            if data.formatted_rows:
+                first_row = data.formatted_rows[0]
+                best_price = first_row.get("chaos_value")
+                if best_price is not None:
+                    try:
+                        best_price = float(best_price)
+                    except (ValueError, TypeError):
+                        best_price = None
 
-                # Also update item comparison widget with crafting analysis
+            # Update item comparison widget with crafting analysis (if rare)
+            if data.is_rare and data.evaluation:
                 try:
                     from core.crafting_potential import CraftingPotentialAnalyzer
                     crafting_analyzer = CraftingPotentialAnalyzer()
@@ -766,33 +773,9 @@ class PriceCheckerWindow(BackgroundServicesMixin, MenuBarMixin, ShortcutsMixin, 
                     self.logger.debug(f"Crafting analysis failed: {e}")
                     panel.item_comparison_widget.setVisible(False)
             else:
-                panel.rare_eval_panel.setVisible(False)
                 panel.item_comparison_widget.setVisible(False)
 
-            # Update quick verdict panel (casual player summary)
-            # Get best price from results for verdict calculation
-            best_price = None
-            if data.formatted_rows:
-                # Use chaos_value from first result as estimate
-                first_row = data.formatted_rows[0]
-                best_price = first_row.get("chaos_value")
-                if best_price is not None:
-                    try:
-                        best_price = float(best_price)
-                    except (ValueError, TypeError):
-                        best_price = None
-
-            # Calculate verdict with parsed item and price
-            verdict_result = panel.quick_verdict_panel.update_verdict(
-                data.parsed_item,
-                price_chaos=best_price
-            )
-            panel.quick_verdict_panel.setVisible(True)
-
-            # Record verdict in session statistics
-            panel.record_verdict(verdict_result)
-
-            # Update unified verdict panel (comprehensive FOR YOU/TO SELL/TO STASH)
+            # Calculate unified verdict (consolidated panel with all info)
             try:
                 from core.unified_verdict import UnifiedVerdictEngine
                 unified_engine = UnifiedVerdictEngine()
@@ -803,7 +786,13 @@ class PriceCheckerWindow(BackgroundServicesMixin, MenuBarMixin, ShortcutsMixin, 
                     current_equipment=None,  # TODO: Get from PoB if available
                     user_builds=None,  # TODO: Get from character manager
                 )
-                panel.set_unified_verdict(unified_verdict)
+                # Pass rare evaluation to the unified panel for detailed sections
+                panel.set_unified_verdict(unified_verdict, data.evaluation)
+
+                # Record verdict in session statistics
+                quick_result = getattr(unified_verdict, 'quick_verdict_result', None)
+                if quick_result:
+                    panel.record_verdict(quick_result)
             except Exception as e:
                 self.logger.debug(f"Unified verdict failed: {e}")
                 panel.unified_verdict_panel.setVisible(False)
