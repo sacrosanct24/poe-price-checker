@@ -34,6 +34,7 @@ from gui_qt.accessibility.screen_reader import (
     announce_assertive,
     AccessibleWidget,
     AccessibleMixin,
+    setup_accessible_table,
 )
 from gui_qt.accessibility.focus_manager import (
     FocusManager,
@@ -63,6 +64,7 @@ __all__ = [
     "announce_assertive",
     "AccessibleWidget",
     "AccessibleMixin",
+    "setup_accessible_table",
     # Focus management
     "FocusManager",
     "get_focus_manager",

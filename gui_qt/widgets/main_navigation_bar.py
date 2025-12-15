@@ -18,6 +18,7 @@ from PyQt6.QtWidgets import (
 )
 
 from gui_qt.screens.screen_controller import ScreenType
+from gui_qt.accessibility import set_accessible_name, set_accessible_description
 
 
 class MainNavigationBar(QWidget):
@@ -75,6 +76,11 @@ class MainNavigationBar(QWidget):
             btn.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
             btn.setMinimumWidth(140)
             btn.setMinimumHeight(36)
+
+            # Add accessibility support
+            label = self.SCREEN_LABELS[screen_type]
+            set_accessible_name(btn, f"{label} screen")
+            set_accessible_description(btn, f"Switch to {label} view")
 
             # Store screen type in button property
             btn.setProperty("screen_type", screen_type.value)

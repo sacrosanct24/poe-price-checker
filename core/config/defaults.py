@@ -172,4 +172,42 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         # Show in-app toast notifications when alerts trigger
         "show_toast_notifications": True,
     },
+    "shortcuts": {
+        # Global hotkeys work even when app is not focused
+        "global_hotkeys": {
+            # Hotkey to check clipboard item price (Ctrl+Shift+C)
+            "price_check": "ctrl+shift+c",
+            # Whether global hotkeys are enabled
+            "enabled": True,
+        },
+    },
+    "price_context": {
+        # Whether to show CHEAP/AVERAGE/EXPENSIVE labels
+        "enabled": True,
+        # Thresholds by item class and rarity: [cheap_max, expensive_min] in chaos
+        # Price <= cheap_max = CHEAP, Price >= expensive_min = EXPENSIVE, else AVERAGE
+        "thresholds": {
+            "Rings": {"Rare": [10, 100], "Unique": [5, 50]},
+            "Amulets": {"Rare": [15, 150], "Unique": [10, 100]},
+            "Body Armours": {"Rare": [20, 200], "Unique": [50, 500]},
+            "One Hand Weapons": {"Rare": [30, 300], "Unique": [20, 200]},
+            "Two Hand Weapons": {"Rare": [30, 300], "Unique": [20, 200]},
+            "Bows": {"Rare": [30, 300], "Unique": [20, 200]},
+            "Wands": {"Rare": [20, 200], "Unique": [15, 150]},
+            "Boots": {"Rare": [15, 150], "Unique": [10, 100]},
+            "Gloves": {"Rare": [10, 100], "Unique": [5, 50]},
+            "Helmets": {"Rare": [15, 150], "Unique": [10, 100]},
+            "Belts": {"Rare": [10, 100], "Unique": [5, 50]},
+            "Shields": {"Rare": [15, 150], "Unique": [10, 100]},
+            "Quivers": {"Rare": [10, 100], "Unique": [5, 50]},
+            "Jewels": {"Rare": [5, 50], "Unique": [10, 100]},
+            "Cluster Jewels": {"Rare": [10, 150], "Unique": [20, 200]},
+            "Flasks": {"Unique": [5, 100]},
+            "Maps": {"Normal": [1, 10], "Rare": [2, 20]},
+            "Currency": {"Currency": [0.5, 10]},
+            "Divination Cards": {"Divination Card": [1, 50]},
+            "Gems": {"Gem": [5, 100]},
+            "_default": {"_default": [10, 100]},
+        },
+    },
 }

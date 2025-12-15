@@ -197,6 +197,9 @@ class PriceCheckerWindow(BackgroundServicesMixin, MenuBarMixin, ShortcutsMixin, 
         # Start background price refresh service
         self._start_price_refresh_service()
 
+        # Start global hotkey clipboard service
+        self._start_clipboard_service()
+
         # Initialize build stats for item inspector from active PoB profile
         self._pob_controller.update_inspector_stats(self.item_inspector)
 
@@ -1089,6 +1092,9 @@ class PriceCheckerWindow(BackgroundServicesMixin, MenuBarMixin, ShortcutsMixin, 
 
         # Stop price alert service
         shutdown_price_alert_service()
+
+        # Stop clipboard service (global hotkeys)
+        self._stop_clipboard_service()
 
         # Stop loot tracking
         if self._loot_controller:

@@ -23,6 +23,7 @@ from PyQt6.QtWidgets import (
 )
 
 from gui_qt.styles import COLORS, get_rarity_color, get_tier_color, TIER_COLORS
+from gui_qt.accessibility import setup_accessible_table
 from gui_qt.widgets.poe_item_tooltip import ItemTooltipMixin
 from core.mod_tier_detector import detect_mod_tier
 
@@ -433,6 +434,14 @@ class ResultsTableWidget(QTableView, ItemTooltipMixin):
         self.setAlternatingRowColors(True)
         self.setSortingEnabled(True)
         self.setShowGrid(False)
+
+        # Setup accessibility
+        column_names = [col[1] for col in ResultsTableModel.COLUMNS]
+        setup_accessible_table(
+            self,
+            "Price check results",
+            column_names
+        )
 
         # Enable context menu
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)

@@ -61,6 +61,10 @@ class ToSellVerdict:
     price_confidence: str = "low"  # "high", "medium", "low"
     price_source: str = ""
     market_notes: List[str] = field(default_factory=list)
+    # Price context (CHEAP/AVERAGE/EXPENSIVE)
+    price_context: str = ""  # "CHEAP", "AVERAGE", "EXPENSIVE", or ""
+    price_context_color: str = ""  # Hex color for display
+    price_context_explanation: str = ""  # Human-readable explanation
 
 
 @dataclass
@@ -478,6 +482,9 @@ class UnifiedVerdictEngine:
         else:
             verdict.to_sell.price_range = f"~{int(price)}c"
 
+        # Calculate price context (CHEAP/AVERAGE/EXPENSIVE)
+        self._evaluate_price_context(verdict, item, price)
+
         # Use market data if provided
         if market_data:
             trend = market_data.get('trend', 'UNKNOWN')
@@ -488,6 +495,39 @@ class UnifiedVerdictEngine:
             verdict.market_context.similar_listings = similar[:5]
 
             verdict.to_sell.demand_level = market_data.get('demand', 'unknown')
+
+    def _evaluate_price_context(
+        self,
+        verdict: UnifiedVerdict,
+        item: "ParsedItem",
+        price: float,
+    ) -> None:
+        """Calculate price context (CHEAP/AVERAGE/EXPENSIVE) for the item."""
+        try:
+            from core.price_context import PriceContextCalculator
+
+            # Get item class and rarity
+            item_class = getattr(item, 'item_class', '') or ''
+            rarity = getattr(item, 'rarity', 'Normal') or 'Normal'
+
+            # Create calculator (uses config for thresholds if available)
+            config = getattr(self, '_config', None)
+            calculator = PriceContextCalculator(config)
+
+            # Skip if disabled in config
+            if not calculator.is_enabled():
+                return
+
+            # Get context
+            context = calculator.get_context(price, item_class, rarity)
+
+            # Set verdict fields
+            verdict.to_sell.price_context = context.label
+            verdict.to_sell.price_context_color = context.color
+            verdict.to_sell.price_context_explanation = context.explanation
+
+        except Exception as e:
+            logger.debug(f"Price context calculation failed: {e}")
 
     def _determine_primary_action(
         self,

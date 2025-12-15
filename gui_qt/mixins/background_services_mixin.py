@@ -90,3 +90,64 @@ class BackgroundServicesMixin:
             self._toast_manager.info(
                 f"{item_name}: {old_price:.0f}c -> {new_price:.0f}c ({direction} {change_pct:.0f}%)"
             )
+
+    def _start_clipboard_service(self: "PriceCheckerWindow") -> None:
+        """Start the global hotkey clipboard service."""
+        from gui_qt.services import init_clipboard_service, get_clipboard_service
+
+        try:
+            service = init_clipboard_service(self.ctx, self)
+            if service:
+                # Connect signals
+                service.hotkey_triggered.connect(self._on_global_hotkey_price_check)
+                service.no_item_in_clipboard.connect(self._on_hotkey_no_item)
+                service.status_changed.connect(self._on_clipboard_service_status)
+
+                # Start the service
+                if service.start():
+                    self.logger.info(
+                        f"Clipboard service started (hotkey: {service.current_hotkey})"
+                    )
+                else:
+                    self.logger.warning("Clipboard service failed to start")
+        except Exception as e:
+            self.logger.warning(f"Failed to start clipboard service: {e}")
+
+    def _stop_clipboard_service(self: "PriceCheckerWindow") -> None:
+        """Stop the global hotkey clipboard service."""
+        from gui_qt.services import shutdown_clipboard_service
+
+        try:
+            shutdown_clipboard_service()
+        except Exception as e:
+            self.logger.warning(f"Error stopping clipboard service: {e}")
+
+    def _on_global_hotkey_price_check(self: "PriceCheckerWindow", item_text: str) -> None:
+        """Handle global hotkey trigger with PoE item in clipboard."""
+        self.logger.info("Global hotkey triggered - checking price")
+
+        # Bring window to front if minimized
+        if self.isMinimized():
+            self.showNormal()
+        self.activateWindow()
+        self.raise_()
+
+        # Set the item text in the input and trigger price check
+        panel = self._get_current_session_panel()
+        if panel:
+            panel.input_text.setPlainText(item_text)
+            self._on_check_price()
+
+    def _on_hotkey_no_item(self: "PriceCheckerWindow") -> None:
+        """Handle global hotkey trigger when no PoE item in clipboard."""
+        if hasattr(self, '_toast_manager') and self._toast_manager:
+            self._toast_manager.warning("No PoE item in clipboard")
+
+    def _on_clipboard_service_status(self: "PriceCheckerWindow", status: str) -> None:
+        """Handle clipboard service status change."""
+        self.logger.debug(f"Clipboard service status: {status}")
+        if status == "unavailable":
+            if hasattr(self, '_toast_manager') and self._toast_manager:
+                self._toast_manager.warning(
+                    "Global hotkeys unavailable - install 'keyboard' module"
+                )

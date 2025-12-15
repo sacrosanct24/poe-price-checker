@@ -33,6 +33,7 @@ from PyQt6.QtWidgets import (
 )
 
 from gui_qt.styles import COLORS
+from gui_qt.accessibility import set_accessible_name, set_accessible_description
 from gui_qt.widgets.results_table import ResultsTableWidget
 from gui_qt.widgets.item_inspector import ItemInspectorWidget
 from gui_qt.widgets.rare_evaluation_panel import RareEvaluationPanelWidget
@@ -118,6 +119,11 @@ class SessionPanel(QWidget):
             "Or select an item from PoB Equipment panel on the left."
         )
         self.input_text.setMinimumHeight(100)
+        set_accessible_name(self.input_text, "Item text input")
+        set_accessible_description(
+            self.input_text,
+            "Paste Path of Exile item text here to check its price"
+        )
         input_layout.addWidget(self.input_text)
 
         # Button row
@@ -126,10 +132,17 @@ class SessionPanel(QWidget):
         self.check_btn = QPushButton("Check Price")
         self.check_btn.clicked.connect(self._on_check_price)
         self.check_btn.setMinimumWidth(120)
+        set_accessible_name(self.check_btn, "Check Price")
+        set_accessible_description(
+            self.check_btn,
+            "Look up the current market price for the pasted item"
+        )
         btn_layout.addWidget(self.check_btn)
 
         self.clear_btn = QPushButton("Clear")
         self.clear_btn.clicked.connect(self._on_clear)
+        set_accessible_name(self.clear_btn, "Clear")
+        set_accessible_description(self.clear_btn, "Clear input and results")
         btn_layout.addWidget(self.clear_btn)
 
         btn_layout.addStretch()
@@ -159,12 +172,22 @@ class SessionPanel(QWidget):
         self.filter_input = QLineEdit()
         self.filter_input.setPlaceholderText("Type to filter results...")
         self.filter_input.textChanged.connect(self._apply_filter)
+        set_accessible_name(self.filter_input, "Filter results")
+        set_accessible_description(
+            self.filter_input,
+            "Type to filter the results table by item name"
+        )
         filter_layout.addWidget(self.filter_input)
 
         filter_layout.addWidget(QLabel("Source:"))
         self.source_filter = QComboBox()
         self.source_filter.addItem("All sources")
         self.source_filter.currentTextChanged.connect(self._apply_filter)
+        set_accessible_name(self.source_filter, "Source filter")
+        set_accessible_description(
+            self.source_filter,
+            "Filter results by price data source"
+        )
         filter_layout.addWidget(self.source_filter)
 
         results_layout.addLayout(filter_layout)
@@ -453,6 +476,8 @@ class SessionTabWidget(QTabWidget):
         btn.setFixedSize(24, 24)
         btn.setToolTip("New Session (Ctrl+T)")
         btn.clicked.connect(self._add_session)
+        set_accessible_name(btn, "New Session")
+        set_accessible_description(btn, "Create a new price checking session tab")
         btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: {COLORS["surface"]};

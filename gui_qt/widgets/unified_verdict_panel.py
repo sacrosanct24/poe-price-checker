@@ -27,6 +27,7 @@ from PyQt6.QtWidgets import (
 )
 
 from gui_qt.styles import COLORS
+from gui_qt.accessibility import set_accessible_name, set_accessible_description
 
 if TYPE_CHECKING:
     from core.unified_verdict import UnifiedVerdict, PrimaryAction
@@ -259,6 +260,7 @@ class UnifiedVerdictPanel(QGroupBox):
         self.emoji_label = QLabel("❓")
         self.emoji_label.setStyleSheet("font-size: 48px; padding: 0; margin: 0;")
         self.emoji_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        set_accessible_name(self.emoji_label, "Verdict indicator")
         top_row.addWidget(self.emoji_label)
 
         # Verdict text column
@@ -271,6 +273,11 @@ class UnifiedVerdictPanel(QGroupBox):
             font-weight: bold;
             color: {COLORS['text']};
         """)
+        set_accessible_name(self.verdict_word_label, "Verdict")
+        set_accessible_description(
+            self.verdict_word_label,
+            "Primary verdict for the evaluated item: Keep, Sell, Vendor, or Maybe"
+        )
         verdict_text_layout.addWidget(self.verdict_word_label)
 
         self.confidence_dots_label = QLabel("")
@@ -278,6 +285,7 @@ class UnifiedVerdictPanel(QGroupBox):
             font-size: 11px;
             color: {COLORS['text_secondary']};
         """)
+        set_accessible_name(self.confidence_dots_label, "Confidence level")
         verdict_text_layout.addWidget(self.confidence_dots_label)
 
         top_row.addLayout(verdict_text_layout)
@@ -293,6 +301,11 @@ class UnifiedVerdictPanel(QGroupBox):
             color: {COLORS['text']};
             padding: 8px 0;
         """)
+        set_accessible_name(self.explanation_label, "Verdict explanation")
+        set_accessible_description(
+            self.explanation_label,
+            "Detailed explanation of why this verdict was given"
+        )
         quick_layout.addWidget(self.explanation_label)
 
         layout.addWidget(self.quick_verdict_frame)
@@ -341,14 +354,29 @@ class UnifiedVerdictPanel(QGroupBox):
 
         # FOR YOU section
         self.for_you_section = VerdictSectionWidget("FOR YOU:")
+        set_accessible_name(self.for_you_section, "For You assessment")
+        set_accessible_description(
+            self.for_you_section,
+            "Shows if this item is an upgrade for your character"
+        )
         content_layout.addWidget(self.for_you_section)
 
         # TO SELL section
         self.to_sell_section = VerdictSectionWidget("TO SELL:")
+        set_accessible_name(self.to_sell_section, "To Sell assessment")
+        set_accessible_description(
+            self.to_sell_section,
+            "Shows the market value and selling potential of this item"
+        )
         content_layout.addWidget(self.to_sell_section)
 
         # TO STASH section
         self.to_stash_section = VerdictSectionWidget("TO STASH:")
+        set_accessible_name(self.to_stash_section, "To Stash assessment")
+        set_accessible_description(
+            self.to_stash_section,
+            "Shows if this item should be saved for other builds"
+        )
         content_layout.addWidget(self.to_stash_section)
 
         # WHY VALUABLE section
@@ -534,6 +562,8 @@ class UnifiedVerdictPanel(QGroupBox):
                 background-color: {COLORS['border']};
             }}
         """)
+        set_accessible_name(self.refresh_btn, "Refresh verdict")
+        set_accessible_description(self.refresh_btn, "Re-evaluate the current item")
         button_layout.addWidget(self.refresh_btn)
 
         self.details_btn = QPushButton("Full Details")
@@ -550,6 +580,11 @@ class UnifiedVerdictPanel(QGroupBox):
                 background-color: #1976D2;
             }}
         """)
+        set_accessible_name(self.details_btn, "Full Details")
+        set_accessible_description(
+            self.details_btn,
+            "Show detailed analysis and evaluation breakdown"
+        )
         button_layout.addWidget(self.details_btn)
 
         layout.addLayout(button_layout)
@@ -601,11 +636,21 @@ class UnifiedVerdictPanel(QGroupBox):
         if verdict.to_sell.is_valuable:
             self.to_sell_section.set_status(True)
             content = f"Worth {verdict.to_sell.price_range}"
+            # Add price context badge if available
+            if verdict.to_sell.price_context:
+                ctx_color = verdict.to_sell.price_context_color or "#2196F3"
+                content += f"  [{verdict.to_sell.price_context}]"
             if verdict.to_sell.demand_level != "unknown":
                 content += f"\nDemand: {verdict.to_sell.demand_level}"
+            # Add price context explanation as tooltip hint
+            if verdict.to_sell.price_context_explanation:
+                content += f"\n{verdict.to_sell.price_context_explanation}"
         else:
             self.to_sell_section.set_status(False)
             content = "Low market value"
+            # Still show price context for low-value items
+            if verdict.to_sell.price_context:
+                content += f"  [{verdict.to_sell.price_context}]"
         self.to_sell_section.set_content(content)
 
         # TO STASH section

@@ -7,6 +7,7 @@ This package contains extracted services that manage application-wide concerns:
 - HistoryManager: Price check session history with bounded storage
 - PriceRefreshService: Background price data refresh
 - PriceAlertService: Price alert monitoring and notifications
+- ClipboardService: Global hotkey support for price checking
 """
 
 from gui_qt.services.window_manager import WindowManager, get_window_manager
@@ -22,6 +23,12 @@ from gui_qt.services.price_alert_service import (
     get_price_alert_service,
     shutdown_price_alert_service,
 )
+from gui_qt.services.clipboard_service import (
+    ClipboardService,
+    get_clipboard_service,
+    init_clipboard_service,
+    shutdown_clipboard_service,
+)
 
 __all__ = [
     "WindowManager",
@@ -35,4 +42,8 @@ __all__ = [
     "PriceAlertService",
     "get_price_alert_service",
     "shutdown_price_alert_service",
+    "ClipboardService",
+    "get_clipboard_service",
+    "init_clipboard_service",
+    "shutdown_clipboard_service",
 ]
