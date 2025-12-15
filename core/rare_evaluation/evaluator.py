@@ -9,7 +9,11 @@ import re
 from datetime import datetime, timedelta
 from functools import lru_cache
 from pathlib import Path
-from typing import List, Dict, Optional, Tuple, Any, Pattern
+from typing import List, Dict, Optional, Tuple, Any, Pattern, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from core.cluster_evaluation import ClusterJewelEvaluation
+    from core.unique_evaluation import UniqueItemEvaluation
 
 from core.item_parser import ParsedItem
 from core.build_archetype import (
