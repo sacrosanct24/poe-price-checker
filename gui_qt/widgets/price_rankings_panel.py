@@ -181,7 +181,7 @@ class PriceRankingsPanel(QFrame):
         ("currency", "Currency"),
         ("divination_cards", "Div Cards"),
         ("unique_weapons", "Unique Weapons"),
-        ("unique_armours", "Unique Armours"),
+        ("unique_armour", "Unique Armour"),
         ("unique_accessories", "Unique Accessories"),
         ("scarabs", "Scarabs"),
         ("fragments", "Fragments"),
