@@ -412,7 +412,7 @@ class LootSessionManager:
         self._current_session.ended_at = datetime.now()
         self._set_state(SessionState.COMPLETED)
 
-        _ = self._current_session
+        session = self._current_session
 
         logger.info(
             f"Ended session: {session.name} - "

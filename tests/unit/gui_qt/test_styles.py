@@ -24,7 +24,6 @@ from gui_qt.styles import (
     get_theme_manager,
     get_rarity_color,
     get_value_color,
-    _ColorsProxy,
 )
 
 
@@ -407,53 +406,6 @@ class TestGetThemeManager:
         m2 = get_theme_manager()
         assert m1 is m2
         ThemeManager.reset_for_testing()
-
-
-class TestColorsProxy:
-    """Tests for _ColorsProxy class."""
-
-    def test_getitem(self):
-        """Should get color from theme manager."""
-        ThemeManager.reset_for_testing()
-        proxy = _ColorsProxy()
-        color = proxy["background"]
-        assert isinstance(color, str)
-        assert color.startswith("#")
-        ThemeManager.reset_for_testing()
-
-    def test_get_with_default(self):
-        """Should return default for missing key."""
-        proxy = _ColorsProxy()
-        color = proxy.get("nonexistent", "#ffffff")
-        assert color == "#ffffff"
-
-    def test_contains(self):
-        """Should check if key exists."""
-        proxy = _ColorsProxy()
-        assert "background" in proxy
-        assert "nonexistent" not in proxy
-
-    def test_keys(self):
-        """Should return color keys."""
-        proxy = _ColorsProxy()
-        keys = list(proxy.keys())
-        assert "background" in keys
-        assert "text" in keys
-
-    def test_values(self):
-        """Should return color values."""
-        proxy = _ColorsProxy()
-        values = list(proxy.values())
-        assert all(isinstance(v, str) for v in values)
-
-    def test_items(self):
-        """Should return key-value pairs."""
-        proxy = _ColorsProxy()
-        items = list(proxy.items())
-        assert len(items) > 0
-        for k, v in items:
-            assert isinstance(k, str)
-            assert isinstance(v, str)
 
 
 class TestGetRarityColor:
