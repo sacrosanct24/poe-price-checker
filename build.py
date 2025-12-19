@@ -37,7 +37,7 @@ def build():
 
     if result.returncode == 0:
         print("\nBuild successful!")
-        print(f"Output: dist/PoEPriceChecker/")
+        print("Output: dist/PoEPriceChecker/")
         if sys.platform == 'win32':
             print("Executable: dist/PoEPriceChecker/PoEPriceChecker.exe")
         elif sys.platform == 'darwin':
