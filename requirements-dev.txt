@@ -11,13 +11,15 @@ pytest-qt>=4.2.0
 pytest-xdist>=3.3.0
 pytest-timeout>=2.1.0
 
+# Baseline parity dependencies
+beautifulsoup4>=4.12.0
+PyQt6>=6.6.0
+
 # =============================================================================
 # Code Quality
 # =============================================================================
 # Linting
-flake8>=6.1.0
-flake8-bugbear>=23.7.0
-flake8-comprehensions>=3.14.0
+ruff>=0.6.0
 
 # Import sorting
 isort>=5.12.0
@@ -67,7 +69,8 @@ pip-audit>=2.6.0
 #   pip-audit
 #
 # Run linting:
-#   flake8 core/ gui_qt/ data_sources/
+#   ruff check .
+#   ruff check --select=F401,F821,F841,F811,F541,E741,A001 --ignore=T201 .  # Tier-0 only
 #   isort --check-only core/ gui_qt/ data_sources/
 #   mypy --config-file=mypy.ini core/ data_sources/
 #
