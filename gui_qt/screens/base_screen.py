@@ -11,7 +11,7 @@ from abc import abstractmethod
 from typing import TYPE_CHECKING, Callable, Optional
 
 from PyQt6.QtCore import pyqtSignal
-from PyQt6.QtWidgets import QWidget, QVBoxLayout
+from PyQt6.QtWidgets import QWidget
 
 if TYPE_CHECKING:
     from core.app_context import AppContext

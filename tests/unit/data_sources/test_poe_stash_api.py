@@ -805,7 +805,7 @@ class TestPoEStashClientUniqueStashSubtabs:
         mock_items.return_value = {"items": []}
         mock_by_id.return_value = {"items": [{"name": "Item"}]}
 
-        snapshot = client.fetch_all_stashes("TestAccount", "Standard")
+        client.fetch_all_stashes("TestAccount", "Standard")
 
         # Should only try the child with ID
         assert mock_by_id.call_count == 1

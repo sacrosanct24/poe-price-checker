@@ -198,7 +198,7 @@ class TestToastNotification:
         qtbot.addWidget(toast)
 
         # Check that the icon label exists with correct text
-        labels = toast.findChildren(type(toast.findChild(type(toast))))
+        toast.findChildren(type(toast.findChild(type(toast))))
         # Just verify it was created without error
 
     def test_success_toast(self, parent_widget, qtbot):

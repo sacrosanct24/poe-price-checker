@@ -18,19 +18,18 @@ Usage:
 from enum import Enum
 from typing import Optional
 
-from PyQt6.QtCore import Qt, pyqtSignal, QSize, QPropertyAnimation, QEasingCurve
-from PyQt6.QtGui import QIcon, QPainter, QColor, QPen, QBrush
+from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtGui import QPainter
 from PyQt6.QtWidgets import (
     QWidget,
     QHBoxLayout,
     QPushButton,
     QButtonGroup,
     QFrame,
-    QToolTip,
 )
 
 from gui_qt.styles import COLORS
-from gui_qt.design_system import Spacing, BorderRadius, Duration
+from gui_qt.design_system import BorderRadius
 
 
 class ViewMode(Enum):

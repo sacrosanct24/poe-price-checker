@@ -22,10 +22,10 @@ eliminating TYPE_CHECKING blocks and potential circular import issues.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Protocol, runtime_checkable, Union, TYPE_CHECKING
+from typing import Any, Dict, List, Optional, Protocol, runtime_checkable, TYPE_CHECKING
 
 if TYPE_CHECKING:  # Avoid runtime import cycles
-    from core.price_row import PriceRow
+    pass
 
 
 @runtime_checkable

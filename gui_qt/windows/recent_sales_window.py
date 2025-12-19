@@ -22,7 +22,6 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QTableView,
     QAbstractItemView,
-    QMenu,
 )
 
 from gui_qt.styles import apply_window_icon

@@ -461,7 +461,7 @@ class TestRareItemIntegration:
                 '_lookup_price_multi_source',
                 return_value=(0.0, 0, "not found", "none")
             ):
-                result = price_service_with_evaluator.check_item("Rarity: RARE\nTest")
+                price_service_with_evaluator.check_item("Rarity: RARE\nTest")
 
             # Note: Confidence is stored internally but may not be in final output
             # This test verifies the mapping logic exists
@@ -516,7 +516,7 @@ class TestRarePricingEdgeCases:
             '_lookup_price_multi_source',
             return_value=(0.0, 0, "not found", "none")
         ):
-            result = price_service_with_evaluator.check_item("Item text")
+            price_service_with_evaluator.check_item("Item text")
 
         # Should not crash, not use evaluator
         price_service_with_evaluator.rare_evaluator.evaluate.assert_not_called()

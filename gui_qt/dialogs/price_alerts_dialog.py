@@ -11,7 +11,7 @@ Provides a UI for:
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, Optional
 
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
@@ -26,7 +26,6 @@ from PyQt6.QtWidgets import (
     QComboBox,
     QSpinBox,
     QDoubleSpinBox,
-    QCheckBox,
     QPushButton,
     QLabel,
     QGroupBox,

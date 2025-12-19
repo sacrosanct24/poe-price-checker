@@ -40,7 +40,6 @@ class TestSQLInjectionPrevention:
 
     def test_league_name_with_sql_injection(self, db):
         """League names with SQL injection attempts should be safely handled."""
-        malicious_league = "Standard'; DROP TABLE sales; --"
 
         # Should not raise or corrupt database
         try:
@@ -99,7 +98,7 @@ class TestPathTraversalPrevention:
 
         # Create config in safe location using config_file parameter
         config_file = tmp_path / "config.json"
-        config = Config(config_file=config_file)
+        Config(config_file=config_file)
 
         # Attempting to access files outside config dir should fail or be sanitized
         malicious_paths = [

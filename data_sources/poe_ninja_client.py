@@ -439,7 +439,7 @@ if __name__ == "__main__":
     print("Building price database...")
     db = client.build_price_database(league, progress_callback=progress)
 
-    print(f"\n=== Sample Prices ===")
+    print("\n=== Sample Prices ===")
 
     # Check some common items
     test_items = [

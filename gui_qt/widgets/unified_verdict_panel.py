@@ -11,7 +11,7 @@ Shows a complete evaluation with quick verdict header and detailed sections.
 from __future__ import annotations
 
 import logging
-from typing import Any, List, Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont
@@ -30,7 +30,7 @@ from gui_qt.styles import COLORS
 from gui_qt.accessibility import set_accessible_name, set_accessible_description
 
 if TYPE_CHECKING:
-    from core.unified_verdict import UnifiedVerdict, PrimaryAction
+    from core.unified_verdict import UnifiedVerdict
     from core.rare_evaluation.models import RareItemEvaluation
 
 logger = logging.getLogger(__name__)
@@ -95,7 +95,7 @@ class VerdictSectionWidget(QFrame):
             self.status_label.setStyleSheet(f"font-weight: bold; color: {COLORS['high_value']};")
         elif is_neutral:
             self.status_label.setText("[!]")
-            self.status_label.setStyleSheet(f"font-weight: bold; color: #FFA726;")
+            self.status_label.setStyleSheet("font-weight: bold; color: #FFA726;")
         else:
             self.status_label.setText("[X]")
             self.status_label.setStyleSheet(f"font-weight: bold; color: {COLORS['low_value']};")
@@ -340,11 +340,11 @@ class UnifiedVerdictPanel(QGroupBox):
         # Scrollable content area
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
-        scroll.setStyleSheet(f"""
-            QScrollArea {{
+        scroll.setStyleSheet("""
+            QScrollArea {
                 border: none;
                 background-color: transparent;
-            }}
+            }
         """)
 
         content_widget = QWidget()
@@ -638,7 +638,6 @@ class UnifiedVerdictPanel(QGroupBox):
             content = f"Worth {verdict.to_sell.price_range}"
             # Add price context badge if available
             if verdict.to_sell.price_context:
-                ctx_color = verdict.to_sell.price_context_color or "#2196F3"
                 content += f"  [{verdict.to_sell.price_context}]"
             if verdict.to_sell.demand_level != "unknown":
                 content += f"\nDemand: {verdict.to_sell.demand_level}"

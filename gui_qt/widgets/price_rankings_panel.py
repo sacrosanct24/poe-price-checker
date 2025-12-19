@@ -7,10 +7,10 @@ Displays Top 20 price rankings in a collapsible sidebar panel.
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 from PyQt6.QtCore import Qt, QAbstractTableModel, QModelIndex, pyqtSignal, QSize, QTimer
-from PyQt6.QtGui import QColor, QBrush, QPixmap
+from PyQt6.QtGui import QColor, QBrush
 from PyQt6.QtWidgets import (
     QWidget,
     QVBoxLayout,

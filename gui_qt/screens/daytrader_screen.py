@@ -18,7 +18,6 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QHBoxLayout,
     QTabWidget,
-    QGroupBox,
     QLabel,
     QPushButton,
     QFrame,

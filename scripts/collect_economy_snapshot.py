@@ -17,7 +17,6 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
-from datetime import datetime
 from pathlib import Path
 
 # Add project root to path
@@ -97,7 +96,7 @@ def main():
 
     leagues = None
     if args.leagues:
-        leagues = [l.strip() for l in args.leagues.split(",")]
+        leagues = [league.strip() for league in args.leagues.split(",")]
 
     results = collect_snapshots(leagues)
 

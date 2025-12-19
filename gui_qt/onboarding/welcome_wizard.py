@@ -13,12 +13,9 @@ Usage:
         settings = wizard.get_settings()
 """
 
-from dataclasses import dataclass
-from enum import IntEnum
-from typing import Optional, Callable
+from typing import Optional
 
 from PyQt6.QtCore import Qt, pyqtSignal, QSize, QPropertyAnimation, QEasingCurve
-from PyQt6.QtGui import QPixmap, QIcon
 from PyQt6.QtWidgets import (
     QDialog,
     QVBoxLayout,
@@ -38,8 +35,6 @@ from gui_qt.design_system import (
     Spacing,
     BorderRadius,
     Duration,
-    get_animation_duration,
-    AnimationPreset,
     should_reduce_motion,
 )
 

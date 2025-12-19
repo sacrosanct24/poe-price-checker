@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
-from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, Callable, Dict, Optional, TYPE_CHECKING
 
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor
@@ -539,7 +539,7 @@ class UpgradeAdvisorWindow(QDialog):
                 )
             else:
                 self.results_text.setPlainText(
-                    f"Slot is empty.\n\n"
+                    "Slot is empty.\n\n"
                     "Click 'Analyze Selected Slot' to get item suggestions."
                 )
 

@@ -343,7 +343,7 @@ class TestStashGridScene:
     def test_load_layout_clears_previous(self, stash_scene, mock_layout):
         """Test that loading new layout clears previous one."""
         stash_scene.load_layout(mock_layout)
-        first_item_count = len(stash_scene.items())
+        len(stash_scene.items())
 
         # Load again
         stash_scene.load_layout(mock_layout)
@@ -533,7 +533,7 @@ class TestStashGridVisualizerWidget:
 
     def test_no_layout_stats(self, stash_visualizer):
         """Test stats display with no layout loaded."""
-        stats_text = stash_visualizer.stats_label.text()
+        stash_visualizer.stats_label.text()
         # Initially should be empty or show placeholder
         # (not specified in widget, but shouldn't crash)
 

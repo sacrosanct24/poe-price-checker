@@ -280,7 +280,7 @@ class TestRePoETierProvider:
             RePoETier("life", 1, "T1", "mod1", 82, 90, 99, "prefix")
         ]
 
-        result = provider.get_tiers_for_stat("life", force_refresh=True)
+        provider.get_tiers_for_stat("life", force_refresh=True)
         # Should call get_mods despite cache
         mock_client.get_mods.assert_called()
 

@@ -239,7 +239,7 @@ def run_complexity() -> bool:
 
     try:
         # Run radon for overall complexity
-        result = subprocess.run(
+        subprocess.run(
             [sys.executable, "-m", "radon", "cc",
              "core", "gui_qt", "data_sources",
              "-a", "-s", "--total-average"],
@@ -257,7 +257,7 @@ def run_complexity() -> bool:
 
         high_complexity = check_result.stdout.strip()
         if high_complexity:
-            line_count = len([l for l in high_complexity.splitlines() if l.strip()])
+            line_count = len([line for line in high_complexity.splitlines() if line.strip()])
             print(f"\n{YELLOW}Warning: {line_count} functions with complexity >= C (11-20){RESET}")
             print(high_complexity)
 
@@ -292,7 +292,7 @@ def run_coverage_check() -> bool:
 
     if result.returncode == 0:
         print(f"\n{GREEN}{PASS_MARK} Coverage check passed{RESET}")
-        print(f"HTML report: htmlcov/index.html")
+        print("HTML report: htmlcov/index.html")
         return True
     else:
         print(f"\n{RED}{FAIL_MARK} Coverage check failed{RESET}")

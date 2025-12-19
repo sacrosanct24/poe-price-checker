@@ -12,7 +12,6 @@ from pathlib import Path
 from typing import List, Dict, Optional, Tuple, Any, Pattern, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from core.cluster_evaluation import ClusterJewelEvaluation
     from core.unique_evaluation import UniqueItemEvaluation
 
 from core.item_parser import ParsedItem
@@ -1288,7 +1287,7 @@ class RareItemEvaluator:
         Returns:
             RareItemEvaluation populated with cluster jewel data
         """
-        from core.cluster_evaluation import ClusterJewelEvaluator, ClusterJewelEvaluation
+        from core.cluster_evaluation import ClusterJewelEvaluator
 
         evaluator = ClusterJewelEvaluator(data_dir=self.data_dir)
         cluster_eval = evaluator.evaluate(item)
@@ -1313,7 +1312,7 @@ class RareItemEvaluator:
         return self._convert_cluster_evaluation(cluster_eval)
 
     def _convert_cluster_evaluation(
-        self, cluster_eval: "ClusterJewelEvaluation"
+        self, cluster_eval
     ) -> RareItemEvaluation:
         """
         Convert ClusterJewelEvaluation to RareItemEvaluation for UI compatibility.
@@ -1324,15 +1323,14 @@ class RareItemEvaluator:
         Returns:
             RareItemEvaluation with cluster jewel data
         """
-        from core.cluster_evaluation import ClusterJewelEvaluation
 
         # Create AffixMatch objects from NotableMatches
         matched_affixes = []
         for notable in cluster_eval.matched_notables:
-            matched_affixes.append(AffixMatch(
-                affix_type=f"notable",
-                pattern="1 Added Passive Skill is",
-                mod_text=f"{notable.name}",
+                matched_affixes.append(AffixMatch(
+                    affix_type="notable",
+                    pattern="1 Added Passive Skill is",
+                    mod_text=notable.name,
                 value=None,
                 weight=notable.weight,
                 tier=notable.tier,
@@ -1411,13 +1409,12 @@ class RareItemEvaluator:
         Returns:
             RareItemEvaluation with unique item data
         """
-        from core.unique_evaluation import UniqueItemEvaluation
 
         # Create AffixMatch objects from corruption matches
         matched_affixes = []
         for corruption in unique_eval.corruption_matches:
             matched_affixes.append(AffixMatch(
-                affix_type=f"corruption",
+                affix_type="corruption",
                 pattern=corruption.corruption_type,
                 mod_text=corruption.mod_text,
                 value=None,
@@ -1431,7 +1428,6 @@ class RareItemEvaluator:
         slot_bonus_reasons = unique_eval.factors.copy()
 
         # Meta relevance info for builds section
-        cross_build_matches = []
         if unique_eval.meta_relevance and unique_eval.meta_relevance.builds_using:
             cross_build_summary = f"Used by: {', '.join(unique_eval.meta_relevance.builds_using[:3])}"
             cross_build_appeal = len(unique_eval.meta_relevance.builds_using)

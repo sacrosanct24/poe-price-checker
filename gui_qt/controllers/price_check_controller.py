@@ -304,7 +304,7 @@ class PriceCheckController:
         if count == 0:
             return "No prices found"
         elif count == 1:
-            return f"Found 1 price result"
+            return "Found 1 price result"
         else:
             return f"Found {count} price result(s)"
 

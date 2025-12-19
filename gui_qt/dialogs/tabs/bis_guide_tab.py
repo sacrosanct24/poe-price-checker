@@ -429,7 +429,7 @@ class BiSGuideTab(QWidget):
 
     def _show_requirements(self, requirements: "BiSRequirements") -> None:
         """Display requirements in the browser."""
-        html = f"""
+        html = """
         <p><b>Required Stats:</b></p>
         <ul style="margin: 4px 0;">
         """

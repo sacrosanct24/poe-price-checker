@@ -7,7 +7,6 @@ for AI context and upgrade comparison.
 from __future__ import annotations
 
 import logging
-from datetime import datetime
 from pathlib import Path
 from typing import Optional, List, TYPE_CHECKING
 

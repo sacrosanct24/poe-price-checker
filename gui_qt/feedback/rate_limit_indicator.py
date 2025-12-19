@@ -19,12 +19,10 @@ Usage:
     indicator.set_queue_size(3)
 """
 
-from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
 
-from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QSize, QPropertyAnimation, QEasingCurve
-from PyQt6.QtGui import QColor, QPainter, QPen, QBrush
+from PyQt6.QtCore import Qt, pyqtSignal, QTimer
 from PyQt6.QtWidgets import (
     QWidget,
     QHBoxLayout,
@@ -33,14 +31,12 @@ from PyQt6.QtWidgets import (
     QFrame,
     QSizePolicy,
     QProgressBar,
-    QToolTip,
 )
 
 from gui_qt.styles import COLORS
 from gui_qt.design_system import (
     Spacing,
     BorderRadius,
-    Duration,
     FontSize,
 )
 

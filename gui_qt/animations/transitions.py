@@ -23,14 +23,11 @@ from enum import Enum
 from typing import Optional, Callable
 
 from PyQt6.QtCore import (
-    Qt,
     QObject,
-    QTimer,
     QPoint,
     QRect,
     QPropertyAnimation,
     QParallelAnimationGroup,
-    QSequentialAnimationGroup,
     QEasingCurve,
     pyqtSignal,
 )
@@ -492,8 +489,6 @@ def create_page_transition(
         )
     elif transition_type == "scale":
         # For scale, we need sequential: scale out old, scale in new
-        group = QSequentialAnimationGroup()
-
         scale_out = ScaleTransition(old_page, show=False, duration=duration // 2)
         scale_in = ScaleTransition(new_page, show=True, duration=duration // 2)
 

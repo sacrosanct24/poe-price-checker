@@ -104,7 +104,7 @@ class TestRateLimiter:
         # Create 10 threads that all try to call at once
         threads = [threading.Thread(target=make_call) for _ in range(10)]
 
-        start = time.time()
+        time.time()
         for t in threads:
             t.start()
         for t in threads:

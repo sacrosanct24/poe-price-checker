@@ -287,8 +287,8 @@ class TestGetAffixProvider:
             provider1.get_source_info.return_value = "Test info"
 
             with patch.object(module, 'AffixDataProvider', return_value=provider1):
-                result1 = get_affix_provider()
-                result2 = get_affix_provider()
+                get_affix_provider()
+                get_affix_provider()
 
                 # Reset for cleanup
                 module._provider = None
@@ -305,7 +305,7 @@ class TestGetAffixProvider:
         mock_provider.get_source_info.return_value = "Test info"
 
         with patch.object(module, 'AffixDataProvider', return_value=mock_provider):
-            provider1 = get_affix_provider()
+            get_affix_provider()
             provider2 = get_affix_provider(force_reload=True)
 
             # After force_reload, we get a new provider

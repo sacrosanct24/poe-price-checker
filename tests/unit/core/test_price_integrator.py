@@ -1014,7 +1014,7 @@ class TestModuleFunctions:
         # Reset singleton
         module._integrator = None
 
-        integrator1 = get_price_integrator("Standard")
+        get_price_integrator("Standard")
         integrator2 = get_price_integrator("Settlers")
 
         # Different leagues should create new integrator
@@ -1181,7 +1181,7 @@ class TestLazyLoadingClients:
         """Test ninja_client falls back to DummyPriceClient on import error."""
         from core.price_integrator import PriceIntegrator, DummyPriceClient
 
-        integrator = PriceIntegrator()
+        PriceIntegrator()
 
         with patch.dict('sys.modules', {'data_sources.pricing.poe_ninja': None}):
             with patch('core.price_integrator.PriceIntegrator.ninja_client',
@@ -1208,7 +1208,7 @@ class TestLazyLoadingClients:
         """Test poeprices_client handles import error."""
         from core.price_integrator import PriceIntegrator
 
-        integrator = PriceIntegrator(use_poeprices=True)
+        PriceIntegrator(use_poeprices=True)
 
         with patch.dict('sys.modules', {'data_sources.pricing.poeprices': None}):
             # Access the property - should return None due to error
@@ -1250,7 +1250,7 @@ class TestLazyLoadingClients:
         """Test character_manager handles import error."""
         from core.price_integrator import PriceIntegrator
 
-        integrator = PriceIntegrator(enable_upgrade_check=True)
+        PriceIntegrator(enable_upgrade_check=True)
 
         with patch.dict('sys.modules', {'core.pob': None}):
             # Test fallback behavior
