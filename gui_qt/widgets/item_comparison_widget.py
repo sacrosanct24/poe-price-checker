@@ -9,7 +9,7 @@ Part of Phase 3: Teaching & Learning features.
 from __future__ import annotations
 
 import logging
-from typing import List, Optional, TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
@@ -18,12 +18,9 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QGroupBox,
-    QGridLayout,
     QFrame,
     QScrollArea,
-    QSizePolicy,
 )
-from PyQt6.QtGui import QFont
 
 from gui_qt.styles import COLORS
 

@@ -67,7 +67,7 @@ class TestRawPromptMode:
         )
 
         # Execute
-        result = worker._execute()
+        worker._execute()
 
         # Verify the prompt was used directly
         call_args = mock_client.complete.call_args
@@ -98,7 +98,7 @@ class TestRawPromptMode:
         )
 
         # Execute
-        result = worker._execute()
+        worker._execute()
 
         # Verify the prompt was built (not raw item_text)
         call_args = mock_client.complete.call_args

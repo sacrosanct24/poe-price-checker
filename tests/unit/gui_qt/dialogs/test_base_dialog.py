@@ -261,7 +261,7 @@ class TestBaseDialogGeometry:
 
     def test_no_restore_when_disabled(self, qtbot):
         """Should not restore when remember_geometry is False."""
-        with patch('gui_qt.dialogs.base_dialog.QSettings') as mock_settings_cls:
+        with patch('gui_qt.dialogs.base_dialog.QSettings'):
             dialog = BaseDialog(title="Test", remember_geometry=False)
             qtbot.addWidget(dialog)
 

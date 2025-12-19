@@ -108,7 +108,7 @@ def test_complete_sale_with_negative_time_delta_clamps_to_zero(temp_db):
     sale_id = temp_db.add_sale("Test Item", listed_price_chaos=10.0)
     
     # Sell "before" it was listed (clock skew scenario)
-    future_time = datetime.now() + timedelta(hours=1)
+    datetime.now() + timedelta(hours=1)
     past_time = datetime.now() - timedelta(hours=1)
     
     temp_db.complete_sale(sale_id, actual_price_chaos=9.0, sold_at=past_time)

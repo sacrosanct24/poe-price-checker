@@ -33,7 +33,7 @@ from typing import Any, Dict, List, Optional
 import platform
 import sys
 
-from PyQt6.QtCore import Qt, pyqtSignal, QSize
+from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -45,9 +45,6 @@ from PyQt6.QtWidgets import (
     QComboBox,
     QLineEdit,
     QCheckBox,
-    QFrame,
-    QGroupBox,
-    QSizePolicy,
     QMessageBox,
 )
 

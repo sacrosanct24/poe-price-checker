@@ -9,11 +9,10 @@ and full-screen UpgradeAdvisorView.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, Callable, Dict, Optional
+from typing import TYPE_CHECKING, Callable, Optional
 
 if TYPE_CHECKING:
     from core.app_context import AppContext
-    from core.config import Config
     from gui_qt.controllers.ai_analysis_controller import AIAnalysisController
     from gui_qt.controllers.pob_controller import PoBController
     from gui_qt.services.window_manager import WindowManager

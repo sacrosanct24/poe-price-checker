@@ -57,7 +57,7 @@ class TestAppContextPoE2:
         mock_config.return_value = config_instance
 
         # Create context
-        ctx = create_app_context()
+        create_app_context()
 
         # Verify poe2.ninja was initialized
         mock_poe2_ninja.assert_called_once_with(league="Dawn of the Hunt")
@@ -153,7 +153,7 @@ class TestAppContextPoE2:
         mock_config.return_value = config_instance
 
         # Create context
-        ctx = create_app_context()
+        create_app_context()
 
         # Verify PoeTradeClient was called with POE2 game version
         mock_trade_client.assert_called_once()
@@ -203,7 +203,7 @@ class TestAppContextPoE2:
         mock_config.return_value = config_instance
 
         # Create context
-        ctx = create_app_context()
+        create_app_context()
 
         # Verify PriceService was called with poe2_ninja and game_version
         mock_price_service.assert_called_once()
@@ -267,7 +267,7 @@ class TestAppContextPoE1:
         mock_config.return_value = config_instance
 
         # Create context
-        ctx = create_app_context()
+        create_app_context()
 
         # Verify poe.ninja was initialized
         mock_poe_ninja.assert_called_once_with(league="Standard")

@@ -28,7 +28,6 @@ from PyQt6.QtWidgets import (
     QProgressBar,
     QCheckBox,
     QMessageBox,
-    QMenu,
 )
 
 from gui_qt.styles import COLORS, RARITY_COLORS, apply_window_icon

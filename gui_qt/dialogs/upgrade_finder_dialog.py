@@ -79,9 +79,9 @@ class UpgradeSearchWorker(QThread):
 
             self.finished.emit(result)
 
-        except Exception as e:
+        except Exception:
             logger.exception("Upgrade search failed")
-            self.error.emit(str(e))
+            self.error.emit("Upgrade search failed")
 
 
 class UpgradeFinderDialog(QDialog):
@@ -374,7 +374,7 @@ class UpgradeFinderDialog(QDialog):
             )
             logger.info(f"Initialized UpgradeFinderService for league: {league}")
 
-        except Exception as e:
+        except Exception:
             logger.exception("Failed to initialize upgrade finder service")
 
     def _on_profile_changed(self, profile_name: str) -> None:

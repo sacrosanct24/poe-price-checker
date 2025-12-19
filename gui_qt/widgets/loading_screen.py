@@ -11,7 +11,7 @@ import logging
 from typing import Optional
 
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QFont, QPixmap, QIcon
+from PyQt6.QtGui import QFont, QIcon
 from PyQt6.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -19,7 +19,6 @@ from PyQt6.QtWidgets import (
     QLabel,
     QProgressBar,
     QApplication,
-    QSplashScreen,
 )
 
 from gui_qt.styles import COLORS

@@ -31,10 +31,9 @@ Usage:
 from functools import wraps
 import logging
 from typing import Any, Callable, Dict, Generic, Optional, Type, TypeVar, cast
-from weakref import WeakValueDictionary
 
-from PyQt6.QtCore import Qt, QObject, QTimer, pyqtSignal
-from PyQt6.QtWidgets import QWidget, QStackedWidget, QVBoxLayout
+from PyQt6.QtCore import QObject, QTimer, pyqtSignal
+from PyQt6.QtWidgets import QWidget, QStackedWidget
 
 logger = logging.getLogger(__name__)
 

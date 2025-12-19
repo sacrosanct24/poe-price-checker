@@ -361,7 +361,7 @@ class TestClipboardMonitorHotkeyRegistration:
         monitor = ClipboardMonitor()
 
         with patch('core.clipboard_monitor.KEYBOARD_AVAILABLE', False):
-            result = monitor.register_hotkey("ctrl+c", lambda: None, "Test")
+            monitor.register_hotkey("ctrl+c", lambda: None, "Test")
             # The actual KEYBOARD_AVAILABLE is checked at module level
             # This test verifies the method exists and can be called
 

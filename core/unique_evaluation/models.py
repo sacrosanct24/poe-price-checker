@@ -7,7 +7,7 @@ Contains dataclasses for representing unique item evaluation results.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, List, Optional
+from typing import TYPE_CHECKING, List, Optional
 
 if TYPE_CHECKING:
     from core.item_parser import ParsedItem

@@ -18,7 +18,7 @@ Usage:
     install_dialog_shortcuts(dialog, on_accept=save, on_reject=cancel)
 """
 
-from typing import Optional, Callable, Sequence
+from typing import Optional, Callable
 
 from PyQt6.QtCore import Qt, QObject, QEvent
 from PyQt6.QtGui import QKeyEvent, QShortcut, QKeySequence
@@ -32,8 +32,6 @@ from PyQt6.QtWidgets import (
     QTableView,
     QTreeView,
     QListView,
-    QAbstractItemView,
-    QApplication,
 )
 
 
@@ -83,7 +81,6 @@ class KeyboardNavigator(QObject):
         if not isinstance(key_event, QKeyEvent):
             return super().eventFilter(obj, event)
         key = key_event.key()
-        modifiers = key_event.modifiers()
 
         # Handle arrow keys
         if key == Qt.Key.Key_Up:

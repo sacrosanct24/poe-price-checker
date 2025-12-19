@@ -204,7 +204,6 @@ class TestPriceRefreshServiceInterval:
     def test_set_refresh_interval_updates_running_timer(self, service, qapp):
         """Should update running timer."""
         service.start()
-        old_interval = service._refresh_interval_ms
 
         service.set_refresh_interval(45)
 

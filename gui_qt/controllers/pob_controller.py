@@ -25,8 +25,6 @@ from PyQt6.QtWidgets import QMainWindow
 if TYPE_CHECKING:
     from core.app_context import AppContext
     from core.pob import CharacterManager, UpgradeChecker
-    from core.dps_impact_calculator import DPSStats
-    from gui_qt.widgets.item_inspector import BuildStats
 
 
 class PoBController:

@@ -32,8 +32,6 @@ from PyQt6.QtWidgets import (
     QWidget,
     QApplication,
     QDialog,
-    QStyleOption,
-    QStyle,
 )
 
 
@@ -210,7 +208,7 @@ class FocusManager(QObject):
         if not self._focus_scopes:
             return
 
-        old_scope = self._focus_scopes.pop()
+        self._focus_scopes.pop()
 
         # Restore focus if we have a saved widget
         if self._focus_scopes:

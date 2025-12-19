@@ -36,7 +36,6 @@ from PyQt6.QtWidgets import (
 from gui_qt.design_system import (
     Spacing,
     BorderRadius,
-    Duration,
     get_animation_duration,
     AnimationPreset,
     should_reduce_motion,

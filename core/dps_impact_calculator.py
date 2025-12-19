@@ -106,14 +106,6 @@ class DPSStats:
         cast_speed = stats.get("CastSpeed", stats.get("CastRate", 1.0))
 
         # Determine primary damage type
-        damage_totals = {
-            DamageType.PHYSICAL: phys_dps,
-            DamageType.FIRE: fire_dps,
-            DamageType.COLD: cold_dps,
-            DamageType.LIGHTNING: lightning_dps,
-            DamageType.CHAOS: chaos_dps,
-        }
-
         total_ele = fire_dps + cold_dps + lightning_dps
         primary_type = DamageType.UNKNOWN
 

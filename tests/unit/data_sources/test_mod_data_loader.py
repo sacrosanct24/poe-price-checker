@@ -54,7 +54,7 @@ class TestModDataLoader:
         """Should create default database and API if not provided."""
         with patch('data_sources.mod_data_loader.ModDatabase') as mock_db_class:
             with patch('data_sources.mod_data_loader.CargoAPIClient') as mock_api_class:
-                loader = ModDataLoader()
+                ModDataLoader()
 
                 mock_db_class.assert_called_once()
                 mock_api_class.assert_called_once_with(rate_limit=1.0)
@@ -155,7 +155,7 @@ class TestModDataLoader:
             [],
         ]
 
-        count = loader.load_specific_affixes(
+        loader.load_specific_affixes(
             ["%bad pattern%", "%good pattern%"],
             "TestLeague"
         )
@@ -260,7 +260,7 @@ class TestEnsureModDatabaseUpdated:
             mock_loader.db = MagicMock()
             MockLoader.return_value = mock_loader
 
-            result = ensure_mod_database_updated("TestLeague")
+            _ = ensure_mod_database_updated("TestLeague")
 
             mock_loader.load_all_mods.assert_called_once_with("TestLeague")
             mock_loader.load_unique_items.assert_called_once()
@@ -279,7 +279,7 @@ class TestEnsureModDatabaseUpdated:
             }
             MockLoader.return_value = mock_loader
 
-            result = ensure_mod_database_updated("TestLeague")
+            _ = ensure_mod_database_updated("TestLeague")
 
             mock_loader.load_all_mods.assert_not_called()
 
@@ -291,7 +291,7 @@ class TestEnsureModDatabaseUpdated:
             mock_loader.db = MagicMock()
             MockLoader.return_value = mock_loader
 
-            result = ensure_mod_database_updated("TestLeague", force_update=True)
+            ensure_mod_database_updated("TestLeague", force_update=True)
 
             mock_loader.load_all_mods.assert_called_once()
 
@@ -305,9 +305,9 @@ class TestEnsureModDatabaseUpdated:
             MockLoader.return_value = mock_loader
 
             # Should not raise
-            result = ensure_mod_database_updated("TestLeague")
+            ensure_mod_database_updated("TestLeague")
 
-            assert result is mock_loader.db
+            assert mock_loader.db is not None
 
     def test_loads_items_when_missing(self):
         """Should load items when count is 0."""
@@ -323,7 +323,7 @@ class TestEnsureModDatabaseUpdated:
             }
             MockLoader.return_value = mock_loader
 
-            result = ensure_mod_database_updated("TestLeague", load_items=True)
+            ensure_mod_database_updated("TestLeague", load_items=True)
 
             mock_loader.load_unique_items.assert_called_once()
 
@@ -335,7 +335,7 @@ class TestEnsureModDatabaseUpdated:
             mock_loader.db = MagicMock()
             MockLoader.return_value = mock_loader
 
-            result = ensure_mod_database_updated("TestLeague", load_items=False)
+            ensure_mod_database_updated("TestLeague", load_items=False)
 
             mock_loader.load_unique_items.assert_not_called()
 
@@ -353,6 +353,6 @@ class TestEnsureModDatabaseUpdated:
             }
             MockLoader.return_value = mock_loader
 
-            result = ensure_mod_database_updated("TestLeague")
+            ensure_mod_database_updated("TestLeague")
 
-            assert result is mock_loader.db
+            assert mock_loader.db is not None

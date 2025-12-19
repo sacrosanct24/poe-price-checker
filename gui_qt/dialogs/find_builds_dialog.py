@@ -31,8 +31,6 @@ logger = logging.getLogger(__name__)
 # Import scrapers
 from data_sources.build_scrapers import (
     PoBArchivesScraper,
-    BuildSourceProvider,
-    ScrapedBuild,
 )
 SCRAPERS_AVAILABLE = True
 

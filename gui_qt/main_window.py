@@ -20,7 +20,7 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import (
     QApplication,
@@ -32,9 +32,7 @@ from PyQt6.QtWidgets import (
     QStackedWidget,
     QGroupBox,
     QLabel,
-    QPushButton,
     QStatusBar,
-    QMessageBox,
     QDialog,
 )
 
@@ -42,7 +40,7 @@ from gui_qt.styles import Theme
 from gui_qt.widgets.toast_notification import ToastManager
 from gui_qt.widgets.pinned_items_widget import PinnedItemsWidget
 from gui_qt.widgets.price_rankings_panel import PriceRankingsPanel
-from gui_qt.widgets.session_tabs import SessionTabWidget, SessionPanel
+from gui_qt.widgets.session_tabs import SessionTabWidget
 from gui_qt.workers import RankingsPopulationWorker
 from gui_qt.services import (
     get_window_manager,

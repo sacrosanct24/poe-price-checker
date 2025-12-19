@@ -29,7 +29,7 @@ def test_item_price_lookup(item_text: str, description: str):
     ctx = create_app_context()
     
     # Check what's available
-    print(f"[OK] App context created")
+    print("[OK] App context created")
     print(f"  - poe.ninja: {'[OK] Available' if ctx.poe_ninja else '[FAIL] Not available'}")
     print(f"  - poe.watch: {'[OK] Available' if ctx.poe_watch else '[FAIL] Not available'}")
 

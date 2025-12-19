@@ -66,7 +66,7 @@ def test_get_current_leagues_returns_pc_realms_only():
 
     # Should have 8 PC leagues, not the Xbox one
     assert len(leagues) == 8
-    names = {l["name"] for l in leagues}
+    names = {league["name"] for league in leagues}
     assert "Standard" in names
     assert "Hardcore" in names
     assert "Xbox League" not in names

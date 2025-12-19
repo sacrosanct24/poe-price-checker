@@ -717,7 +717,6 @@ class SettingsDialog(QDialog):
 
     def _create_verdict_tab(self) -> QWidget:
         """Create the Verdict settings tab for keep/vendor thresholds."""
-        from core.quick_verdict import VerdictThresholds
 
         tab = QWidget()
         layout = QVBoxLayout(tab)

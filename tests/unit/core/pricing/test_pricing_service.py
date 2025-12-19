@@ -363,7 +363,7 @@ class TestPriceServiceInitialization:
 
         mock_cache = Mock()
 
-        service = PriceService(
+        PriceService(
             config=config,
             parser=Mock(),
             db=Mock(),

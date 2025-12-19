@@ -101,11 +101,11 @@ def margin_ltrb(
     Returns:
         Tuple of margins
     """
-    l = _get_spacing_value(left) if isinstance(left, str) else left
+    left_val = _get_spacing_value(left) if isinstance(left, str) else left
     t = _get_spacing_value(top) if isinstance(top, str) else top
     r = _get_spacing_value(right) if isinstance(right, str) else right
     b = _get_spacing_value(bottom) if isinstance(bottom, str) else bottom
-    return (l, t, r, b)
+    return (left_val, t, r, b)
 
 
 def padding(

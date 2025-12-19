@@ -18,7 +18,7 @@ from typing import Optional
 import requests
 import logging
 
-from core.constants import API_TIMEOUT_HEALTH_CHECK, API_TIMEOUT_DEFAULT, API_TIMEOUT_LOCAL_AI
+from core.constants import API_TIMEOUT_HEALTH_CHECK, API_TIMEOUT_DEFAULT
 from core.result import Result, Ok, Err
 from data_sources.ai.base_ai_client import BaseAIClient, AIResponse
 

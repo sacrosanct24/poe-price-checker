@@ -29,11 +29,11 @@ Usage:
 """
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Callable
+from typing import List, Optional, Callable
 from enum import Enum
 
-from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QUrl
-from PyQt6.QtGui import QColor, QDesktopServices
+from PyQt6.QtCore import pyqtSignal, QTimer, QUrl
+from PyQt6.QtGui import QDesktopServices
 from PyQt6.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -44,17 +44,14 @@ from PyQt6.QtWidgets import (
     QDialog,
     QTextEdit,
     QSizePolicy,
-    QGraphicsDropShadowEffect,
 )
 
 from gui_qt.styles import COLORS
 from gui_qt.design_system import (
     Spacing,
     BorderRadius,
-    Duration,
     FontSize,
     FontWeight,
-    Elevation,
 )
 
 

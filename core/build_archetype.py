@@ -670,7 +670,7 @@ if __name__ == "__main__":
     }
 
     arch1 = detect_archetype(stats1)
-    print(f"Test 1 - Life Crit Attack:")
+    print("Test 1 - Life Crit Attack:")
     print(f"  Summary: {arch1.get_summary()}")
     print(f"  Confidence: {arch1.confidence:.2f}")
     print(f"  Needs chaos res: {arch1.needs_chaos_res}")
@@ -692,7 +692,7 @@ if __name__ == "__main__":
     }
 
     arch2 = detect_archetype(stats2, "Ice Spear")
-    print(f"Test 2 - ES Cold Spell:")
+    print("Test 2 - ES Cold Spell:")
     print(f"  Summary: {arch2.get_summary()}")
     print(f"  Confidence: {arch2.confidence:.2f}")
     print(f"  Primary element: {arch2.primary_element}")
@@ -707,7 +707,7 @@ if __name__ == "__main__":
     }
 
     arch3 = detect_archetype(stats3)
-    print(f"Test 3 - Minion Build:")
+    print("Test 3 - Minion Build:")
     print(f"  Summary: {arch3.get_summary()}")
     print(f"  Is minion: {arch3.is_minion}")
     print()

@@ -526,7 +526,7 @@ class TestIntegration:
         tier_min, tier_max = 90, 99
 
         # Calculate goodness
-        goodness = calculate_goodness_score(life_value, tier_min, tier_max)
+        calculate_goodness_score(life_value, tier_min, tier_max)
 
         # Calculate filter range (20% variance)
         filter_min, filter_max = calculate_filter_range(

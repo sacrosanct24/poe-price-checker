@@ -683,7 +683,7 @@ if __name__ == "__main__":
         print(f"Account:     {snapshot.account_name}")
         print(f"League:      {snapshot.league}")
         print(f"Total Items: {snapshot.total_items}")
-        print(f"\nTabs:")
+        print("\nTabs:")
         for tab in snapshot.tabs:
             status = ""
             if tab.type == "UniqueStash" and tab.item_count == 0:

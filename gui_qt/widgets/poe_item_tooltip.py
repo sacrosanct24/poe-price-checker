@@ -429,7 +429,7 @@ class PoEItemTooltip(QFrame):
 
         if getattr(item, "is_synthesised", False):
             parts.append(
-                f'<div style="color: #60a0d0; text-align: center; font-size: 11px;">Synthesised</div>'
+                '<div style="color: #60a0d0; text-align: center; font-size: 11px;">Synthesised</div>'
             )
 
         # Influences

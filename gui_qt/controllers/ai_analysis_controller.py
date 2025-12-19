@@ -22,7 +22,6 @@ from __future__ import annotations
 import logging
 from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
 
-from PyQt6.QtWidgets import QWidget
 
 if TYPE_CHECKING:
     from core.config import Config
