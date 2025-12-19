@@ -127,7 +127,7 @@ Item Level: 85
             if chaos_value > 0:
                 print(f"[OK] ✓ Non-zero price: {chaos_value:.1f}c")
             else:
-                print(f"[WARN] Zero price returned")
+                print("[WARN] Zero price returned")
 
         except Exception as e:
             print(f"[FAIL] Error: {e}")

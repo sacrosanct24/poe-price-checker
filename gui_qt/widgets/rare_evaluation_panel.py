@@ -6,7 +6,7 @@ PyQt6 widget for displaying rare item evaluation results.
 
 from __future__ import annotations
 
-from typing import Any, Callable, Optional
+from typing import Any, Optional
 
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtGui import QFont
@@ -285,13 +285,13 @@ class RareEvaluationPanelWidget(QGroupBox):
         crafting_layout.setSpacing(4)
 
         crafting_header = QLabel("CRAFTING POTENTIAL:")
-        crafting_header.setStyleSheet(f"""
-            QLabel {{
+        crafting_header.setStyleSheet("""
+            QLabel {
                 font-weight: bold;
                 color: #FFA726;
                 font-size: 10px;
                 letter-spacing: 1px;
-            }}
+            }
         """)
         crafting_layout.addWidget(crafting_header)
 
@@ -325,13 +325,13 @@ class RareEvaluationPanelWidget(QGroupBox):
         cluster_layout.setSpacing(4)
 
         cluster_header = QLabel("CLUSTER JEWEL INFO:")
-        cluster_header.setStyleSheet(f"""
-            QLabel {{
+        cluster_header.setStyleSheet("""
+            QLabel {
                 font-weight: bold;
                 color: #9c27b0;
                 font-size: 10px;
                 letter-spacing: 1px;
-            }}
+            }
         """)
         cluster_layout.addWidget(cluster_header)
 
@@ -365,13 +365,13 @@ class RareEvaluationPanelWidget(QGroupBox):
         unique_layout.setSpacing(4)
 
         unique_header = QLabel("UNIQUE ITEM INFO:")
-        unique_header.setStyleSheet(f"""
-            QLabel {{
+        unique_header.setStyleSheet("""
+            QLabel {
                 font-weight: bold;
                 color: #af6025;
                 font-size: 10px;
                 letter-spacing: 1px;
-            }}
+            }
         """)
         unique_layout.addWidget(unique_header)
 
@@ -530,7 +530,7 @@ class RareEvaluationPanelWidget(QGroupBox):
 
             # Set as HTML to render the colored meta tags
             self.affixes_text.setHtml(
-                f'<pre style="font-family: monospace; font-size: 12px; margin: 0;">'
+                '<pre style="font-family: monospace; font-size: 12px; margin: 0;">'
                 + "<br>".join(html_lines)
                 + "</pre>"
             )
@@ -580,7 +580,6 @@ class RareEvaluationPanelWidget(QGroupBox):
 
         league = meta_info.get('league', 'Unknown')
         builds = meta_info.get('builds_analyzed', 0)
-        source = meta_info.get('source', 'unknown')
 
         # Get top meta affixes
         meta_weights = getattr(self._evaluator, 'meta_weights', {})
@@ -727,7 +726,7 @@ class RareEvaluationPanelWidget(QGroupBox):
             else:
                 self.crafting_frame.setVisible(False)
 
-        except Exception as e:
+        except Exception:
             # Don't show crafting section if analysis fails
             self.crafting_frame.setVisible(False)
 
@@ -776,11 +775,7 @@ class RareEvaluationPanelWidget(QGroupBox):
             for notable in matched_notables:
                 name = getattr(notable, 'name', 'Unknown')
                 tier = getattr(notable, 'tier', 'low')
-                weight = getattr(notable, 'weight', 0)
                 has_synergy = getattr(notable, 'has_synergy', False)
-
-                # Get tier color
-                tier_color = self.NOTABLE_TIER_COLORS.get(tier, "#888888")
 
                 # Build tier symbol
                 tier_symbols = {

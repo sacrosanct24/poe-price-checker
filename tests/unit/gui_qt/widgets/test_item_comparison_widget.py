@@ -78,7 +78,7 @@ class TestModComparisonRow:
         )
 
         # Check tier label exists
-        tier_label = row.findChild(type(row), "")  # Generic search
+        row.findChild(type(row), "")  # Generic search
         # Basic existence check since we can't easily find specific labels
         assert row.layout() is not None
 

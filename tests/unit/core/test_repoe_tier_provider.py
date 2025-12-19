@@ -218,7 +218,7 @@ class TestRePoETierProvider:
     def test_init_creates_client(self):
         """Creates client if not provided."""
         with patch('core.repoe_tier_provider.RePoEClient') as MockClient:
-            provider = RePoETierProvider()
+            RePoETierProvider()
             MockClient.assert_called_once()
 
     def test_get_mods_caches_data(self, provider, mock_client):
@@ -483,7 +483,7 @@ class TestBaseItemRecommender:
         """Creates client if not provided."""
         # BaseItemRecommender imports RePoEClient inside __init__ from data_sources
         with patch('data_sources.repoe_client.RePoEClient') as MockClient:
-            recommender = BaseItemRecommender()
+            BaseItemRecommender()
             MockClient.assert_called_once()
 
     def test_get_base_items_caches(self, recommender, mock_client):

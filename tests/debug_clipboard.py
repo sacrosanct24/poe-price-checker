@@ -71,12 +71,12 @@ def debug_clipboard():
         if not lines:
             print("\n⚠️  Clipboard appears to be empty")
         elif not lines[0].strip().startswith("Rarity:"):
-            print(f"\n⚠️  First line doesn't start with 'Rarity:'")
+            print("\n⚠️  First line doesn't start with 'Rarity:'")
             print(f"   Instead it is: '{lines[0]}'")
         
     else:
         print("✅ PARSER SUCCESS")
-        print(f"\nParsed item:")
+        print("\nParsed item:")
         print(f"  Rarity: {result.rarity}")
         print(f"  Name: {result.name}")
         print(f"  Base Type: {result.base_type}")

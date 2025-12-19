@@ -170,7 +170,7 @@ class TestFeedbackCollectorInit:
         """Should create storage directory."""
         with TemporaryDirectory() as tmpdir:
             storage_path = Path(tmpdir) / "feedback_test"
-            collector = FeedbackCollector(storage_dir=storage_path)
+            FeedbackCollector(storage_dir=storage_path)
 
             assert storage_path.exists()
 
@@ -271,7 +271,7 @@ class TestFeedbackCollectorCollect:
         with TemporaryDirectory() as tmpdir:
             collector = FeedbackCollector(storage_dir=Path(tmpdir))
 
-            entry = collector.collect(
+            collector.collect(
                 type=FeedbackType.BUG,
                 message="Test bug",
             )

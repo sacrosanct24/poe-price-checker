@@ -15,10 +15,10 @@ Usage:
     cards_view.set_data(results_list)
 """
 
-from typing import Any, Dict, List, Optional, Callable
+from typing import Any, Dict, List, Optional
 
-from PyQt6.QtCore import Qt, pyqtSignal, QSize, QPoint, QTimer
-from PyQt6.QtGui import QColor, QPainter, QPen, QBrush, QFont, QMouseEvent
+from PyQt6.QtCore import Qt, pyqtSignal, QPoint, QTimer
+from PyQt6.QtGui import QColor, QMouseEvent
 from PyQt6.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -27,7 +27,6 @@ from PyQt6.QtWidgets import (
     QFrame,
     QScrollArea,
     QGridLayout,
-    QSizePolicy,
     QGraphicsDropShadowEffect,
     QMenu,
     QApplication,
@@ -37,7 +36,6 @@ from gui_qt.styles import COLORS, get_rarity_color
 from gui_qt.design_system import (
     Spacing,
     BorderRadius,
-    Duration,
     FontSize,
     FontWeight,
     Elevation,

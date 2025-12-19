@@ -31,7 +31,7 @@ Usage:
 from enum import Enum
 from typing import Optional
 
-from PyQt6.QtCore import QObject, QTimer
+from PyQt6.QtCore import QTimer
 from PyQt6.QtWidgets import QWidget, QApplication
 
 # Note: QAccessible and QAccessibleEvent are available via QtGui in PyQt6

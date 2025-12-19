@@ -235,7 +235,7 @@ Crusader Item
             
             influence_mods = [m for m in eval_result.matched_affixes if m.is_influence_mod]
             if influence_mods:
-                print(f"  Influence Mods Detected:")
+                print("  Influence Mods Detected:")
                 for mod in influence_mods:
                     print(f"    - {mod.affix_type}: {mod.mod_text}")
 

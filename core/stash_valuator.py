@@ -655,14 +655,14 @@ if __name__ == "__main__":
         progress_callback=progress,
     )
 
-    print(f"\n=== Results ===")
+    print("\n=== Results ===")
     print(f"Total Value: {result.display_total}")
     print(f"Items: {result.total_items} ({result.priced_items} priced)")
-    print(f"\nTop Tabs:")
+    print("\nTop Tabs:")
     for tab in result.tabs[:5]:
         print(f"  {tab.name}: {tab.display_value} ({tab.valuable_count} valuable)")
 
-    print(f"\nTop Items:")
+    print("\nTop Items:")
     all_items = []
     for tab in result.tabs:
         all_items.extend(tab.items)

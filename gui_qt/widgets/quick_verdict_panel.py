@@ -19,7 +19,6 @@ from PyQt6.QtWidgets import (
     QLabel,
     QPushButton,
     QFrame,
-    QSizePolicy,
 )
 
 from gui_qt.styles import COLORS
@@ -27,8 +26,6 @@ from core.quick_verdict import (
     QuickVerdictCalculator,
     VerdictResult,
     VerdictStatistics,
-    Verdict,
-    VerdictThresholds,
 )
 
 
@@ -503,19 +500,19 @@ class VerdictStatisticsWidget(QWidget):
 
         # Keep count
         self._keep_label = QLabel("👍 0")
-        self._keep_label.setStyleSheet(f"color: #22bb22; font-weight: bold;")
+        self._keep_label.setStyleSheet("color: #22bb22; font-weight: bold;")
         self._keep_label.setToolTip("Items marked as KEEP")
         stats_layout.addWidget(self._keep_label)
 
         # Vendor count
         self._vendor_label = QLabel("👎 0")
-        self._vendor_label.setStyleSheet(f"color: #bb2222; font-weight: bold;")
+        self._vendor_label.setStyleSheet("color: #bb2222; font-weight: bold;")
         self._vendor_label.setToolTip("Items marked as VENDOR")
         stats_layout.addWidget(self._vendor_label)
 
         # Maybe count
         self._maybe_label = QLabel("🤔 0")
-        self._maybe_label.setStyleSheet(f"color: #bbbb22; font-weight: bold;")
+        self._maybe_label.setStyleSheet("color: #bbbb22; font-weight: bold;")
         self._maybe_label.setToolTip("Items marked as MAYBE")
         stats_layout.addWidget(self._maybe_label)
 

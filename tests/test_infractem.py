@@ -57,7 +57,7 @@ else:
     print(f"Requirements: {result.requirements}")
     print(f"Implicits: {len(result.implicits)}")
     print(f"Explicits: {len(result.explicits)}")
-    print(f"\nExplicit mods:")
+    print("\nExplicit mods:")
     for mod in result.explicits:
         print(f"  - {mod}")
 

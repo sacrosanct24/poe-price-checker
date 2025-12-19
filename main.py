@@ -63,24 +63,15 @@ def main() -> None:
     loading.set_progress(5)
     app.processEvents()
 
-    from core.config import Config
-    config = Config()
-
     # Phase 2: Database
     loading.set_status("Connecting to database...")
     loading.set_progress(15)
     app.processEvents()
 
-    from core.database import Database
-    db = Database()
-
     # Phase 3: Item parser
     loading.set_status("Initializing item parser...")
     loading.set_progress(25)
     app.processEvents()
-
-    from core.item_parser import ItemParser
-    parser = ItemParser()
 
     # Phase 4: Pricing services
     loading.set_status("Setting up pricing services...")

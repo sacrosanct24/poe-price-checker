@@ -35,7 +35,6 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
 
-from core.result import Result, Ok, Err
 
 
 class Verdict(Enum):
@@ -444,11 +443,8 @@ class QuickVerdictCalculator:
 
         # Extract item properties
         rarity = getattr(item, 'rarity', 'Normal')
-        name = getattr(item, 'name', '') or getattr(item, 'base_type', 'Item')
         sockets = getattr(item, 'sockets', 0) or 0
         links = getattr(item, 'links', 0) or 0
-        item_level = getattr(item, 'item_level', 0) or 0
-        corrupted = getattr(item, 'corrupted', False)
 
         # Extract special item properties
         influences = getattr(item, 'influences', []) or []
@@ -654,7 +650,6 @@ class QuickVerdictCalculator:
         has_resists = False
         has_damage = False
         has_crit = False
-        has_gem_level = False
 
         for mod in all_mods:
             mod_lower = mod.lower()
@@ -662,7 +657,6 @@ class QuickVerdictCalculator:
             # +Gem level mods - VERY valuable (build-defining)
             # Patterns: "+1 to Level of all X Gems", "+1 to Level of all Skill Gems"
             if 'to level of all' in mod_lower and 'gem' in mod_lower:
-                has_gem_level = True
                 # Extract the gem type for better description
                 # Check specific types BEFORE generic "skill gems"
                 if 'spell' in mod_lower:

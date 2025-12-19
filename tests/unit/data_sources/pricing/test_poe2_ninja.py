@@ -41,7 +41,7 @@ class TestPoe2NinjaAPIInit:
         """Base URL is set to poe2.ninja API."""
         mock_base_init.return_value = None
 
-        api = Poe2NinjaAPI()
+        Poe2NinjaAPI()
 
         mock_base_init.assert_called_once()
         call_kwargs = mock_base_init.call_args[1]
@@ -52,7 +52,7 @@ class TestPoe2NinjaAPIInit:
         """Rate limit is conservative at 0.33."""
         mock_base_init.return_value = None
 
-        api = Poe2NinjaAPI()
+        Poe2NinjaAPI()
 
         call_kwargs = mock_base_init.call_args[1]
         assert call_kwargs['rate_limit'] == 0.33
@@ -62,7 +62,7 @@ class TestPoe2NinjaAPIInit:
         """Cache TTL is 1 hour."""
         mock_base_init.return_value = None
 
-        api = Poe2NinjaAPI()
+        Poe2NinjaAPI()
 
         call_kwargs = mock_base_init.call_args[1]
         assert call_kwargs['cache_ttl'] == 3600
@@ -311,7 +311,7 @@ class TestFindItemPrice:
         """Should find rune price (PoE2-specific item type)."""
         api._find_from_overview_by_name = Mock(return_value={"name": "Glacial Rune", "exaltedValue": 10})
 
-        result = api.find_item_price("Glacial Rune", None, rarity="RUNE")
+        api.find_item_price("Glacial Rune", None, rarity="RUNE")
 
         api._find_from_overview_by_name.assert_called_with("Rune", "Glacial Rune")
 
@@ -319,7 +319,7 @@ class TestFindItemPrice:
         """Should find soul core price (PoE2-specific item type)."""
         api._find_from_overview_by_name = Mock(return_value={"name": "Soul Core of Azcapa", "exaltedValue": 100})
 
-        result = api.find_item_price("Soul Core of Azcapa", None, rarity="SOULCORE")
+        api.find_item_price("Soul Core of Azcapa", None, rarity="SOULCORE")
 
         api._find_from_overview_by_name.assert_called_with("SoulCore", "Soul Core of Azcapa")
 

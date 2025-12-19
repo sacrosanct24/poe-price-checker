@@ -10,7 +10,7 @@ Displays:
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 from PyQt6.QtCore import Qt, QAbstractTableModel, QModelIndex, QTimer
@@ -22,7 +22,6 @@ from PyQt6.QtWidgets import (
     QFrame,
     QGroupBox,
     QHBoxLayout,
-    QHeaderView,
     QLabel,
     QListWidget,
     QListWidgetItem,
@@ -38,7 +37,7 @@ from gui_qt.styles import apply_window_icon
 
 if TYPE_CHECKING:
     from core.interfaces import IAppContext
-    from core.loot_session import LootDrop, LootSession, MapRun
+    from core.loot_session import LootDrop, LootSession
     from gui_qt.controllers.loot_tracking_controller import LootTrackingController
 
 logger = logging.getLogger(__name__)

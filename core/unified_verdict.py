@@ -26,7 +26,6 @@ from typing import Any, Dict, List, Optional, TYPE_CHECKING
 if TYPE_CHECKING:
     from core.item_parser import ParsedItem
     from core.pob.models import CharacterProfile
-    from core.build_archetypes import ArchetypeMatch
 
 logger = logging.getLogger(__name__)
 
@@ -147,14 +146,14 @@ class UnifiedVerdict:
             if self.to_sell.demand_level != "unknown":
                 lines.append(f"          Demand: {self.to_sell.demand_level}")
         else:
-            lines.append(f"TO SELL:  [X] Low market value")
+            lines.append("TO SELL:  [X] Low market value")
 
         # TO STASH
         if self.to_stash.should_stash:
             builds = ", ".join(self.to_stash.good_for_builds[:2])
             lines.append(f"TO STASH: [!] Good for: {builds}")
         else:
-            lines.append(f"TO STASH: [-] No specific build fit")
+            lines.append("TO STASH: [-] No specific build fit")
 
         # WHY VALUABLE
         if self.why_valuable.factors:
@@ -189,7 +188,7 @@ class UnifiedVerdict:
     def get_action_text(self) -> str:
         """Get short action recommendation text."""
         if self.primary_action == PrimaryAction.KEEP:
-            return f"KEEP - Upgrade for your build"
+            return "KEEP - Upgrade for your build"
         elif self.primary_action == PrimaryAction.SELL:
             return f"SELL - Worth {self.to_sell.price_range or 'checking'}"
         elif self.primary_action == PrimaryAction.STASH:
@@ -478,7 +477,7 @@ class UnifiedVerdictEngine:
             if divines >= 1.5:
                 verdict.to_sell.price_range = f"{divines:.1f} div"
             else:
-                verdict.to_sell.price_range = f"~1 div"
+                verdict.to_sell.price_range = "~1 div"
         else:
             verdict.to_sell.price_range = f"~{int(price)}c"
 

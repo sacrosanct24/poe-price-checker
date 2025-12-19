@@ -93,7 +93,7 @@ class BackgroundServicesMixin:
 
     def _start_clipboard_service(self: "PriceCheckerWindow") -> None:
         """Start the global hotkey clipboard service."""
-        from gui_qt.services import init_clipboard_service, get_clipboard_service
+        from gui_qt.services import init_clipboard_service
 
         try:
             service = init_clipboard_service(self.ctx, self)

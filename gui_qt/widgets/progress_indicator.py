@@ -34,7 +34,7 @@ from PyQt6.QtCore import (
     QRectF,
 )
 from PyQt6.QtCore import pyqtProperty  # type: ignore[attr-defined]
-from PyQt6.QtGui import QPainter, QColor, QPen, QPaintEvent, QConicalGradient
+from PyQt6.QtGui import QPainter, QColor, QPen, QPaintEvent
 from PyQt6.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -48,8 +48,6 @@ from gui_qt.design_system import (
     Spacing,
     Duration,
     BorderRadius,
-    get_animation_duration,
-    AnimationPreset,
     should_reduce_motion,
 )
 

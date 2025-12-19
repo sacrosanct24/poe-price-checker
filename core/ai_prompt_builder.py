@@ -8,7 +8,7 @@ Includes build context from PoB for upgrade evaluation.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, List, Dict, Any, TYPE_CHECKING
 import logging
@@ -203,7 +203,7 @@ class AIPromptBuilder:
 
         # Include relevant parts of the build summary
         lines = []
-        lines.append(f"\n--- Build Details ---")
+        lines.append("\n--- Build Details ---")
         lines.append(f"Class: {build_summary.ascendancy or build_summary.class_name}")
         lines.append(f"Level: {build_summary.level}")
         lines.append(f"Main Skill: {build_summary.main_skill}")

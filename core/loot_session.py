@@ -451,7 +451,7 @@ class LootSessionManager:
             else:
                 return
 
-        session = self._current_session
+        _ = self._current_session
 
         if zone_type == "map":
             # Entering a map - start a new map run
@@ -652,7 +652,7 @@ if __name__ == "__main__":
 
     if result.is_ok():
         session = result.unwrap()
-        print(f"\nSession summary:")
+        print("\nSession summary:")
         print(f"  Duration: {session.duration}")
         print(f"  Maps: {session.total_maps}")
         print(f"  Drops: {session.total_drops}")

@@ -252,7 +252,7 @@ class TestCraftingPotentialAnalyzer:
         item.fractured_mods = []
 
         analyzer = CraftingPotentialAnalyzer()
-        analysis = analyzer.analyze(item)
+        analyzer.analyze(item)
 
         # T2 life at 90 has potential (max is 99)
         # But need significant potential for recommendation

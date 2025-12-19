@@ -216,10 +216,10 @@ if __name__ == "__main__":
         result = parser.parse(text)
         
         if result is None:
-            print(f"❌ FAILED TO PARSE")
+            print("❌ FAILED TO PARSE")
             print(f"Raw text:\n{text}")
         else:
-            print(f"✅ Successfully parsed")
+            print("✅ Successfully parsed")
             print(f"  Rarity: {result.rarity}")
             print(f"  Name: {result.name}")
             print(f"  Base Type: {result.base_type}")

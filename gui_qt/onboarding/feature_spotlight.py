@@ -32,14 +32,13 @@ from typing import Optional, Callable, cast
 from weakref import ref
 
 from PyQt6.QtCore import Qt, QPoint, QRect, QTimer, QPropertyAnimation, QEasingCurve, QSize
-from PyQt6.QtGui import QPainter, QColor, QPainterPath, QPen, QBrush, QRegion
+from PyQt6.QtGui import QPainter, QColor, QPen
 from PyQt6.QtWidgets import (
     QWidget,
     QVBoxLayout,
     QHBoxLayout,
     QLabel,
     QPushButton,
-    QApplication,
     QGraphicsOpacityEffect,
 )
 
@@ -267,7 +266,6 @@ class FeatureSpotlight(QWidget):
         space_below = parent_rect.height() - target_rect.bottom()
         space_above = target_rect.top()
         space_right = parent_rect.width() - target_rect.right()
-        space_left = target_rect.left()
 
         # Prefer bottom, then top, then right, then left
         if space_below >= tooltip_size.height() + margin:

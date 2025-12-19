@@ -534,7 +534,7 @@ if __name__ == "__main__":
         affinity = analyzer.get_affinity()
         if affinity:
             print(f"Primary Element: {affinity.primary_element}")
-            print(f"Valuable Affixes:")
+            print("Valuable Affixes:")
             for affix, mult in analyzer.get_valuable_affixes()[:5]:
                 print(f"  - {affix}: {mult:.1f}x")
             print(f"Anti Affixes: {', '.join(affinity.anti_affixes) if affinity.anti_affixes else 'None'}")

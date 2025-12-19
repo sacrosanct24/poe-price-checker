@@ -7,7 +7,7 @@ lifecycle callbacks.
 
 from __future__ import annotations
 
-from enum import IntEnum, auto
+from enum import IntEnum
 from typing import TYPE_CHECKING, Callable, Dict, Optional
 
 from PyQt6.QtCore import QObject, pyqtSignal

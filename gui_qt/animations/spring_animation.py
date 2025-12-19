@@ -24,7 +24,6 @@ from typing import Optional, Any, Callable
 from dataclasses import dataclass
 
 from PyQt6.QtCore import (
-    Qt,
     QObject,
     QTimer,
     QPoint,
@@ -36,7 +35,7 @@ from PyQt6.QtCore import (
 )
 from PyQt6.QtWidgets import QWidget, QGraphicsOpacityEffect
 
-from gui_qt.design_system import Duration, should_reduce_motion
+from gui_qt.design_system import should_reduce_motion
 
 
 @dataclass

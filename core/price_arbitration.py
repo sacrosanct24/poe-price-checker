@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import asdict
 from typing import Any, Iterable, Optional, Union
 
 from core.price_row import PriceRow

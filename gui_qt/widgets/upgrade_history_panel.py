@@ -12,14 +12,12 @@ from typing import Any, Dict, List, Optional
 
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
-    QFrame,
     QGroupBox,
     QHBoxLayout,
     QLabel,
     QListWidget,
     QListWidgetItem,
     QPushButton,
-    QSizePolicy,
     QTextEdit,
     QVBoxLayout,
     QWidget,
@@ -166,7 +164,7 @@ class UpgradeHistoryPanel(QWidget):
             item_text = f"[{i}] {time_str} - {model_str}, {stash_str}"
             item = QListWidgetItem(item_text)
             item.setData(Qt.ItemDataRole.UserRole, entry.get("id"))
-            item.setToolTip(f"Click to preview, double-click to use")
+            item.setToolTip("Click to preview, double-click to use")
             self.history_list.addItem(item)
 
     def clear(self) -> None:
