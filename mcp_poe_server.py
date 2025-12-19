@@ -636,7 +636,7 @@ def add_build_category(name: str, category: str) -> dict:
     else:
         return {
             "success": False,
-            "error": f"Failed to add category. Character not found or invalid category.",
+            "error": "Failed to add category. Character not found or invalid category.",
             "available_categories": character_manager.get_available_categories()
         }
 
@@ -664,7 +664,7 @@ def remove_build_category(name: str, category: str) -> dict:
     else:
         return {
             "success": False,
-            "error": f"Failed to remove category"
+            "error": "Failed to remove category"
         }
 
 
