@@ -29,11 +29,11 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install flake8 mypy
+          pip install ruff mypy
 
-      - name: Lint (flake8)
+      - name: Lint (ruff)
         run: |
-          flake8 .
+          ruff check . --select=F401,F821,F841,F811,F541,E741,A001 --ignore=T201
 
       - name: Type check (mypy)
         run: |

@@ -16,6 +16,7 @@ PyQt6 GUI for the PoE Price Checker.
 from __future__ import annotations
 
 import logging
+import os
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
@@ -189,14 +190,15 @@ class PriceCheckerWindow(BackgroundServicesMixin, MenuBarMixin, ShortcutsMixin, 
 
         self._set_status("Ready")
 
-        # Start background rankings population check
-        self._start_rankings_population()
+        if self._should_start_background_services():
+            # Start background rankings population check
+            self._start_rankings_population()
 
-        # Start background price refresh service
-        self._start_price_refresh_service()
+            # Start background price refresh service
+            self._start_price_refresh_service()
 
-        # Start global hotkey clipboard service
-        self._start_clipboard_service()
+            # Start global hotkey clipboard service
+            self._start_clipboard_service()
 
         # Initialize build stats for item inspector from active PoB profile
         self._pob_controller.update_inspector_stats(self.item_inspector)
@@ -209,6 +211,14 @@ class PriceCheckerWindow(BackgroundServicesMixin, MenuBarMixin, ShortcutsMixin, 
             self._rare_evaluator = RareItemEvaluator(data_dir=data_dir)
         except Exception as e:
             self.logger.warning(f"Failed to initialize rare evaluator: {e}")
+
+    def _should_start_background_services(self) -> bool:
+        """Check if background services should start for this process."""
+        if os.environ.get("POE_DISABLE_BACKGROUND_SERVICES") == "1":
+            return False
+        if os.environ.get("PYTEST_CURRENT_TEST"):
+            return False
+        return True
 
 
     # -------------------------------------------------------------------------

@@ -11,25 +11,17 @@ For new code, import directly from this package:
     from core.pob import PoBDecoder, CharacterManager, UpgradeChecker
 """
 
-# Re-export all public classes for backward compatibility
-from core.pob.models import (
-    BuildCategory,
-    PoBItem,
-    PoBBuild,
-    CharacterProfile,
-)
-
-from core.pob.decoder import (
+from core.pob.checker import UpgradeChecker
+from core.pob.decoder import (  # URL helper functions (for internal use, but exported for compatibility)
     PoBDecoder,
-    # URL helper functions (for internal use, but exported for compatibility)
     _is_pastebin_url,
     _is_pobbin_url,
     _url_host_matches,
 )
-
 from core.pob.manager import CharacterManager
 
-from core.pob.checker import UpgradeChecker
+# Re-export all public classes for backward compatibility
+from core.pob.models import BuildCategory, CharacterProfile, PoBBuild, PoBItem
 
 __all__ = [
     # Models
@@ -39,6 +31,9 @@ __all__ = [
     "CharacterProfile",
     # Decoder
     "PoBDecoder",
+    "_is_pastebin_url",
+    "_is_pobbin_url",
+    "_url_host_matches",
     # Manager
     "CharacterManager",
     # Checker

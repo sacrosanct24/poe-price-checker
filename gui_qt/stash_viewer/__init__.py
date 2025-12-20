@@ -13,42 +13,42 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
-from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable, Optional
 
-from PyQt6.QtCore import Qt, QModelIndex, pyqtSignal
+from PyQt6.QtCore import QModelIndex, Qt, pyqtSignal
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
-    QWidget,
+    QAbstractItemView,
+    QCheckBox,
+    QComboBox,
     QDialog,
-    QVBoxLayout,
+    QFormLayout,
     QHBoxLayout,
-    QSplitter,
     QLabel,
     QLineEdit,
-    QComboBox,
-    QSpinBox,
-    QPushButton,
-    QCheckBox,
     QListWidget,
     QListWidgetItem,
-    QTableView,
-    QAbstractItemView,
-    QProgressBar,
-    QFormLayout,
     QMessageBox,
+    QProgressBar,
+    QPushButton,
+    QSpinBox,
+    QSplitter,
+    QTableView,
+    QVBoxLayout,
+    QWidget,
 )
 
-from gui_qt.styles import COLORS, apply_window_icon
-from gui_qt.widgets.item_context_menu import ItemContext, ItemContextMenuManager
-from core.stash_valuator import ValuationResult, PricedItem, PriceSource
-from core.stash_storage import get_stash_storage, StashStorageService
-from core.stash_diff_engine import StashDiffEngine, StashDiff
+from core.stash_diff_engine import StashDiff, StashDiffEngine
+from core.stash_storage import StashStorageService, get_stash_storage
+from core.stash_valuator import PricedItem, PriceSource, ValuationResult
 from data_sources.poe_stash_api import PoEStashClient, StashSnapshot, get_available_leagues
+from gui_qt.stash_viewer.dialogs import StashItemDetailsDialog
+from gui_qt.stash_viewer.models import ItemTableModel
 
 # Import from submodules
 from gui_qt.stash_viewer.workers import FetchWorker
-from gui_qt.stash_viewer.models import ItemTableModel
-from gui_qt.stash_viewer.dialogs import StashItemDetailsDialog
+from gui_qt.styles import COLORS, apply_window_icon
+from gui_qt.widgets.item_context_menu import ItemContext, ItemContextMenuManager
 
 if TYPE_CHECKING:
     from core.app_context import AppContext
