@@ -169,6 +169,7 @@ jobs:
       id: pytest
       env:
         QT_QPA_PLATFORM: offscreen
+        POE_DISABLE_BACKGROUND_SERVICES: "1"
       run: |
         pytest tests/ --ignore=tests/integration \
           --junitxml=test-results-macos.xml \
