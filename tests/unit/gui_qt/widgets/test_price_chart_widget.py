@@ -4,14 +4,10 @@ Tests for PriceChartWidget.
 
 import pytest
 from datetime import datetime, timedelta
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import Mock
+from importlib.util import find_spec
 
-# Check if matplotlib is available
-try:
-    import matplotlib
-    MATPLOTLIB_AVAILABLE = True
-except ImportError:
-    MATPLOTLIB_AVAILABLE = False
+MATPLOTLIB_AVAILABLE = find_spec("matplotlib") is not None
 
 
 @pytest.fixture
@@ -33,7 +29,7 @@ class TestPriceChartWidgetWithMatplotlib:
 
     def test_import(self):
         """Test that the widget can be imported."""
-        from gui_qt.widgets.price_chart_widget import PriceChartWidget, MATPLOTLIB_AVAILABLE
+        from gui_qt.widgets.price_chart_widget import MATPLOTLIB_AVAILABLE
         assert MATPLOTLIB_AVAILABLE is True
 
     def test_time_ranges_defined(self):
