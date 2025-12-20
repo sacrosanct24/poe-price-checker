@@ -77,8 +77,9 @@ class TestDefaultShortcuts:
         assert len(ids) == len(set(ids)), "Duplicate action IDs found"
 
     def test_all_shortcuts_have_unique_keys(self):
-        """Test that all shortcuts have unique default keys."""
-        keys = [s.default_key for s in DEFAULT_SHORTCUTS]
+        """Test that shortcuts with keys have unique default keys (empty keys are ok)."""
+        # Filter out empty keys - those are "no shortcut" entries (e.g., navigation shortcuts)
+        keys = [s.default_key for s in DEFAULT_SHORTCUTS if s.default_key]
         assert len(keys) == len(set(keys)), "Duplicate default keys found"
 
     def test_expected_shortcuts_exist(self):
