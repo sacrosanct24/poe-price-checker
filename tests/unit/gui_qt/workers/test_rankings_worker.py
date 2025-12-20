@@ -1,7 +1,7 @@
 """Tests for RankingsPopulationWorker."""
 
 import pytest
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 
 from gui_qt.workers.rankings_worker import RankingsPopulationWorker
 

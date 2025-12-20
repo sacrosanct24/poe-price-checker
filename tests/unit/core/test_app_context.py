@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 import requests
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 
 from core.app_context import create_app_context, AppContext
 from core.game_version import GameVersion
@@ -183,7 +183,7 @@ class TestAppContextPolicyConfig:
              patch("core.app_context.ExistingServiceAdapter"), \
              patch("core.app_context.UndercutPriceSource"), \
              patch("core.app_context.PriceService"):
-            ctx = create_app_context()
+            create_app_context()
 
         mock_set_policy.assert_called_once_with({"min_value": 100})
 
@@ -224,7 +224,7 @@ class TestAppContextPolicyConfig:
              patch("core.app_context.UndercutPriceSource"), \
              patch("core.app_context.PriceService"), \
              patch("core.app_context.set_active_policy_from_dict"):
-            ctx = create_app_context()
+            create_app_context()
 
         mock_set_verbosity.assert_called_once_with("verbose")
 
@@ -270,7 +270,7 @@ class TestAppContextPOE1Setup:
         with patch("core.app_context.ItemParser"), \
              patch("core.app_context.Database"), \
              patch("core.app_context.PoeNinjaAPI") as mock_ninja, \
-             patch("core.app_context.PoeWatchAPI") as mock_watch, \
+             patch("core.app_context.PoeWatchAPI"), \
              patch("core.app_context.PoeTradeClient"), \
              patch("core.app_context.TradeApiSource"), \
              patch("core.app_context.RareItemEvaluator"), \
@@ -317,7 +317,7 @@ class TestAppContextPOE1Setup:
             mock_ninja_instance.detect_current_league.return_value = "NewLeague"
             mock_ninja.return_value = mock_ninja_instance
 
-            ctx = create_app_context()
+            create_app_context()
 
             mock_config.set_game_config.assert_called()
             assert mock_game_cfg.league == "NewLeague"
@@ -353,7 +353,7 @@ class TestAppContextPOE1Setup:
             mock_ninja_instance.detect_current_league.side_effect = requests.RequestException("API error")
             mock_ninja.return_value = mock_ninja_instance
 
-            ctx = create_app_context()
+            create_app_context()
             # League should remain unchanged
             assert mock_game_cfg.league == "FallbackLeague"
 
@@ -388,7 +388,7 @@ class TestAppContextPOE1Setup:
             mock_ninja_instance.detect_current_league.return_value = "SameLeague"
             mock_ninja.return_value = mock_ninja_instance
 
-            ctx = create_app_context()
+            create_app_context()
             # set_game_config should NOT be called since league is same
             mock_config.set_game_config.assert_not_called()
 
@@ -453,7 +453,7 @@ class TestAppContextPOE1Setup:
              patch("core.app_context.set_retry_logging_verbosity"):
             mock_eval.side_effect = OSError("Evaluator init error")
 
-            ctx = create_app_context()
+            create_app_context()
             # Should still create context, but with no rare_evaluator
             mock_price_svc.assert_called()
             # Check rare_evaluator arg is None
@@ -488,7 +488,7 @@ class TestAppContextMultiSourceSetup:
              patch("core.app_context.UndercutPriceSource"), \
              patch("core.app_context.set_active_policy_from_dict"), \
              patch("core.app_context.set_retry_logging_verbosity"):
-            ctx = create_app_context()
+            create_app_context()
             # Should have called twice - first with full args, then fallback
             assert call_count[0] == 2
 
@@ -509,7 +509,7 @@ class TestAppContextMultiSourceSetup:
              patch("core.app_context.UndercutPriceSource"), \
              patch("core.app_context.set_active_policy_from_dict"), \
              patch("core.app_context.set_retry_logging_verbosity"):
-            ctx = create_app_context()
+            create_app_context()
             call_kwargs = mock_multi.call_args.kwargs
             assert call_kwargs.get("use_arbitration") is True
 
@@ -530,7 +530,7 @@ class TestAppContextMultiSourceSetup:
              patch("core.app_context.UndercutPriceSource"), \
              patch("core.app_context.set_active_policy_from_dict"), \
              patch("core.app_context.set_retry_logging_verbosity"):
-            ctx = create_app_context()
+            create_app_context()
             call_kwargs = mock_multi.call_args.kwargs
             assert call_kwargs.get("use_arbitration") is False
 
@@ -555,7 +555,7 @@ class TestAppContextMultiSourceSetup:
              patch("core.app_context.UndercutPriceSource"), \
              patch("core.app_context.set_active_policy_from_dict"), \
              patch("core.app_context.set_retry_logging_verbosity"):
-            ctx = create_app_context()
+            create_app_context()
             call_kwargs = mock_multi.call_args.kwargs
             assert call_kwargs.get("use_arbitration") is False
 
@@ -582,7 +582,7 @@ class TestAppContextEnabledSources:
              patch("core.app_context.UndercutPriceSource"), \
              patch("core.app_context.set_active_policy_from_dict"), \
              patch("core.app_context.set_retry_logging_verbosity"):
-            ctx = create_app_context()
+            create_app_context()
             mock_multi_service.set_enabled_state.assert_called_with(
                 {"poe_ninja": True, "poe_watch": False}
             )
@@ -606,7 +606,7 @@ class TestAppContextEnabledSources:
              patch("core.app_context.UndercutPriceSource"), \
              patch("core.app_context.set_active_policy_from_dict"), \
              patch("core.app_context.set_retry_logging_verbosity"):
-            ctx = create_app_context()
+            create_app_context()
             mock_multi_service.set_enabled_state.assert_not_called()
 
     @patch("core.app_context.Config")
@@ -628,7 +628,7 @@ class TestAppContextEnabledSources:
              patch("core.app_context.UndercutPriceSource"), \
              patch("core.app_context.set_active_policy_from_dict"), \
              patch("core.app_context.set_retry_logging_verbosity"):
-            ctx = create_app_context()
+            create_app_context()
             mock_multi_service.set_enabled_state.assert_not_called()
 
     @patch("core.app_context.Config")
@@ -707,7 +707,7 @@ class TestAppContextPersistCallback:
              patch("core.app_context.UndercutPriceSource"), \
              patch("core.app_context.set_active_policy_from_dict"), \
              patch("core.app_context.set_retry_logging_verbosity"):
-            ctx = create_app_context()
+            create_app_context()
 
             # Call the captured callback
             if captured_callback[0]:
@@ -739,7 +739,7 @@ class TestAppContextPersistCallback:
              patch("core.app_context.UndercutPriceSource"), \
              patch("core.app_context.set_active_policy_from_dict"), \
              patch("core.app_context.set_retry_logging_verbosity"):
-            ctx = create_app_context()
+            create_app_context()
 
             # Call the captured callback - should not raise
             if captured_callback[0]:

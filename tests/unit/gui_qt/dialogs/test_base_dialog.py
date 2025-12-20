@@ -1,17 +1,13 @@
 """Tests for gui_qt/dialogs/base_dialog.py - Base dialog classes."""
 
-import pytest
 from unittest.mock import MagicMock, patch
 
-from PyQt6.QtCore import Qt, QSize
-from PyQt6.QtWidgets import QWidget, QLabel, QPushButton, QDialog
+from PyQt6.QtWidgets import QLabel, QPushButton
 
 from gui_qt.dialogs.base_dialog import (
     BaseDialog,
     ConfirmDialog,
     InputDialog,
-    confirm,
-    get_input,
 )
 
 
@@ -261,7 +257,7 @@ class TestBaseDialogGeometry:
 
     def test_no_restore_when_disabled(self, qtbot):
         """Should not restore when remember_geometry is False."""
-        with patch('gui_qt.dialogs.base_dialog.QSettings') as mock_settings_cls:
+        with patch('gui_qt.dialogs.base_dialog.QSettings'):
             dialog = BaseDialog(title="Test", remember_geometry=False)
             qtbot.addWidget(dialog)
 

@@ -1,7 +1,7 @@
 """Tests for data_sources/pricing/poe_watch.py - poe.watch API Client."""
 
 import pytest
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import patch
 
 from data_sources.pricing.poe_watch import PoeWatchAPI
 
@@ -37,7 +37,7 @@ class TestPoeWatchAPIInit:
         """Base URL is set to poe.watch API."""
         mock_base_init.return_value = None
 
-        api = PoeWatchAPI()
+        PoeWatchAPI()
 
         mock_base_init.assert_called_once()
         call_kwargs = mock_base_init.call_args[1]
@@ -48,7 +48,7 @@ class TestPoeWatchAPIInit:
         """Rate limit is conservative at 0.5 (1 request per 2 seconds)."""
         mock_base_init.return_value = None
 
-        api = PoeWatchAPI()
+        PoeWatchAPI()
 
         call_kwargs = mock_base_init.call_args[1]
         assert call_kwargs['rate_limit'] == 0.5
@@ -58,7 +58,7 @@ class TestPoeWatchAPIInit:
         """Cache TTL is 1 hour."""
         mock_base_init.return_value = None
 
-        api = PoeWatchAPI()
+        PoeWatchAPI()
 
         call_kwargs = mock_base_init.call_args[1]
         assert call_kwargs['cache_ttl'] == 3600
@@ -236,7 +236,7 @@ class TestAPIEndpoints:
         """search_items calls correct endpoint with query."""
         mock_get.return_value = [{'name': 'Divine Orb'}]
 
-        result = api.search_items("Divine")
+        api.search_items("Divine")
 
         mock_get.assert_called_once_with("search", params={
             'league': 'Standard',
@@ -248,7 +248,7 @@ class TestAPIEndpoints:
         """get_item_history calls correct endpoint with item ID."""
         mock_get.return_value = [{'mean': 150, 'date': '2024-01-01'}]
 
-        result = api.get_item_history(123)
+        api.get_item_history(123)
 
         mock_get.assert_called_once_with("history", params={
             'league': 'Standard',
@@ -260,7 +260,7 @@ class TestAPIEndpoints:
         """get_enchants calls correct endpoint."""
         mock_get.return_value = [{'name': 'Enchant', 'value': 100}]
 
-        result = api.get_enchants(456)
+        api.get_enchants(456)
 
         mock_get.assert_called_once_with("enchants", params={
             'league': 'Standard',
@@ -281,7 +281,7 @@ class TestAPIEndpoints:
         """get_corruptions calls correct endpoint."""
         mock_get.return_value = [{'name': 'Corruption', 'mean': 50}]
 
-        result = api.get_corruptions(789)
+        api.get_corruptions(789)
 
         mock_get.assert_called_once_with("corruptions", params={
             'league': 'Standard',
@@ -302,7 +302,7 @@ class TestAPIEndpoints:
         """get_compact_data calls compact endpoint."""
         mock_get.return_value = {'items': []}
 
-        result = api.get_compact_data()
+        api.get_compact_data()
 
         mock_get.assert_called_once_with("compact", params={
             'league': 'Standard'
@@ -313,7 +313,7 @@ class TestAPIEndpoints:
         """get_status calls status endpoint."""
         mock_get.return_value = {'changeID': '123', 'requestedStashes': 100}
 
-        result = api.get_status()
+        api.get_status()
 
         mock_get.assert_called_once_with("status")
 

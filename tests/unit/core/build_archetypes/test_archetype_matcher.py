@@ -15,7 +15,6 @@ from core.build_archetypes.archetype_matcher import (
     extract_item_stats_from_dict,
     STAT_PATTERNS,
 )
-from core.build_archetypes.archetype_database import get_archetype_database
 from core.build_archetypes.archetype_models import CrossBuildAnalysis
 
 

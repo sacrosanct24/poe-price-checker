@@ -315,7 +315,7 @@ class UpgradeFinderTab(QWidget):
             )
             logger.info(f"Initialized UpgradeFinderService for league: {league}")
 
-        except Exception as e:
+        except Exception:
             logger.exception("Failed to initialize upgrade finder service")
 
     def _select_all_slots(self) -> None:

@@ -221,7 +221,7 @@ class TestPassiveTreeDataProvider:
         cache_dir = tmp_path / "new_cache"
         assert not cache_dir.exists()
 
-        provider = PassiveTreeDataProvider(cache_dir=cache_dir)
+        PassiveTreeDataProvider(cache_dir=cache_dir)
 
         assert cache_dir.exists()
 

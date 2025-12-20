@@ -5,7 +5,7 @@ Tests for gui_qt.services.history_manager - HistoryManager service.
 import pytest
 import threading
 from datetime import datetime
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from gui_qt.services.history_manager import HistoryManager, get_history_manager
 from core.history import HistoryEntry

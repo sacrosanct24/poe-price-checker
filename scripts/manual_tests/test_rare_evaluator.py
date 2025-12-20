@@ -180,7 +180,7 @@ Item Level: 86
         
         print(f"\nItem: {item.get_display_name()}")
         print(f"Base: {item.base_type}")
-        print(f"\nMatched Builds:")
+        print("\nMatched Builds:")
         
         if matches:
             for match in matches:

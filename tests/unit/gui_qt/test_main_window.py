@@ -1,11 +1,10 @@
 """Tests for gui_qt.main_window - PriceCheckerWindow."""
 
 import pytest
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock, patch
 from pathlib import Path
 
 from PyQt6.QtWidgets import QApplication, QMessageBox, QFileDialog
-from PyQt6.QtCore import Qt
 
 from gui_qt.main_window import PriceCheckerWindow
 from gui_qt.styles import Theme
@@ -279,7 +278,7 @@ class TestPriceCheckerWindowClipboard:
         window_with_mock_panel._mock_panel.input_text.toPlainText.return_value = "pasted item"
         QApplication.clipboard().setText("test item text")
 
-        with patch.object(window_with_mock_panel, '_do_price_check') as mock_check:
+        with patch.object(window_with_mock_panel, '_do_price_check'):
             window_with_mock_panel._paste_and_check()
             window_with_mock_panel._mock_panel.input_text.setPlainText.assert_called_once_with("test item text")
 

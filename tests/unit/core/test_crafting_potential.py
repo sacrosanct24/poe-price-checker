@@ -7,7 +7,6 @@ Tests the crafting potential analyzer including:
 - Open slot estimation
 - Craft option generation
 """
-import pytest
 from unittest.mock import MagicMock
 
 from core.crafting_potential import (
@@ -252,7 +251,7 @@ class TestCraftingPotentialAnalyzer:
         item.fractured_mods = []
 
         analyzer = CraftingPotentialAnalyzer()
-        analysis = analyzer.analyze(item)
+        analyzer.analyze(item)
 
         # T2 life at 90 has potential (max is 99)
         # But need significant potential for recommendation

@@ -5,7 +5,7 @@ from datetime import datetime
 from unittest.mock import MagicMock, patch, PropertyMock
 
 from gui_qt.controllers.loot_tracking_controller import LootTrackingController
-from core.loot_session import LootDrop, LootSession, MapRun, SessionState
+from core.loot_session import LootDrop, LootSession, SessionState
 
 
 # =============================================================================

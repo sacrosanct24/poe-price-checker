@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import types
 import pytest
 
 from data_sources.base_api import RateLimiter

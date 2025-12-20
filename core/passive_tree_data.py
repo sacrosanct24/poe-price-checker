@@ -10,7 +10,7 @@ import json
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, cast
+from typing import Optional, Dict, List, Any
 
 import requests
 
@@ -127,7 +127,7 @@ class PassiveTreeDataProvider:
             try:
                 with open(self.cache_path, 'r', encoding='utf-8') as f:
                     data = json.load(f)
-                logger.info(f"Loaded passive tree data from cache")
+                logger.info("Loaded passive tree data from cache")
             except Exception as e:
                 logger.warning(f"Failed to load cached tree data: {e}")
 
@@ -314,7 +314,7 @@ if __name__ == "__main__":
     provider._load_data()
 
     stats = provider.get_stats()
-    print(f"\nStatistics:")
+    print("\nStatistics:")
     for key, value in stats.items():
         print(f"  {key}: {value}")
 

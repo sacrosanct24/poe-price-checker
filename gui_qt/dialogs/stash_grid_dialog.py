@@ -340,7 +340,7 @@ class StashGridDialog(QDialog):
             rarity_counts[rarity] = rarity_counts.get(rarity, 0) + 1
 
         # Build HTML
-        html = f"""
+        html = """
         <h4 style="margin: 0 0 8px 0;">Value Distribution</h4>
         <table style="width: 100%;">
         """
@@ -368,7 +368,7 @@ class StashGridDialog(QDialog):
         html += "</table>"
 
         # Rarity breakdown
-        html += f"<h4 style='margin: 12px 0 8px 0;'>Rarity Breakdown</h4>"
+        html += "<h4 style='margin: 12px 0 8px 0;'>Rarity Breakdown</h4>"
         for rarity, count in sorted(rarity_counts.items(), key=lambda x: -x[1]):
             html += f"<p style='margin: 2px 0;'>{rarity}: {count}</p>"
 

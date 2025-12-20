@@ -31,8 +31,8 @@ from dataclasses import dataclass, asdict, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
-from PyQt6.QtCore import Qt, QByteArray, QPoint, QSize
-from PyQt6.QtWidgets import QWidget, QMainWindow, QSplitter, QHeaderView
+from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QWidget, QMainWindow, QSplitter
 
 if TYPE_CHECKING:
     from PyQt6.QtWidgets import QTableView

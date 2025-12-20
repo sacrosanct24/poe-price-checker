@@ -1,10 +1,7 @@
 """Tests for gui_qt.widgets.loading_screen."""
 
 import pytest
-from unittest.mock import MagicMock, patch
 
-from PyQt6.QtWidgets import QWidget
-from PyQt6.QtGui import QIcon
 
 from gui_qt.widgets.loading_screen import (
     LoadingScreen,

@@ -1,6 +1,5 @@
 """Tests for core/build_archetype.py - Build archetype detection."""
 
-import pytest
 from unittest.mock import patch, MagicMock
 
 from core.build_archetype import (

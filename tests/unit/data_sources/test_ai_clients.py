@@ -3,12 +3,11 @@ Unit tests for AI client implementations.
 """
 
 import pytest
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 
 from data_sources.ai import (
     create_ai_client,
     AIResponse,
-    BaseAIClient,
     SUPPORTED_PROVIDERS,
     get_provider_display_name,
 )

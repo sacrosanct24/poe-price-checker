@@ -32,13 +32,10 @@ from abc import ABC, abstractmethod
 import logging
 from typing import Any, Callable, Dict, Generic, List, Optional, TypeVar
 
-from PyQt6.QtCore import Qt, QObject, QTimer, QRect, pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QWidget,
     QScrollArea,
-    QVBoxLayout,
-    QFrame,
-    QSizePolicy,
 )
 
 logger = logging.getLogger(__name__)
@@ -199,7 +196,6 @@ class SimpleRowDelegate(RowDelegate):
         Args:
             row_height: Fixed row height
         """
-        from PyQt6.QtWidgets import QLabel
 
         self._row_height = row_height
 

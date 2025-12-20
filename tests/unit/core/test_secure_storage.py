@@ -30,18 +30,18 @@ class TestSecureStorage:
     def test_init_creates_salt_file(self, temp_salt_file):
         """Salt file should be created on init if it doesn't exist."""
         assert not temp_salt_file.exists()
-        storage = SecureStorage(salt_file=temp_salt_file)
+        SecureStorage(salt_file=temp_salt_file)
         assert temp_salt_file.exists()
         assert len(temp_salt_file.read_bytes()) == 32  # 32-byte salt
 
     def test_init_reuses_existing_salt(self, temp_salt_file):
         """Existing salt should be reused."""
         # Create initial storage with salt
-        storage1 = SecureStorage(salt_file=temp_salt_file)
+        SecureStorage(salt_file=temp_salt_file)
         salt1 = temp_salt_file.read_bytes()
 
         # Create second storage - should use same salt
-        storage2 = SecureStorage(salt_file=temp_salt_file)
+        SecureStorage(salt_file=temp_salt_file)
         salt2 = temp_salt_file.read_bytes()
 
         assert salt1 == salt2
@@ -206,14 +206,14 @@ class TestFilePermissions:
     def test_salt_file_created_in_parent_dir(self, tmp_path):
         """Salt file parent directory should be created."""
         deep_path = tmp_path / "deep" / "nested" / ".salt"
-        storage = SecureStorage(salt_file=deep_path)
+        SecureStorage(salt_file=deep_path)
         assert deep_path.parent.exists()
 
     @patch('platform.system', return_value='Linux')
     @patch('os.chmod')
     def test_unix_permissions_set(self, mock_chmod, mock_system, temp_salt_file):
         """Unix should use chmod 600."""
-        storage = SecureStorage(salt_file=temp_salt_file)
+        SecureStorage(salt_file=temp_salt_file)
         # chmod should be called with 0o600
         if mock_chmod.called:
             mock_chmod.assert_called_with(temp_salt_file, 0o600)
@@ -223,7 +223,7 @@ class TestFilePermissions:
     def test_windows_permissions_set(self, mock_run, mock_system, temp_salt_file):
         """Windows should use icacls."""
         with patch.dict(os.environ, {'USERNAME': 'testuser'}):
-            storage = SecureStorage(salt_file=temp_salt_file)
+            SecureStorage(salt_file=temp_salt_file)
             # icacls should be called on Windows
             # (may not be called if exception handling swallows it)
 

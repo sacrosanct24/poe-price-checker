@@ -60,7 +60,7 @@ def get_tier_tooltip(stat_type: str, current_value: int, current_tier: int) -> s
     # Add improvement note
     if current_tier > 1:
         # Get T1 data
-        t1_min, t1_max = tier_data[0][2], tier_data[0][3]
+        t1_max = tier_data[0][3]
         improvement = t1_max - current_value
         if improvement > 0:
             lines.append(f"<br><span style='color: #FFA726;'>T1 would give up to +{improvement}</span>")
@@ -105,7 +105,7 @@ def get_quick_tier_info(stat_type: str, value: int) -> str:
 
     # Above T1
     if value > tier_data[0][3]:
-        return f"T1+ (elevated)"
+        return "T1+ (elevated)"
 
     return "T?"
 

@@ -20,22 +20,20 @@ Usage:
     SuccessFeedback(widget).show()
 """
 
-from typing import Optional, Callable
+from typing import Optional
 
 from PyQt6.QtCore import (
     Qt,
     QObject,
-    QTimer,
     QPoint,
     QRect,
     QPropertyAnimation,
     QParallelAnimationGroup,
     QEasingCurve,
-    pyqtSignal,
 )
 from PyQt6.QtCore import pyqtProperty  # type: ignore[attr-defined]
 from PyQt6.QtGui import QPainter, QColor, QPaintEvent, QRadialGradient
-from PyQt6.QtWidgets import QWidget, QGraphicsOpacityEffect, QPushButton
+from PyQt6.QtWidgets import QWidget, QPushButton
 
 from gui_qt.design_system import Duration, BorderRadius, should_reduce_motion
 

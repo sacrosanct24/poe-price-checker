@@ -2,7 +2,6 @@
 Tests for core/pricing/models.py - PriceExplanation dataclass.
 """
 import json
-import pytest
 from core.pricing.models import PriceExplanation
 
 
@@ -116,7 +115,7 @@ class TestPriceExplanationSummaryLines:
         )
         lines = exp.to_summary_lines()
 
-        source_line = [l for l in lines if "Source:" in l][0]
+        source_line = [line for line in lines if "Source:" in line][0]
         assert "poe.ninja (Currency API)" in source_line
 
     def test_confidence_uppercase(self):
@@ -134,7 +133,7 @@ class TestPriceExplanationSummaryLines:
         )
         lines = exp.to_summary_lines()
 
-        conf_line = [l for l in lines if "Confidence:" in l][0]
+        conf_line = [line for line in lines if "Confidence:" in line][0]
         assert "HIGH - Large sample size" in conf_line
 
     def test_sample_size_shown_when_positive(self):
@@ -180,7 +179,7 @@ class TestPriceExplanationSummaryLines:
         )
         lines = exp.to_summary_lines()
 
-        mods_line = [l for l in lines if "Valuable mods:" in l][0]
+        mods_line = [line for line in lines if "Valuable mods:" in line][0]
         # Should have exactly 5 mods (comma-separated = 4 commas)
         assert mods_line.count(",") == 4
 
@@ -202,7 +201,7 @@ class TestPriceExplanationSummaryLines:
         lines = exp.to_summary_lines()
 
         assert any("Adjustments:" in line for line in lines)
-        adj_line = [l for l in lines if "Adjustments:" in l][0]
+        adj_line = [line for line in lines if "Adjustments:" in line][0]
         assert "Corrupted: -20%" in adj_line
         assert "Quality: +5%" in adj_line
 

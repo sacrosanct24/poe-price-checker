@@ -1,7 +1,7 @@
 """Tests for gui_qt/services/price_refresh_service.py - Background price refresh."""
 
-from unittest.mock import MagicMock, patch
-from datetime import datetime, timedelta
+from unittest.mock import MagicMock
+from datetime import timedelta
 
 import pytest
 
@@ -204,7 +204,6 @@ class TestPriceRefreshServiceInterval:
     def test_set_refresh_interval_updates_running_timer(self, service, qapp):
         """Should update running timer."""
         service.start()
-        old_interval = service._refresh_interval_ms
 
         service.set_refresh_interval(45)
 

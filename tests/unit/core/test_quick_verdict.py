@@ -838,7 +838,7 @@ class TestMetaWeightsIntegration:
         item.is_synthesised = False
 
         # With 5c price: no meta = MAYBE, with meta = could be KEEP
-        result_no_meta = calc_without_meta.calculate(item, price_chaos=5.0)
+        calc_without_meta.calculate(item, price_chaos=5.0)
         result_with_meta = calc_with_meta.calculate(item, price_chaos=5.0)
 
         # Meta bonus should improve the verdict

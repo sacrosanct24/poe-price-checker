@@ -4,8 +4,7 @@ Tests for core/database/repositories/sales_repository.py
 Tests sales tracking functionality.
 """
 import pytest
-import time
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from core.database import Database
 

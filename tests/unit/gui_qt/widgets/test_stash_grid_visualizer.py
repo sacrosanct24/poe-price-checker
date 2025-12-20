@@ -5,12 +5,11 @@ Tests grid rendering, cell selection, filtering, and value display.
 """
 
 import pytest
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 from dataclasses import dataclass
 from typing import List, Optional
 
 from PyQt6.QtWidgets import QApplication
-from PyQt6.QtCore import Qt, QPointF
 from PyQt6.QtGui import QColor
 
 from gui_qt.widgets.stash_grid_visualizer import (
@@ -343,7 +342,7 @@ class TestStashGridScene:
     def test_load_layout_clears_previous(self, stash_scene, mock_layout):
         """Test that loading new layout clears previous one."""
         stash_scene.load_layout(mock_layout)
-        first_item_count = len(stash_scene.items())
+        len(stash_scene.items())
 
         # Load again
         stash_scene.load_layout(mock_layout)
@@ -533,7 +532,7 @@ class TestStashGridVisualizerWidget:
 
     def test_no_layout_stats(self, stash_visualizer):
         """Test stats display with no layout loaded."""
-        stats_text = stash_visualizer.stats_label.text()
+        stash_visualizer.stats_label.text()
         # Initially should be empty or show placeholder
         # (not specified in widget, but shouldn't crash)
 

@@ -2,7 +2,7 @@
 PoE currency accent colors for user customization.
 """
 
-from typing import Dict, Any
+from typing import Dict
 
 POE_CURRENCY_COLORS: Dict[str, Dict[str, str]] = {
     "chaos": {

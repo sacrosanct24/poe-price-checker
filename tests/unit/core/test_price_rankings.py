@@ -20,7 +20,6 @@ from core.price_rankings import (
     UNIQUE_CATEGORIES,
     CONSUMABLE_CATEGORIES,
     CARD_CATEGORIES,
-    CATEGORY_TO_RARITY,
     get_top20_rankings,
     get_top20_for_category,
     get_top20_for_slot,

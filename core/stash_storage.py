@@ -15,13 +15,13 @@ from __future__ import annotations
 
 import json
 import logging
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from core.database import Database
-    from data_sources.poe_stash_api import StashSnapshot, StashTab
+    from data_sources.poe_stash_api import StashSnapshot
     from core.stash_valuator import ValuationResult
 
 logger = logging.getLogger(__name__)

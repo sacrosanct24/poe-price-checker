@@ -5,9 +5,9 @@ Tests for ExportService.
 import pytest
 import json
 import csv
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import Mock, patch
 
 from core.services.export_service import ExportService, ExportResult
 

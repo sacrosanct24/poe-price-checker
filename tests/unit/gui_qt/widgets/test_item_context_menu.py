@@ -1,7 +1,7 @@
 """Tests for gui_qt.widgets.item_context_menu."""
 
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from PyQt6.QtWidgets import QWidget, QMenu
 

@@ -1,10 +1,9 @@
 """Tests for UpgradeAdvisorWindow."""
 
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QTreeWidgetItem
 
 from gui_qt.windows.upgrade_advisor_window import (
     UpgradeAdvisorWindow,

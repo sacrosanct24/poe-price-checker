@@ -2,9 +2,9 @@
 
 import pytest
 from pathlib import Path
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock, patch
 
-from PyQt6.QtCore import Qt, QModelIndex
+from PyQt6.QtCore import Qt
 
 from gui_qt.windows.price_rankings_window import (
     IconCache,
@@ -59,13 +59,13 @@ class TestIconCacheInit:
 
     def test_init_creates_directory(self, temp_cache_dir):
         """Should create cache directory."""
-        cache = IconCache(cache_dir=temp_cache_dir)
+        IconCache(cache_dir=temp_cache_dir)
         assert temp_cache_dir.exists()
 
     def test_init_default_directory(self):
         """Should use default directory if none specified."""
         with patch('gui_qt.windows.price_rankings_window.ICON_CACHE_DIR', Path("/tmp/test_cache")):
-            cache = IconCache()
+            IconCache()
             # Just verify it doesn't crash - don't actually create the directory
 
 

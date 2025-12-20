@@ -10,7 +10,6 @@ import logging
 from pathlib import Path
 from typing import Any, Optional, TYPE_CHECKING
 
-from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QDialog,
     QVBoxLayout,
@@ -157,17 +156,17 @@ class ExportDialog(QDialog):
     def _do_export(self) -> None:
         """Perform the export."""
         data_type = self._data_type_combo.currentData()
-        format = self._format_combo.currentData()
+        export_format = self._format_combo.currentData()
         days = self._date_range_combo.currentData()
 
         # Get file extension
-        ext = ".csv" if format == "csv" else ".json"
+        ext = ".csv" if export_format == "csv" else ".json"
 
         # Get default filename
         default_name = f"{data_type}_export{ext}"
 
         # Show file dialog
-        file_filter = f"{'CSV' if format == 'csv' else 'JSON'} Files (*{ext})"
+        file_filter = f"{'CSV' if export_format == 'csv' else 'JSON'} Files (*{ext})"
         file_path, _ = QFileDialog.getSaveFileName(
             self,
             "Export Data",
@@ -199,7 +198,7 @@ class ExportDialog(QDialog):
 
             result = service.export_data(
                 data_type=data_type,
-                format=format,
+                format=export_format,
                 file_path=Path(file_path),
                 days=days,
                 **kwargs

@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Optional
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
-from PyQt6.QtCore import Qt
 
 from gui_qt.views.upgrade_advisor_view import UpgradeAdvisorView, EQUIPMENT_SLOTS
 

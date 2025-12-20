@@ -1,9 +1,7 @@
 # tests/unit/gui_qt/feedback/test_rate_limit_indicator.py
 """Tests for RateLimitIndicator widget."""
 
-import sys
 import pytest
-from unittest.mock import MagicMock, patch
 
 from PyQt6.QtCore import QTimer
 from PyQt6.QtWidgets import QFrame, QProgressBar, QLabel

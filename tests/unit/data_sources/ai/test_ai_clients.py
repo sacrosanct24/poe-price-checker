@@ -1,10 +1,10 @@
 """Tests for AI client implementations (Gemini, Claude, OpenAI, Groq, Ollama)."""
 
 import pytest
-from unittest.mock import MagicMock, patch, Mock
+from unittest.mock import MagicMock, patch
 import requests
 
-from core.result import Ok, Err
+from core.result import Ok
 from data_sources.ai.base_ai_client import BaseAIClient, AIResponse
 from data_sources.ai.gemini_client import GeminiClient, DEFAULT_MODEL as GEMINI_DEFAULT_MODEL
 from data_sources.ai.claude_client import ClaudeClient, DEFAULT_MODEL as CLAUDE_DEFAULT_MODEL

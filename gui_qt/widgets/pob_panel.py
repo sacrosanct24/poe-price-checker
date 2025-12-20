@@ -24,7 +24,6 @@ from PyQt6.QtWidgets import (
     QTreeWidgetItem,
     QPushButton,
     QHeaderView,
-    QMenu,
 )
 
 from gui_qt.styles import COLORS, get_rarity_color

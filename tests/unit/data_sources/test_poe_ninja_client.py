@@ -1,8 +1,6 @@
 """Tests for data_sources/poe_ninja_client.py - poe.ninja API Client."""
 
-import pytest
-import threading
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import patch
 
 from data_sources.poe_ninja_client import (
     NinjaPrice,
@@ -10,8 +8,6 @@ from data_sources.poe_ninja_client import (
     PoeNinjaClient,
     get_ninja_client,
     get_ninja_price,
-    _client,
-    _price_db,
 )
 
 

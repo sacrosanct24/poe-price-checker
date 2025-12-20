@@ -43,15 +43,13 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QLabel,
     QFrame,
-    QSizePolicy,
 )
 
-from gui_qt.design_system import Spacing, BorderRadius, Duration
+from gui_qt.design_system import Spacing, BorderRadius
 from gui_qt.accessibility import (
     set_accessible_name,
     set_accessible_description,
     set_focus_order,
-    install_dialog_shortcuts,
     add_button_mnemonic,
 )
 

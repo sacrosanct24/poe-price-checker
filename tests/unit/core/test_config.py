@@ -153,7 +153,7 @@ class TestGameVersionManagement:
         file2 = get_unique_config_path(tmp_path)
 
         cfg1 = Config(file1)
-        cfg2 = Config(file2)
+        Config(file2)
 
         cfg1.min_value_chaos = 123.0
         cfg1.save()

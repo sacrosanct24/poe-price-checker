@@ -61,8 +61,6 @@ from gui_qt.themes import (
     get_app_stylesheet,
     get_rarity_color,
     get_value_color,
-    # Internal (for tests)
-    _ColorsProxy,
 )
 
 __all__ = [

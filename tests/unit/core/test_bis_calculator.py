@@ -1,5 +1,4 @@
 """Tests for core/bis_calculator.py - BiS (Best-in-Slot) item calculator."""
-from unittest.mock import MagicMock
 
 import pytest
 

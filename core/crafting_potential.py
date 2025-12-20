@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional, TYPE_CHECKING
 
 from core.affix_tier_calculator import AFFIX_TIER_DATA, AffixTierCalculator
-from core.mod_tier_detector import detect_mod_tier, ModTierResult
+from core.mod_tier_detector import detect_mod_tier
 
 if TYPE_CHECKING:
     from core.item_parser import ParsedItem

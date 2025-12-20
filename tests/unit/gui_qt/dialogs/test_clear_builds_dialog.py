@@ -1,9 +1,8 @@
 """Tests for ClearBuildsDialog."""
 
-import pytest
 from unittest.mock import MagicMock, patch
 
-from PyQt6.QtWidgets import QDialog, QWidget, QMessageBox
+from PyQt6.QtWidgets import QWidget, QMessageBox
 
 
 class TestClearBuildsDialogInit:

@@ -9,7 +9,7 @@ from gui_qt.widgets.quick_verdict_panel import (
     QuickVerdictPanel,
     CompactVerdictWidget,
 )
-from core.quick_verdict import Verdict, VerdictThresholds
+from core.quick_verdict import Verdict
 
 
 @pytest.fixture

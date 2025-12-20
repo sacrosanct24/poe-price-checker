@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any, Optional, List
+from typing import Any, Optional
 from datetime import datetime, timezone
 
 from core.config import Config

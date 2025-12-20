@@ -1,12 +1,10 @@
 """Tests for gui_qt/dialogs/local_builds_dialog.py - Local PoB builds browser."""
 
-import pytest
 from datetime import datetime
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, patch
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QTableWidgetItem
 
 from gui_qt.dialogs.local_builds_dialog import (
     ScanWorker,

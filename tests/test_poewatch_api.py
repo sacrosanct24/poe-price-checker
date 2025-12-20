@@ -107,8 +107,8 @@ def test_poewatch_api():
         print(f"[OK] Found {len(leagues)} leagues")
 
         # Find current league
-        current_leagues = [l for l in leagues if l['end_date'].startswith('0001')]
-        print(f"  Current/Permanent leagues: {[l['name'] for l in current_leagues[:5]]}")
+        current_leagues = [league for league in leagues if league['end_date'].startswith('0001')]
+        print(f"  Current/Permanent leagues: {[league['name'] for league in current_leagues[:5]]}")
         
         # Use Standard for testing
         test_league = "Standard"
@@ -136,7 +136,7 @@ def test_poewatch_api():
         # Show Divine Orb price
         divine = next((c for c in currency if c['name'] == 'Divine Orb'), None)
         if divine:
-            print(f"\n  Divine Orb:")
+            print("\n  Divine Orb:")
             print(f"    Mean: {divine['mean']} chaos")
             print(f"    Min: {divine['min']} chaos")
             print(f"    Max: {divine['max']} chaos")
@@ -173,7 +173,7 @@ def test_poewatch_api():
             history = api.get_item_history(test_league, test_item_id)
             print(f"[OK] Found {len(history)} history entries")
             if len(history) >= 3:
-                print(f"\n  Recent prices:")
+                print("\n  Recent prices:")
                 for entry in history[-3:]:
                     date = entry['date'][:10]  # Just the date part
                     print(f"    {date}: {entry['mean']:.2f} chaos")
@@ -199,7 +199,7 @@ def test_poewatch_api():
     print("\n[TEST 7] Getting API status...")
     try:
         status = api.get_status()
-        print(f"[OK] API Status:")
+        print("[OK] API Status:")
         print(f"  Change ID: {status['changeID']}")
         print(f"  Requested stashes: {status['requestedStashes']}")
         print(f"  Computed stashes: {status['computedStashes']}")

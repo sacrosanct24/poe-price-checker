@@ -8,10 +8,7 @@ Tests the unified verdict panel widget including:
 - Signal emissions
 """
 import pytest
-from unittest.mock import MagicMock, patch
 
-from PyQt6.QtWidgets import QApplication
-from PyQt6.QtCore import Qt
 
 
 @pytest.fixture

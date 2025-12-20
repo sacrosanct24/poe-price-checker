@@ -407,7 +407,7 @@ class TestCargoAPIClientPagination:
         mock_session.get.return_value = mock_response
 
         # Request max 1000 items
-        results = client.get_all_item_mods(batch_size=500, max_total=1000, domain=1)
+        client.get_all_item_mods(batch_size=500, max_total=1000, domain=1)
 
         # Should stop after reaching max_total
         assert mock_session.get.call_count == 2  # 500 + 500 = 1000
@@ -496,7 +496,7 @@ class TestCargoAPIClientItemFetching:
 
         # Call without specifying classes - uses defaults
         # Note: Many default classes are not in VALID_ITEM_CLASSES so will be skipped
-        results = client.get_all_items(batch_size=500, max_total=500)
+        client.get_all_items(batch_size=500, max_total=500)
 
         # Should have made at least one successful call (for Unique rarity)
         assert mock_session.get.call_count >= 1
@@ -524,7 +524,7 @@ class TestCargoAPIClientItemFetching:
         mock_session.get.return_value = mock_response
 
         # Mix of valid and invalid classes
-        results = client.get_all_items(item_classes=["Belt", "InvalidClass", "Ring"], batch_size=500)
+        client.get_all_items(item_classes=["Belt", "InvalidClass", "Ring"], batch_size=500)
 
         # Should only fetch valid classes (Belt and Ring)
         assert mock_session.get.call_count == 2
@@ -537,7 +537,7 @@ class TestCargoAPIClientItemFetching:
         }
         mock_session.get.return_value = mock_response
 
-        results = client.get_all_items(item_classes=["Unique"], batch_size=500)
+        client.get_all_items(item_classes=["Unique"], batch_size=500)
 
         # Should have queried with rarity filter
         mock_session.get.assert_called()

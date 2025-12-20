@@ -37,7 +37,7 @@ def demo_manual_builds():
     # Create builds (simulating meta builds)
     matcher = BuildMatcher()
 
-    builds = [
+    [
         matcher.add_manual_build(
             "Lightning Strike Raider",
             required_life=4000,
@@ -240,7 +240,7 @@ def demo_integration_workflow():
     analyzer.analyze_builds(matcher.builds, league="Settlers")
 
     top_affixes = analyzer.get_top_affixes(5)
-    print(f"\nTop 5 Meta Affixes:")
+    print("\nTop 5 Meta Affixes:")
     for affix_type, pop in top_affixes:
         print(f"  • {affix_type:20s} - {pop.popularity_percent:5.1f}%")
 

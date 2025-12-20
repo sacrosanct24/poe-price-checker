@@ -6,7 +6,6 @@ provide measurable performance improvements.
 """
 import time
 import pytest
-from pathlib import Path
 
 from core.item_parser import ItemParser
 from core.rare_evaluation import RareItemEvaluator
@@ -178,7 +177,7 @@ Item Level: 84
             f"Only processed {items_per_second:.1f} items/sec (expected > 20)"
         
         # Log performance metrics
-        print(f"\nBulk evaluation performance:")
+        print("\nBulk evaluation performance:")
         print(f"  Items evaluated: {len(bulk_items)}")
         print(f"  Time elapsed: {elapsed_time:.3f}s")
         print(f"  Items/second: {items_per_second:.1f}")

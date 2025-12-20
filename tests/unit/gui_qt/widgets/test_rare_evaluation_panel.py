@@ -3,7 +3,7 @@ Tests for the RareEvaluationPanelWidget.
 """
 
 import pytest
-from unittest.mock import MagicMock, Mock
+from unittest.mock import MagicMock
 
 from gui_qt.widgets.rare_evaluation_panel import RareEvaluationPanelWidget
 

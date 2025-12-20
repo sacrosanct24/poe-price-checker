@@ -4,7 +4,7 @@ Tests for ChartDataService.
 
 import pytest
 from datetime import datetime, timedelta
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import Mock
 
 from core.services.chart_data_service import (
     ChartDataService,
@@ -144,12 +144,12 @@ class TestChartDataService:
 
     def test_get_currency_rate_series_unknown_currency(self, service, mock_db):
         """Test getting rate series for unknown currency falls back to economy rates."""
-        now = datetime.now()
+        datetime.now()
         mock_db.conn.execute.return_value.fetchall.return_value = [
             ("2024-01-01", 5.0),
         ]
 
-        series = service.get_currency_rate_series("Orb of Fusing", "Settlers", days=30)
+        service.get_currency_rate_series("Orb of Fusing", "Settlers", days=30)
 
         # Should attempt to get from economy rates table
         assert mock_db.conn.execute.called
@@ -217,7 +217,7 @@ class TestChartDataService:
             [("2024-01-01T00:00:00", 100.0, 0.5)],  # price_history has data
         ]
 
-        series = service.get_item_from_economy_items("Some Item", "Settlers")
+        service.get_item_from_economy_items("Some Item", "Settlers")
 
         # Should have called execute twice
         assert mock_db.conn.execute.call_count == 2

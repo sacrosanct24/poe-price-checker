@@ -5,7 +5,7 @@ from typing import Any, Dict, Optional
 
 import pytest
 
-from data_sources.base_api import BaseAPIClient, APIError
+from data_sources.base_api import BaseAPIClient
 
 
 pytestmark = pytest.mark.unit

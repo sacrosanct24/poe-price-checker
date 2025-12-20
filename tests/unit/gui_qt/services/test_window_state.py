@@ -4,11 +4,9 @@
 import json
 import pytest
 from pathlib import Path
-from unittest.mock import MagicMock, patch
 from tempfile import TemporaryDirectory
 
-from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QWidget, QMainWindow, QSplitter, QTableView
+from PyQt6.QtWidgets import QWidget, QMainWindow
 
 from gui_qt.services.window_state import (
     WindowGeometry,
@@ -207,7 +205,7 @@ class TestWindowStateManager:
     def test_init_creates_storage_dir(self, temp_dir):
         """Manager should create storage directory."""
         new_dir = temp_dir / "subdir"
-        manager = WindowStateManager(storage_dir=new_dir)
+        WindowStateManager(storage_dir=new_dir)
         assert new_dir.exists()
 
     def test_get_state_creates_new(self, manager):

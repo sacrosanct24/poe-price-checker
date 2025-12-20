@@ -3,9 +3,8 @@ from __future__ import annotations
 
 import threading
 import time
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock, patch
 
-import pytest
 
 
 class TestHotkeyConfig:
@@ -776,7 +775,6 @@ class TestModuleFunctions:
         from core.clipboard_monitor import (
             get_hotkey_manager,
             cleanup_hotkey_manager,
-            _manager,
         )
 
         callback = MagicMock()

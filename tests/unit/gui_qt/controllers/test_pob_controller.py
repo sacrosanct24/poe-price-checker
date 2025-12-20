@@ -3,7 +3,7 @@ Tests for gui_qt.controllers.pob_controller - PoBController.
 """
 
 import pytest
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock, patch
 
 
 from gui_qt.controllers.pob_controller import (

@@ -3,7 +3,7 @@
 import time
 import pytest
 import requests
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 
 from data_sources.pricing.poe_ninja import PoeNinjaAPI
 
@@ -41,7 +41,7 @@ class TestPoeNinjaAPIInit:
         """Base URL is set to poe.ninja API."""
         mock_base_init.return_value = None
 
-        api = PoeNinjaAPI()
+        PoeNinjaAPI()
 
         mock_base_init.assert_called_once()
         call_kwargs = mock_base_init.call_args[1]
@@ -52,7 +52,7 @@ class TestPoeNinjaAPIInit:
         """Rate limit is conservative at 0.33."""
         mock_base_init.return_value = None
 
-        api = PoeNinjaAPI()
+        PoeNinjaAPI()
 
         call_kwargs = mock_base_init.call_args[1]
         assert call_kwargs['rate_limit'] == 0.33
@@ -62,7 +62,7 @@ class TestPoeNinjaAPIInit:
         """Cache TTL is 1 hour."""
         mock_base_init.return_value = None
 
-        api = PoeNinjaAPI()
+        PoeNinjaAPI()
 
         call_kwargs = mock_base_init.call_args[1]
         assert call_kwargs['cache_ttl'] == 3600
@@ -291,7 +291,7 @@ class TestLeagueDetection:
         leagues = api.get_current_leagues()
 
         assert len(leagues) == 2
-        names = [l["name"] for l in leagues]
+        names = [league["name"] for league in leagues]
         assert "Standard" in names
         assert "Hardcore" in names
 
@@ -577,7 +577,7 @@ class TestFindItemPrice:
         """Should find divination card price."""
         api._find_from_overview_by_name = Mock(return_value={"name": "The Doctor", "chaosValue": 5000})
 
-        result = api.find_item_price("The Doctor", None, rarity="DIVINATION")
+        api.find_item_price("The Doctor", None, rarity="DIVINATION")
 
         api._find_from_overview_by_name.assert_called_with("DivinationCard", "The Doctor")
 
@@ -585,7 +585,7 @@ class TestFindItemPrice:
         """Should find fragment price."""
         api._find_from_overview_by_name = Mock(return_value={"name": "Mortal Ignorance", "chaosValue": 50})
 
-        result = api.find_item_price("Mortal Ignorance", None, rarity="FRAGMENT")
+        api.find_item_price("Mortal Ignorance", None, rarity="FRAGMENT")
 
         api._find_from_overview_by_name.assert_called_with("Fragment", "Mortal Ignorance")
 
@@ -606,7 +606,7 @@ class TestFindItemPrice:
         """Should find scarab by name substring."""
         api._find_from_overview_by_name = Mock(return_value={"name": "Gilded Breach Scarab", "chaosValue": 10})
 
-        result = api.find_item_price("Gilded Breach Scarab", None)
+        api.find_item_price("Gilded Breach Scarab", None)
 
         api._find_from_overview_by_name.assert_called_with("Scarab", "Gilded Breach Scarab")
 
@@ -614,7 +614,7 @@ class TestFindItemPrice:
         """Should find essence by name substring."""
         api._find_from_overview_by_name = Mock(return_value={"name": "Deafening Essence of Woe"})
 
-        result = api.find_item_price("Deafening Essence of Woe", None)
+        api.find_item_price("Deafening Essence of Woe", None)
 
         api._find_from_overview_by_name.assert_called_with("Essence", "Deafening Essence of Woe")
 

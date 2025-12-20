@@ -1,12 +1,9 @@
 """Tests for gui_qt/widgets/results_table.py - Results Table Widget."""
 
 import pytest
-from unittest.mock import Mock, patch, MagicMock
-from typing import Dict, Any, List
+from unittest.mock import Mock, patch
 
-from PyQt6.QtCore import Qt, QModelIndex
-from PyQt6.QtGui import QColor
-from PyQt6.QtWidgets import QWidget
+from PyQt6.QtCore import Qt
 
 from gui_qt.widgets.results_table import (
     build_item_tooltip_html,
@@ -717,7 +714,6 @@ class TestContextMenu:
 
     def test_show_header_context_menu(self, widget, qtbot):
         """Header context menu can be shown."""
-        from PyQt6.QtCore import QPoint
 
         # This would normally show a menu, but we can't test GUI interactions directly
         # Just verify the method exists and is callable

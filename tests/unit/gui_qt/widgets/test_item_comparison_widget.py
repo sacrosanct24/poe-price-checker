@@ -8,10 +8,8 @@ Tests the item comparison widget including:
 - Improvement suggestions
 """
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
-from PyQt6.QtWidgets import QApplication
-from PyQt6.QtCore import Qt
 
 
 @pytest.fixture
@@ -78,7 +76,7 @@ class TestModComparisonRow:
         )
 
         # Check tier label exists
-        tier_label = row.findChild(type(row), "")  # Generic search
+        row.findChild(type(row), "")  # Generic search
         # Basic existence check since we can't easily find specific labels
         assert row.layout() is not None
 

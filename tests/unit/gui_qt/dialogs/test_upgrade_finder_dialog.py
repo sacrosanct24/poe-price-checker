@@ -3,8 +3,6 @@
 import pytest
 from unittest.mock import MagicMock, patch
 
-from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QTableWidgetItem
 
 from gui_qt.dialogs.upgrade_finder_dialog import (
     UpgradeSearchWorker,
