@@ -352,10 +352,11 @@ class SettingsDialog(QDialog):
         behavior_layout = QVBoxLayout(behavior_group)
         behavior_layout.setSpacing(8)
 
-        self._minimize_to_tray_cb = QCheckBox("Minimize to system tray")
+        self._minimize_to_tray_cb = QCheckBox("Minimize button hides to tray")
         self._minimize_to_tray_cb.setToolTip(
-            "When enabled, minimizing the window will hide it to the system tray\n"
-            "instead of the taskbar. Click the tray icon to restore."
+            "When enabled, the minimize button will hide to system tray.\n"
+            "When disabled, use File > Minimize to Tray for explicit tray minimize.\n"
+            "Click the tray icon to restore the window."
         )
         behavior_layout.addWidget(self._minimize_to_tray_cb)
 
@@ -1104,7 +1105,7 @@ class SettingsDialog(QDialog):
             self._toast_duration_spin.setValue(3000)
             self._history_max_spin.setValue(100)
         elif current_tab == 2:  # System Tray
-            self._minimize_to_tray_cb.setChecked(True)
+            self._minimize_to_tray_cb.setChecked(False)  # Use File > Minimize to Tray instead
             self._start_minimized_cb.setChecked(False)
             self._show_notifications_cb.setChecked(True)
             self._threshold_spin.setValue(50.0)

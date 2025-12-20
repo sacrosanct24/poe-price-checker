@@ -447,11 +447,16 @@ class SessionTabWidget(QTabWidget):
     update_meta_requested: pyqtSignal = pyqtSignal()  # Meta weights update request
     verdict_stats_changed: pyqtSignal = pyqtSignal(object)  # VerdictStatistics changed
 
-    def __init__(self, parent: Optional[QWidget] = None):
+    def __init__(
+        self,
+        parent: Optional[QWidget] = None,
+        initial_session_name: Optional[str] = None,
+    ):
         super().__init__(parent)
 
         self._session_counter = 0
         self._rare_evaluator = None  # Reference to rare evaluator for panels
+        self._default_session_name = initial_session_name  # For new sessions
 
         # Enable close buttons and movable tabs
         self.setTabsClosable(True)
@@ -467,15 +472,15 @@ class SessionTabWidget(QTabWidget):
             tab_bar.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
             tab_bar.customContextMenuRequested.connect(self._show_tab_context_menu)
 
-        # Create initial session
-        self._add_session()
+        # Create initial session with provided name or default
+        self._add_session(initial_session_name)
 
     def _create_add_button(self) -> QPushButton:
         """Create the add session button."""
         btn = QPushButton("+")
         btn.setFixedSize(24, 24)
         btn.setToolTip("New Session (Ctrl+T)")
-        btn.clicked.connect(self._add_session)
+        btn.clicked.connect(self._prompt_new_session)
         set_accessible_name(btn, "New Session")
         set_accessible_description(btn, "Create a new price checking session tab")
         btn.setStyleSheet(f"""
@@ -491,6 +496,24 @@ class SessionTabWidget(QTabWidget):
             }}
         """)
         return btn
+
+    def _prompt_new_session(self) -> None:
+        """Prompt user for new session name and create it."""
+        # Use default name as suggestion (e.g., "PoE1 - League" or "Session N")
+        default_name = self._default_session_name or f"Session {self._session_counter + 1}"
+
+        name, ok = QInputDialog.getText(
+            self,
+            "New Session",
+            "Enter session name (e.g., 'PoE1 - Settlers' or 'Mapping Run'):",
+            text=default_name,
+        )
+
+        if ok and name.strip():
+            self._add_session(name.strip())
+        elif ok:
+            # User clicked OK but left it empty - use default
+            self._add_session()
 
     def _on_tab_close_requested(self, index: int) -> None:
         """Handle tab close request."""

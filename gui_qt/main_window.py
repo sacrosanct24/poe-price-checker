@@ -390,7 +390,9 @@ class PriceCheckerWindow(BackgroundServicesMixin, MenuBarMixin, ShortcutsMixin, 
         main_splitter.addWidget(left_splitter)
 
         # ========== RIGHT SIDE: Session Tabs (multiple price-checking sessions) ==========
-        self.session_tabs = SessionTabWidget()
+        # Build initial session name from game version and league
+        initial_session_name = self._build_session_name()
+        self.session_tabs = SessionTabWidget(initial_session_name=initial_session_name)
         self.session_tabs.check_price_requested.connect(self._on_session_check_price)
         self.session_tabs.row_selected.connect(self._on_result_selected)
         self.session_tabs.pin_requested.connect(self._on_pin_items_requested)
@@ -474,22 +476,41 @@ class PriceCheckerWindow(BackgroundServicesMixin, MenuBarMixin, ShortcutsMixin, 
             self._screen_controller.switch_to(screen_type)
 
     def _switch_to_evaluator(self) -> None:
-        """Switch to Item Evaluator screen (Ctrl+1)."""
+        """Switch to Item Evaluator screen."""
         self._on_screen_selected(ScreenType.ITEM_EVALUATOR.value)
         if self._nav_bar:
             self._nav_bar.set_active_screen(ScreenType.ITEM_EVALUATOR)
 
     def _switch_to_advisor(self) -> None:
-        """Switch to AI Advisor screen (Ctrl+2)."""
+        """Switch to AI Advisor screen."""
         self._on_screen_selected(ScreenType.AI_ADVISOR.value)
         if self._nav_bar:
             self._nav_bar.set_active_screen(ScreenType.AI_ADVISOR)
 
     def _switch_to_daytrader(self) -> None:
-        """Switch to Daytrader screen (Ctrl+3)."""
+        """Switch to Daytrader screen."""
         self._on_screen_selected(ScreenType.DAYTRADER.value)
         if self._nav_bar:
             self._nav_bar.set_active_screen(ScreenType.DAYTRADER)
+
+    def _build_session_name(self) -> str:
+        """Build session name from current game version and league.
+
+        Returns:
+            Session name like "PoE1 - Settlers" or "PoE2 - Standard"
+        """
+        from core.game_version import GameVersion
+
+        try:
+            game = self.ctx.config.current_game  # GameVersion enum
+            league = self.ctx.config.league or "Standard"
+
+            # Format game version for display
+            game_display = "PoE1" if game == GameVersion.POE1 else "PoE2"
+
+            return f"{game_display} - {league}"
+        except Exception:
+            return "Session 1"
 
     # -------------------------------------------------------------------------
     # Status Bar
@@ -1044,6 +1065,14 @@ class PriceCheckerWindow(BackgroundServicesMixin, MenuBarMixin, ShortcutsMixin, 
             # Apply updated verdict thresholds
             self._apply_verdict_thresholds()
             self._set_status("Settings saved")
+
+    def _minimize_to_tray(self) -> None:
+        """Explicitly minimize the window to system tray."""
+        if self._tray_controller:
+            self._tray_controller.hide_to_tray()
+        else:
+            # Fallback: just minimize normally
+            self.showMinimized()
 
     def _show_export_dialog(self) -> None:
         """Show export data dialog."""

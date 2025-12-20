@@ -342,7 +342,7 @@ class SetupPage(WizardPage):
         self.subtitle = "Configure optional features (you can change these later)"
 
         self._settings = {
-            "minimize_to_tray": True,
+            "minimize_to_tray": False,
             "start_minimized": False,
             "enable_ai": False,
         }
@@ -351,7 +351,7 @@ class SetupPage(WizardPage):
         layout.setSpacing(Spacing.MD)
 
         options = [
-            ("minimize_to_tray", "Minimize to system tray", "Keep the app running in the background", True),
+            ("minimize_to_tray", "Minimize button hides to tray", "Use File > Minimize to Tray for explicit control", False),
             ("start_minimized", "Start minimized", "Launch to tray when opening the app", False),
             ("enable_ai", "Enable AI insights", "Get AI-powered analysis of your items (requires API key)", False),
         ]

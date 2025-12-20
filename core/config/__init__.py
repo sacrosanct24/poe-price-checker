@@ -444,7 +444,7 @@ class Config:
     @property
     def minimize_to_tray(self) -> bool:
         """Whether to minimize to system tray instead of taskbar."""
-        return self._get_ui_bool("minimize_to_tray", True)
+        return self._get_ui_bool("minimize_to_tray", False)
 
     @minimize_to_tray.setter
     def minimize_to_tray(self, value: bool) -> None:

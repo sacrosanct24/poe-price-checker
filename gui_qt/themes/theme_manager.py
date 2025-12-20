@@ -355,9 +355,11 @@ QGroupBox {{
 
 QGroupBox::title {{
     subcontrol-origin: margin;
+    subcontrol-position: top left;
     left: 10px;
     padding: 2px 8px;
     color: {c["accent"]};
+    background-color: {c["background"]};
 }}
 
 QLineEdit, QTextEdit, QPlainTextEdit {{

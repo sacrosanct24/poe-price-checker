@@ -519,8 +519,9 @@ class TestThemeSettings:
 
 class TestSystemTraySettings:
     def test_minimize_to_tray_default(self, tmp_path):
+        """Default is False - use File > Minimize to Tray for explicit control."""
         cfg = Config(get_unique_config_path(tmp_path))
-        assert cfg.minimize_to_tray is True
+        assert cfg.minimize_to_tray is False
 
     def test_minimize_to_tray_setter(self, tmp_path):
         cfg = Config(get_unique_config_path(tmp_path))

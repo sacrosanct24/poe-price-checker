@@ -50,7 +50,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "window_height": 800,
         "theme": "dark",  # dark, light, or system
         "accent_color": None,  # None = theme default, or currency key like "chaos", "divine"
-        "minimize_to_tray": True,  # Minimize to system tray instead of taskbar
+        "minimize_to_tray": False,  # Use File > Minimize to Tray for explicit tray minimize
         "start_minimized": False,  # Start application minimized to tray
         "show_tray_notifications": True,  # Show system notifications for price alerts
         "tray_alert_threshold": 50.0,  # Chaos value threshold for tray notifications

@@ -479,8 +479,8 @@ class TestSettingsDialogReset:
         # Reset
         dialog._reset_to_defaults()
 
-        # Verify defaults
-        assert dialog._minimize_to_tray_cb.isChecked() is True
+        # Verify defaults (minimize_to_tray defaults to False - use File > Minimize to Tray)
+        assert dialog._minimize_to_tray_cb.isChecked() is False
         assert dialog._start_minimized_cb.isChecked() is False
         assert dialog._show_notifications_cb.isChecked() is True
         assert dialog._threshold_spin.value() == 50.0

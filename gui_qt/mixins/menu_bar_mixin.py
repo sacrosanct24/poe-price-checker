@@ -55,16 +55,14 @@ class MenuBarMixin:
                              shortcut="Ctrl+,"),
                 ]),
                 MenuSection([
+                    MenuItem("Minimize to &Tray", handler=self._minimize_to_tray),
                     MenuItem("E&xit", handler=self.close, shortcut="Alt+F4"),
                 ]),
             ]),
             MenuConfig("&Navigate", [
-                MenuItem("&Item Evaluator", handler=self._switch_to_evaluator,
-                         shortcut="Ctrl+1"),
-                MenuItem("&AI Advisor", handler=self._switch_to_advisor,
-                         shortcut="Ctrl+2"),
-                MenuItem("&Daytrader", handler=self._switch_to_daytrader,
-                         shortcut="Ctrl+3"),
+                MenuItem("&Item Evaluator", handler=self._switch_to_evaluator),
+                MenuItem("&AI Advisor", handler=self._switch_to_advisor),
+                MenuItem("&Daytrader", handler=self._switch_to_daytrader),
             ]),
             MenuConfig("&Build", [
                 MenuSection([
