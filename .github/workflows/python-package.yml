@@ -42,13 +42,13 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         # Note: pytest-qt not installed on Ubuntu - Qt tests skipped here, run on Windows/macOS
-        python -m pip install flake8 pytest pytest-cov pytest-xdist mypy types-requests
+        python -m pip install ruff pytest pytest-cov pytest-xdist mypy types-requests
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
-    - name: Lint with flake8
+    - name: Lint with ruff
       run: |
-        # Lint project code using .flake8 config (fails on errors)
-        flake8 core gui_qt data_sources tests --count --show-source --statistics
+        # Lint project code using ruff rule set aligned with pre-commit
+        ruff check core gui_qt data_sources tests --select=F401,F821,F841,F811,F541,E741,A001 --ignore=T201
 
     - name: Type check with mypy
       run: |
