@@ -1,8 +1,7 @@
 """Tests for core/repoe_tier_provider.py - RePoE Tier Data Provider."""
 
 import pytest
-from unittest.mock import Mock, patch, MagicMock
-from typing import Dict, List
+from unittest.mock import Mock, patch
 
 from core.repoe_tier_provider import (
     STAT_ID_MAPPING,

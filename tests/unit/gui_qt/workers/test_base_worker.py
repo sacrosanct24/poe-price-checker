@@ -5,8 +5,7 @@ Thread integration is tested via careful signal/slot testing without relying on
 cross-thread communication which can be unstable in CI headless environments.
 """
 
-import pytest
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock
 from PyQt6.QtCore import QThread, QObject
 
 from gui_qt.workers.base_worker import BaseWorker, BaseThreadWorker

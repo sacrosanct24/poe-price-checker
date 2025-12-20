@@ -2,9 +2,9 @@
 
 import pytest
 from pathlib import Path
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock, patch
 
-from PyQt6.QtCore import Qt, QModelIndex
+from PyQt6.QtCore import Qt
 
 from gui_qt.windows.price_rankings_window import (
     IconCache,

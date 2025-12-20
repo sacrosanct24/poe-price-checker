@@ -5,7 +5,6 @@ Tests cascading dropdown logic, game version filtering, and build matching.
 """
 
 import pytest
-from unittest.mock import MagicMock, patch
 
 from PyQt6.QtWidgets import QApplication
 

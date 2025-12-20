@@ -16,7 +16,6 @@ from core.item_parser import ParsedItem
 from core.cluster_evaluation import (
     ClusterJewelEvaluator,
     ClusterJewelEvaluation,
-    NotableMatch,
 )
 
 pytestmark = pytest.mark.unit

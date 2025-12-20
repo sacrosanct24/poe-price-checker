@@ -1,9 +1,8 @@
 """Tests for RecordSaleDialog."""
 
-import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
-from PyQt6.QtWidgets import QDialog, QWidget
+from PyQt6.QtWidgets import QWidget
 
 
 class TestRecordSaleDialogInit:

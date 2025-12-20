@@ -14,7 +14,7 @@ from core.poe2_data import (
     # Enums
     RuneTier, ModifierType, DamageType,
     # Data classes
-    Rune, CharmMod, BaseItem, PseudoRule,
+    PseudoRule,
     # Data constants
     POE2_RUNES, POE2_CHARM_MODS, POE2_ITEM_TYPES, POE2_NEW_ITEM_TYPES,
     PSEUDO_STAT_RULES,

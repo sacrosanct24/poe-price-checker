@@ -1,7 +1,6 @@
 """Tests for core/app_context.py - PoE2 initialization."""
 
-import pytest
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 
 from core.game_version import GameVersion, GameConfig
 

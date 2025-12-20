@@ -3,7 +3,7 @@
 import pytest
 from datetime import datetime
 from pathlib import Path
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import patch
 
 from core.pob_local_scanner import (
     LocalBuildInfo,

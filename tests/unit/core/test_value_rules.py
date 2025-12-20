@@ -11,7 +11,6 @@ from core.value_rules import (
     _count_mod_matches,
     _pattern_to_regex,
     Rule,
-    ValueAssessment,
 )
 
 pytestmark = pytest.mark.unit

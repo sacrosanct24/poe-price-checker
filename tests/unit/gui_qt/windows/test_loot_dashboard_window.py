@@ -2,9 +2,9 @@
 
 import pytest
 from datetime import datetime, timedelta
-from unittest.mock import MagicMock, Mock, patch, PropertyMock
+from unittest.mock import MagicMock
 
-from PyQt6.QtCore import Qt, QModelIndex
+from PyQt6.QtCore import Qt
 
 from gui_qt.windows.loot_dashboard_window import (
     TopDropsModel,

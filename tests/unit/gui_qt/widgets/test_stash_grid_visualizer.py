@@ -5,12 +5,11 @@ Tests grid rendering, cell selection, filtering, and value display.
 """
 
 import pytest
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 from dataclasses import dataclass
 from typing import List, Optional
 
 from PyQt6.QtWidgets import QApplication
-from PyQt6.QtCore import Qt, QPointF
 from PyQt6.QtGui import QColor
 
 from gui_qt.widgets.stash_grid_visualizer import (

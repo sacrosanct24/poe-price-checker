@@ -1,9 +1,7 @@
 """Tests for core/stash_valuator.py - Stash Valuation Module."""
 
 import pytest
-from unittest.mock import Mock, patch, MagicMock
-from dataclasses import dataclass, field
-from typing import List, Dict, Any
+from unittest.mock import Mock, patch
 
 from core.stash_valuator import (
     PriceSource,

@@ -1,6 +1,5 @@
 """Tests for PoE2 trade stat IDs and affix data."""
 
-import pytest
 from unittest.mock import MagicMock
 
 from data_sources.pricing.trade_stat_ids_poe2 import (

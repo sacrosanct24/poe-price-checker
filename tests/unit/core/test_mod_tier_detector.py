@@ -1,6 +1,5 @@
 """Tests for core/mod_tier_detector.py - Mod Tier Detection."""
 
-import pytest
 from unittest.mock import patch
 
 from core.mod_tier_detector import (

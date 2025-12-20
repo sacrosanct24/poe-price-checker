@@ -17,10 +17,6 @@ import pytest
 from core.item_parser import ParsedItem
 from core.unique_evaluation import (
     UniqueItemEvaluator,
-    UniqueItemEvaluation,
-    CorruptionMatch,
-    LinkEvaluation,
-    MetaRelevance,
 )
 
 pytestmark = pytest.mark.unit

@@ -2,9 +2,8 @@
 """Tests for MainNavigationBar widget."""
 
 import pytest
-from unittest.mock import MagicMock
 
-from PyQt6.QtWidgets import QWidget, QPushButton, QButtonGroup
+from PyQt6.QtWidgets import QWidget
 
 from gui_qt.widgets.main_navigation_bar import MainNavigationBar
 from gui_qt.screens.screen_controller import ScreenType

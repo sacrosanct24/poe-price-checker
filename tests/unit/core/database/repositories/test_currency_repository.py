@@ -4,7 +4,6 @@ Tests for core/database/repositories/currency_repository.py
 Tests currency rate tracking functionality.
 """
 import pytest
-import time
 from datetime import datetime
 
 from core.database import Database

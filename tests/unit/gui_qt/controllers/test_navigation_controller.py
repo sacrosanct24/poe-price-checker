@@ -3,7 +3,7 @@ Tests for gui_qt.controllers.navigation_controller - NavigationController servic
 """
 
 import pytest
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 
 from gui_qt.controllers.navigation_controller import (
     NavigationController,

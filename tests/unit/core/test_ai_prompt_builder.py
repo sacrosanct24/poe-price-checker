@@ -4,8 +4,7 @@ Unit tests for AI prompt builder.
 
 import pytest
 from pathlib import Path
-from unittest.mock import patch, mock_open, Mock, MagicMock
-from dataclasses import dataclass
+from unittest.mock import patch, Mock
 
 from core.ai_prompt_builder import (
     PromptContext,

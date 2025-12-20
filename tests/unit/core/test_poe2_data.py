@@ -1,7 +1,6 @@
 """Tests for core/poe2_data.py - PoE2 Game Data Module."""
 
 import pytest
-from typing import Dict
 
 from core.poe2_data import (
     # Enums

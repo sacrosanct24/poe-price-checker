@@ -2,10 +2,7 @@
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch, PropertyMock
-from dataclasses import dataclass
-from typing import List, Optional
 
-import pytest
 
 
 class TestUpgradeInfo:
@@ -272,7 +269,7 @@ class TestPriceIntegratorLazyLoading:
 
     def test_ninja_client_fallback_on_error(self):
         """Test ninja_client falls back to DummyPriceClient on error."""
-        from core.price_integrator import PriceIntegrator, DummyPriceClient
+        from core.price_integrator import PriceIntegrator
 
         integrator = PriceIntegrator()
 
@@ -811,7 +808,7 @@ class TestPriceIntegratorPriceItem:
 
     def test_price_item_unique(self):
         """Test price_item with unique item."""
-        from core.price_integrator import PriceIntegrator, PriceResult
+        from core.price_integrator import PriceIntegrator
 
         integrator = PriceIntegrator(enable_upgrade_check=False)
         integrator._prices_loaded = True
@@ -1008,7 +1005,7 @@ class TestModuleFunctions:
 
     def test_get_price_integrator_different_league(self):
         """Test get_price_integrator creates new for different league."""
-        from core.price_integrator import get_price_integrator, _integrator
+        from core.price_integrator import get_price_integrator
         import core.price_integrator as module
 
         # Reset singleton
@@ -1146,7 +1143,7 @@ class TestLazyLoadingClients:
 
     def test_ninja_client_lazy_load(self):
         """Test ninja_client is lazy loaded on first access."""
-        from core.price_integrator import PriceIntegrator, DummyPriceClient
+        from core.price_integrator import PriceIntegrator
 
         integrator = PriceIntegrator()
         assert integrator._ninja_client is None
@@ -1507,7 +1504,7 @@ class TestPriceItemWithUpgrade:
 
     def test_price_item_with_upgrade_info(self):
         """Test price_item includes upgrade info when enabled."""
-        from core.price_integrator import PriceIntegrator, UpgradeInfo
+        from core.price_integrator import PriceIntegrator
 
         mock_evaluator = MagicMock()
         mock_evaluation = MagicMock()
@@ -1579,7 +1576,7 @@ class TestPriceSummaryEdgeCases:
 
     def test_get_price_summary_with_ml_range(self):
         """Test price summary includes ML range when available."""
-        from core.price_integrator import PriceIntegrator, PriceResult
+        from core.price_integrator import PriceIntegrator
 
         mock_evaluator = MagicMock()
         mock_evaluation = MagicMock()
@@ -1616,7 +1613,7 @@ class TestPriceSummaryEdgeCases:
 
     def test_get_price_summary_with_upgrade_info(self):
         """Test price summary includes upgrade info section."""
-        from core.price_integrator import PriceIntegrator, UpgradeInfo
+        from core.price_integrator import PriceIntegrator
 
         mock_evaluator = MagicMock()
         mock_evaluation = MagicMock()

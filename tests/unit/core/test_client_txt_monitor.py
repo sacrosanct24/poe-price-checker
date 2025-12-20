@@ -1,10 +1,9 @@
 """Tests for core/client_txt_monitor.py - Client.txt log monitoring."""
 
 import pytest
-import time
 from datetime import datetime
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from core.client_txt_monitor import (
     ZoneType,

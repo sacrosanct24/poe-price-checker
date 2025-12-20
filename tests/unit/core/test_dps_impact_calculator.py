@@ -1,7 +1,6 @@
 """Tests for core/dps_impact_calculator.py - DPS Impact Calculator."""
 
 import pytest
-from unittest.mock import Mock, patch
 
 from core.dps_impact_calculator import (
     DamageType,

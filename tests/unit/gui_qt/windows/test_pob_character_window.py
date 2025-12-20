@@ -1,10 +1,9 @@
 """Tests for gui_qt/windows/pob_character_window.py - PoB character management."""
 
 import pytest
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock, patch
 
-from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QDialog, QListWidgetItem, QMessageBox
+from PyQt6.QtWidgets import QDialog, QMessageBox
 
 from gui_qt.windows.pob_character_window import (
     PoBCharacterWindow,

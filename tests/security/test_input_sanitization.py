@@ -135,7 +135,6 @@ class TestCommandInjectionPrevention:
 
     def test_no_shell_true_in_subprocess(self):
         """Verify subprocess calls don't use shell=True with user input."""
-        import ast
         from pathlib import Path
 
         project_root = Path(__file__).parent.parent.parent

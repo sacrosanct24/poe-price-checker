@@ -2,7 +2,6 @@
 Tests for core/pricing/models.py - PriceExplanation dataclass.
 """
 import json
-import pytest
 from core.pricing.models import PriceExplanation
 
 

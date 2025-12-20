@@ -1,6 +1,5 @@
 """Tests for CommandPaletteDialog."""
 
-import pytest
 from unittest.mock import MagicMock
 from PyQt6.QtCore import Qt
 

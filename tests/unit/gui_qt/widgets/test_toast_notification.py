@@ -1,10 +1,9 @@
 """Tests for gui_qt/widgets/toast_notification.py - Toast Notification Widget."""
 
 import pytest
-from unittest.mock import Mock, patch, MagicMock
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QWidget, QApplication
+from PyQt6.QtWidgets import QWidget
 
 from gui_qt.widgets.toast_notification import (
     ToastType,
