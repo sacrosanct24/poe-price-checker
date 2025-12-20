@@ -21,65 +21,58 @@ Usage:
     stylesheet = manager.get_stylesheet()
 """
 
-# Theme enumeration and metadata
-from gui_qt.themes.theme_enum import (
-    Theme,
-    THEME_DISPLAY_NAMES,
-    THEME_CATEGORIES,
-    COLORBLIND_THEMES,
-    THEME_BANNER_MAP,
-)
-
 # Color constants
 from gui_qt.themes.colors import (
+    POE_CURRENCY_COLORS,
     RARITY_COLORS,
     RARITY_COLORS_COLORBLIND,
-    VALUE_COLORS,
-    VALUE_COLORS_COLORBLIND,
     STAT_COLORS,
     STAT_COLORS_COLORBLIND,
     STATUS_COLORS,
     STATUS_COLORS_COLORBLIND,
-    POE_CURRENCY_COLORS,
     TIER_COLORS,
     TIER_COLORS_COLORBLIND,
+    VALUE_COLORS,
+    VALUE_COLORS_COLORBLIND,
     get_tier_color,
-)
-
-# Theme palettes
-from gui_qt.themes.palettes import (
-    DARK_THEME,
-    LIGHT_THEME,
-    HIGH_CONTRAST_DARK_THEME,
-    HIGH_CONTRAST_LIGHT_THEME,
-    SOLARIZED_DARK_THEME,
-    SOLARIZED_LIGHT_THEME,
-    DRACULA_THEME,
-    NORD_THEME,
-    MONOKAI_THEME,
-    GRUVBOX_DARK_THEME,
-    COLORBLIND_DEUTERANOPIA_THEME,
-    COLORBLIND_PROTANOPIA_THEME,
-    COLORBLIND_TRITANOPIA_THEME,
-)
-
-# Theme manager
-from gui_qt.themes.theme_manager import (
-    ThemeManager,
-    get_theme_manager,
-    THEME_COLORS,
 )
 
 # Icons and pixmaps
 from gui_qt.themes.icons import (
-    get_app_icon,
-    get_app_banner_pixmap,
-    get_theme_icon_pixmap,
     apply_window_icon,
+    get_app_banner_pixmap,
+    get_app_icon,
+    get_theme_icon_pixmap,
 )
 
-# Legacy compatibility - COLORS proxy
-from typing import Dict
+# Theme palettes
+from gui_qt.themes.palettes import (
+    COLORBLIND_DEUTERANOPIA_THEME,
+    COLORBLIND_PROTANOPIA_THEME,
+    COLORBLIND_TRITANOPIA_THEME,
+    DARK_THEME,
+    DRACULA_THEME,
+    GRUVBOX_DARK_THEME,
+    HIGH_CONTRAST_DARK_THEME,
+    HIGH_CONTRAST_LIGHT_THEME,
+    LIGHT_THEME,
+    MONOKAI_THEME,
+    NORD_THEME,
+    SOLARIZED_DARK_THEME,
+    SOLARIZED_LIGHT_THEME,
+)
+
+# Theme enumeration and metadata
+from gui_qt.themes.theme_enum import (
+    COLORBLIND_THEMES,
+    THEME_BANNER_MAP,
+    THEME_CATEGORIES,
+    THEME_DISPLAY_NAMES,
+    Theme,
+)
+
+# Theme manager
+from gui_qt.themes.theme_manager import THEME_COLORS, ThemeManager, get_theme_manager
 
 
 class _ColorsProxy(dict):
