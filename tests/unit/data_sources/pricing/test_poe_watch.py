@@ -1,7 +1,7 @@
 """Tests for data_sources/pricing/poe_watch.py - poe.watch API Client."""
 
 import pytest
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import patch
 
 from data_sources.pricing.poe_watch import PoeWatchAPI
 

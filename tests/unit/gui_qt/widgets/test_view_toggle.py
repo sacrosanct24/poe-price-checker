@@ -4,7 +4,7 @@
 import pytest
 from unittest.mock import MagicMock
 
-from PyQt6.QtWidgets import QWidget, QPushButton, QFrame, QButtonGroup
+from PyQt6.QtWidgets import QWidget, QPushButton, QFrame
 
 from gui_qt.widgets.view_toggle import (
     ViewMode,

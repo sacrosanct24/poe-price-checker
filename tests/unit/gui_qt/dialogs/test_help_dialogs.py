@@ -1,9 +1,8 @@
 """Tests for help dialogs."""
 
-import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
-from PyQt6.QtWidgets import QDialog, QWidget, QTextEdit, QLabel, QPushButton
+from PyQt6.QtWidgets import QDialog, QWidget
 
 
 class TestShowShortcutsDialog:

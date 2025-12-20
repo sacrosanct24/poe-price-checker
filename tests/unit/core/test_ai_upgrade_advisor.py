@@ -2,7 +2,6 @@
 
 import pytest
 from unittest.mock import MagicMock, patch
-from datetime import datetime
 
 from core.ai_upgrade_advisor import (
     AIUpgradeAdvisorService,
@@ -11,7 +10,6 @@ from core.ai_upgrade_advisor import (
     UpgradeRecommendation,
     SlotUpgradeAnalysis,
     BuildResearch,
-    UpgradeAdvisorResult,
     UpgradeTier,
     get_ai_upgrade_advisor,
     reset_ai_upgrade_advisor,

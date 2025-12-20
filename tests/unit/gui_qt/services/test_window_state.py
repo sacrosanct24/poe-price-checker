@@ -4,11 +4,9 @@
 import json
 import pytest
 from pathlib import Path
-from unittest.mock import MagicMock, patch
 from tempfile import TemporaryDirectory
 
-from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QWidget, QMainWindow, QSplitter, QTableView
+from PyQt6.QtWidgets import QWidget, QMainWindow
 
 from gui_qt.services.window_state import (
     WindowGeometry,

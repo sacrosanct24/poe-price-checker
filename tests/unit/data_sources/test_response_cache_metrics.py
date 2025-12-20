@@ -1,4 +1,3 @@
-from datetime import timedelta
 import time
 
 from data_sources.base_api import ResponseCache

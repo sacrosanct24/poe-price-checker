@@ -1,11 +1,9 @@
 """Tests for gui_qt/windows/stash_viewer_window.py - Stash viewer."""
 
 import pytest
-from unittest.mock import MagicMock, patch, PropertyMock
-from datetime import datetime
+from unittest.mock import MagicMock, patch
 
-from PyQt6.QtCore import Qt, QModelIndex
-from PyQt6.QtWidgets import QWidget
+from PyQt6.QtCore import Qt
 
 from core.stash_valuator import PricedItem, PriceSource, ValuationResult
 

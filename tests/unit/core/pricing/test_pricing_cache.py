@@ -3,7 +3,6 @@ Tests for core/pricing/cache.py - ItemPriceCache and related classes.
 """
 import time
 import pytest
-from unittest.mock import patch
 from core.pricing.cache import (
     CacheEntry,
     CacheStats,

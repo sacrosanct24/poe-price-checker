@@ -4,7 +4,7 @@ Tests for core/pricing/service.py - PriceService class.
 Focuses on cache management, stats computation, and price display logic.
 """
 import pytest
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import Mock
 from core.pricing.service import PriceService
 from core.pricing.models import PriceExplanation
 

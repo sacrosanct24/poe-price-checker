@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 import requests
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 
 from core.app_context import create_app_context, AppContext
 from core.game_version import GameVersion

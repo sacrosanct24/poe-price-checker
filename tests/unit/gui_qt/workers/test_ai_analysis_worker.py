@@ -1,6 +1,5 @@
 """Tests for AIAnalysisWorker."""
 
-import pytest
 from unittest.mock import MagicMock, patch
 
 from gui_qt.workers.ai_analysis_worker import AIAnalysisWorker

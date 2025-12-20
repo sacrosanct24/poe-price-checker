@@ -1,17 +1,13 @@
 """Tests for gui_qt/dialogs/base_dialog.py - Base dialog classes."""
 
-import pytest
 from unittest.mock import MagicMock, patch
 
-from PyQt6.QtCore import Qt, QSize
-from PyQt6.QtWidgets import QWidget, QLabel, QPushButton, QDialog
+from PyQt6.QtWidgets import QLabel, QPushButton
 
 from gui_qt.dialogs.base_dialog import (
     BaseDialog,
     ConfirmDialog,
     InputDialog,
-    confirm,
-    get_input,
 )
 
 

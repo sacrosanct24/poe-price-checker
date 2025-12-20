@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import datetime as realdt
 import threading
-import queue
 import faulthandler
 
 import pytest

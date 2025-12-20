@@ -6,7 +6,6 @@ provide measurable performance improvements.
 """
 import time
 import pytest
-from pathlib import Path
 
 from core.item_parser import ItemParser
 from core.rare_evaluation import RareItemEvaluator

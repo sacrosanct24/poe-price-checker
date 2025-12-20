@@ -1,8 +1,7 @@
 """Tests for gui_qt/feedback/feedback_collector.py - Feedback collection."""
 
 import json
-import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 from pathlib import Path
 from tempfile import TemporaryDirectory
 

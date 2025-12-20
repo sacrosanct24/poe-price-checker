@@ -1,7 +1,6 @@
 """Tests for StashGridDialog."""
 
-import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 from dataclasses import dataclass
 from typing import List
 

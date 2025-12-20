@@ -3,7 +3,6 @@
 import pytest
 from unittest.mock import MagicMock, patch
 
-from PyQt6.QtWidgets import QWidget
 
 from gui_qt.dialogs.item_comparison_dialog import ItemComparisonDialog
 

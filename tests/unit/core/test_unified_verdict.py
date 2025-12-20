@@ -8,8 +8,7 @@ Tests the unified verdict engine including:
 - Slot inference
 - Primary action determination
 """
-import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from core.unified_verdict import (
     PrimaryAction,

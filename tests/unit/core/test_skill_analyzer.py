@@ -1,7 +1,6 @@
 """Tests for core/skill_analyzer.py."""
 from __future__ import annotations
 
-import pytest
 
 
 class TestSkillTag:

@@ -4,8 +4,6 @@ Tests for core/database/repositories/price_alert_repository.py
 Tests price alert CRUD operations and cooldown logic.
 """
 import pytest
-import time
-from datetime import datetime, timedelta
 
 from core.database import Database
 

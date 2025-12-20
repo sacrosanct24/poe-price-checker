@@ -1,7 +1,7 @@
 """Tests for gui_qt/services/price_alert_service.py - Price alert monitoring."""
 
-from datetime import datetime, timedelta
-from unittest.mock import MagicMock, patch
+from datetime import datetime
+from unittest.mock import MagicMock
 
 import pytest
 

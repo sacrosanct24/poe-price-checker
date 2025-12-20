@@ -5,7 +5,7 @@ Tests mod display, breakdown logic, tier highlighting, and build-effective calcu
 """
 
 import pytest
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 from dataclasses import dataclass
 from typing import Optional, List
 

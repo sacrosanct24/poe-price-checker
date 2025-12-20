@@ -8,10 +8,8 @@ Tests the item comparison widget including:
 - Improvement suggestions
 """
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
-from PyQt6.QtWidgets import QApplication
-from PyQt6.QtCore import Qt
 
 
 @pytest.fixture

@@ -7,7 +7,6 @@ Tests the crafting potential analyzer including:
 - Open slot estimation
 - Craft option generation
 """
-import pytest
 from unittest.mock import MagicMock
 
 from core.crafting_potential import (

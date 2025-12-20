@@ -14,7 +14,7 @@ from core.build_archetype import (
     # Dataclass
     BuildArchetype,
     # Detection functions
-    detect_archetype, detect_archetype_from_build, get_default_archetype,
+    detect_archetype, get_default_archetype,
     # Weight functions
     load_archetype_weights, get_weight_multiplier, apply_archetype_weights,
 )

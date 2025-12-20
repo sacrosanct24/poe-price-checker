@@ -8,8 +8,7 @@ Tests the AI-powered improvement advisor including:
 - Suggestion generation from crafting analysis
 - AI response parsing
 """
-import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
+from unittest.mock import MagicMock, AsyncMock
 
 from core.ai_improvement_advisor import (
     ImprovementSuggestion,

@@ -2,13 +2,9 @@
 
 from __future__ import annotations
 
-from datetime import datetime
 from typing import List, Dict, Any
-from unittest.mock import MagicMock
 
 import pytest
-from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QListWidgetItem
 
 from gui_qt.widgets.upgrade_history_panel import UpgradeHistoryPanel
 

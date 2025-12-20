@@ -3,7 +3,7 @@
 import time
 import pytest
 import requests
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 
 from data_sources.pricing.poe2_ninja import Poe2NinjaAPI
 

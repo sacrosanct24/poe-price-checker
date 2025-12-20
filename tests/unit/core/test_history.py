@@ -2,7 +2,6 @@
 from datetime import datetime
 from unittest.mock import MagicMock
 
-import pytest
 
 from core.history import HistoryEntry
 

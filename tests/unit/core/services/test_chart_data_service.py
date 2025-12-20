@@ -4,7 +4,7 @@ Tests for ChartDataService.
 
 import pytest
 from datetime import datetime, timedelta
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import Mock
 
 from core.services.chart_data_service import (
     ChartDataService,

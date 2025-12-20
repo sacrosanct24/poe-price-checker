@@ -1,11 +1,10 @@
 """Tests for gui_qt.main_window - PriceCheckerWindow."""
 
 import pytest
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock, patch
 from pathlib import Path
 
 from PyQt6.QtWidgets import QApplication, QMessageBox, QFileDialog
-from PyQt6.QtCore import Qt
 
 from gui_qt.main_window import PriceCheckerWindow
 from gui_qt.styles import Theme

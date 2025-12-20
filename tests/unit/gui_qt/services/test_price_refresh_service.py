@@ -1,7 +1,7 @@
 """Tests for gui_qt/services/price_refresh_service.py - Background price refresh."""
 
-from unittest.mock import MagicMock, patch
-from datetime import datetime, timedelta
+from unittest.mock import MagicMock
+from datetime import timedelta
 
 import pytest
 

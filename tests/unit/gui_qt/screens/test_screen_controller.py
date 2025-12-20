@@ -2,9 +2,9 @@
 """Tests for ScreenController and ScreenType."""
 
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
-from PyQt6.QtWidgets import QStackedWidget, QWidget
+from PyQt6.QtWidgets import QStackedWidget
 
 from gui_qt.screens.screen_controller import ScreenController, ScreenType
 from gui_qt.screens.base_screen import BaseScreen
