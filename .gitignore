@@ -92,3 +92,4 @@ docs_archived/
 
 # Local documentation (internal reference only)
 .docs_local/
+.webui_secret_key
