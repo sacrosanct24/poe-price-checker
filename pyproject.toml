@@ -1,0 +1,168 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "poe-price-checker"
+description = "A tool to check and compare prices for Path of Exile items"
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [{ name = "Todd Branch", email = "todd.branch@gmail.com" }]
+keywords = ["path-of-exile", "price-checking", "gaming"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+]
+requires-python = ">=3.11"
+dependencies = [
+    "requests>=2.31.0",
+    "openpyxl>=3.1.0",
+    "beautifulsoup4>=4.12.0",
+    "PyQt6>=6.10.0",
+    "mcp[cli]>=1.22.0",
+    "sqlalchemy>=2.0.0",
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    "pytest-mock>=3.11.0",
+    "pytest-xdist>=3.5.0",
+    "pytest-qt>=4.2.0",
+    "pytest-timeout>=2.3.1",
+    "mypy>=1.13.0",
+    "types-requests>=2.31.0",
+    "pandas>=2.0.0",
+    "matplotlib>=3.7.0",
+    "plotly>=5.17.0",
+    "fastapi>=0.100.0",
+    "uvicorn>=0.23.0",
+    "pydantic>=2.0.0",
+    "scikit-learn>=1.3.0",
+    "python-dotenv>=1.0.0",
+    "pyperclip>=1.8.0",
+    "keyboard>=0.13.5",
+    "cryptography>=41.0.0",
+    "defusedxml>=0.7.0",
+    "pyinstaller>=6.0.0",
+    "lxml>=5.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.6.0",
+    "isort>=5.12.0",
+    "pre-commit>=3.3.0",
+    "bandit>=1.7.5",
+    "safety>=2.3.0",
+    "pip-audit>=2.6.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/cline/poe-price-checker"
+Repository = "https://github.com/cline/poe-price-checker"
+Issues = "https://github.com/cline/poe-price-checker/issues"
+
+[tool.setuptools.packages.find]
+where = ["."]
+
+[tool.setuptools.package-data]
+"*" = ["*.md", "*.txt", "*.cfg", "*.ini", "*.toml"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "-ra",
+    "--strict-markers",
+    "--strict-config",
+    "--showlocals",
+    "--tb=short",
+    "-v",
+    "--durations=20",
+]
+timeout = 120
+timeout_method = "thread"
+filterwarnings = [
+    "ignore:unclosed database:ResourceWarning",
+]
+markers = [
+    "unit: Unit tests (fast, no external dependencies)",
+    "integration: Integration tests (may use database, slower)",
+    "slow: Slow tests (skip with -m \"not slow\")",
+    "api: Tests that call external APIs (skip in CI)",
+]
+
+[tool.coverage.run]
+source = ["core", "data_sources", "gui"]
+omit = [
+    "*/tests/*",
+    "*/test_*.py",
+    "*/__pycache__/*",
+    "*/venv/*",
+]
+
+[tool.coverage.report]
+precision = 2
+show_missing = true
+skip_covered = false
+
+[tool.coverage.html]
+directory = "htmlcov"
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_ignores = true
+show_error_codes = true
+show_error_context = true
+no_implicit_optional = false
+ignore_missing_imports = true
+check_untyped_defs = false
+disallow_untyped_defs = false
+files = [
+    "core/price_arbitration.py",
+    "core/clipboard_monitor.py",
+    "data_sources/base_api.py",
+    "data_sources/affix_data_provider.py",
+    "data_sources/poe_ninja_client.py",
+]
+
+[tool.mypy.core.config]
+disallow_untyped_defs = true
+
+[tool.mypy.core.game_version]
+disallow_untyped_defs = true
+
+[tool.ruff]
+line-length = 127
+target-version = "py311"
+lint.select = [
+    "F401",  # module imported but unused
+    "F821",  # undefined name
+    "F841",  # local variable assigned but never used
+    "F811",  # redefinition of unused variable
+    "F541",  # f-string is missing placeholders
+    "E741",  # ambiguous variable name
+    "A001",  # variable shadows builtin name
+    "T201",  # found print statement
+]
+lint.ignore = ["T201"]  # Ignore print statements for now
+lint.per-file-ignores = { "tests/*" = ["F401", "F811"], "*/__init__.py" = ["F401"] }
+lint.isort.known-first-party = ["core", "data_sources", "gui", "tests"]
+lint.isort.known-third-party = ["pytest", "PyQt6", "requests", "sqlalchemy"]
+lint.flake8-bugbear.extend-immutable-calls = ["django.utils.timezone.now"]
+lint.flake8-import-conventions.aliases = { "numpy" = "np", "pandas" = "pd", "matplotlib.pyplot" = "plt" }
+format.docstring-code-format = true
+format.docstring-code-line-length = "dynamic"
+lint.pyupgrade.keep-runtime-typing = true
+lint.pycodestyle.max-line-length = 127
+lint.pylint.max-args = 10
+lint.pylint.max-branches = 12
+lint.pylint.max-returns = 6
+lint.pylint.max-statements = 50
+lint.pylint.max-bool-expr = 10
+lint.pylint.max-nested-blocks = 5
+lint.pylint.max-locals = 25
