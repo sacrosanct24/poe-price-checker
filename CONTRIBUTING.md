@@ -118,7 +118,9 @@ We welcome feature suggestions! Please:
    ```
 3. **Run linting**:
    ```bash
-   flake8 core/ gui_qt/ data_sources/
+   ruff check .
+   # Or run only Tier-0 rules (CI enforcement):
+   ruff check --select=F401,F821,F841,F811,F541,E741,A001 --ignore=T201 .
    ```
 4. **Update CHANGELOG.md** with your changes under "Unreleased"
 
