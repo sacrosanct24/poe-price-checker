@@ -101,8 +101,8 @@
 | **Bluetooth** | Integrated | 5.0 |
 | **VPN** | NordVPN TAP Adapter | - |
 
-**Ethernet MAC:** D4:5D:64:D3:54:42
-**WiFi MAC:** 04:33:C2:65:5F:18
+**Ethernet MAC:** [redacted]
+**WiFi MAC:** [redacted]
 
 ---
 
