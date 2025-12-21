@@ -31,6 +31,13 @@ These artifacts do not belong in Python Prime’s baseline. They are expected to
 - Repo-specific rules must live outside the canonical baseline.
 - If it isn’t declared, it doesn’t exist.
 
+## Orchestrator Template Usage
+- [ ] All tasks are authored from `ops/orchestrator/task_template.md`.
+- [ ] CI failures are captured with `ops/orchestrator/ci_failure_bundle_template.md`.
+- [ ] Work is not authorized until templates are present and used.
+
+Note: This checklist is a minimum requirement and does not replace repo-specific gates.
+
 ## Inventory
 Repository-specific inventory lives in `ops/inventory/README.md`.
 
