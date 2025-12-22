@@ -16,7 +16,7 @@ All canonical governance lives in:
 - **[scotty/](./scotty/)** - Repo-local Scotty execution support (pointer to canonical charter)
 - **[orchestrator/](./orchestrator/)** - Repo-local orchestrator support (pointers to canonical templates)
 - **[agents/cline/](./agents/cline/)** - Repo-local Cline support (pointers to python-prime governance)
-- **[inventory/](./inventory/)** - Repo-local inventory (hosts, services)
+- **[inventory/](./inventory/)** - Pointer to canonical inventory in devcenter-system
 - **[troi/](./troi/)** - Pointer to troi-system repository
 - **[repo_overrides.md](./repo_overrides.md)** - Repo-local execution configuration
 

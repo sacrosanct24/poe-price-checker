@@ -1,7 +1,15 @@
 # Ops Inventory
 
-This directory contains repository-specific infrastructure inventory. It is informational only.
+**Canonical governance source:** `devcenter-system/governance/ROLES.md`
 
-| Host | Role | OS | Access | Notes |
-|------|------|----|--------|-------|
-| Normandy | Headless worker / inference | Windows 11 Pro (Build 26200) | SSH :22, Ollama :11434, RDP :3389 | IPv4 192.168.87.127 (DHCP; reserve if needed) |
+## Status
+
+**Inventory has moved to canonical location:** `devcenter-system/ops/inventory/`
+
+## Documentation
+
+See canonical [devcenter-system/ops/inventory/README.md](https://github.com/sacrosanct24/devcenter-system/blob/main/ops/inventory/README.md) for studio-wide infrastructure inventory.
+
+## Scope
+
+This directory is a pointer only. All canonical inventory documentation lives in devcenter-system for studio-wide visibility and management.
