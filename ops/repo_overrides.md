@@ -1,14 +1,16 @@
 # Repository-Specific Overrides
 
-**Purpose:** This file contains repository-specific governance notes and constraints for the PoE Price Checker project.
+**Canonical governance source:** `devcenter-system/governance/ROLES.md`
 
-**Important:** This file does not weaken or override the canonical baseline templates.
+**Purpose:** This file contains repo-local execution configuration for poe-price-checker.
+
+**Important:** This file does not weaken or override canonical governance. It provides repo-specific implementation details only.
 
 ---
 
 ## Allowed Modification Paths
 
-_Placeholder: Document specific files or directories that may be modified within this repository while respecting the governance baseline._
+_Placeholder: Document specific files or directories that may be modified within this repository while respecting canonical governance._
 
 Examples:
 - Application code in `core/`, `gui_qt/`, `api/`
@@ -40,8 +42,8 @@ Examples:
 
 ## Additional Repository Context
 
-_Placeholder: Add any additional repository-specific governance notes here._
+_Placeholder: Add any additional repository-specific execution notes here._
 
 ---
 
-**Reminder:** All modifications must comply with the canonical ops/ governance baseline established in the source templates. This file serves only to document repository-specific implementation details and constraints.
+**Reminder:** All operations must comply with canonical governance at `devcenter-system/governance/ROLES.md`. This file serves only to document repo-local execution details and does NOT establish governance authority.
