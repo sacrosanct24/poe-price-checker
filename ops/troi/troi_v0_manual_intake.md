@@ -55,18 +55,30 @@ This prints GitHub-issue-ready markdown to stdout, including:
 - S3 provenance (bucket, key)
 - Email body (HTML → text or plain text)
 
-### Save to File
+### Save to File (Outside Repo)
+
+**GOVERNANCE: Output files MUST be saved outside the repository working tree.**
 
 ```bash
+# Save to /tmp (recommended)
 python ops/troi/render_email.py \
   --bucket troi-mail-inbound-stardock \
   --key raw/2024-12-21T15:30:00Z-abc123 \
-  --out issue-draft.md
+  --out /tmp/issue-draft.md
+
+# Or save to ~/.cache/troi/
+mkdir -p ~/.cache/troi
+python ops/troi/render_email.py \
+  --bucket troi-mail-inbound-stardock \
+  --key raw/2024-12-21T15:30:00Z-abc123 \
+  --out ~/.cache/troi/issue-draft.md
 ```
 
-This saves the markdown to `ops/troi/triaged/issue-draft.md` (relative to project root).
+The script will **refuse to write inside the repository** and exit with an error if `--out` points to a repo path.
 
 ### Workflow Example
+
+**CRITICAL: GitHub issue creation is WEB UI ONLY. No GitHub CLI (`gh`) or API calls permitted.**
 
 1. **Operator receives notification** (email, Slack, etc.) about new S3 object
 2. **Operator runs render_email.py** to preview content:
@@ -74,14 +86,16 @@ This saves the markdown to `ops/troi/triaged/issue-draft.md` (relative to projec
    python ops/troi/render_email.py --bucket troi-mail-inbound-stardock --key raw/xyz
    ```
 3. **Operator reviews output**, determines priority/category
-4. **Operator creates GitHub issue** manually:
-   - Copy markdown output
-   - Create issue via GitHub UI or `gh issue create`
-   - Apply appropriate labels (bug, feature, support, etc.)
+4. **Operator creates GitHub issue manually via GitHub web UI**:
+   - Copy markdown output to clipboard: `python ops/troi/render_email.py --bucket ... --key ... | pbcopy`
+   - Navigate to https://github.com/sacrosanct24/poe-price-checker/issues/new
+   - Paste markdown content into issue body
+   - Add title, apply appropriate labels (bug, feature, support, etc.)
    - Assign to team member if needed
-5. **Operator saves triaged version** (optional):
+   - Submit issue manually
+5. **Operator saves triaged version** (optional, outside repo):
    ```bash
-   python ops/troi/render_email.py --bucket ... --key ... --out triaged-$(date +%Y%m%d-%H%M%S).md
+   python ops/troi/render_email.py --bucket ... --key ... --out /tmp/triaged-$(date +%Y%m%d-%H%M%S).md
    ```
 
 ## Email Processing Details
@@ -115,7 +129,8 @@ Every rendered email includes:
 ### Security
 - ✅ S3 access requires valid AWS credentials
 - ✅ No persistent storage (stdout by default)
-- ✅ Optional file output under `ops/troi/triaged/` (gitignored)
+- ✅ Optional file output to `/tmp/` or `~/.cache/troi/` only (no repo writes)
+- ✅ Script enforces repo write protection (exits with error if `--out` targets repo)
 
 ### Auditability
 - ✅ S3 object key preserved in output
