@@ -74,7 +74,7 @@ def extract_body(msg: EmailMessage) -> tuple[str, str]:
                     plain_content = part.get_content()
                 elif content_type == "text/html" and html_content is None:
                     html_content = part.get_content()
-            except Exception as e:
+            except Exception:
                 # Skip parts that can't be decoded
                 continue
     else:
@@ -170,6 +170,32 @@ def render_markdown(msg: EmailMessage, bucket: str, key: str) -> str:
     return '\n'.join(output)
 
 
+def get_repo_root() -> Optional[Path]:
+    """
+    Detect git repository root.
+
+    Returns None if not in a git repo, otherwise returns the repo root path.
+    """
+    try:
+        import subprocess
+        result = subprocess.run(
+            ['git', 'rev-parse', '--show-toplevel'],
+            capture_output=True,
+            text=True,
+            check=False
+        )
+        if result.returncode == 0:
+            return Path(result.stdout.strip())
+        return None
+    except Exception:
+        # Fallback: traverse up looking for .git directory
+        current = Path(__file__).resolve().parent
+        for parent in [current] + list(current.parents):
+            if (parent / '.git').exists():
+                return parent
+        return None
+
+
 def main():
     parser = argparse.ArgumentParser(
         description='Troi v0: Convert S3-stored email to GitHub-issue-ready markdown',
@@ -179,20 +205,24 @@ Examples:
   # Print to stdout
   python ops/troi/render_email.py --bucket troi-mail-inbound-stardock --key raw/abc123
 
-  # Save to file
-  python ops/troi/render_email.py --bucket troi-mail-inbound-stardock --key raw/abc123 --out issue.md
+  # Save to file (outside repo)
+  python ops/troi/render_email.py --bucket troi-mail-inbound-stardock --key raw/abc123 --out /tmp/issue.md
+  python ops/troi/render_email.py --bucket troi-mail-inbound-stardock --key raw/abc123 --out ~/.cache/troi/issue.md
 
 Requirements:
   boto3, beautifulsoup4 (install via: uv pip install boto3 beautifulsoup4)
 
 AWS Credentials:
   Configure via ~/.aws/credentials, environment variables, or IAM role
+
+GOVERNANCE: --out must NOT write inside the repository working tree.
+            Use /tmp/ or ~/.cache/troi/ for output files.
         """
     )
 
     parser.add_argument('--bucket', required=True, help='S3 bucket name')
     parser.add_argument('--key', required=True, help='S3 object key')
-    parser.add_argument('--out', help='Output file (relative to ops/troi/triaged/). If omitted, prints to stdout')
+    parser.add_argument('--out', help='Output file (absolute path, MUST be outside repo). If omitted, prints to stdout')
 
     args = parser.parse_args()
 
@@ -210,12 +240,35 @@ AWS Credentials:
 
     # Output
     if args.out:
-        # Determine output path (relative to project root)
-        project_root = Path(__file__).parent.parent.parent
-        output_dir = project_root / 'ops' / 'troi' / 'triaged'
-        output_dir.mkdir(parents=True, exist_ok=True)
+        output_path = Path(args.out).resolve()
 
-        output_path = output_dir / args.out
+        # GOVERNANCE: Refuse to write inside repository working tree
+        repo_root = get_repo_root()
+        if repo_root is not None:
+            try:
+                # Check if output_path is inside repo_root
+                output_path.relative_to(repo_root)
+                # If we get here, output_path IS inside repo_root - reject it
+                print("", file=sys.stderr)
+                print("❌ ERROR: Output path is inside repository working tree", file=sys.stderr)
+                print(f"   Repository root: {repo_root}", file=sys.stderr)
+                print(f"   Requested output: {output_path}", file=sys.stderr)
+                print("", file=sys.stderr)
+                print("GOVERNANCE VIOLATION: render_email.py must not write to repo.", file=sys.stderr)
+                print("", file=sys.stderr)
+                print("Recommended output locations:", file=sys.stderr)
+                print("  - /tmp/issue-draft.md", file=sys.stderr)
+                print("  - ~/.cache/troi/issue-draft.md", file=sys.stderr)
+                print("", file=sys.stderr)
+                sys.exit(1)
+            except ValueError:
+                # output_path is NOT relative to repo_root - this is OK
+                pass
+
+        # Create parent directory if needed
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Write output
         output_path.write_text(markdown, encoding='utf-8')
         print(f"✅ Saved to: {output_path}", file=sys.stderr)
     else:
