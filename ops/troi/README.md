@@ -12,8 +12,9 @@ Troi is a **governance-compliant, manual email-to-issue intake system** designed
 ### Tools
 - **[render_email.py](./render_email.py)** - Manual email renderer (S3 → Markdown)
 
-### Directories
-- **triaged/** - Local workspace for operator-triaged email drafts (gitignored)
+### Output Locations
+- **GOVERNANCE:** All file outputs MUST use `/tmp/` or `~/.cache/troi/` only
+- **No repo writes:** The script enforces this constraint and will exit with error if `--out` targets the repository
 
 ## Quick Start
 

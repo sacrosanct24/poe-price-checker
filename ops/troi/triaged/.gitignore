@@ -1,8 +1,0 @@
-# Troi v0: Local operator workspace for triaged email drafts
-# These files are temporary and should not be committed to git
-
-# Ignore all files in this directory
-*
-
-# Except this .gitignore file
-!.gitignore
