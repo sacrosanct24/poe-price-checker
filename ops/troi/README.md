@@ -62,20 +62,36 @@ python ops/troi/render_email.py \
 
 ### Save Draft for Review
 ```bash
+# Save to /tmp (recommended)
 python ops/troi/render_email.py \
   --bucket troi-mail-inbound-stardock \
   --key raw/xyz \
-  --out issue-draft-$(date +%Y%m%d-%H%M%S).md
+  --out /tmp/issue-draft-$(date +%Y%m%d-%H%M%S).md
+
+# Or save to ~/.cache/troi/
+mkdir -p ~/.cache/troi
+python ops/troi/render_email.py \
+  --bucket troi-mail-inbound-stardock \
+  --key raw/xyz \
+  --out ~/.cache/troi/issue-draft-$(date +%Y%m%d-%H%M%S).md
 ```
 
-### Create GitHub Issue
+### Create GitHub Issue (WEB UI ONLY)
+
+**CRITICAL: Issue creation is WEB UI ONLY. No GitHub CLI (`gh`) or API calls permitted.**
+
 ```bash
-# Option 1: Copy markdown from stdout, paste in GitHub UI
+# Render markdown to stdout, copy to clipboard
 python ops/troi/render_email.py --bucket ... --key ... | pbcopy
 
-# Option 2: Use gh CLI
-python ops/troi/render_email.py --bucket ... --key ... > draft.md
-gh issue create --title "Subject from email" --body-file draft.md --label support
+# Or save to temporary file for review
+python ops/troi/render_email.py --bucket ... --key ... --out /tmp/issue-draft.md
+
+# Then manually create GitHub issue via web UI:
+# 1. Navigate to https://github.com/sacrosanct24/poe-price-checker/issues/new
+# 2. Paste markdown content into issue body
+# 3. Add title, labels, and triage notes
+# 4. Submit issue manually
 ```
 
 ## Support
