@@ -156,7 +156,7 @@ def pytest_collection_modifyitems(config, items):
                 item.add_marker(pytest.mark.slow)
             continue
 
-        if "/tests/unit/" in path or "/tests/security/" in path:
+        if "/tests/unit/" in path or "/tests/security/" in path or "/tests/" in path:
             item.add_marker(pytest.mark.unit)
         else:
             item.add_marker(pytest.mark.integration)

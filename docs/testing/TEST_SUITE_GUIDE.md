@@ -85,7 +85,8 @@ tests/
 ## CI Behavior
 
 - Pull requests run **unit** tests only (fast signal).
-- Integration and GUI tiers are isolated and run manually via workflow dispatch.
+- Integration and GUI tiers are isolated and run manually via workflow dispatch
+  (see workflows: `CI Integration`, `CI GUI`).
 - API/slow tests are always manual.
 
 ### Edge Case Tests
