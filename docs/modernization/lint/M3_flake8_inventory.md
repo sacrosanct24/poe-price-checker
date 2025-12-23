@@ -1,6 +1,6 @@
 # M3 — Flake8 Inventory (Pre-Removal)
 
-**Date:** 2025-12-19  
+**Date:** 2025-12-19
 **Purpose:** Document all flake8 references before removing it from the project
 
 ## Summary
@@ -57,14 +57,13 @@ Flake8 is currently installed and used in multiple locations. This document inve
 
 ### Operational Scripts
 
-8. **`ops/inventory/collect_env_snapshot.sh`** (line 146)
-   - Lists `.flake8` as a config file to collect in environment snapshots
+8. **`ops/inventory/README.md`** (pointer)
+   - Repo-local pointer to canonical inventory in devcenter-system
+   - The `collect_env_snapshot.sh` script is no longer in this repo
 
-9. **`ops/locks/pip-freeze.dev.txt`** (lines 24-26)
-   - pip freeze snapshot showing installed versions:
-     - flake8==7.3.0
-     - flake8-bugbear==25.11.29
-     - flake8-comprehensions==3.17.0
+9. **`ops/locks/`** (not present)
+   - Repo-local lock snapshots are not present in this repo
+   - Historical lock data should be referenced from canonical inventory when available
 
 ## Ruff Status (Already Installed)
 
@@ -86,9 +85,8 @@ Ruff is already present and configured:
 1. `.flake8` - No longer needed
 
 ### Files to Leave Unchanged
-1. `ops/locks/pip-freeze.dev.txt` - Historical snapshot
-2. `.github/workflows/python-package.yml` - Will be updated separately or deprecated
-3. `pyproject.toml` [tool.ruff.lint] sections - Keep all ruff config
+1. `.github/workflows/python-package.yml` - Will be updated separately or deprecated
+2. `pyproject.toml` [tool.ruff.lint] sections - Keep all ruff config
 
 ## Notes
 

@@ -16,10 +16,12 @@
 - **Note:** Runtime-only; dev/test tools are in requirements-dev.txt and pyproject optional-dependencies
 
 **File:** `requirements-dev.txt`
-- Includes `-r requirements.txt` and adds test/quality/security tooling
-- Adds code quality tools: ruff, isort
-- Adds security scanning: bandit, safety, pip-audit
-- Adds pre-commit hooks: pre-commit
+- Includes `-r requirements.txt` and adds dev/test/quality tooling
+- Testing: pytest, pytest-cov, pytest-mock, pytest-xdist, pytest-qt, pytest-timeout
+- Type checking: mypy, types-requests
+- Code quality: ruff, isort
+- Security scanning: bandit, safety, pip-audit
+- Pre-commit hooks: pre-commit
 
 ### Testing Configuration
 
@@ -64,10 +66,10 @@
 - Steps:
   1. Checkout
   2. Set up Python 3.11
-  3. Install dependencies: pip install -r requirements.txt, pip install flake8 mypy
-  4. Lint: flake8 .
+  3. Install dependencies: pip install -r requirements-dev.txt
+  4. Lint: ruff check . --select=F401,F821,F841,F811,F541,E741,A001 --ignore=T201
   5. Type check: mypy --install-types --non-interactive
-  6. Tests: pytest -m unit -q --durations=20 --ignore=tests/unit/gui_qt --ignore=tests/test_shortcuts.py
+  6. Tests: python -m pytest -m unit -q --durations=20 --ignore=tests/unit/gui_qt --ignore=tests/test_shortcuts.py -p pytest_mock
 - Additional jobs: security-deps, secrets-scan, integration-tests, complexity
 
 ### Build/Development Scripts
