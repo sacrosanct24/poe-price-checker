@@ -68,7 +68,7 @@ ls -la ops/locks/
 
 ### Acceptance Criteria
 
-- [ ] pyproject.toml created with proper configuration
+- [ ] pyproject.toml aligned with requirements files (no drift)
 - [ ] uv.lock file generated for reproducible builds
 - [ ] Backward compatibility maintained with requirements.txt
 - [ ] All existing functionality preserved
@@ -435,6 +435,6 @@ Regular review and updates to this document will ensure it remains relevant and 
 
 ---
 
-**Document Version**: 1.0  
-**Last Updated**: December 18, 2025  
+**Document Version**: 1.0
+**Last Updated**: December 18, 2025
 **Next Review**: January 15, 2026

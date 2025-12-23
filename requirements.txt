@@ -12,18 +12,6 @@ mcp[cli]>=1.22.0  # For AI assistant integration
 # Database (for future phases)
 sqlalchemy>=2.0.0
 
-# Testing
-pytest>=7.4.0
-pytest-cov>=4.1.0
-pytest-mock>=3.11.0
-pytest-xdist>=3.5.0  # Parallel test execution
-pytest-qt>=4.2.0  # Qt testing support
-pytest-timeout>=2.3.1  # Enforce per-test timeouts to avoid hangs
-
-# Type checking
-mypy>=1.13.0
-types-requests>=2.31.0  # Type stubs for requests
-
 # Data analysis (for future phases)
 pandas>=2.0.0
 

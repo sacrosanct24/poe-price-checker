@@ -1,10 +1,10 @@
 # Modernization RFC: Python Project Infrastructure and Tooling
 
-**Author:** Cline  
-**Date:** December 18, 2025  
-**Status:** Draft  
-**Repository:** poe-price-checker  
-**Branch:** main  
+**Author:** Cline
+**Date:** December 18, 2025
+**Status:** Draft
+**Repository:** poe-price-checker
+**Branch:** main
 
 ## Table of Contents
 
@@ -46,7 +46,7 @@ The modernization effort is structured into 7 milestones (M0-M6), each building 
 
 ### Risk 1: Build System Migration
 
-**Risk**: Moving from requirements.txt to pyproject.toml could break existing CI/CD pipelines.
+**Risk**: Divergence between requirements files and pyproject.toml could break existing CI/CD pipelines.
 
 **Mitigation**:
 - Maintain backward compatibility during transition period
@@ -108,7 +108,7 @@ pytest -m unit -q --durations=20 --ignore=tests/unit/gui_qt --ignore=tests/test_
 **Objective**: Upgrade to modern Python packaging standards.
 
 **Acceptance Criteria**:
-- pyproject.toml created with proper configuration
+- pyproject.toml aligned with requirements files (no drift)
 - uv.lock file generated for reproducible builds
 - Backward compatibility maintained with requirements.txt
 - All existing functionality preserved
@@ -200,7 +200,7 @@ uv run pip-audit
 
 ### Immediate Rollback (Within 24 hours)
 
-1. **Branch Strategy**: 
+1. **Branch Strategy**:
    - Each milestone will be developed in a feature branch
    - Main branch will remain stable until milestone is verified
    - Quick rollback by reverting to previous commit if issues arise
@@ -302,6 +302,6 @@ The success of this modernization depends on:
 
 ---
 
-**Document Version**: 1.0  
-**Last Updated**: December 18, 2025  
+**Document Version**: 1.0
+**Last Updated**: December 18, 2025
 **Next Review**: January 15, 2026
