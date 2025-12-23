@@ -17,15 +17,16 @@ review_frequency: quarterly
 ## Quick Start
 
 ```bash
-# Run all tests
-python -m pytest tests/
+# Run fast unit tier (default CI signal)
+python -m pytest -m "unit and not gui and not slow"
 
 # Run with coverage
 python -m pytest --cov=core --cov=data_sources --cov=gui --cov-report=html
 
-# Run specific category
-python -m pytest tests/unit/            # Unit tests only
-python -m pytest tests/integration/     # Integration tests only
+# Run specific tiers
+python -m pytest -m "integration and not slow and not api" tests/integration/
+python -m pytest -m "gui and not slow"
+python -m pytest -m "slow or api"
 ```
 
 ---
@@ -47,26 +48,45 @@ tests/
 │   └── data_sources/              # API clients
 │       ├── test_poeninja*.py
 │       └── test_trade_api*.py
-└── integration/                    # GUI & integration tests
-    ├── core/
-    └── gui/
+├── integration/                    # Integration tests (non-GUI)
+├── acceptance/                     # Real-world API checks (manual only)
+└── security/                       # Security-focused tests
 ```
 
 ---
 
 ## Test Categories
 
-### Unit Tests (Fast, Isolated)
+### Unit Tests (`unit`)
 - **Core Logic:** Parser, database, pricing, config
-- **Data Sources:** API clients, mocking external services
-- **Runtime:** < 2 seconds
-- **Coverage:** 85%+
+- **Data Sources:** API clients with mocked external services
+- **Runtime:** Fast, deterministic, no network
 
-### Integration Tests (End-to-End)
-- **GUI Components:** Results table, item inspector
-- **Full Workflows:** Parse → Price → Display
-- **Runtime:** < 1 second
-- **Coverage:** 65%+
+### Integration Tests (`integration`)
+- **Scope:** Cross-module workflows without GUI
+- **Runtime:** Moderate; may touch database/config but not real APIs
+
+### GUI Tests (`gui`)
+- **Scope:** Qt/UI behavior and controllers
+- **Runtime:** Isolated; run on demand (manual/nightly)
+
+### Slow / API Tests (`slow`, `api`)
+- **Scope:** Real-world or long-running checks
+- **Runtime:** Manual only; never part of unit CI
+
+## Marker Reference
+
+- `unit`: Fast, deterministic, no network
+- `integration`: Cross-module workflows (non-GUI)
+- `gui`: Qt/UI tests
+- `slow`: Long-running checks
+- `api`: Real network calls (manual only)
+
+## CI Behavior
+
+- Pull requests run **unit** tests only (fast signal).
+- Integration and GUI tiers are isolated and run manually via workflow dispatch.
+- API/slow tests are always manual.
 
 ### Edge Case Tests
 - **Error Handling:** Invalid input, missing data
@@ -108,6 +128,11 @@ pytest tests/unit/core/test_database.py
 
 # Run specific test
 pytest tests/unit/core/test_database.py::test_get_quotes
+
+# Run by marker tiers
+pytest -m "unit and not gui and not slow"
+pytest -m "integration and not slow and not api" tests/integration/
+pytest -m "gui and not slow"
 ```
 
 ### Coverage Commands
