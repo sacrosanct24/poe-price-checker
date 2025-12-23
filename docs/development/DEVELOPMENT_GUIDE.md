@@ -34,7 +34,7 @@ PoE Price Checker is a desktop-first tool for Path of Exile 1 & 2 that aims to b
 
 **Non-functional goals**
 
-* Python **3.12+**.
+* Python **3.11+** (aligns with `pyproject.toml`).
 * Strong use of **type hints**, **dataclasses**, and **logging**.
 * Clear separation between:
 

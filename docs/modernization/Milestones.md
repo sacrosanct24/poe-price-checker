@@ -36,11 +36,8 @@ This document outlines the detailed milestones for the Python project modernizat
 # Run unit tests specifically (excluding Qt and shortcuts tests)
 pytest -m unit -q --durations=20 --ignore=tests/unit/gui_qt --ignore=tests/test_shortcuts.py
 
-# Verify environment snapshot script works
-./ops/inventory/collect_env_snapshot.sh
-
-# Check that lock files were generated
-ls -la ops/locks/
+# Inventory tooling lives in canonical DevCenter ops (repo-local pointer only)
+# See devcenter-system/ops/inventory/README.md
 ```
 
 ### Deliverables
@@ -48,18 +45,13 @@ ls -la ops/locks/
 - `docs/modernization/Modernization_RFC.md` - Comprehensive RFC document
 - `docs/modernization/Milestones.md` - This milestones document
 - `docs/modernization/inventory/` - Directory for environment snapshots
-- `ops/inventory/collect_env_snapshot.sh` - Environment collection script
-- `ops/locks/` - Directory for lock files
-  - `pip-freeze.dev.txt` - Development environment dependencies
-  - `pip-freeze.runtime.txt` - Runtime environment dependencies
-  - `pip-check.txt` - Dependency compatibility check
+- `ops/inventory/README.md` - Pointer to canonical inventory (DevCenter)
 
 ### Success Indicators
 
 - All existing tests continue to pass
 - Documentation is comprehensive and accurate
-- Environment snapshot captures all relevant information
-- Lock files are generated successfully
+- Inventory pointer is up to date
 - No changes to application behavior
 
 ## M1: Dependency Management Modernization
@@ -68,7 +60,7 @@ ls -la ops/locks/
 
 ### Acceptance Criteria
 
-- [ ] pyproject.toml created with proper configuration
+- [ ] pyproject.toml aligned with requirements files (no drift)
 - [ ] uv.lock file generated for reproducible builds
 - [ ] Backward compatibility maintained with requirements.txt
 - [ ] All existing functionality preserved
@@ -435,6 +427,6 @@ Regular review and updates to this document will ensure it remains relevant and 
 
 ---
 
-**Document Version**: 1.0  
-**Last Updated**: December 18, 2025  
+**Document Version**: 1.0
+**Last Updated**: December 18, 2025
 **Next Review**: January 15, 2026

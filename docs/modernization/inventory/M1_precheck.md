@@ -1,8 +1,8 @@
 # M1 Pre-Check Inventory
 
-**Date:** December 18, 2025  
-**Branch:** m1-pyproject-uv  
-**Purpose:** Document existing tooling configuration before introducing `pyproject.toml` and optional `uv` workflow.
+**Date:** December 18, 2025
+**Branch:** m1-pyproject-uv
+**Purpose:** Document existing tooling configuration for Phase 1 dependency hygiene and optional `uv` workflow.
 
 ## Summary of Existing Configuration
 
@@ -10,19 +10,18 @@
 
 **File:** `requirements.txt`
 - Core dependencies: requests, openpyxl, beautifulsoup4, PyQt6, mcp[cli], sqlalchemy
-- Testing: pytest, pytest-cov, pytest-mock, pytest-xdist, pytest-qt, pytest-timeout
-- Type checking: mypy, types-requests
 - Data/ML: pandas, matplotlib, plotly, fastapi, uvicorn, pydantic, scikit-learn
 - Utils: python-dotenv, pyperclip, keyboard, cryptography, defusedxml
 - Build: pyinstaller, lxml
-- **Note:** All versions use `>=` constraints, no pinning
+- **Note:** Runtime-only; dev/test tools are in requirements-dev.txt and pyproject optional-dependencies
 
 **File:** `requirements-dev.txt`
-- Mirrors testing and type checking from requirements.txt
-- Adds code quality tools: flake8, flake8-bugbear, flake8-comprehensions, isort
-- Adds security scanning: bandit, safety, pip-audit
-- Adds pre-commit hooks: pre-commit
-- **Note:** Uses specific version constraints for dev tools
+- Includes `-r requirements.txt` and adds dev/test/quality tooling
+- Testing: pytest, pytest-cov, pytest-mock, pytest-xdist, pytest-qt, pytest-timeout
+- Type checking: mypy, types-requests
+- Code quality: ruff, isort
+- Security scanning: bandit, safety, pip-audit
+- Pre-commit hooks: pre-commit
 
 ### Testing Configuration
 
@@ -67,10 +66,10 @@
 - Steps:
   1. Checkout
   2. Set up Python 3.11
-  3. Install dependencies: pip install -r requirements.txt, pip install flake8 mypy
-  4. Lint: flake8 .
+  3. Install dependencies: pip install -r requirements-dev.txt
+  4. Lint: ruff check . --select=F401,F821,F841,F811,F541,E741,A001 --ignore=T201
   5. Type check: mypy --install-types --non-interactive
-  6. Tests: pytest -m unit -q --durations=20 --ignore=tests/unit/gui_qt --ignore=tests/test_shortcuts.py
+  6. Tests: python -m pytest -m unit -q --durations=20 --ignore=tests/unit/gui_qt --ignore=tests/test_shortcuts.py -p pytest_mock
 - Additional jobs: security-deps, secrets-scan, integration-tests, complexity
 
 ### Build/Development Scripts
@@ -87,7 +86,7 @@
 ## Key Observations
 
 ### Current State
-- **No existing `pyproject.toml`** - This is a greenfield introduction
+- **pyproject.toml present** - dependency metadata is first-class
 - **Dual requirements files** - runtime (requirements.txt) and dev (requirements-dev.txt)
 - **Conservative tooling** - Permissive mypy settings, style ignores in flake8
 - **CI uses Python 3.11** - This should be the baseline for pyproject.toml
@@ -101,25 +100,26 @@
 
 ### Migration Strategy
 - Keep existing config files initially (no deletion in M1)
-- Add minimal pyproject.toml with project metadata and tool configs
+- Align pyproject.toml with requirements files to reduce drift
 - Add optional uv workflow documentation and bootstrap script
 - Add CI job for uv (additive, non-blocking)
 
 ## Files to Create/Modify in M1
 
 ### New Files
-- `pyproject.toml` - Minimal project configuration
+- (None required for pyproject.toml; already present)
 - `docs/modernization/Uv_Workflow.md` - uv workflow documentation
 - `ops/dev/uv_bootstrap.sh` - uv environment setup script
 
 ### Modified Files (if any)
+- `pyproject.toml` - Align metadata and dependency listings
 - `.github/workflows/ci.yml` - Additive CI job only (optional)
 - `check.sh` - Only if necessary for help message or stable targets
 
 ## Risk Assessment
 
 ### Low Risk
-- Adding pyproject.toml alongside existing configs
+- Aligning existing pyproject.toml with requirements files
 - Creating documentation and scripts
 - Adding optional CI job
 

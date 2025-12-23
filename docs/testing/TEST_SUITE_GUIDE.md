@@ -148,22 +148,22 @@ from unittest.mock import Mock, patch
 
 class TestMyFeature:
     """Tests for MyFeature class"""
-    
+
     @pytest.fixture
     def my_fixture(self):
         """Setup code that runs before each test"""
         return SomeObject()
-    
+
     def test_happy_path(self, my_fixture):
         """Test the main success scenario"""
         result = my_fixture.do_something()
         assert result == expected_value
-    
+
     def test_error_handling(self, my_fixture):
         """Test error scenarios"""
         with pytest.raises(ValueError):
             my_fixture.do_something_invalid()
-    
+
     def test_edge_case(self, my_fixture):
         """Test boundary conditions"""
         result = my_fixture.do_something_with_empty_input([])
@@ -177,9 +177,9 @@ from unittest.mock import patch, Mock
 def test_with_mock():
     with patch('module.external_call') as mock_call:
         mock_call.return_value = "mocked result"
-        
+
         result = function_that_calls_external()
-        
+
         assert result == "processed: mocked result"
         mock_call.assert_called_once()
 ```
@@ -250,10 +250,10 @@ def test_parse_unique_item():
     text = """Rarity: Unique
 Headhunter
 Leather Belt"""
-    
+
     parser = ItemParser()
     result = parser.parse(text)
-    
+
     assert result.name == "Headhunter"
     assert result.rarity == "UNIQUE"
 ```
@@ -285,7 +285,7 @@ jobs:
         with:
           python-version: '3.13'
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: pip install -r requirements-dev.txt
       - name: Run tests
         run: pytest --cov=core --cov-report=xml
       - name: Upload coverage
