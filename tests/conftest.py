@@ -127,9 +127,12 @@ def pytest_collection_modifyitems(config, items):
         "test_real_world.py",
     }
 
+    tests_root = Path(__file__).resolve().parent
+
     for item in items:
-        path = Path(str(item.fspath)).as_posix()
-        filename = Path(path).name
+        path_obj = Path(str(item.fspath))
+        path = path_obj.as_posix()
+        filename = path_obj.name
 
         if "/tests/acceptance/" in path:
             item.add_marker(pytest.mark.integration)
@@ -156,7 +159,9 @@ def pytest_collection_modifyitems(config, items):
                 item.add_marker(pytest.mark.slow)
             continue
 
-        if "/tests/unit/" in path or "/tests/security/" in path or "/tests/" in path:
+        if "/tests/unit/" in path or "/tests/security/" in path:
+            item.add_marker(pytest.mark.unit)
+        elif path_obj.parent == tests_root:
             item.add_marker(pytest.mark.unit)
         else:
             item.add_marker(pytest.mark.integration)

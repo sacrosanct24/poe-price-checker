@@ -82,6 +82,8 @@ tests/
 - `slow`: Long-running checks
 - `api`: Real network calls (manual only)
 
+Legacy tests at `tests/test_*.py` default to `unit` unless explicitly tagged.
+
 ## CI Behavior
 
 - Pull requests run **unit** tests only (fast signal).
