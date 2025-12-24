@@ -125,7 +125,6 @@ jobs:
       run: |
         python -m pytest -m "unit and not gui and not slow" tests/ --ignore=tests/integration --ignore=tests/unit/gui_qt --ignore=tests/test_shortcuts.py `
           --junitxml=test-results-windows.xml `
-          -n auto `
           -v
 
     - name: Upload test results
@@ -169,7 +168,6 @@ jobs:
       run: |
         python -m pytest -m "unit and not gui and not slow" tests/ --ignore=tests/integration --ignore=tests/unit/gui_qt --ignore=tests/test_shortcuts.py \
           --junitxml=test-results-macos.xml \
-          -n auto \
           -v
 
     - name: Upload test results
