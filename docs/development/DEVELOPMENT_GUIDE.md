@@ -551,11 +551,12 @@ Runs on every push and pull request to `main`:
 - Scans Python code for security vulnerabilities
 - Uses `security-and-quality` query suite
 
-### 5.3 Build Release (`build-release.yml`)
+### 5.3 Release Workflow (`release.yml`)
 
-- Triggered on release publication or manual dispatch
-- Builds Windows executable using PyInstaller
-- Uploads artifact to GitHub release
+- Triggered on tag push `v*.*.*` or manual dispatch
+- Runs unit tests before building
+- Builds Windows artifact via `build.py` (spec-driven)
+- Publishes versioned artifact to GitHub Release
 
 ### 5.4 Dependabot (`dependabot.yml`)
 

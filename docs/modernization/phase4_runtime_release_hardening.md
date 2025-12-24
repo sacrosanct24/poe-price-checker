@@ -54,17 +54,54 @@ runtime behavior.
 - **Output:** `dist/PoEPriceChecker/`
 
 ### Release builds (workflow-driven)
-- **Workflow:** `.github/workflows/build-release.yml`
-- **Command (Windows):**
-  - `pyinstaller --name "PoE-Price-Checker" --onefile --windowed --icon "assets/icon.ico" \
-    --add-data "assets;assets" --add-data "data;data" --hidden-import "PyQt6.QtSvg" \
-    --hidden-import "PyQt6.QtSvgWidgets" main.py`
-- **Output:** `dist/PoE-Price-Checker.exe`
+- **Workflow:** `.github/workflows/release.yml`
+- **Trigger:** tag push `v*.*.*` or manual dispatch (see release process below)
+- **Command (Windows):** `python build.py --clean`
+- **Output:** `dist/PoEPriceChecker/` (packaged as `dist/PoEPriceChecker-windows-vX.Y.Z.zip`)
 
 **Keep in sync**
-- If assets, hidden imports, or entrypoints change in the spec, update the
-  release workflow to match (and vice-versa) so local builds reproduce release
-  behavior.
+- If assets, hidden imports, or entrypoints change in the spec, update
+  `.github/workflows/release.yml` to match (and vice-versa) so local builds
+  reproduce release behavior.
+
+## Release Process (Tag + Manual)
+
+### How to cut a release (tagged)
+1. Update release notes or version metadata if applicable:
+   - `RELEASE_NOTES.md` (recommended for human-readable change summaries)
+2. Create a version tag using the `vX.Y.Z` format:
+   - `git tag vX.Y.Z`
+3. Push the tag:
+   - `git push origin vX.Y.Z`
+4. The release workflow runs automatically and publishes a GitHub Release.
+
+### Manual workflow dispatch
+1. Open the GitHub Actions workflow: `Release`.
+2. Provide:
+   - `release_tag` (must already exist, e.g., `v1.2.3`)
+   - `release_ref` (branch, tag, or SHA to build; default `main`)
+3. Run the workflow to build and publish the release.
+
+### Artifacts produced
+- `PoEPriceChecker-windows-vX.Y.Z.zip`
+  - Windows distribution built from `poe_price_checker.spec` via `build.py`
+
+### Unit test tier used in release workflow
+```bash
+python -m pytest -m "unit and not gui and not slow" -q --durations=20 --ignore=tests/unit/gui_qt --ignore=tests/test_shortcuts.py -p pytest_mock
+```
+
+### Verify a release
+- GitHub Release exists for the tag and includes
+  `PoEPriceChecker-windows-vX.Y.Z.zip`.
+- Workflow run shows unit tests completed before the build step.
+
+## AI-010 Completion Packet
+- Workflow: `.github/workflows/release.yml`
+- Example tag: `v1.2.3`
+- Artifacts: `PoEPriceChecker-windows-v1.2.3.zip` (Windows release bundle)
+- Evidence: Workflow not executed in this change (no tag pushed).
+- Known limitations: Windows-only artifact; release requires a pre-existing tag.
 
 ## Smoke Checklist (no network)
 Run from the repo root:
@@ -92,4 +129,4 @@ Expected outcomes:
 - `core/logging_setup.py`
 - `build.py`
 - `poe_price_checker.spec`
-- `.github/workflows/build-release.yml`
+- `.github/workflows/release.yml`
