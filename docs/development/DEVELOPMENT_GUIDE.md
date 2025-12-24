@@ -41,7 +41,7 @@ PoE Price Checker is a desktop-first tool for Path of Exile 1 & 2 that aims to b
   * Core domain logic (`core/`)
   * External data sources (`data_sources/`)
   * Persistence layer (`core/database.py`)
-  * UI (`gui/`)
+  * UI (`gui_qt/`)
 * Easy to test:
 
   * Unit tests for core modules and data sources.
@@ -54,7 +54,8 @@ PoE Price Checker is a desktop-first tool for Path of Exile 1 & 2 that aims to b
 
 Top-level structure (excluding virtualenv and tooling artifacts):
 
-* `main.py` – primary entrypoint to launch the app. Supports `--qt` (default) and `--tk` flags.
+* `main.py` – primary GUI entrypoint (PyQt6). No CLI flags.
+* `run_api.py` – API server entrypoint (FastAPI via `uvicorn`).
 * `core/` – core domain logic and services:
 
   * `app_context.py` – wiring factory / dependency injection for the app.
@@ -82,9 +83,6 @@ Top-level structure (excluding virtualenv and tooling artifacts):
   * `build_scrapers.py` – Maxroll.gg build scraper integration.
   * `official/` – placeholder for official API integrations.
   * `wiki/` – placeholder for wiki integrations.
-* `gui/` – Legacy Tkinter GUI (use `--tk` flag):
-
-  * `main_window.py` – Tkinter GUI (`PriceCheckerGUI` and related widgets).
 * `gui_qt/` – PyQt6 GUI (default):
 
   * `main_window.py` – Main window (`PriceCheckerWindow`) with integrated PoB panel.
@@ -140,8 +138,9 @@ Top-level structure (excluding virtualenv and tooling artifacts):
 
 This file is effectively the **composition root**:
 
-* `create_app_context()` is the canonical factory used by the entrypoint (`poe_price_checker.py`).
-* The Tkinter GUI receives an `AppContext` which it uses to access services and the DB.
+* `create_app_context()` is the canonical factory used by the entrypoints (`main.py`
+  and `api/main.py` via `run_api.py`).
+* The GUI receives an `AppContext` which it uses to access services and the DB.
 
 **Best practice status:**
 Good separation of concerns; `AppContext` keeps wiring out of UI and core modules. Dependencies are clearly injected.
@@ -390,12 +389,22 @@ Recommended future structure:
 
 **File:** `main.py`
 
-* Primary entrypoint:
+* Primary GUI entrypoint:
 
   * Sets up logging via `core.logging_setup`.
-  * Parses command line arguments (`--qt` for PyQt6, `--tk` for Tkinter).
   * Calls `create_app_context()`.
-  * Launches the PyQt6 GUI by default, with Tkinter fallback.
+  * Launches the PyQt6 GUI (`gui_qt/`).
+
+**File:** `run_api.py`
+
+* API server entrypoint:
+
+  * Parses host/port/reload/workers flags.
+  * Runs `api.main:app` via `uvicorn`.
+  * `api.main` creates `AppContext` during FastAPI lifespan startup.
+
+For runtime configuration locations and build/release reproducibility notes, see
+`docs/modernization/phase4_runtime_release_hardening.md`.
 
 **scripts/**
 
