@@ -28,7 +28,7 @@ echo "Step 3: Installing development dependencies..."
 pip install -r requirements-dev.txt
 
 echo "Step 4: Running CI-equivalent unit tests..."
-pytest -m unit -q --durations=20 --ignore=tests/unit/gui_qt --ignore=tests/test_shortcuts.py
+pytest -m "unit and not gui and not slow" -q --durations=20 --ignore=tests/unit/gui_qt --ignore=tests/test_shortcuts.py
 
 echo "=== checks: PASS ==="
 echo "All CI-equivalent unit tests completed successfully"

@@ -1,11 +1,13 @@
-import pytest
-import time
-import sys
 import faulthandler
+import sys
+import time
+from pathlib import Path
+
+import pytest
+
 from core.config import Config
 from core.database import Database
 from core.item_parser import ItemParser
-
 
 # =============================================================================
 # Global singleton reset fixture for test isolation
@@ -105,6 +107,67 @@ def temp_db(tmp_path):
 @pytest.fixture
 def parser():
     return ItemParser()
+
+
+def pytest_collection_modifyitems(config, items):
+    """Assign tier markers based on test location and known network usage."""
+    gui_files = {
+        "test_item_comparison_dialog.py",
+        "test_loadout_selector.py",
+        "test_shortcuts.py",
+    }
+    slow_files = {
+        "test_performance_improvements.py",
+        "test_item_parser_perf.py",
+        "test_poe_ninja_performance.py",
+    }
+    api_files = {
+        "test_poewatch_api.py",
+        "test_ai_connectivity.py",
+        "test_real_world.py",
+    }
+
+    tests_root = Path(__file__).resolve().parent
+
+    for item in items:
+        path_obj = Path(str(item.fspath))
+        path = path_obj.as_posix()
+        filename = path_obj.name
+
+        if "/tests/acceptance/" in path:
+            item.add_marker(pytest.mark.integration)
+            item.add_marker(pytest.mark.slow)
+            item.add_marker(pytest.mark.api)
+            continue
+
+        if "/tests/integration/" in path:
+            item.add_marker(pytest.mark.integration)
+            if filename in api_files:
+                item.add_marker(pytest.mark.slow)
+                item.add_marker(pytest.mark.api)
+            continue
+
+        if filename in api_files:
+            item.add_marker(pytest.mark.integration)
+            item.add_marker(pytest.mark.slow)
+            item.add_marker(pytest.mark.api)
+            continue
+
+        if "/tests/unit/gui_qt/" in path or "/tests/gui_qt/" in path or filename in gui_files:
+            item.add_marker(pytest.mark.gui)
+            if filename in slow_files:
+                item.add_marker(pytest.mark.slow)
+            continue
+
+        if "/tests/unit/" in path or "/tests/security/" in path:
+            item.add_marker(pytest.mark.unit)
+        elif path_obj.parent == tests_root:
+            item.add_marker(pytest.mark.unit)
+        else:
+            item.add_marker(pytest.mark.integration)
+
+        if filename in slow_files:
+            item.add_marker(pytest.mark.slow)
 
 
 def pytest_sessionstart(session):  # pragma: no cover - test harness init

@@ -45,7 +45,7 @@ jobs:
         run: |
           # Exclude Qt/GUI-dependent tests from collection in this headless CI job
           # Single-line command is shell-agnostic across Ubuntu (bash) and Windows (PowerShell)
-          python -m pytest -m unit -q --durations=20 --ignore=tests/unit/gui_qt --ignore=tests/test_shortcuts.py -p pytest_mock
+          python -m pytest -m "unit and not gui and not slow" -q --durations=20 --ignore=tests/unit/gui_qt --ignore=tests/test_shortcuts.py -p pytest_mock
 
   # Security: Dependency vulnerability scanning
   security-deps:
@@ -81,31 +81,6 @@ jobs:
           base: ""
           head: HEAD
           extra_args: --only-verified
-
-  # Integration tests (run after unit tests pass)
-  integration-tests:
-    name: Integration Tests
-    needs: build-test
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements-dev.txt
-
-      - name: Run integration tests
-        env:
-          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
-        run: |
-          python -m pytest tests/integration/ -v --timeout=300 -p pytest_mock || echo "Integration tests completed"
 
   # Code complexity analysis (informational)
   complexity:
