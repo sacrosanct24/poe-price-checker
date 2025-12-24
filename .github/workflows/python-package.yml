@@ -59,7 +59,7 @@ jobs:
       id: pytest
       run: |
         python -m pytest -m "unit and not gui and not slow" tests/ --ignore=tests/integration --ignore=tests/unit/gui_qt --ignore=tests/test_shortcuts.py \
-          -p no:pytest-qt \
+          -p no:pytest-qt -p pytest_mock \
           --cov=core --cov=gui_qt --cov-report=term-missing \
           --cov-report=xml \
           --junitxml=test-results-ubuntu-${{ matrix.python-version }}.xml \
@@ -125,6 +125,7 @@ jobs:
       run: |
         python -m pytest -m "unit and not gui and not slow" tests/ --ignore=tests/integration --ignore=tests/unit/gui_qt --ignore=tests/test_shortcuts.py `
           --junitxml=test-results-windows.xml `
+          -p pytest_mock `
           -v
 
     - name: Upload test results
@@ -168,6 +169,7 @@ jobs:
       run: |
         python -m pytest -m "unit and not gui and not slow" tests/ --ignore=tests/integration --ignore=tests/unit/gui_qt --ignore=tests/test_shortcuts.py \
           --junitxml=test-results-macos.xml \
+          -p pytest_mock \
           -v
 
     - name: Upload test results
