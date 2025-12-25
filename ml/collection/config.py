@@ -9,18 +9,18 @@ ML_COLLECTION_CONFIG = {
     "frequency_minutes": 30,
     "base_types": {
         "boots": [
+            "Two-Toned Boots",
+            "Sorcerer Boots",
             "Titan Greaves",
             "Dragonscale Boots",
-            "Sorcerer Boots",
-            "Two-Toned Boots (Armour/Energy Shield)",
-            "Two-Toned Boots (Evasion/Energy Shield)",
-            "Fugitive Boots",
+            "Slink Boots",
         ],
         "rings": [
             "Amethyst Ring",
             "Two-Stone Ring",
             "Vermillion Ring",
             "Prismatic Ring",
+            "Diamond Ring",
         ],
     },
     "max_listings_per_base": 100,
