@@ -1,0 +1,14 @@
+[Unit]
+Description=PoE Price Checker ML Data Collector
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/todd/studio/projects/poe-price-checker
+Environment=PYTHONPATH=/home/todd/studio/projects/poe-price-checker
+ExecStart=/home/todd/studio/projects/poe-price-checker/.venv/bin/python -c "from ml.collection.orchestrator import MLCollectionOrchestrator; import logging; logging.basicConfig(level=logging.INFO, format='%%(asctime)s %%(levelname)s %%(name)s: %%(message)s'); orch = MLCollectionOrchestrator(); orch.start(); import threading; threading.Event().wait()"
+Restart=on-failure
+RestartSec=60
+
+[Install]
+WantedBy=default.target
