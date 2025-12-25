@@ -6,7 +6,7 @@ Separated from the main Database class for better maintainability.
 """
 
 # Current schema version. Increment if schema structure changes.
-SCHEMA_VERSION = 12
+SCHEMA_VERSION = 13
 
 # Full schema creation SQL for fresh databases
 CREATE_SCHEMA_SQL = """
@@ -344,6 +344,48 @@ ON price_alerts (league, game_version, enabled);
 
 CREATE INDEX IF NOT EXISTS idx_price_alerts_item
 ON price_alerts (item_name, league);
+
+-- v13: ML training data collection
+CREATE TABLE IF NOT EXISTS ml_listings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    listing_id TEXT UNIQUE NOT NULL,
+    game_id TEXT NOT NULL DEFAULT 'poe1',
+    league TEXT NOT NULL,
+    item_class TEXT NOT NULL,
+    base_type TEXT NOT NULL,
+    ilvl INTEGER,
+    influences TEXT,  -- JSON
+    flags TEXT,  -- JSON: corrupted, mirrored, fractured, synthesised
+    affixes TEXT,  -- JSON array: [{affix_id, tier, roll_percentile}, ...]
+    price_chaos REAL NOT NULL,
+    original_currency TEXT,
+    original_amount REAL,
+    seller_account TEXT,
+    first_seen_at TIMESTAMP NOT NULL,
+    last_seen_at TIMESTAMP NOT NULL,
+    disappeared_at TIMESTAMP,
+    listing_state TEXT NOT NULL DEFAULT 'LIVE',
+    CHECK (listing_state IN ('LIVE', 'STALE', 'DISAPPEARED_FAST', 'DISAPPEARED_SLOW', 'EXCLUDED'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_ml_listings_league ON ml_listings(league);
+CREATE INDEX IF NOT EXISTS idx_ml_listings_base_type ON ml_listings(base_type);
+CREATE INDEX IF NOT EXISTS idx_ml_listings_state ON ml_listings(listing_state);
+CREATE INDEX IF NOT EXISTS idx_ml_listings_first_seen ON ml_listings(first_seen_at);
+
+CREATE TABLE IF NOT EXISTS ml_collection_runs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id TEXT UNIQUE NOT NULL,
+    game_id TEXT NOT NULL DEFAULT 'poe1',
+    league TEXT NOT NULL,
+    started_at TIMESTAMP NOT NULL,
+    completed_at TIMESTAMP,
+    listings_fetched INTEGER DEFAULT 0,
+    listings_new INTEGER DEFAULT 0,
+    listings_updated INTEGER DEFAULT 0,
+    errors INTEGER DEFAULT 0,
+    error_details TEXT  -- JSON array of error messages
+);
 """
 
 # Migration SQL for each version upgrade
@@ -640,6 +682,49 @@ ON price_alerts (league, game_version, enabled);
 
 CREATE INDEX IF NOT EXISTS idx_price_alerts_item
 ON price_alerts (item_name, league);
+"""
+
+MIGRATION_V13_SQL = """
+CREATE TABLE IF NOT EXISTS ml_listings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    listing_id TEXT UNIQUE NOT NULL,
+    game_id TEXT NOT NULL DEFAULT 'poe1',
+    league TEXT NOT NULL,
+    item_class TEXT NOT NULL,
+    base_type TEXT NOT NULL,
+    ilvl INTEGER,
+    influences TEXT,
+    flags TEXT,
+    affixes TEXT,
+    price_chaos REAL NOT NULL,
+    original_currency TEXT,
+    original_amount REAL,
+    seller_account TEXT,
+    first_seen_at TIMESTAMP NOT NULL,
+    last_seen_at TIMESTAMP NOT NULL,
+    disappeared_at TIMESTAMP,
+    listing_state TEXT NOT NULL DEFAULT 'LIVE',
+    CHECK (listing_state IN ('LIVE', 'STALE', 'DISAPPEARED_FAST', 'DISAPPEARED_SLOW', 'EXCLUDED'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_ml_listings_league ON ml_listings(league);
+CREATE INDEX IF NOT EXISTS idx_ml_listings_base_type ON ml_listings(base_type);
+CREATE INDEX IF NOT EXISTS idx_ml_listings_state ON ml_listings(listing_state);
+CREATE INDEX IF NOT EXISTS idx_ml_listings_first_seen ON ml_listings(first_seen_at);
+
+CREATE TABLE IF NOT EXISTS ml_collection_runs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id TEXT UNIQUE NOT NULL,
+    game_id TEXT NOT NULL DEFAULT 'poe1',
+    league TEXT NOT NULL,
+    started_at TIMESTAMP NOT NULL,
+    completed_at TIMESTAMP,
+    listings_fetched INTEGER DEFAULT 0,
+    listings_new INTEGER DEFAULT 0,
+    listings_updated INTEGER DEFAULT 0,
+    errors INTEGER DEFAULT 0,
+    error_details TEXT
+);
 """
 
 # Whitelist of allowed column names and types for v4 migration security

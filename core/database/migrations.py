@@ -12,7 +12,7 @@ from threading import RLock
 from typing import Iterator
 
 from core.database.schema import (
-    SCHEMA_VERSION,
+    ALLOWED_MIGRATION_COLUMNS,
     CREATE_SCHEMA_SQL,
     MIGRATION_V3_SQL,
     MIGRATION_V4_CURRENCY_RATES_SQL,
@@ -24,7 +24,8 @@ from core.database.schema import (
     MIGRATION_V10_SQL,
     MIGRATION_V11_SQL,
     MIGRATION_V12_SQL,
-    ALLOWED_MIGRATION_COLUMNS,
+    MIGRATION_V13_SQL,
+    SCHEMA_VERSION,
 )
 
 logger = logging.getLogger(__name__)
@@ -146,6 +147,8 @@ class MigrationRunner:
         v11 -> v12:
             - Add `price_alerts` for price monitoring and notifications.
             - Tracks item alerts with above/below thresholds and cooldowns.
+        v12 -> v13:
+            - Add `ml_listings` and `ml_collection_runs` for ML data collection.
 
         Args:
             old: Current schema version
@@ -186,6 +189,9 @@ class MigrationRunner:
 
             if old < 12 <= new:
                 self._migrate_v12(conn)
+
+            if old < 13 <= new:
+                self._migrate_v13(conn)
 
         self._set_schema_version(new)
         logger.info(f"Schema migration complete. Now at v{new}.")
@@ -286,3 +292,10 @@ class MigrationRunner:
         """v11 -> v12: Create price_alerts table."""
         logger.info("Applying v12 migration: creating price_alerts table.")
         conn.executescript(MIGRATION_V12_SQL)
+
+    def _migrate_v13(self, conn: sqlite3.Connection) -> None:
+        """v12 -> v13: Create ML collection tables."""
+        logger.info(
+            "Applying v13 migration: creating ml_listings and ml_collection_runs tables."
+        )
+        conn.executescript(MIGRATION_V13_SQL)
