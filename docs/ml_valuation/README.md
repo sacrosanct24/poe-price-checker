@@ -21,17 +21,23 @@ Collection infrastructure is implemented. Running 2-week data collection before 
 
 ### Starting Collection
 
-Run the setup script once to install and start the collector as a systemd user service:
+**Option 1: nohup (WSL2 without systemd)**
+
+```bash
+./scripts/start-ml-collector.sh
+```
+
+Starts collector in background. Logs to `~/.poe_price_checker/ml-collector.log`.
+
+**Option 2: systemd (Linux with systemd)**
 
 ```bash
 ./scripts/setup-ml-collector.sh
 ```
 
-This will:
-- Install the service to `~/.config/systemd/user/`
-- Enable the service to start on login
-- Start the collector immediately
-- Enable linger so it survives logout
+Installs as a user service that starts on login and survives logout.
+
+**Note:** WSL2 defaults to nohup mode. The collector survives terminal close but NOT machine restart. After restart, run `start-ml-collector.sh` again.
 
 ### Checking Status
 
