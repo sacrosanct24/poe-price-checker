@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import sqlite3
+import threading
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -89,11 +90,12 @@ class ModDatabase:
         """
         self.db_path = db_path or self.DEFAULT_DB_PATH
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        self._lock = threading.RLock()
         self.conn: sqlite3.Connection = self._init_database()
 
     def _init_database(self) -> sqlite3.Connection:
         """Initialize database schema if needed."""
-        conn = sqlite3.connect(str(self.db_path))
+        conn = sqlite3.connect(str(self.db_path), check_same_thread=False)
         conn.row_factory = sqlite3.Row  # Enable dict-like access
         conn.executescript(self.SCHEMA)
         conn.commit()
@@ -102,26 +104,28 @@ class ModDatabase:
 
     def get_metadata(self, key: str) -> Optional[str]:
         """Get metadata value by key."""
-        cursor = self.conn.execute(
-            "SELECT value FROM metadata WHERE key = ?",
-            (key,)
-        )
-        row = cursor.fetchone()
+        with self._lock:
+            cursor = self.conn.execute(
+                "SELECT value FROM metadata WHERE key = ?",
+                (key,),
+            )
+            row = cursor.fetchone()
         return row['value'] if row else None
 
     def set_metadata(self, key: str, value: str) -> None:
         """Set metadata key-value pair."""
-        self.conn.execute(
-            """
-            INSERT INTO metadata (key, value, updated_at)
-            VALUES (?, ?, CURRENT_TIMESTAMP)
-            ON CONFLICT(key) DO UPDATE SET
-                value = excluded.value,
-                updated_at = CURRENT_TIMESTAMP
-            """,
-            (key, value)
-        )
-        self.conn.commit()
+        with self._lock:
+            self.conn.execute(
+                """
+                INSERT INTO metadata (key, value, updated_at)
+                VALUES (?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(key) DO UPDATE SET
+                    value = excluded.value,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                (key, value),
+            )
+            self.conn.commit()
 
     def get_last_update_time(self) -> Optional[datetime]:
         """Get the last database update timestamp."""
@@ -171,47 +175,48 @@ class ModDatabase:
         Returns:
             Number of mods inserted/updated
         """
-        cursor = self.conn.cursor()
-        count = 0
+        with self._lock:
+            cursor = self.conn.cursor()
+            count = 0
 
-        for mod in mods:
-            try:
-                # Handle both space-separated (API) and underscore (local) field names
-                cursor.execute(
-                    """
-                    INSERT OR REPLACE INTO mods (
-                        id, name, stat_text, stat_text_raw, domain, generation_type,
-                        mod_group, required_level, tier_text,
-                        stat1_id, stat1_min, stat1_max,
-                        stat2_id, stat2_min, stat2_max,
-                        tags
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        mod.get('id'),
-                        mod.get('name'),
-                        mod.get('stat text') or mod.get('stat_text'),
-                        mod.get('stat text raw') or mod.get('stat_text_raw'),
-                        mod.get('domain'),
-                        mod.get('generation type') or mod.get('generation_type'),
-                        mod.get('mod groups') or mod.get('mod_group'),
-                        mod.get('required level') or mod.get('required_level'),
-                        mod.get('tier text') or mod.get('tier_text'),
-                        mod.get('stat1 id') or mod.get('stat1_id'),
-                        mod.get('stat1 min') or mod.get('stat1_min'),
-                        mod.get('stat1 max') or mod.get('stat1_max'),
-                        mod.get('stat2 id') or mod.get('stat2_id'),
-                        mod.get('stat2 min') or mod.get('stat2_min'),
-                        mod.get('stat2 max') or mod.get('stat2_max'),
-                        mod.get('tags'),
+            for mod in mods:
+                try:
+                    # Handle both space-separated (API) and underscore (local) field names
+                    cursor.execute(
+                        """
+                        INSERT OR REPLACE INTO mods (
+                            id, name, stat_text, stat_text_raw, domain, generation_type,
+                            mod_group, required_level, tier_text,
+                            stat1_id, stat1_min, stat1_max,
+                            stat2_id, stat2_min, stat2_max,
+                            tags
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            mod.get('id'),
+                            mod.get('name'),
+                            mod.get('stat text') or mod.get('stat_text'),
+                            mod.get('stat text raw') or mod.get('stat_text_raw'),
+                            mod.get('domain'),
+                            mod.get('generation type') or mod.get('generation_type'),
+                            mod.get('mod groups') or mod.get('mod_group'),
+                            mod.get('required level') or mod.get('required_level'),
+                            mod.get('tier text') or mod.get('tier_text'),
+                            mod.get('stat1 id') or mod.get('stat1_id'),
+                            mod.get('stat1 min') or mod.get('stat1_min'),
+                            mod.get('stat1 max') or mod.get('stat1_max'),
+                            mod.get('stat2 id') or mod.get('stat2_id'),
+                            mod.get('stat2 min') or mod.get('stat2_min'),
+                            mod.get('stat2 max') or mod.get('stat2_max'),
+                            mod.get('tags'),
+                        ),
                     )
-                )
-                count += 1
-            except sqlite3.Error as e:
-                logger.warning(f"Failed to insert mod {mod.get('id')}: {e}")
-                continue
+                    count += 1
+                except sqlite3.Error as e:
+                    logger.warning(f"Failed to insert mod {mod.get('id')}: {e}")
+                    continue
 
-        self.conn.commit()
+            self.conn.commit()
         logger.info(f"Inserted/updated {count} mods")
         return count
 
@@ -238,8 +243,9 @@ class ModDatabase:
             query += " AND generation_type = ?"
             params.append(generation_type)
 
-        cursor = self.conn.execute(query, params)
-        return [dict(row) for row in cursor.fetchall()]
+        with self._lock:
+            cursor = self.conn.execute(query, params)
+            return [dict(row) for row in cursor.fetchall()]
 
     def get_affix_tiers(
         self,
@@ -310,8 +316,9 @@ class ModDatabase:
 
     def get_mod_count(self) -> int:
         """Get total number of mods in database."""
-        cursor = self.conn.execute("SELECT COUNT(*) as count FROM mods")
-        row = cursor.fetchone()
+        with self._lock:
+            cursor = self.conn.execute("SELECT COUNT(*) as count FROM mods")
+            row = cursor.fetchone()
         return int(row['count']) if row else 0
 
     # =========================================================================
@@ -328,33 +335,34 @@ class ModDatabase:
         Returns:
             Number of items inserted/updated
         """
-        cursor = self.conn.cursor()
-        count = 0
+        with self._lock:
+            cursor = self.conn.cursor()
+            count = 0
 
-        for item in items:
-            try:
-                # Handle both space-separated (API) and underscore (local) field names
-                cursor.execute(
-                    """
-                    INSERT OR REPLACE INTO items (
-                        name, base_item, item_class, rarity, required_level, drop_enabled
-                    ) VALUES (?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        item.get('name'),
-                        item.get('base item') or item.get('base_item'),
-                        item.get('class') or item.get('item_class'),
-                        item.get('rarity'),
-                        item.get('required level') or item.get('required_level'),
-                        item.get('drop enabled') or item.get('drop_enabled', 1),
+            for item in items:
+                try:
+                    # Handle both space-separated (API) and underscore (local) field names
+                    cursor.execute(
+                        """
+                        INSERT OR REPLACE INTO items (
+                            name, base_item, item_class, rarity, required_level, drop_enabled
+                        ) VALUES (?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            item.get('name'),
+                            item.get('base item') or item.get('base_item'),
+                            item.get('class') or item.get('item_class'),
+                            item.get('rarity'),
+                            item.get('required level') or item.get('required_level'),
+                            item.get('drop enabled') or item.get('drop_enabled', 1),
+                        ),
                     )
-                )
-                count += 1
-            except sqlite3.Error as e:
-                logger.warning(f"Failed to insert item {item.get('name')}: {e}")
-                continue
+                    count += 1
+                except sqlite3.Error as e:
+                    logger.warning(f"Failed to insert item {item.get('name')}: {e}")
+                    continue
 
-        self.conn.commit()
+            self.conn.commit()
         logger.info(f"Inserted/updated {count} items")
         return count
 
@@ -368,11 +376,12 @@ class ModDatabase:
         Returns:
             Item dictionary or None if not found
         """
-        cursor = self.conn.execute(
-            "SELECT * FROM items WHERE name = ? AND rarity = 'Unique'",
-            (name,)
-        )
-        row = cursor.fetchone()
+        with self._lock:
+            cursor = self.conn.execute(
+                "SELECT * FROM items WHERE name = ? AND rarity = 'Unique'",
+                (name,),
+            )
+            row = cursor.fetchone()
         return dict(row) if row else None
 
     def find_items_by_base(self, base_item: str) -> List[Dict[str, Any]]:
@@ -385,11 +394,12 @@ class ModDatabase:
         Returns:
             List of matching item dictionaries
         """
-        cursor = self.conn.execute(
-            "SELECT * FROM items WHERE base_item = ?",
-            (base_item,)
-        )
-        return [dict(row) for row in cursor.fetchall()]
+        with self._lock:
+            cursor = self.conn.execute(
+                "SELECT * FROM items WHERE base_item = ?",
+                (base_item,),
+            )
+            return [dict(row) for row in cursor.fetchall()]
 
     def get_unique_items_by_class(self, item_class: str) -> List[Dict[str, Any]]:
         """
@@ -401,24 +411,27 @@ class ModDatabase:
         Returns:
             List of unique item dictionaries
         """
-        cursor = self.conn.execute(
-            "SELECT * FROM items WHERE item_class = ? AND rarity = 'Unique'",
-            (item_class,)
-        )
-        return [dict(row) for row in cursor.fetchall()]
+        with self._lock:
+            cursor = self.conn.execute(
+                "SELECT * FROM items WHERE item_class = ? AND rarity = 'Unique'",
+                (item_class,),
+            )
+            return [dict(row) for row in cursor.fetchall()]
 
     def get_item_count(self) -> int:
         """Get total number of items in database."""
-        cursor = self.conn.execute("SELECT COUNT(*) as count FROM items")
-        row = cursor.fetchone()
+        with self._lock:
+            cursor = self.conn.execute("SELECT COUNT(*) as count FROM items")
+            row = cursor.fetchone()
         return int(row['count']) if row else 0
 
     def get_unique_item_count(self) -> int:
         """Get number of unique items in database."""
-        cursor = self.conn.execute(
-            "SELECT COUNT(*) as count FROM items WHERE rarity = 'Unique'"
-        )
-        row = cursor.fetchone()
+        with self._lock:
+            cursor = self.conn.execute(
+                "SELECT COUNT(*) as count FROM items WHERE rarity = 'Unique'",
+            )
+            row = cursor.fetchone()
         return int(row['count']) if row else 0
 
     def get_items_by_class(self, item_class: str) -> List[Dict[str, Any]]:
@@ -431,11 +444,12 @@ class ModDatabase:
         Returns:
             List of item dictionaries
         """
-        cursor = self.conn.execute(
-            "SELECT * FROM items WHERE item_class = ?",
-            (item_class,)
-        )
-        return [dict(row) for row in cursor.fetchall()]
+        with self._lock:
+            cursor = self.conn.execute(
+                "SELECT * FROM items WHERE item_class = ?",
+                (item_class,),
+            )
+            return [dict(row) for row in cursor.fetchall()]
 
     def get_divination_cards(self) -> List[Dict[str, Any]]:
         """Get all divination cards."""
@@ -443,17 +457,19 @@ class ModDatabase:
 
     def get_skill_gems(self) -> List[Dict[str, Any]]:
         """Get all skill gems (active and support)."""
-        cursor = self.conn.execute(
-            "SELECT * FROM items WHERE item_class IN ('Skill Gem', 'Support Gem')"
-        )
-        return [dict(row) for row in cursor.fetchall()]
+        with self._lock:
+            cursor = self.conn.execute(
+                "SELECT * FROM items WHERE item_class IN ('Skill Gem', 'Support Gem')",
+            )
+            return [dict(row) for row in cursor.fetchall()]
 
     def get_scarabs(self) -> List[Dict[str, Any]]:
         """Get all scarabs."""
-        cursor = self.conn.execute(
-            "SELECT * FROM items WHERE name LIKE '%Scarab%'"
-        )
-        return [dict(row) for row in cursor.fetchall()]
+        with self._lock:
+            cursor = self.conn.execute(
+                "SELECT * FROM items WHERE name LIKE '%Scarab%'",
+            )
+            return [dict(row) for row in cursor.fetchall()]
 
     def get_currency_items(self) -> List[Dict[str, Any]]:
         """Get all currency items."""
@@ -469,11 +485,12 @@ class ModDatabase:
         Returns:
             Item dictionary or None if not found
         """
-        cursor = self.conn.execute(
-            "SELECT * FROM items WHERE name = ?",
-            (name,)
-        )
-        row = cursor.fetchone()
+        with self._lock:
+            cursor = self.conn.execute(
+                "SELECT * FROM items WHERE name = ?",
+                (name,),
+            )
+            row = cursor.fetchone()
         return dict(row) if row else None
 
     def search_items(self, name_pattern: str, limit: int = 50) -> List[Dict[str, Any]]:
@@ -487,17 +504,19 @@ class ModDatabase:
         Returns:
             List of matching item dictionaries
         """
-        cursor = self.conn.execute(
-            "SELECT * FROM items WHERE name LIKE ? LIMIT ?",
-            (name_pattern, limit)
-        )
-        return [dict(row) for row in cursor.fetchall()]
+        with self._lock:
+            cursor = self.conn.execute(
+                "SELECT * FROM items WHERE name LIKE ? LIMIT ?",
+                (name_pattern, limit),
+            )
+            return [dict(row) for row in cursor.fetchall()]
 
     def close(self) -> None:
         """Close database connection."""
-        if self.conn:
-            self.conn.close()
-            self.conn = None  # type: ignore[assignment]
+        with self._lock:
+            if self.conn:
+                self.conn.close()
+                self.conn = None  # type: ignore[assignment]
 
     def __enter__(self):
         return self

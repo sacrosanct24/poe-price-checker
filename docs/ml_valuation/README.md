@@ -13,9 +13,9 @@ This directory contains design and specification documents for the ML-backed rar
 
 ## Current Status
 
-**Phase 0: Data Collection** — In progress
+**Phase 0: Feasibility Gate** — BLOCKED (see PHASE0_FEASIBILITY_REPORT.md).
 
-Collection infrastructure is implemented. Running 2-week data collection before feasibility gate.
+Data collection restarted with a populated mod database; gate remains blocked until 2+ weeks of data are collected. Last recorded run: 2026-01-16T03:53:43+00:00.
 
 ## Data Collection
 
