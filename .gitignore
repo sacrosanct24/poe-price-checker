@@ -93,3 +93,6 @@ docs_archived/
 # Local documentation (internal reference only)
 .docs_local/
 .webui_secret_key
+
+# Generated ML feasibility reports
+docs/ml_valuation/reports/

@@ -47,6 +47,20 @@ Installs as a user service that starts on login and survives logout.
 
 Shows service status, recent logs, and database stats.
 
+## Daily Feasibility Report
+
+Run the report on demand:
+```bash
+./scripts/ml-feasibility-daily.py
+```
+
+Install a daily noon job (systemd user timer with cron fallback):
+```bash
+./scripts/install-ml-feasibility-timer.sh
+```
+
+Reports are written to `docs/ml_valuation/reports/feasibility_status_YYYY-MM-DD.md`.
+
 ### Stopping Collection
 
 ```bash
