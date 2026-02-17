@@ -28,4 +28,4 @@ jobs:
         env:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
         run: |
-          python -m pytest -m "integration and not slow and not api" -v --timeout=300 -p pytest_mock
+          python -m pytest -m "integration and not slow and not api" -v --timeout=300 -p pytest_mock -p pytest_timeout
