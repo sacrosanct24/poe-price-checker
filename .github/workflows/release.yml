@@ -45,7 +45,7 @@ jobs:
         env:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
         run: |
-          python -m pytest -m "unit and not gui and not slow" -q --durations=20 --ignore=tests/unit/gui_qt --ignore=tests/test_shortcuts.py -p pytest_mock
+          python -m pytest -m "unit and not gui and not slow" -q --durations=20 --ignore=tests/unit/gui_qt --ignore=tests/test_shortcuts.py -p pytest_mock -p pytest_timeout
 
       - name: Build release artifact
         run: |

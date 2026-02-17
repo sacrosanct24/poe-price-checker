@@ -45,7 +45,7 @@ jobs:
         run: |
           # Exclude Qt/GUI-dependent tests from collection in this headless CI job
           # Single-line command is shell-agnostic across Ubuntu (bash) and Windows (PowerShell)
-          python -m pytest -m "unit and not gui and not slow" -q --durations=20 --ignore=tests/unit/gui_qt --ignore=tests/test_shortcuts.py -p pytest_mock
+          python -m pytest -m "unit and not gui and not slow" -q --durations=20 --ignore=tests/unit/gui_qt --ignore=tests/test_shortcuts.py -p pytest_mock -p pytest_timeout
 
   # Security: Dependency vulnerability scanning
   security-deps:
